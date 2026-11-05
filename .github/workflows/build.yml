@@ -1,0 +1,127 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: 22
+
+jobs:
+  lint:
+    name: Lint et format
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: cargo fmt
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+  build:
+    name: Build ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows (NSIS)
+            os: windows-latest
+            bundle: nsis
+            # N3 : installeur inférieur à 15 Mo.
+            max-mb: 15
+            artifact: arnod-windows-nsis
+            path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          - name: Linux (AppImage)
+            # Ubuntu 22.04 : glibc minimale visée par N6.
+            os: ubuntu-22.04
+            bundle: appimage
+            artifact: arnod-linux-appimage
+            path: src-tauri/target/release/bundle/appimage/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dépendances système (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libxdo-dev libssl-dev librsvg2-dev patchelf file \
+            xvfb xdotool imagemagick
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - run: npm ci
+
+      - name: Tests frontend (Vitest)
+        run: npm test
+
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test --locked
+
+      - name: tauri build
+        run: npm run tauri build
+
+      - name: Taille du paquet
+        run: node scripts/bundle-size.mjs ${{ matrix.bundle }} ${{ matrix.max-mb && format('--max-mb {0}', matrix.max-mb) || '' }}
+
+      - name: Test de fumée (AppImage sous Xvfb)
+        if: runner.os == 'Linux'
+        run: scripts/smoke-linux.sh "$(ls ${{ matrix.path }} | head -n 1)" smoke-linux.png
+
+      - name: Test de fumée (installation silencieuse sans élévation)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: scripts/smoke-windows.ps1 -Installer (Get-Item "${{ matrix.path }}" | Select-Object -First 1).FullName
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        if: always() && runner.os == 'Linux'
+        with:
+          name: smoke-linux-screenshot
+          path: smoke-linux.png
+          if-no-files-found: ignore
