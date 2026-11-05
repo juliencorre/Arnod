@@ -69,10 +69,10 @@ La CI construit les deux paquets à chaque pull request et les publie comme arte
 
 ### Taille des paquets (cible N3 : installeur < 15 Mo)
 
-| Paquet                    | Taille                     | Mesure                         |
-| ------------------------- | -------------------------- | ------------------------------ |
-| Installeur Windows (NSIS) | _à venir (premier run CI)_ | CI `windows-latest`            |
-| AppImage Linux            | 80,4 Mo (76,6 Mio)         | Ubuntu 24.04, build local v0.1 |
+| Paquet                    | Taille                         | Mesure                           |
+| ------------------------- | ------------------------------ | -------------------------------- |
+| Installeur Windows (NSIS) | **1,17 Mo** (1 167 097 octets) | CI `windows-latest`, v0.1.0      |
+| AppImage Linux            | 80,4 Mo (76,6 Mio)             | Ubuntu 24.04, build local v0.1.0 |
 
 1 Mo = 1 000 000 octets. La CI recalcule ces tailles à chaque build (résumé de
 l'exécution) et échoue si l'installeur Windows dépasse 15 Mo (`scripts/bundle-size.mjs`).
@@ -117,8 +117,9 @@ Vitest, clippy, `cargo test`, le build puis un test de fumée :
 
 - **Windows** (`scripts/smoke-windows.ps1`) : manifeste de l'installeur en `asInvoker`
   (aucune élévation demandée), installation silencieuse dans `%LOCALAPPDATA%\Arnod`,
-  raccourci du menu Démarrer, entrée de désinstallation dans `HKCU`, lancement de la fenêtre
-  « Arnod », fermeture par la croix (code 0), désinstallation silencieuse.
+  raccourci du menu Démarrer, entrée de désinstallation dans `HKCU`, lancement, attente de
+  « Hello World » dans la page (UI Automation), capture publiée en artefact, fermeture par la
+  croix (code 0), désinstallation silencieuse.
 - **Linux** (`scripts/smoke-linux.sh`) : AppImage construit sur Ubuntu 22.04, lancé sous
   Xvfb, capture d'écran publiée en artefact, fermeture par `Ctrl+Q` (code 0).
 

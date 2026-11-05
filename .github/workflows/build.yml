@@ -104,6 +104,13 @@ jobs:
       - name: Taille du paquet
         run: node scripts/bundle-size.mjs ${{ matrix.bundle }} ${{ matrix.max-mb && format('--max-mb {0}', matrix.max-mb) || '' }}
 
+      # Publié avant les tests de fumée : le paquet reste téléchargeable s'ils échouent.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
+
       - name: Test de fumée (AppImage sous Xvfb)
         if: runner.os == 'Linux'
         run: scripts/smoke-linux.sh "$(ls ${{ matrix.path }} | head -n 1)" smoke-linux.png
@@ -111,17 +118,11 @@ jobs:
       - name: Test de fumée (installation silencieuse sans élévation)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: scripts/smoke-windows.ps1 -Installer (Get-Item "${{ matrix.path }}" | Select-Object -First 1).FullName
+        run: scripts/smoke-windows.ps1 -Installer (Get-Item "${{ matrix.path }}" | Select-Object -First 1).FullName -Screenshot smoke-windows.png
 
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.path }}
-          if-no-files-found: error
-
-      - uses: actions/upload-artifact@v7
-        if: always() && runner.os == 'Linux'
-        with:
-          name: smoke-linux-screenshot
-          path: smoke-linux.png
+          name: smoke-screenshots-${{ matrix.bundle }}
+          path: smoke-*.png
           if-no-files-found: ignore
