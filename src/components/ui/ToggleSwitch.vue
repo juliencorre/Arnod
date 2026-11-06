@@ -1,0 +1,76 @@
+<script setup lang="ts">
+/** Interrupteur (`role="switch"`), libellé dans le slot par défaut. */
+const model = defineModel<boolean>({ required: true });
+defineProps<{ disabled?: boolean }>();
+</script>
+
+<template>
+  <label class="toggle" :class="{ 'toggle--disabled': disabled }">
+    <button
+      type="button"
+      role="switch"
+      class="toggle__switch"
+      :aria-checked="model"
+      :disabled="disabled"
+      @click="model = !model"
+    >
+      <span class="toggle__thumb" />
+    </button>
+    <span class="toggle__label"><slot /></span>
+  </label>
+</template>
+
+<style scoped>
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  cursor: pointer;
+}
+
+.toggle--disabled {
+  cursor: not-allowed;
+}
+
+.toggle__switch {
+  position: relative;
+  flex: none;
+  width: 2.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-chip);
+  cursor: inherit;
+  transition: background-color 120ms ease;
+}
+
+.toggle__switch[aria-checked="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.toggle__switch:disabled {
+  opacity: 0.55;
+}
+
+.toggle__switch:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.toggle__thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--color-surface);
+  transition: transform 120ms ease;
+}
+
+.toggle__switch[aria-checked="true"] .toggle__thumb {
+  transform: translateX(1rem);
+}
+</style>
