@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches: [main]
+    branches: [main, Develop]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -35,6 +35,8 @@ jobs:
           components: rustfmt
 
       - run: npm ci
+      - name: Versions concordantes
+        run: node scripts/check-version.mjs
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
@@ -188,12 +190,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Vérifier que le tag correspond à la version
-        run: |
-          version="$(node -p "require('./package.json').version")"
-          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
-            echo "Le tag ${GITHUB_REF_NAME} ne correspond pas à la version ${version}" >&2
-            exit 1
-          fi
+        run: node scripts/check-version.mjs "${GITHUB_REF_NAME}"
 
       - uses: actions/download-artifact@v7
         with:
@@ -201,11 +198,17 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Créer la release
+      - name: Créer la release ou y ajouter les paquets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -l dist
-          gh release create "${GITHUB_REF_NAME}" dist/* \
-            --title "Arnod ${GITHUB_REF_NAME}" \
-            --generate-notes
+          # Release déjà créée (à la main ou par une exécution précédente) : on y ajoute les
+          # paquets au lieu d'échouer.
+          if gh release view "${GITHUB_REF_NAME}" > /dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" dist/* --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" dist/* \
+              --title "Arnod ${GITHUB_REF_NAME}" \
+              --generate-notes
+          fi

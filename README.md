@@ -56,13 +56,14 @@ npm ci
 npm run tauri dev
 ```
 
-| Commande                                    | Rôle                          |
-| ------------------------------------------- | ----------------------------- |
-| `npm test`                                  | Tests frontend (Vitest)       |
-| `npm run lint` / `npm run typecheck`        | ESLint / vue-tsc              |
-| `npm run format` / `npm run format:check`   | Prettier                      |
-| `cargo test` (dans `src-tauri/`)            | Tests du cœur Rust            |
-| `cargo clippy --all-targets -- -D warnings` | Lint Rust, zéro avertissement |
+| Commande                                    | Rôle                                                              |
+| ------------------------------------------- | ----------------------------------------------------------------- |
+| `npm run check`                             | Toutes les vérifications de la CI hors build, avant chaque commit |
+| `npm test`                                  | Tests frontend (Vitest)                                           |
+| `npm run lint` / `npm run typecheck`        | ESLint / vue-tsc                                                  |
+| `npm run format` / `npm run format:check`   | Prettier                                                          |
+| `cargo test` (dans `src-tauri/`)            | Tests du cœur Rust                                                |
+| `cargo clippy --all-targets -- -D warnings` | Lint Rust, zéro avertissement                                     |
 
 ## Build
 
@@ -70,10 +71,10 @@ npm run tauri dev
 npm run tauri build
 ```
 
-| Système | Paquet produit                                                        |
-| ------- | --------------------------------------------------------------------- |
-| Windows | `src-tauri/target/release/bundle/nsis/Arnod_0.0.1_x64-setup.exe`      |
-| Linux   | `src-tauri/target/release/bundle/appimage/Arnod_0.0.1_amd64.AppImage` |
+| Système | Paquet produit                                                            |
+| ------- | ------------------------------------------------------------------------- |
+| Windows | `src-tauri/target/release/bundle/nsis/Arnod_<version>_x64-setup.exe`      |
+| Linux   | `src-tauri/target/release/bundle/appimage/Arnod_<version>_amd64.AppImage` |
 
 La CI construit les deux paquets à chaque pull request et les publie comme artefacts
 (onglet **Actions** › exécution › **Artifacts**).
@@ -90,12 +91,31 @@ l'exécution) et échoue si l'installeur Windows dépasse 15 Mo (`scripts/bundle
 L'AppImage embarque WebKitGTK et ses dépendances, d'où sa taille ; la cible N3 vise
 l'installeur Windows, qui s'appuie sur le WebView2 du système.
 
+## Publier une version
+
+Les versions suivent [SemVer](https://semver.org/lang/fr/). `Develop` reçoit les pull requests,
+`main` porte les versions publiées.
+
+1. **Passer à la nouvelle version** par une pull request vers `Develop` (`chore: version X.Y.Z`) :
+   `npm version X.Y.Z --no-git-tag-version` (`package.json` et `package-lock.json`), puis
+   `version` dans `src-tauri/Cargo.toml` et `src-tauri/tauri.conf.json`, puis
+   `cargo update -p arnod --offline` dans `src-tauri/` (`Cargo.lock`).
+   `node scripts/check-version.mjs` vérifie que les six sources concordent ; `npm run check` et
+   la CI le lancent aussi.
+2. **Fusionner `Develop` dans `main`** avec un commit de merge.
+3. **Poser le tag sur `main`** et le pousser :
+   `git tag -a vX.Y.Z -m "Arnod X.Y.Z" && git push origin vX.Y.Z`.
+4. **La CI publie la release** : build, tests, contrôle tag = version, puis release GitHub avec
+   l'installeur Windows, l'AppImage et des notes générées à partir des pull requests. Ne pas
+   créer la release à la main ; si elle existe déjà, la CI y ajoute les paquets.
+
 ## Installation
 
 ### Windows, sans droits administrateur
 
-1. Lancer `Arnod_0.0.1_x64-setup.exe` depuis un compte standard. L'installeur est en mode
-   `currentUser` : il ne demande pas d'élévation UAC.
+1. Télécharger `Arnod_<version>_x64-setup.exe` depuis les
+   [releases](https://github.com/juliencorre/Arnod/releases) et le lancer depuis un compte
+   standard. L'installeur est en mode `currentUser` : il ne demande pas d'élévation UAC.
 2. SmartScreen peut afficher « Windows a protégé votre ordinateur », l'exécutable n'étant pas
    signé : **Informations complémentaires › Exécuter quand même**.
 3. Arnod est installé dans **`%LOCALAPPDATA%\Arnod`** avec un raccourci dans le menu Démarrer.
@@ -109,13 +129,16 @@ WebView2 : s'il est absent, l'installeur télécharge son bootstrapper (connexio
 Pour un poste hors ligne, passer `bundle.windows.webviewInstallMode` à `embedBootstrapper`
 dans `src-tauri/tauri.conf.json` (+1,8 Mo).
 
-Installation silencieuse : `Arnod_0.0.1_x64-setup.exe /S`.
+Installation silencieuse : `Arnod_<version>_x64-setup.exe /S`.
 
 ### Linux (AppImage)
 
+Télécharger `Arnod_<version>_amd64.AppImage` depuis les
+[releases](https://github.com/juliencorre/Arnod/releases), puis :
+
 ```sh
-chmod +x Arnod_0.0.1_amd64.AppImage
-./Arnod_0.0.1_amd64.AppImage
+chmod +x Arnod_<version>_amd64.AppImage
+./Arnod_<version>_amd64.AppImage
 ```
 
 Aucun droit root n'est nécessaire. Sans FUSE (conteneurs, certaines distributions),

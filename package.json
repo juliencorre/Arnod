@@ -1,7 +1,7 @@
 {
   "name": "arnod",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Arnod - application de test d'API (squelette Tauri 2 + Vue 3)",
   "license": "MIT",
   "type": "module",
@@ -20,7 +20,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "build:e2e": "tauri build --debug --no-bundle"
+    "build:e2e": "tauri build --debug --no-bundle",
+    "check": "node scripts/check-version.mjs && npm run format:check && npm run lint && npm run typecheck && npm test && npm run check:rust",
+    "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml --locked"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

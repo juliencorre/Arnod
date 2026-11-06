@@ -6,7 +6,8 @@ frontend Vue 3 + TypeScript + Vite + Pinia, cœur natif Rust. Toute nouvelle
 fonctionnalité part de cette base et respecte les règles ci-dessous.
 
 Travail en cours : projets et workspaces, selon `docs/plan-projets-workspaces.md`
-(maquettes dans `docs/maquettes/`). Voir la section « Projets et workspaces ».
+(maquettes dans `docs/maquettes/`). Voir la section « Projets et workspaces ». Un nouveau lot
+commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
 ## Architecture
 
@@ -70,9 +71,10 @@ src-tauri/              Cœur Rust
   src/state.rs          AppState : catalogue + stockage + annulation (app.manage)
   src/menu.rs           Menu natif (Fichier > Quitter)
   src/commands/         Commandes, un fichier par domaine
-docs/                   Plan en cours, maquettes, captures du README
-scripts/                Mesure de taille et tests de fumée (CI)
-.github/workflows/      CI de build Windows et Linux
+docs/                   Plan en cours, modèle de plan, maquettes, captures du README
+scripts/                Mesure de taille, concordance des versions, tests de fumée (CI)
+.github/                Modèles d'issue et de pull request, Dependabot
+  workflows/            CI de build Windows et Linux, contrôle des titres de pull request
 ```
 
 ## Commandes
@@ -82,6 +84,7 @@ npm ci                      # dépendances frontend (Node 22+)
 npm run tauri dev           # application en développement (Vite sur le port 1420)
 npm run tauri build         # build release : NSIS sous Windows, AppImage sous Linux
 
+npm run check               # avant chaque commit : tout ce que vérifie la CI hors build
 npm test                    # Vitest
 npm run build:e2e           # binaire debug pour les tests e2e (Linux)
 xvfb-run -a npm run test:e2e # e2e sur l'application réelle (voir e2e/README.md)
@@ -111,8 +114,13 @@ Linux : installer d'abord les dépendances système
   hors tests ; erreurs de commande renvoyées en `Result<T, CommandError>`.
 - Commentaires, messages et textes d'interface en français.
 - Commits en [Conventional Commits](https://www.conventionalcommits.org/fr/) :
-  `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `ci:`, `refactor:`...
-- Chaque tâche est relue avant commit ; lint, tests et clippy passent avant chaque commit.
+  `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `ci:`, `refactor:`... Le titre d'une pull request
+  suit la même forme (vérifié par `.github/workflows/pr-title.yml`) et sa description reprend les
+  sections de `.github/pull_request_template.md`.
+- Chaque tâche est relue avant commit ; `npm run check` passe avant chaque commit.
+- Une version se publie par un tag `vX.Y.Z` sur `main` (README, « Publier une version ») : la CI
+  crée la release. Jamais de release créée à la main ; `scripts/check-version.mjs` garde les six
+  sources de version concordantes.
 - Tests : règles dans `cargo test` (vrais dossiers temporaires pour le stockage), parcours
   d'interface dans Vitest avec le faux cœur `tests/fakeCore.ts`, parcours complets sur
   l'application réelle dans `e2e/` (à étendre à chaque nouvelle fonctionnalité visible).

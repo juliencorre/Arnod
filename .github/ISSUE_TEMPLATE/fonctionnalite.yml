@@ -1,0 +1,29 @@
+name: Proposer une fonctionnalité
+description: Un besoin qu'Arnod ne couvre pas encore.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Besoin
+      description: Le problème à résoudre ou la tâche à accomplir, du point de vue de l'utilisateur.
+      placeholder: Quand je teste une API SOAP, je dois…
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposition
+      description: Ce qu'Arnod pourrait faire, avec un exemple concret si possible.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Solutions actuelles
+      description: Comment vous faites aujourd'hui (autre outil, contournement).
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexte
+      description: Fréquence du besoin, captures, liens utiles.
