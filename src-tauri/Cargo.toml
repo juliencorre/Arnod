@@ -1,6 +1,6 @@
 [package]
 name = "arnod"
-version = "0.0.1"
+version = "0.0.2"
 description = "Arnod - application de test d'API"
 authors = ["Julien Corre"]
 license = "MIT"
