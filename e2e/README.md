@@ -31,6 +31,9 @@ embarquée dans le binaire.
   (W2), dossier supprimé hors d'Arnod (P10), dossier projet existant (P12), projet oublié puis
   rétabli (P11). Chaque étape
   vérifie aussi le disque (`arnod.yml`, `arnod.json`).
+- Les sélecteurs sont stricts (WebdriverIO 10) : `$()` échoue s'il trouve plusieurs éléments,
+  y compris des éléments masqués. Les fenêtres (`<dialog>`) restent dans le DOM une fois
+  fermées : viser `main`, `aside` ou `dialog[open]` plutôt qu'un sélecteur global.
 - Les captures sont enregistrées dans `e2e/artifacts/` (ignoré par Git) et publiées par la CI.
 
 ## Limites
