@@ -128,9 +128,58 @@ jobs:
           path: smoke-*.png
           if-no-files-found: ignore
 
+  e2e:
+    name: E2E (Linux, application réelle)
+    # Parcours complets sur le binaire debug via tauri-driver et WebKitWebDriver,
+    # sous Xvfb, en thème clair puis sombre. Voir e2e/README.md.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dépendances système
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libxdo-dev libssl-dev librsvg2-dev file \
+            webkit2gtk-driver xvfb
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - run: npm ci
+
+      - name: tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Build debug de l'application
+        run: npm run build:e2e
+
+      - name: Tests e2e (thème clair)
+        run: xvfb-run -a npm run test:e2e
+
+      - name: Tests e2e (thème sombre)
+        run: xvfb-run -a npm run test:e2e
+        env:
+          ARNOD_E2E_THEME: dark
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-captures
+          path: e2e/artifacts/*.png
+          if-no-files-found: ignore
+
   release:
     name: Release GitHub
-    needs: [lint, build]
+    needs: [lint, build, e2e]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-22.04
     permissions:

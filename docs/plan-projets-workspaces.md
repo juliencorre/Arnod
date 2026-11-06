@@ -424,8 +424,8 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 
 **Lot G - Finitions et CI**
 
-- [ ] **T25** Tests de fumée Windows et Linux adaptés (§ 7) ; captures CI relues.
-- [ ] **T26** Thème sombre et accessibilité vérifiés, README (captures, tableau des fonctions).
+- [x] **T25** Tests de fumée Windows et Linux adaptés (§ 7) ; captures CI relues.
+- [x] **T26** Thème sombre et accessibilité vérifiés, README (captures, tableau des fonctions).
 
 **Lot H - Après le plan principal**
 
@@ -434,23 +434,27 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 
 ## 9. Critères d'acceptation
 
-- [ ] Premier lancement sur un poste vierge : « Mes projets » existe, est par défaut, et la page
+- [x] Premier lancement sur un poste vierge : « Mes projets » existe, est par défaut, et la page
       « Créez votre premier projet » s'affiche.
-- [ ] Créer `boutique-tests` crée `~/arnod/boutique-tests/arnod.yml`, ajoute le projet au
+- [x] Créer `boutique-tests` crée `~/arnod/boutique-tests/arnod.yml`, ajoute le projet au
       référentiel et à « Mes projets », l'ouvre et affiche la notification.
-- [ ] Un projet créé depuis le workspace « Boutique » est dans « Boutique » et dans « Mes projets ».
-- [ ] Un nom de projet ou de workspace déjà pris est refusé, quelle que soit la casse.
-- [ ] Un projet peut être dans plusieurs workspaces ; le référentiel l'affiche une seule fois avec
+- [x] Un projet créé depuis le workspace « Boutique » est dans « Boutique » et dans « Mes projets ».
+- [x] Un nom de projet ou de workspace déjà pris est refusé, quelle que soit la casse.
+- [x] Un projet peut être dans plusieurs workspaces ; le référentiel l'affiche une seule fois avec
       toutes ses pastilles.
-- [ ] Retirer un projet d'un workspace ou supprimer un workspace ne touche ni au référentiel ni
+- [x] Retirer un projet d'un workspace ou supprimer un workspace ne touche ni au référentiel ni
       aux fichiers ; « Annuler » rétablit l'état précédent.
-- [ ] Le workspace par défaut ne peut pas être supprimé ; on peut transférer ce rôle.
-- [ ] Après fermeture et relance, Arnod rouvre le dernier workspace utilisé, avec les mêmes
+- [x] Le workspace par défaut ne peut pas être supprimé ; on peut transférer ce rôle.
+- [x] Après fermeture et relance, Arnod rouvre le dernier workspace utilisé, avec les mêmes
       projets, noms et couleurs.
-- [ ] Un dossier de projet supprimé hors d'Arnod est signalé sans planter l'application.
+- [x] Un dossier de projet supprimé hors d'Arnod est signalé sans planter l'application.
 - [ ] Sous Windows, compte standard : aucune invite UAC, état stocké dans `%LOCALAPPDATA%`.
 - [ ] Installeur Windows < 15 Mo ; CI verte sous Windows et Linux.
-- [ ] Toutes les actions sont faisables au clavier ; thèmes clair et sombre lisibles.
+- [x] Toutes les actions sont faisables au clavier ; thèmes clair et sombre lisibles.
+
+Les critères cochés sont vérifiés par les tests e2e sur l'application réelle (`e2e/`), en
+thème clair et sombre, et par les tests Rust et Vitest. Restent à vérifier : l'installation
+sur un compte Windows standard (§ 6 du PRD du squelette) et la CI verte sur `main`.
 
 ## 10. Risques
 

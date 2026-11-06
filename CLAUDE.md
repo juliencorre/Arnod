@@ -57,7 +57,8 @@ src/                    Frontend Vue
   components/projects/  Vues des projets (premier lancement...)
   components/workspaces/ Vues des workspaces
   types/ipc.ts          Types IPC documentés à la main
-tests/                  Tests Vitest (happy-dom, mockIPC), dont contrastes du thème
+tests/                  Tests Vitest (happy-dom, mockIPC, faux cœur fakeCore.ts), dont contrastes
+e2e/                    Tests e2e sur l'application réelle (tauri-driver, WebdriverIO)
 src-tauri/              Cœur Rust
   tauri.conf.json       Fenêtre, CSP, bundles (NSIS currentUser, AppImage)
   capabilities/         Permissions de la WebView
@@ -82,6 +83,8 @@ npm run tauri dev           # application en développement (Vite sur le port 14
 npm run tauri build         # build release : NSIS sous Windows, AppImage sous Linux
 
 npm test                    # Vitest
+npm run build:e2e           # binaire debug pour les tests e2e (Linux)
+xvfb-run -a npm run test:e2e # e2e sur l'application réelle (voir e2e/README.md)
 npm run lint                # ESLint
 npm run typecheck           # vue-tsc
 npm run format              # Prettier (écriture) ; format:check pour vérifier
@@ -110,6 +113,9 @@ Linux : installer d'abord les dépendances système
 - Commits en [Conventional Commits](https://www.conventionalcommits.org/fr/) :
   `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `ci:`, `refactor:`...
 - Chaque tâche est relue avant commit ; lint, tests et clippy passent avant chaque commit.
+- Tests : règles dans `cargo test` (vrais dossiers temporaires pour le stockage), parcours
+  d'interface dans Vitest avec le faux cœur `tests/fakeCore.ts`, parcours complets sur
+  l'application réelle dans `e2e/` (à étendre à chaque nouvelle fonctionnalité visible).
 
 ## Contraintes à ne pas casser
 

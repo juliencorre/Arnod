@@ -35,7 +35,8 @@ for _ in $(seq 1 60); do
     exit 1
   fi
   # --onlyvisible : GTK crée aussi une fenêtre X non mappée portant le même titre.
-  window="$(xdotool search --onlyvisible --name '^Arnod$' 2>/dev/null | head -n 1 || true)"
+  # Titre « Arnod », ou « Arnod — <workspace ou projet> » une fois un workspace ouvert.
+  window="$(xdotool search --onlyvisible --name '^Arnod( — .+)?$' 2>/dev/null | head -n 1 || true)"
   [[ -n "$window" ]] && break
   sleep 0.5
 done

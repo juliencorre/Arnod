@@ -2,26 +2,35 @@
 
 Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 
-> **Statut : squelette technique.** Ce dépôt valide la chaîne complète (code, build,
-> installation Windows sans droits administrateur, lancement, IPC interface ↔ cœur
-> natif) avant toute fonctionnalité. Voir [`PRD-squelette.md`](PRD-squelette.md).
+> **Statut : projets et workspaces.** Sur le squelette technique
+> ([`PRD-squelette.md`](PRD-squelette.md)), Arnod crée et gère des projets et des
+> workspaces selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md).
+> Les requêtes, assertions et runs viendront ensuite.
 
 | Thème clair                                      | Thème sombre                                           |
 | ------------------------------------------------ | ------------------------------------------------------ |
 | ![Arnod, thème clair](docs/screenshot-linux.png) | ![Arnod, thème sombre](docs/screenshot-linux-dark.png) |
 
-_AppImage release sous Linux (WebKitGTK). Le thème suit la préférence du système._
+_Vue d'un workspace, capturée sur l'application réelle (WebKitGTK) par les tests e2e. Le thème
+suit la préférence du système._
 
 ## Ce que fait Arnod aujourd'hui
 
-Projets et workspaces en cours, selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md).
+Cas d'usage détaillés dans [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md),
+maquettes dans [`docs/maquettes/`](docs/maquettes/).
 
-| ID  | Comportement                                                                                                     |
-| --- | ---------------------------------------------------------------------------------------------------------------- |
-| W1  | Au premier lancement, le workspace « Mes projets » est créé et la page « Créez votre premier projet » s'affiche. |
-| W2  | Les lancements suivants rouvrent le dernier workspace utilisé, conservé dans `arnod.json`.                       |
-| F4  | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                         |
-| N7  | Thème clair ou sombre selon le système, police système.                                                          |
+| ID      | Comportement                                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| W1, P1  | Premier lancement : « Mes projets » est créé par défaut et Arnod propose de créer le premier projet (dossier `~/arnod/<nom>`). |
+| P2      | Nouveau projet depuis un workspace : rangé dans ce workspace et dans le workspace par défaut.                                  |
+| P5, P10 | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                               |
+| P6, P7  | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                              |
+| P9, P12 | Référentiel des projets : chaque projet une fois, ajout d'un dossier projet existant (`arnod.yml`).                            |
+| W2      | Les lancements suivants rouvrent le dernier workspace utilisé, conservé dans `arnod.json`.                                     |
+| W4, W5  | Sélecteur de workspaces avec recherche, création d'un workspace.                                                               |
+| W7–W11  | Gestion des workspaces : nom, couleur, workspace par défaut, projets, suppression avec « Annuler ».                            |
+| F4      | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                       |
+| N7      | Thème clair ou sombre selon le système, police système.                                                                        |
 
 Pile : [Tauri 2](https://v2.tauri.app) (cœur Rust, WebView2 sous Windows, WebKitGTK sous
 Linux), Vue 3, TypeScript strict, Vite, Pinia. Les règles d'architecture et les conventions
@@ -123,6 +132,18 @@ Vitest, clippy, `cargo test`, le build puis un test de fumée :
   fermeture par la croix (code 0), désinstallation silencieuse.
 - **Linux** (`scripts/smoke-linux.sh`) : AppImage construit sur Ubuntu 22.04, lancé sous
   Xvfb, capture d'écran publiée en artefact, fermeture par `Ctrl+Q` (code 0).
+- **E2E** (`e2e/`, voir [`e2e/README.md`](e2e/README.md)) : parcours complets sur
+  l'application réelle (binaire debug, cœur Rust, vrai disque) via `tauri-driver`, sous Xvfb,
+  en thème clair puis sombre ; captures publiées en artefact.
+
+Lancer les tests e2e en local (Linux) :
+
+```sh
+sudo apt install webkit2gtk-driver xvfb
+cargo install tauri-driver --locked
+npm run build:e2e                      # binaire debug avec l'interface embarquée
+xvfb-run -a npm run test:e2e           # ARNOD_E2E_THEME=dark pour le thème sombre
+```
 
 Restent à vérifier à la main (le runner Windows CI est administrateur) :
 
