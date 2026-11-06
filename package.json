@@ -1,7 +1,7 @@
 {
   "name": "arnod",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Arnod - application de test d'API (squelette Tauri 2 + Vue 3)",
   "license": "MIT",
   "type": "module",

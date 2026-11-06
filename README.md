@@ -61,8 +61,8 @@ npm run tauri build
 
 | Système | Paquet produit                                                        |
 | ------- | --------------------------------------------------------------------- |
-| Windows | `src-tauri/target/release/bundle/nsis/Arnod_0.1.0_x64-setup.exe`      |
-| Linux   | `src-tauri/target/release/bundle/appimage/Arnod_0.1.0_amd64.AppImage` |
+| Windows | `src-tauri/target/release/bundle/nsis/Arnod_0.0.1_x64-setup.exe`      |
+| Linux   | `src-tauri/target/release/bundle/appimage/Arnod_0.0.1_amd64.AppImage` |
 
 La CI construit les deux paquets à chaque pull request et les publie comme artefacts
 (onglet **Actions** › exécution › **Artifacts**).
@@ -71,8 +71,8 @@ La CI construit les deux paquets à chaque pull request et les publie comme arte
 
 | Paquet                    | Taille                         | Mesure                           |
 | ------------------------- | ------------------------------ | -------------------------------- |
-| Installeur Windows (NSIS) | **1,17 Mo** (1 167 097 octets) | CI `windows-latest`, v0.1.0      |
-| AppImage Linux            | 80,4 Mo (76,6 Mio)             | Ubuntu 24.04, build local v0.1.0 |
+| Installeur Windows (NSIS) | **1,17 Mo** (1 167 097 octets) | CI `windows-latest`, v0.0.1      |
+| AppImage Linux            | 80,4 Mo (76,6 Mio)             | Ubuntu 24.04, build local v0.0.1 |
 
 1 Mo = 1 000 000 octets. La CI recalcule ces tailles à chaque build (résumé de
 l'exécution) et échoue si l'installeur Windows dépasse 15 Mo (`scripts/bundle-size.mjs`).
@@ -83,7 +83,7 @@ l'installeur Windows, qui s'appuie sur le WebView2 du système.
 
 ### Windows, sans droits administrateur
 
-1. Lancer `Arnod_0.1.0_x64-setup.exe` depuis un compte standard. L'installeur est en mode
+1. Lancer `Arnod_0.0.1_x64-setup.exe` depuis un compte standard. L'installeur est en mode
    `currentUser` : il ne demande pas d'élévation UAC.
 2. SmartScreen peut afficher « Windows a protégé votre ordinateur », l'exécutable n'étant pas
    signé : **Informations complémentaires › Exécuter quand même**.
@@ -98,13 +98,13 @@ WebView2 : s'il est absent, l'installeur télécharge son bootstrapper (connexio
 Pour un poste hors ligne, passer `bundle.windows.webviewInstallMode` à `embedBootstrapper`
 dans `src-tauri/tauri.conf.json` (+1,8 Mo).
 
-Installation silencieuse : `Arnod_0.1.0_x64-setup.exe /S`.
+Installation silencieuse : `Arnod_0.0.1_x64-setup.exe /S`.
 
 ### Linux (AppImage)
 
 ```sh
-chmod +x Arnod_0.1.0_amd64.AppImage
-./Arnod_0.1.0_amd64.AppImage
+chmod +x Arnod_0.0.1_amd64.AppImage
+./Arnod_0.0.1_amd64.AppImage
 ```
 
 Aucun droit root n'est nécessaire. Sans FUSE (conteneurs, certaines distributions),
