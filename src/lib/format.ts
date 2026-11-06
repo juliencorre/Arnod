@@ -9,3 +9,8 @@ const timeFormatter = new Intl.DateTimeFormat("fr-FR", {
 export function formatTime(timestampMs: number): string {
   return timeFormatter.format(new Date(timestampMs));
 }
+
+/** Nombre suivi du nom accordé, au singulier jusqu'à 1 : « 0 projet », « 6 projets ». */
+export function countLabel(count: number, singular: string, plural: string): string {
+  return `${count} ${count > 1 ? plural : singular}`;
+}
