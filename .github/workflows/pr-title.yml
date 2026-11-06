@@ -1,7 +1,7 @@
 name: pr-title
 
-# Le titre d'une pull request devient le message du commit sur main et alimente les notes de
-# release : il doit suivre les Conventional Commits (feat: …, fix: …, docs: …).
+# Le titre d'une pull request devient le message du commit sur la branche cible (Develop) et
+# alimente les notes de release : il doit suivre les Conventional Commits (feat: …, fix: …).
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
