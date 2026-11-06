@@ -84,7 +84,7 @@ Priorités : **Must** (indispensable au lot), **Should** (attendu), **Could** (s
 | P2  | Créer un projet depuis un workspace | 2a, 2a bis, 2c, 2e | « + Nouveau projet » (2a), « + Créer un nouveau projet » (2c) et « Nouveau projet » (2e) ouvrent une fenêtre modale : même formulaire, workspace prérempli avec le workspace ouvert, mention « Aussi ajouté à Mes projets (par défaut) » quand il diffère (R4). Boutons « Annuler » et « Créer le projet ».                                                                                                                                                                                                                                                               | Must     |
 | P3  | Choisir l'emplacement du dossier    | 1a, 2a bis         | « Changer » ouvre le sélecteur de dossier natif. Le dossier choisi est l'emplacement parent : le projet est créé dans `<emplacement>/<nom>` (Q1). Erreurs affichées sous le champ : dossier déjà existant et non vide, projet Arnod déjà présent, droits insuffisants.                                                                                                                                                                                                                                                                                                    | Must     |
 | P4  | Notification après création         | 1b                 | « ✓ `<projet>` créé dans le workspace `<workspace>` (par défaut) · Ajouter à un autre… ». L'action ouvre la liste des autres workspaces.                                                                                                                                                                                                                                                                                                                                                                                                                                  | Should   |
-| P5  | Ouvrir un projet                    | 2a, 1b             | « Ouvrir » sur une carte ou clic dans la barre latérale. Titre de fenêtre « Arnod — `<projet>` ». Vue projet vide : « Aucune requête pour l'instant ». Le contenu arrive avec le lot requêtes.                                                                                                                                                                                                                                                                                                                                                                            | Must     |
+| P5  | Ouvrir un projet                    | 2a, 1b             | « Ouvrir » sur une carte ou clic dans la barre latérale. Titre de fenêtre « Arnod — `<projet>` » (`window_set_title`). Vue projet vide : « Aucune requête pour l'instant ». Le contenu arrive avec le lot requêtes.                                                                                                                                                                                                                                                                                                                                                       | Must     |
 | P6  | Ajouter un projet à un workspace    | 1b, 2a, 2e         | Depuis la notification (P4), le menu ⋯ d'un projet (« Ajouter à un autre workspace ▸ ») ou « Ajouter à… ▾ » du référentiel. Les workspaces qui contiennent déjà le projet sont cochés et inactifs.                                                                                                                                                                                                                                                                                                                                                                        | Must     |
 | P7  | Retirer un projet d'un workspace    | 2a, 2d             | Menu ⋯ « Retirer de « `<workspace>` » » (sous-titre « Le projet reste dans le référentiel. ») ou « Retirer » dans 2d. Sans confirmation, notification avec « Annuler » (R5, R6).                                                                                                                                                                                                                                                                                                                                                                                          | Must     |
 | P8  | Afficher dans le référentiel        | 2a                 | Menu ⋯ « Afficher dans le référentiel » : ouvre 2e et met la ligne du projet en évidence.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Should   |
@@ -108,7 +108,7 @@ Priorités : **Must** (indispensable au lot), **Should** (attendu), **Could** (s
 | ID  | Cas d'usage                            | Écrans | Comportement attendu                                                                                                                                                                                                                                                                                                                            | Priorité |
 | --- | -------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | W1  | Workspace par défaut automatique       | 1a     | Au premier lancement, « Mes projets » (gris) est créé et défini par défaut. La barre latérale l'affiche avec le badge « par défaut », le compteur 0 et « Créé automatiquement. Votre premier projet y sera rangé. »                                                                                                                             | Must     |
-| W2  | Rouvrir le dernier workspace           | 2a     | Le workspace ouvert est mémorisé à chaque changement et rouvert au démarrage (R7). Titre de fenêtre « Arnod — `<workspace>` ».                                                                                                                                                                                                                  | Must     |
+| W2  | Rouvrir le dernier workspace           | 2a     | Le workspace ouvert est mémorisé à chaque changement et rouvert au démarrage (R7). Titre de fenêtre « Arnod — `<workspace>` » (`window_set_title`).                                                                                                                                                                                             | Must     |
 | W3  | Vue d'un workspace                     | 2a     | En-tête : pastille, nom, « N projets du référentiel, regroupés ici pour travailler ensemble. », « Renommer », « + Nouveau projet ». Cartes projet : initiale, nom, dossier, « Ouvrir », menu ⋯. Carte « + Ajouter un projet depuis le référentiel, ou en créer un ». Barre latérale : sélecteur, projets du workspace, « + Ajouter un projet ». | Must     |
 | W4  | Changer de workspace                   | 2b     | Sélecteur en haut de la barre latérale (nom, « Workspace · N projets »). Liste déroulante : recherche, workspaces avec pastille, badge « par défaut », nombre de projets et coche sur le courant ; puis « + Nouveau workspace », « Gérer les workspaces… », « Référentiel des projets (N projets) ». Clavier : flèches, Entrée, Échap.          | Must     |
 | W5  | Créer un workspace                     | 2b, 2d | Petite fenêtre « Nouveau workspace » : nom, « Il démarre vide : ajoutez-y des projets du référentiel. Entrée pour créer. », « Annuler » / « Créer ». Couleur attribuée automatiquement (première couleur libre de la palette). Depuis 2b, le workspace créé est ouvert.                                                                         | Must     |
@@ -150,8 +150,7 @@ chemins de projets sont propres au poste. Aucun droit administrateur requis.
     {
       "id": "0b5c…",
       "name": "boutique-tests",
-      "path": "C:\\Users\\julien\\arnod\\boutique-tests",
-      "createdAt": "2026-11-06T09:12:00Z"
+      "path": "C:\\Users\\julien\\arnod\\boutique-tests"
     }
   ],
   "workspaces": [
@@ -188,18 +187,23 @@ déplacement ou un clone (P12). Le format des requêtes sera défini par le lot 
 
 ```
 src-tauri/src/
-  catalog/              Logique métier pure, sans dépendance à Tauri
+  error.rs              CommandError, erreur commune des commandes (lot A)
+  catalog/              Logique métier pure, sans dépendance à Tauri ni au disque
     mod.rs              Catalog : référentiel + workspaces, une méthode par règle
+    tests.rs            Tests par règle (R1 à R11) et cas d'usage
     model.rs            Project, Workspace, WorkspaceColor, CatalogFile (format disque)
-    names.rs            Validation des noms (R9, R10), dossier proposé
+    names.rs            Validation des noms (R9, R10)
+    snapshot.rs         Instantané et réponses des commandes (miroirs TypeScript)
     undo.rs             Pile d'annulation en mémoire (20 entrées, durée de la session)
-    error.rs            CatalogError : Serialize, messages en français
-  storage.rs            Lecture / écriture d'arnod.json, création du dossier et du manifeste
-  state.rs              AppState { catalog: Mutex<Catalog>, undo, chemins }, via app.manage()
+  storage.rs            Lecture / écriture atomique d'arnod.json
+  manifest.rs           Dossier du projet et manifeste arnod.yml
+  state.rs              AppState : catalogue, stockage et annulation, via app.manage()
   commands/
     hello.rs            Inchangé
+    catalog.rs          catalog_load, undo
     projects.rs         Façades des commandes projets
     workspaces.rs       Façades des commandes workspaces
+    window.rs           Titre de la fenêtre
 ```
 
 - Chaque mutation suit le même schéma, factorisé dans `AppState::mutate` : copie de l'état,
@@ -208,9 +212,10 @@ src-tauri/src/
 - Création d'un projet : validation → calcul du dossier → refus si le dossier existe et n'est pas
   vide → création → écriture de `arnod.yml` → inscription au référentiel → sauvegarde. En cas
   d'échec après la création du dossier, le dossier créé par Arnod est supprimé.
-- Pas de `unwrap()` : un verrou empoisonné devient une `CatalogError`.
-- Le titre de la fenêtre est mis à jour côté Rust (`WebviewWindow::set_title`) à l'ouverture d'un
-  workspace ou d'un projet : aucune permission WebView à ajouter.
+- Pas de `unwrap()` : un verrou empoisonné devient une `CommandError`.
+- Le titre de la fenêtre est changé par la commande `window_set_title`, que l'interface appelle à
+  chaque changement de vue (elle seule sait si un workspace, un projet ou l'écran de gestion est
+  affiché). Appelé depuis Rust, `set_title` ne demande aucune permission WebView.
 - Sélecteur de dossier : `tauri-plugin-dialog` appelé **uniquement depuis Rust**
   (`app.dialog().file().blocking_pick_folder()` dans une commande `async`, jamais sur le thread
   principal). Pas de paquet npm `@tauri-apps/plugin-dialog`, pas de permission dans
@@ -235,9 +240,9 @@ actions annulables renvoient aussi un jeton d'annulation.
 
 | Commande                        | Arguments                          | Réponse                     | Écrans          |
 | ------------------------------- | ---------------------------------- | --------------------------- | --------------- |
-| `catalog_load`                  | -                                  | `CatalogSnapshot`           | Démarrage       |
+| `catalog_load`                  | -                                  | `{ snapshot, warning }`     | Démarrage       |
 | `project_suggest_folder`        | `{ name, location? }`              | `string`                    | 1a, 2a bis      |
-| `project_pick_folder`           | -                                  | `string \| null`            | 1a, 2a bis, P12 |
+| `project_pick_folder`           | `{ location? }`                    | `string \| null`            | 1a, 2a bis, P12 |
 | `project_create`                | `{ name, location?, workspaceId }` | `{ snapshot, projectId }`   | 1a, 2a bis      |
 | `project_open`                  | `{ projectId }`                    | `ProjectView`               | 2a, 1b          |
 | `workspace_open`                | `{ workspaceId }`                  | `CatalogSnapshot`           | 2a, 2b          |
@@ -249,6 +254,7 @@ actions annulables renvoient aussi un jeton d'annulation.
 | `workspace_remove_project`      | `{ workspaceId, projectId }`       | `{ snapshot, undoToken }`   | 2a, 2d          |
 | `workspace_delete`              | `{ workspaceId }`                  | `{ snapshot, undoToken }`   | 2d              |
 | `undo`                          | `{ undoToken }`                    | `CatalogSnapshot`           | Notifications   |
+| `window_set_title`              | `{ subject? }`                     | -                           | Toutes les vues |
 | `project_add_existing` (Should) | `{ path, workspaceId }`            | `{ snapshot, projectId }`   | P12             |
 | `project_forget` (Could)        | `{ projectId }`                    | `{ snapshot, undoToken }`   | 2e              |
 
@@ -278,6 +284,12 @@ interface CatalogSnapshot {
   workspaces: WorkspaceView[]; // ordre R11
   defaultWorkspaceId: string;
   lastWorkspaceId: string;
+}
+
+/** Réponse de `catalog_load` : `warning` (nature `corruptState`) n'est renvoyé qu'une fois. */
+interface CatalogLoad {
+  snapshot: CatalogSnapshot;
+  warning: CommandError | null;
 }
 
 /** Erreur renvoyée par toute commande ; `message` est prêt à afficher. */
@@ -368,15 +380,15 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 
 **Lot B - Cœur Rust (sans interface)**
 
-- [ ] **T4** `catalog/model.rs` et `catalog/names.rs` : types, validation R9 et R10, dossier proposé.
-- [ ] **T5** `catalog/mod.rs` : une méthode par règle (création, renommage, couleur, défaut,
+- [x] **T4** `catalog/model.rs` et `catalog/names.rs` : types, validation R9 et R10, dossier proposé.
+- [x] **T5** `catalog/mod.rs` : une méthode par règle (création, renommage, couleur, défaut,
       suppression de workspace ; inscription, ajout et retrait de projets) ; un test par règle R1 à R11.
-- [ ] **T6** `catalog/undo.rs` : annulation du retrait d'un projet et de la suppression d'un workspace.
-- [ ] **T7** `storage.rs` : lecture, écriture atomique, premier lancement (W1), fichier corrompu,
+- [x] **T6** `catalog/undo.rs` : annulation du retrait d'un projet et de la suppression d'un workspace.
+- [x] **T7** `storage.rs` : lecture, écriture atomique, premier lancement (W1), fichier corrompu,
       version plus récente ; tests dans un dossier temporaire.
-- [ ] **T8** Création du projet sur disque : dossier, `arnod.yml`, nettoyage en cas d'échec,
+- [x] **T8** Création du projet sur disque : dossier, `arnod.yml`, nettoyage en cas d'échec,
       « dossier non vide », « projet déjà inscrit ».
-- [ ] **T9** `state.rs`, `commands/projects.rs`, `commands/workspaces.rs`, enregistrement dans
+- [x] **T9** `state.rs`, `commands/projects.rs`, `commands/workspaces.rs`, enregistrement dans
       `generate_handler!` ; tests de la forme JSON de `CatalogSnapshot` et des erreurs.
 - [ ] **T10** Sélecteur de dossier `project_pick_folder` (`tauri-plugin-dialog` côté Rust) et titre de fenêtre ;
       mesure de la taille de l'installeur.
