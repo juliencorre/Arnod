@@ -21,6 +21,10 @@ ARNOD_E2E_THEME=dark xvfb-run -a npm run test:e2e   # thème sombre (GTK_THEME=A
 Après une modification de l'interface, relancer `npm run build:e2e` : l'interface est
 embarquée dans le binaire.
 
+`tauri-driver` est lancé par son chemin absolu, sans recherche dans `PATH` : celui de
+`cargo install` (`$CARGO_HOME/bin`, par défaut `~/.cargo/bin`). Pour un binaire installé
+ailleurs : `ARNOD_E2E_TAURI_DRIVER=/chemin/vers/tauri-driver`.
+
 ## Fonctionnement
 
 - `app.ts` crée un bac à sable (dossier personnel `HOME` et données `XDG_DATA_HOME`
