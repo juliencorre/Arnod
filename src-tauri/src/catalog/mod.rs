@@ -449,10 +449,21 @@ impl Catalog {
 /// Deux chemins désignent-ils le même dossier ? Sous Windows, la casse est ignorée.
 fn same_path(a: &Path, b: &Path) -> bool {
     if cfg!(windows) {
-        a.to_string_lossy().to_lowercase() == b.to_string_lossy().to_lowercase()
+        same_path_ignoring_case(a, b)
     } else {
         a == b
     }
+}
+
+/// Compare deux chemins composant par composant, sans tenir compte de la casse :
+/// séparateurs répétés, `/` ou `\` et barre finale n'y changent rien.
+fn same_path_ignoring_case(a: &Path, b: &Path) -> bool {
+    let key = |path: &Path| -> Vec<String> {
+        path.components()
+            .map(|component| component.as_os_str().to_string_lossy().to_lowercase())
+            .collect()
+    };
+    key(a) == key(b)
 }
 
 fn project_not_found() -> CommandError {

@@ -87,6 +87,19 @@ fn r1_chemins_compares_par_composants() {
 }
 
 #[test]
+fn r1_comparaison_sans_casse_par_composants() {
+    // Règle appliquée sous Windows, testée sur toutes les plateformes.
+    assert!(same_path_ignoring_case(
+        Path::new("/dev//Boutique/"),
+        Path::new("/dev/boutique")
+    ));
+    assert!(!same_path_ignoring_case(
+        Path::new("/dev/boutique"),
+        Path::new("/dev/boutiques")
+    ));
+}
+
+#[test]
 fn r1_un_identifiant_ne_peut_etre_inscrit_qu_une_fois() {
     let mut catalog = Catalog::first_launch();
     let default = catalog.default_workspace_id();
