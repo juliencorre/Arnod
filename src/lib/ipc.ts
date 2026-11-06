@@ -6,16 +6,54 @@
  */
 import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 
-import type { CommandName, HelloResponse } from "@/types/ipc";
+import type { CommandError, CommandErrorKind, CommandName, HelloResponse } from "@/types/ipc";
 
-/** Erreur levée quand une commande Rust échoue ou que l'IPC est indisponible. */
+/** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
+const COMMAND_ERROR_KINDS: Record<CommandErrorKind, true> = {
+  invalidName: true,
+  nameTaken: true,
+  folderNotEmpty: true,
+  alreadyRegistered: true,
+  notAProject: true,
+  notFound: true,
+  defaultWorkspace: true,
+  undoExpired: true,
+  io: true,
+  corruptState: true,
+  newerVersion: true,
+};
+
+/** Indique si la cause d'un rejet est une `CommandError` renvoyée par le cœur natif. */
+function isCommandError(cause: unknown): cause is CommandError {
+  if (typeof cause !== "object" || cause === null) return false;
+  if (!("kind" in cause) || !("message" in cause)) return false;
+  const { kind, message } = cause;
+  return (
+    typeof kind === "string" &&
+    Object.hasOwn(COMMAND_ERROR_KINDS, kind) &&
+    typeof message === "string"
+  );
+}
+
+/**
+ * Erreur levée quand une commande Rust échoue ou que l'IPC est indisponible.
+ *
+ * Si le cœur natif a renvoyé une `CommandError`, `kind` en donne la nature et
+ * `message` reprend son texte, prêt à afficher. Sinon `kind` vaut `null` et
+ * `message` décrit la cause brute.
+ */
 export class IpcError extends Error {
   readonly command: CommandName;
+  readonly kind: CommandErrorKind | null;
 
   constructor(command: CommandName, cause: unknown) {
-    super(`La commande « ${command} » a échoué : ${describe(cause)}`, { cause });
+    const commandError = isCommandError(cause) ? cause : null;
+    super(commandError?.message ?? `La commande « ${command} » a échoué : ${describe(cause)}`, {
+      cause,
+    });
     this.name = "IpcError";
     this.command = command;
+    this.kind = commandError?.kind ?? null;
   }
 }
 

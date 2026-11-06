@@ -43,6 +43,8 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     include: ["tests/**/*.spec.ts"],
+    // Contenu réel de la feuille de style globale, lue par tests/theme.spec.ts.
+    css: { include: [/src\/styles\.css/] },
     restoreMocks: true,
   },
 });

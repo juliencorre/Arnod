@@ -1,17 +1,55 @@
 /*
  * Styles globaux : thème clair/sombre suivant le système et police système (N7).
+ *
+ * Palette issue des maquettes (docs/maquettes/), accent orange. Valeurs en
+ * hexadécimal : WebKitGTK d'Ubuntu 22.04 ne garantit pas `oklch`. Chaque jeton
+ * `--color-*` est défini pour les deux thèmes ; tests/theme.spec.ts vérifie les
+ * contrastes (texte 4,5:1, texte secondaire et focus 3:1).
  */
 :root {
   color-scheme: light dark;
 
-  --color-bg: #f6f7f9;
-  --color-text: #16181d;
-  --color-muted: #5b616e;
-  --color-accent: #2557d6;
-  --color-accent-hover: #1d47b3;
-  --color-accent-text: #ffffff;
-  --color-focus: #2557d6;
+  /* Fonds */
+  --color-bg: #fbfaf8; /* Zone principale */
+  --color-surface: #ffffff; /* Cartes, champs, fenêtres modales */
+  --color-sidebar: #f4f2ee; /* Barre latérale, barres d'onglets */
+  --color-chip: #efebe4; /* Badges et pastilles (« par défaut ») */
+  --color-accent-soft: #fdf1e1; /* Ligne sélectionnée ou mise en évidence */
+
+  /* Bordures */
+  --color-border: #e6e2db;
+  --color-border-strong: #cfc9bf; /* Cases à cocher, séparateurs marqués */
+
+  /* Textes */
+  --color-text: #1d1b18;
+  --color-muted: #6b665e; /* Texte secondaire */
+  --color-subtle: #8b857b; /* Indications et textes désactivés, 3:1 minimum */
+  --color-link: #9a5a0c; /* Liens et actions textuelles (« + Ajouter un projet ») */
+  --color-success: #2f7a4b;
   --color-danger: #b42318;
+
+  /* Accent : bouton principal */
+  --color-accent: #e8962e;
+  --color-accent-hover: #d9822a;
+  --color-accent-text: #1d1b18;
+  --color-focus: #9a5a0c;
+
+  /* Notifications */
+  --color-toast-bg: #1d1b18;
+  --color-toast-text: #fbfaf8;
+  --color-toast-action: #f0a54a;
+
+  /* Couleurs des workspaces (pastilles) */
+  --color-ws-gray: #a39d93;
+  --color-ws-orange: #e8962e;
+  --color-ws-blue: #3f7fd6;
+  --color-ws-green: #3f9a5a;
+  --color-ws-purple: #8a63d2;
+  --color-ws-red: #d6564b;
+  --color-ws-yellow: #d4ad2a;
+  --color-ws-teal: #2f9c95;
+
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
 
   font-family:
     system-ui,
@@ -34,14 +72,39 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #17181c;
-    --color-text: #eceef2;
-    --color-muted: #9aa1ad;
-    --color-accent: #6b9bff;
-    --color-accent-hover: #8fb3ff;
-    --color-accent-text: #0b1226;
-    --color-focus: #8fb3ff;
+    --color-bg: #1a1917;
+    --color-surface: #23211e;
+    --color-sidebar: #201e1b;
+    --color-chip: #2e2b27;
+    --color-accent-soft: #3a2c1a;
+
+    --color-border: #36322d;
+    --color-border-strong: #4a453e;
+
+    --color-text: #ede9e3;
+    --color-muted: #b0a99e;
+    --color-subtle: #8a8378;
+    --color-link: #f0b46a;
+    --color-success: #6cc28b;
     --color-danger: #ff8a80;
+
+    --color-accent: #eda24c;
+    --color-accent-hover: #f3b46a;
+    --color-accent-text: #1d1b18;
+    --color-focus: #f0b46a;
+
+    --color-toast-bg: #3a3631;
+    --color-toast-text: #ede9e3;
+    --color-toast-action: #f0b46a;
+
+    --color-ws-gray: #8f887e;
+    --color-ws-orange: #eda24c;
+    --color-ws-blue: #6b9be6;
+    --color-ws-green: #5cb878;
+    --color-ws-purple: #a585e3;
+    --color-ws-red: #e8766c;
+    --color-ws-yellow: #e2c04a;
+    --color-ws-teal: #4bbab2;
   }
 }
 
