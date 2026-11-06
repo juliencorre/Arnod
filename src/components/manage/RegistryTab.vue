@@ -21,7 +21,7 @@ const props = defineProps<{ highlightProjectId: string | null }>();
 
 const catalog = useCatalogStore();
 const dialogs = useDialogStore();
-const { addToWorkspaces } = useProjectActions();
+const { addToWorkspaces, addExistingProject } = useProjectActions();
 const titleId = useId();
 const table = useTemplateRef<HTMLElement>("table");
 
@@ -40,9 +40,19 @@ function addItems(project: ProjectView): MenuItem[] {
   });
 }
 
+/** Workspace où ranger un nouveau projet : le dernier ouvert. */
+function targetWorkspace(): string | undefined {
+  return catalog.snapshot?.lastWorkspaceId ?? catalog.defaultWorkspace?.id;
+}
+
 function newProject(): void {
-  const target = catalog.snapshot?.lastWorkspaceId ?? catalog.defaultWorkspace?.id;
+  const target = targetWorkspace();
   if (target) dialogs.openNewProject(target);
+}
+
+async function addExisting(): Promise<void> {
+  const target = targetWorkspace();
+  if (target) await addExistingProject(target);
 }
 
 onMounted(async () => {
@@ -74,6 +84,7 @@ onMounted(async () => {
           label="Rechercher un projet ou un dossier"
           placeholder="Rechercher…"
         />
+        <BaseButton @click="addExisting">Ajouter un dossier existant…</BaseButton>
         <BaseButton variant="primary" @click="newProject">Nouveau projet</BaseButton>
       </div>
     </header>
@@ -189,8 +200,13 @@ onMounted(async () => {
 
 .registry__tools {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
-  width: min(100%, 30rem);
+  width: min(100%, 44rem);
+}
+
+.registry__tools > :first-child {
+  flex: 1 1 14rem;
 }
 
 .registry__table-wrap {

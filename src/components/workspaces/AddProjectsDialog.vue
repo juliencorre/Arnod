@@ -9,7 +9,7 @@ import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
 import SearchInput from "@/components/ui/SearchInput.vue";
 import { countLabel } from "@/lib/format";
-import { joinNames } from "@/composables/useProjectActions";
+import { joinNames, useProjectActions } from "@/composables/useProjectActions";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
 import { useToastStore } from "@/stores/toasts";
@@ -17,6 +17,7 @@ import { useToastStore } from "@/stores/toasts";
 const catalog = useCatalogStore();
 const dialogs = useDialogStore();
 const toasts = useToastStore();
+const { addExistingProject } = useProjectActions();
 
 const query = ref("");
 const selected = ref<string[]>([]);
@@ -80,6 +81,13 @@ function createProject(): void {
   if (target) dialogs.openNewProject(target.id);
 }
 
+/** Dossier projet existant, par exemple après un clone Git (P12). */
+async function addExisting(): Promise<void> {
+  const target = workspace.value;
+  close();
+  if (target) await addExistingProject(target.id);
+}
+
 async function submit(): Promise<void> {
   const target = workspace.value;
   if (!target || selected.value.length === 0) return;
@@ -128,6 +136,9 @@ async function submit(): Promise<void> {
         <div class="footer__create">
           <BaseButton variant="link" @click="createProject">+ Créer un nouveau projet</BaseButton>
           <span class="footer__note">{{ createNote }}</span>
+          <BaseButton variant="link" @click="addExisting"
+            >+ Ajouter un dossier existant…</BaseButton
+          >
         </div>
         <BaseButton @click="close">Annuler</BaseButton>
         <BaseButton variant="primary" :disabled="selected.length === 0" @click="submit">

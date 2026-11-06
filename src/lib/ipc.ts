@@ -112,6 +112,10 @@ export const ipc = {
   projectCreate: (input: ProjectCreateInput): Promise<ProjectCreated> =>
     call<ProjectCreated>("project_create", { ...input }),
 
+  /** Inscrit un dossier projet existant (avec `arnod.yml`) au référentiel (P12). */
+  projectAddExisting: (path: string, workspaceId: string): Promise<ProjectCreated> =>
+    call<ProjectCreated>("project_add_existing", { path, workspaceId }),
+
   /** Projet à ouvrir ; échoue si son dossier est introuvable (P10). */
   projectOpen: (projectId: string): Promise<ProjectView> =>
     call<ProjectView>("project_open", { projectId }),

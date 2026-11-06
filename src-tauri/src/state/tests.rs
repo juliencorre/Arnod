@@ -326,3 +326,97 @@ fn dossier_propose_pour_un_nom() {
         elsewhere.join("api").display().to_string()
     );
 }
+
+/// Crée `name` dans un premier état, puis renvoie le dossier et l'identifiant.
+fn existing_project(fixture: &Fixture, name: &str) -> (PathBuf, Uuid) {
+    let state = fixture.load();
+    let created = state
+        .create_project(name, None, default_workspace(&state))
+        .unwrap();
+    (fixture.default_location().join(name), created.project_id)
+}
+
+#[test]
+fn ajoute_un_dossier_projet_existant_avec_son_identifiant() {
+    let origin = Fixture::new();
+    let (folder, id) = existing_project(&origin, "boutique-tests");
+    let fixture = Fixture::new();
+    let state = fixture.load();
+    let (boutique, _) = state
+        .mutate(|catalog| catalog.create_workspace("Boutique"))
+        .unwrap();
+
+    let added = state
+        .add_existing_project(&folder.display().to_string(), boutique)
+        .unwrap();
+
+    assert_eq!(added.project_id, id);
+    let project = &added.snapshot.projects[0];
+    assert_eq!(project.name, "boutique-tests");
+    assert_eq!(project.path, canonical(&folder).display().to_string());
+    assert_eq!(
+        project.workspace_ids,
+        vec![default_workspace(&state), boutique]
+    );
+    assert_eq!(read_manifest(&folder).unwrap().id, id, "manifeste intact");
+}
+
+#[test]
+fn dossier_sans_manifeste_refuse() {
+    let fixture = Fixture::new();
+    let state = fixture.load();
+    let empty = fixture.root.path().join("vide");
+    fs::create_dir_all(&empty).unwrap();
+
+    let error = state
+        .add_existing_project(&empty.display().to_string(), default_workspace(&state))
+        .unwrap_err();
+
+    assert_eq!(error.kind, CommandErrorKind::NotAProject);
+    assert!(state.load_catalog().unwrap().snapshot.projects.is_empty());
+}
+
+#[test]
+fn projet_deja_inscrit_ou_nom_pris_refuse() {
+    let fixture = Fixture::new();
+    let state = fixture.load();
+    let default = default_workspace(&state);
+    state.create_project("boutique", None, default).unwrap();
+    let folder = fixture.default_location().join("boutique");
+
+    assert_eq!(
+        kind(state.add_existing_project(&folder.display().to_string(), default)),
+        CommandErrorKind::AlreadyRegistered
+    );
+
+    let other = Fixture::new();
+    let (homonym, _) = existing_project(&other, "BOUTIQUE");
+    assert_eq!(
+        kind(state.add_existing_project(&homonym.display().to_string(), default)),
+        CommandErrorKind::NameTaken
+    );
+    assert_eq!(state.load_catalog().unwrap().snapshot.projects.len(), 1);
+}
+
+#[test]
+fn chemin_relatif_ou_manifeste_plus_recent_refuse() {
+    let fixture = Fixture::new();
+    let state = fixture.load();
+    let default = default_workspace(&state);
+    assert_eq!(
+        kind(state.add_existing_project("relatif/boutique", default)),
+        CommandErrorKind::Io
+    );
+
+    let newer = fixture.root.path().join("futur");
+    fs::create_dir_all(&newer).unwrap();
+    fs::write(
+        newer.join(MANIFEST_FILE_NAME),
+        format!("version: 2\nid: {}\nname: futur\n", Uuid::new_v4()),
+    )
+    .unwrap();
+    assert_eq!(
+        kind(state.add_existing_project(&newer.display().to_string(), default)),
+        CommandErrorKind::NewerVersion
+    );
+}

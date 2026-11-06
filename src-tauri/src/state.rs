@@ -190,6 +190,50 @@ impl AppState {
         }
     }
 
+    /// Inscrit au référentiel un dossier projet existant, reconnu par son
+    /// manifeste `arnod.yml` (P12, après un clone Git par exemple), et l'ajoute
+    /// au workspace par défaut et à `workspace_id` (R4). Rien n'est écrit dans
+    /// le dossier du projet.
+    pub fn add_existing_project(
+        &self,
+        path: &str,
+        workspace_id: Uuid,
+    ) -> Result<ProjectCreated, CommandError> {
+        let folder = PathBuf::from(path);
+        if !folder.is_absolute() {
+            return Err(CommandError::new(
+                CommandErrorKind::Io,
+                format!(
+                    "Le dossier doit être un chemin absolu : {}.",
+                    folder.display()
+                ),
+            ));
+        }
+        let mut inner = self.lock()?;
+        let manifest = manifest::read_manifest(&folder)?;
+        if manifest.version > manifest::MANIFEST_VERSION {
+            return Err(CommandError::new(
+                CommandErrorKind::NewerVersion,
+                format!(
+                    "Le projet « {} » a été créé par une version plus récente d'Arnod (format {}).",
+                    manifest.name, manifest.version
+                ),
+            ));
+        }
+        let mut next = inner.catalog.clone();
+        next.register_project(
+            manifest.id,
+            &manifest.name,
+            canonical(&folder),
+            workspace_id,
+        )?;
+        let snapshot = self.commit(&mut inner, next)?;
+        Ok(ProjectCreated {
+            snapshot,
+            project_id: manifest.id,
+        })
+    }
+
     /// Projet à ouvrir (P5). Refusé si son dossier est introuvable (P10).
     pub fn open_project(&self, project_id: Uuid) -> Result<ProjectView, CommandError> {
         let inner = self.lock()?;

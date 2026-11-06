@@ -184,13 +184,15 @@ impl Catalog {
         path: PathBuf,
         workspace_id: Uuid,
     ) -> Result<(), CommandError> {
-        let name = self.check_new_project(raw_name, &path, workspace_id)?;
+        // L'identifiant d'abord : réinscrire le même projet (P12) doit dire
+        // « déjà inscrit », pas « nom déjà pris ».
         if self.projects.iter().any(|project| project.id == id) {
             return Err(CommandError::new(
                 CommandErrorKind::AlreadyRegistered,
                 "Ce projet est déjà inscrit au référentiel.",
             ));
         }
+        let name = self.check_new_project(raw_name, &path, workspace_id)?;
         self.projects.push(Project { id, name, path });
         for target in [self.default_workspace_id, workspace_id] {
             let workspace = self.workspace_mut(target)?;
