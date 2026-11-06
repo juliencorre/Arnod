@@ -108,6 +108,35 @@ describe("Arnod, de bout en bout", () => {
     await screenshot(browser, "02-projet-cree");
   });
 
+  it("le menu du sélecteur s'affiche en entier, par-dessus la zone principale (2b, W4)", async () => {
+    await openSwitcher();
+    const layout = await browser.execute(() => {
+      const sidebar = document.querySelector("aside");
+      const popover = document.querySelector('[aria-label="Changer de workspace"]');
+      if (!sidebar || !popover) return null;
+      const box = popover.getBoundingClientRect();
+      // Près de chaque coin, c'est bien le menu qui est affiché : il n'est pas rogné.
+      const corners = [
+        [box.left + 4, box.top + 4],
+        [box.right - 4, box.top + 4],
+        [box.left + 4, box.bottom - 4],
+        [box.right - 4, box.bottom - 4],
+      ] as const;
+      return {
+        sidebarScrollLeft: sidebar.scrollLeft,
+        overflowsSidebar: box.right > sidebar.getBoundingClientRect().right,
+        cornersVisible: corners.every(([x, y]) =>
+          popover.contains(document.elementFromPoint(x, y)),
+        ),
+      };
+    });
+    expect(layout).toEqual({ sidebarScrollLeft: 0, overflowsSidebar: true, cornersVisible: true });
+    await screenshot(browser, "02b-selecteur-workspaces");
+
+    await browser.keys("Escape");
+    await browser.$('[aria-label="Changer de workspace"]').waitForDisplayed({ reverse: true });
+  });
+
   it("refuse un nom déjà pris, message du cœur sous le champ (R9)", async () => {
     await browser.$("button=← Mes projets").click();
     await waitForHeading(browser, "Mes projets");
