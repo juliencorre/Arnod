@@ -108,7 +108,7 @@ function cancelRename(): void {
       />
       <button type="button" class="add-card" @click="dialogs.openAddProjects(workspace.id)">
         <span class="add-card__title">+ Ajouter un projet</span>
-        <span class="add-card__text">depuis le référentiel, ou en créer un</span>
+        <span class="add-card__text">nouveau, existant ou du référentiel</span>
       </button>
     </div>
   </section>

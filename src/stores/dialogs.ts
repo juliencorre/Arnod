@@ -11,7 +11,7 @@ export const useDialogStore = defineStore("dialogs", () => {
   const newProject = ref<{ workspaceId: string } | null>(null);
   /** « Ajouter à des workspaces » pour un projet (P4, P6). */
   const addToWorkspaces = ref<{ projectId: string } | null>(null);
-  /** « Ajouter des projets à un workspace » (2c). */
+  /** « Ajouter un projet à un workspace » (2c) : créer, importer ou reprendre du référentiel. */
   const addProjects = ref<{ workspaceId: string } | null>(null);
   /** « Nouveau workspace » (2b, 2d) ; `open` : ouvrir le workspace créé. */
   const newWorkspace = ref<{ open: boolean } | null>(null);

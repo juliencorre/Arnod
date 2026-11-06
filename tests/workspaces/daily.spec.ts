@@ -281,33 +281,93 @@ describe("sélecteur de workspaces (2b, W4, W5)", () => {
   });
 });
 
-describe("ajouter des projets du référentiel (2c, W6)", () => {
+describe("ajouter un projet à un workspace (2c, W6)", () => {
   async function openAddProjects(app: AppWrapper) {
     await app.get("main .add-card").trigger("click");
     await flushPromises();
     return app.get("dialog[open]");
   }
 
-  it("grise les projets présents et ajoute la sélection", async () => {
+  function choiceTitles(dialog: Searchable): string[] {
+    return dialog.findAll(".choice__title").map((title) => title.text());
+  }
+
+  function choice(dialog: Searchable, title: string) {
+    const found = dialog.findAll(".choice").find((c) => c.find(".choice__title").text() === title);
+    if (!found) throw new Error(`choix « ${title} » introuvable`);
+    return found;
+  }
+
+  /** Instantané où Boutique laisse de côté `count` projets du référentiel. */
+  function longRegistrySnapshot(count: number) {
+    const snapshot = boutiqueSnapshot();
+    for (let i = 1; i <= count; i++) {
+      snapshot.projects.push(project(`p-api-${String(i)}`, `api-${String(i)}`));
+    }
+    return snapshot;
+  }
+
+  it("propose d'abord de créer ou d'importer un projet", async () => {
+    installFakeCore(boutiqueSnapshot());
+    wrapper = await mountApp();
+    const dialog = await openAddProjects(wrapper);
+
+    expect(dialog.get("h2").text()).toBe("Ajouter un projet à « Boutique »");
+    expect(choiceTitles(dialog)).toEqual([
+      "Créer un nouveau projet",
+      "Importer un projet existant…",
+    ]);
+    const create = choice(dialog, "Créer un nouveau projet");
+    expect(create.element.tagName).toBe("BUTTON");
+    expect(create.attributes("aria-labelledby")).toBe(
+      create.get(".choice__title").attributes("id"),
+    );
+    expect(create.attributes("aria-describedby")).toBe(
+      create.get(".choice__text").attributes("id"),
+    );
+    expect(dialog.get(".note").text()).toBe(
+      "Un projet créé ou importé est aussi ajouté à « Mes projets » (par défaut).",
+    );
+    // Tous les projets du référentiel sont déjà là : ni liste, ni recherche, ni « Ajouter ».
+    expect(dialog.find("section").exists()).toBe(false);
+    expect(dialog.find('input[type="search"]').exists()).toBe(false);
+    expect(dialog.findAll("footer button").map((b) => b.text())).toEqual(["Annuler"]);
+  });
+
+  it("« Créer un nouveau projet » est le premier élément focalisable", async () => {
+    installFakeCore(richSnapshot());
+    wrapper = await mountApp();
+    const dialog = await openAddProjects(wrapper);
+
+    // `showModal()` donne le focus au premier élément focalisable : Entrée crée un projet.
+    const first = dialog.element.querySelector("button, input, select, textarea, [tabindex]");
+    expect(first).toBe(choice(dialog, "Créer un nouveau projet").element);
+  });
+
+  it("dans le workspace par défaut, n'annonce pas d'ajout supplémentaire", async () => {
+    const snapshot = boutiqueSnapshot();
+    snapshot.lastWorkspaceId = MES_PROJETS;
+    installFakeCore(snapshot);
+    wrapper = await mountApp();
+    const dialog = await openAddProjects(wrapper);
+
+    expect(dialog.get("h2").text()).toBe("Ajouter un projet à « Mes projets »");
+    expect(dialog.find(".note").exists()).toBe(false);
+  });
+
+  it("liste ensuite les seuls projets absents du workspace et ajoute la sélection", async () => {
     const core = installFakeCore(richSnapshot());
     wrapper = await mountApp();
     const dialog = await openAddProjects(wrapper);
 
-    expect(dialog.get("h2").text()).toBe("Ajouter des projets à « Boutique »");
+    expect(dialog.get("section h3").text()).toBe("Ou reprendre un projet du référentiel");
     const rows = dialog.findAll("li label");
-    expect(rows.map((row) => row.find(".row__note").text())).toEqual([
-      "déjà dans ce workspace",
-      "déjà dans ce workspace",
-      "Mes projets",
-    ]);
-    expect(rows.map((row) => row.get<HTMLInputElement>("input").element.disabled)).toEqual([
-      true,
-      true,
-      false,
-    ]);
+    expect(rows.map((row) => row.get(".row__name").text())).toEqual(["notifications"]);
+    expect(rows.map((row) => row.get(".row__note").text())).toEqual(["Mes projets"]);
+    expect(dialog.find('input[type="search"]').exists()).toBe(false);
     expect(button(dialog, "Ajouter").attributes("disabled")).toBeDefined();
 
-    await rows[2]?.get("input").setValue(true);
+    await rows[0]?.get("input").setValue(true);
     await button(dialog, "Ajouter 1 projet").trigger("click");
     await flushPromises();
 
@@ -319,25 +379,34 @@ describe("ajouter des projets du référentiel (2c, W6)", () => {
     expect(wrapper.get(".toast").text()).toBe("« notifications » ajouté à « Boutique ».");
   });
 
-  it("filtre par nom ou dossier", async () => {
-    installFakeCore(richSnapshot());
+  it("n'affiche pas la recherche pour six projets proposés ou moins", async () => {
+    installFakeCore(longRegistrySnapshot(6));
     wrapper = await mountApp();
     const dialog = await openAddProjects(wrapper);
 
-    await dialog.get('input[type="search"]').setValue("NOTIF");
-    expect(dialog.findAll(".row__name").map((n) => n.text())).toEqual(["notifications"]);
+    expect(dialog.findAll(".row__name")).toHaveLength(6);
+    expect(dialog.find('input[type="search"]').exists()).toBe(false);
+  });
+
+  it("filtre par nom ou dossier quand la liste est longue", async () => {
+    installFakeCore(longRegistrySnapshot(7));
+    wrapper = await mountApp();
+    const dialog = await openAddProjects(wrapper);
+    expect(dialog.findAll(".row__note").map((n) => n.text())).toContain("Aucun workspace");
+
+    await dialog.get('input[type="search"]').setValue("API-7");
+    expect(dialog.findAll(".row__name").map((n) => n.text())).toEqual(["api-7"]);
 
     await dialog.get('input[type="search"]').setValue("introuvable");
     expect(dialog.text()).toContain("Aucun projet ne correspond.");
   });
 
-  it("« + Créer un nouveau projet » ouvre la fenêtre de création pour ce workspace", async () => {
+  it("« Créer un nouveau projet » ouvre la fenêtre de création pour ce workspace", async () => {
     installFakeCore(richSnapshot());
     wrapper = await mountApp();
     const dialog = await openAddProjects(wrapper);
-    expect(dialog.text()).toContain("ajouté ici et à « Mes projets » (par défaut)");
 
-    await button(dialog, "+ Créer un nouveau projet").trigger("click");
+    await choice(dialog, "Créer un nouveau projet").trigger("click");
     await flushPromises();
 
     const next = wrapper.get("dialog[open]");

@@ -35,6 +35,6 @@ embarquée dans le binaire.
 
 ## Limites
 
-Le sélecteur de dossier natif (« Changer », « Ajouter un dossier existant… ») ne se pilote
+Le sélecteur de dossier natif (« Changer », « Importer un projet existant… ») ne se pilote
 pas par WebDriver. Le choix de l'emplacement est couvert par les tests Vitest ; l'inscription
 d'un dossier existant est testée en appelant la vraie commande Rust depuis la page.
