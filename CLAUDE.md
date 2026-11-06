@@ -1,9 +1,12 @@
 # CLAUDE.md - Règles pour Claude Code
 
 Arnod est une application de bureau de test d'API (remplaçant de SoapUI et Bruno).
-Ce dépôt est le **squelette technique** décrit dans `PRD-squelette.md` : Tauri 2,
+Ce dépôt part du **squelette technique** décrit dans `PRD-squelette.md` : Tauri 2,
 frontend Vue 3 + TypeScript + Vite + Pinia, cœur natif Rust. Toute nouvelle
 fonctionnalité part de cette base et respecte les règles ci-dessous.
+
+Travail en cours : projets et workspaces, selon `docs/plan-projets-workspaces.md`
+(maquettes dans `docs/maquettes/`). Voir la section « Projets et workspaces ».
 
 ## Architecture
 
@@ -18,17 +21,23 @@ fonctionnalité part de cette base et respecte les règles ci-dessous.
   (`hello.rs`, plus tard `http.rs`, `mocks.rs`...).
 - Les types échangés sont écrits à la main dans `src/types/ipc.ts` et doivent refléter
   exactement la sérialisation serde (`#[serde(rename_all = "camelCase")]`).
+- Une commande qui peut échouer renvoie `Result<T, CommandError>` (`src-tauri/src/error.rs`) :
+  `kind` donne la nature de l'erreur, `message` un texte en français prêt à afficher. Côté
+  interface, `IpcError` reprend `kind` (ou `null` si la cause n'est pas une `CommandError`) et
+  `message`. Une nouvelle nature s'ajoute à `CommandErrorKind` en Rust, dans `src/types/ipc.ts`
+  et dans `COMMAND_ERROR_KINDS` (`src/lib/ipc.ts`) ; un test Rust vérifie la concordance.
 
 ### Ajouter une commande Rust
 
 1. Écrire la fonction `#[tauri::command]` dans `src-tauri/src/commands/<domaine>.rs`
    (déclarer le module dans `commands/mod.rs`). Garder la logique dans des fonctions
-   pures testables, la commande n'étant qu'une façade.
+   pures testables, la commande n'étant qu'une façade. Si elle peut échouer, elle renvoie
+   `Result<T, CommandError>`.
 2. L'enregistrer dans `tauri::generate_handler![...]` (`src-tauri/src/lib.rs`).
 3. Ajouter son nom à `CommandName` et ses types dans `src/types/ipc.ts`.
 4. L'exposer dans l'objet `ipc` de `src/lib/ipc.ts`.
-5. Tester : `#[cfg(test)]` côté Rust (dont la forme JSON sérialisée), Vitest avec
-   `mockIPC` côté frontend (`tests/`).
+5. Tester : `#[cfg(test)]` côté Rust (dont la forme JSON sérialisée, erreurs comprises),
+   Vitest avec `mockIPC` côté frontend (`tests/`).
 6. Si la commande a besoin d'un plugin ou d'une permission, l'ajouter dans
    `src-tauri/capabilities/default.json` avec le strict minimum.
 
@@ -43,13 +52,15 @@ src/                    Frontend Vue
   lib/format.ts         Formatage d'affichage
   stores/               Stores Pinia
   types/ipc.ts          Types IPC documentés à la main
-tests/                  Tests Vitest (happy-dom, mockIPC)
+tests/                  Tests Vitest (happy-dom, mockIPC), dont contrastes du thème
 src-tauri/              Cœur Rust
   tauri.conf.json       Fenêtre, CSP, bundles (NSIS currentUser, AppImage)
   capabilities/         Permissions de la WebView
   src/lib.rs            Builder Tauri, enregistrement des commandes
+  src/error.rs          CommandError, erreur commune des commandes
   src/menu.rs           Menu natif (Fichier > Quitter)
   src/commands/         Commandes, un fichier par domaine
+docs/                   Plan en cours, maquettes, captures du README
 scripts/                Mesure de taille et tests de fumée (CI)
 .github/workflows/      CI de build Windows et Linux
 ```
@@ -81,7 +92,7 @@ Linux : installer d'abord les dépendances système
 - ESLint (`vueTsConfigs.strictTypeChecked`) et Prettier sans erreur. Imports de types
   avec `import type`. Alias `@/` pour `src/`.
 - Rust : `cargo fmt` et `cargo clippy -D warnings` sans avertissement. Pas de `unwrap()`
-  hors tests ; erreurs de commande renvoyées en `Result<T, E>` avec `E: Serialize`.
+  hors tests ; erreurs de commande renvoyées en `Result<T, CommandError>`.
 - Commentaires, messages et textes d'interface en français.
 - Commits en [Conventional Commits](https://www.conventionalcommits.org/fr/) :
   `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `ci:`, `refactor:`...
@@ -95,8 +106,31 @@ Linux : installer d'abord les dépendances système
   `embedBootstrapper` (+1,8 Mo).
 - Installeur Windows < 15 Mo (vérifié par la CI, `scripts/bundle-size.mjs`).
 - CSP stricte dans `tauri.conf.json` : pas de ressource distante, pas de `unsafe-eval`.
-- Pas de nouveau plugin Tauri ni de nouvelle permission sans besoin explicite.
-- Thème clair/sombre suivant le système via les variables de `src/styles.css` :
-  utiliser `var(--color-*)`, jamais de couleur codée en dur dans les composants.
-- Hors périmètre du squelette : requêtes HTTP/SOAP, mocks, scripts, CLI, signature de
-  code, updater, persistance.
+- Pas de nouveau plugin Tauri ni de nouvelle permission sans besoin explicite. Seul ajout
+  validé : `tauri-plugin-dialog`, appelé uniquement depuis Rust (ni paquet npm, ni
+  permission WebView).
+- Thème clair/sombre suivant le système via les variables de `src/styles.css` (palette des
+  maquettes, accent orange) : utiliser `var(--color-*)`, jamais de couleur codée en dur dans
+  les composants. Tout nouveau jeton est défini pour les deux thèmes, en `#rrggbb` ;
+  `tests/theme.spec.ts` vérifie les contrastes.
+- Police système uniquement : la CSP interdit les polices distantes des maquettes.
+- Hors périmètre actuel : requêtes HTTP/SOAP, mocks, scripts, CLI, signature de code,
+  updater. La persistance se limite à l'état des projets et workspaces.
+
+## Projets et workspaces
+
+Référence : `docs/plan-projets-workspaces.md` (cas d'usage P1 à P12 et W1 à W11, règles R1 à
+R11, tâches T1 à T27). Cocher une tâche dans le plan quand elle est livrée.
+
+- Les règles R1 à R11 vivent dans le cœur Rust, dans un module pur sans dépendance à Tauri
+  (`src-tauri/src/catalog/`, lot B). L'interface affiche l'état et ne fait que des filtres et
+  comptages d'affichage.
+- Une commande qui modifie le catalogue renvoie l'instantané complet (`CatalogSnapshot`) ; le
+  store remplace son état. Les actions annulables renvoient aussi un jeton d'annulation.
+- État de l'application : `arnod.json` dans `app_local_data_dir()`, écrit de façon atomique
+  (fichier temporaire puis renommage). Un fichier illisible ou écrit par une version plus
+  récente n'est jamais écrasé.
+- Un projet est un dossier contenant un manifeste `arnod.yml`. Arnod n'initialise pas Git.
+- Noms de projet et de workspace uniques, sans tenir compte de la casse. « Changer » choisit
+  l'emplacement parent : le projet est créé dans `<emplacement>/<nom>`.
+- Pas de confirmation quand rien n'est perdu : une notification avec « Annuler ».

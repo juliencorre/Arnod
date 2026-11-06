@@ -362,9 +362,9 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 
 **Lot A - Fondations**
 
-- [ ] **T1** Mettre à jour `CLAUDE.md` (§ 7) et y reporter les décisions du § 11.
-- [ ] **T2** Palette et variables CSS clair / sombre (§ 6.5), taille de fenêtre.
-- [ ] **T3** Type `CommandError { kind, message }` côté Rust et TypeScript, `IpcError.kind`, tests.
+- [x] **T1** Mettre à jour `CLAUDE.md` (§ 7) et y reporter les décisions du § 11.
+- [x] **T2** Palette et variables CSS clair / sombre (§ 6.5), taille de fenêtre.
+- [x] **T3** Type `CommandError { kind, message }` côté Rust et TypeScript, `IpcError.kind`, tests.
 
 **Lot B - Cœur Rust (sans interface)**
 
