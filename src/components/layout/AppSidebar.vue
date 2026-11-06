@@ -56,7 +56,7 @@ const openProjectId = computed(() =>
 
     <template v-else-if="workspace">
       <WorkspaceSwitcher :workspace="workspace" />
-      <nav class="sidebar__section" :aria-labelledby="projectsLabelId">
+      <nav class="sidebar__section sidebar__section--scroll" :aria-labelledby="projectsLabelId">
         <h2 :id="projectsLabelId" class="sidebar__label">Projets</h2>
         <ul class="sidebar__projects">
           <li v-for="project in projects" :key="project.id">
@@ -91,6 +91,13 @@ const openProjectId = computed(() =>
 </template>
 
 <style scoped>
+/*
+ * La barre latérale ne défile pas : le menu du sélecteur de workspace (2b),
+ * plus large qu'elle, doit déborder sur la zone principale. Un `overflow-y`
+ * ici le rognerait (l'axe horizontal passe alors aussi en `auto`) et le focus
+ * de sa recherche ferait défiler la barre de côté. Seule la liste des projets
+ * défile (`sidebar__section--scroll`).
+ */
 .sidebar {
   box-sizing: border-box;
   display: flex;
@@ -101,7 +108,6 @@ const openProjectId = computed(() =>
   padding: 1rem 0.75rem;
   border-right: 1px solid var(--color-border);
   background: var(--color-sidebar);
-  overflow-y: auto;
 }
 
 .sidebar__brand {
@@ -124,6 +130,12 @@ const openProjectId = computed(() =>
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.sidebar__section--scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .sidebar__label {
