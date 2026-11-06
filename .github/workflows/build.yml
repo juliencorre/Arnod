@@ -14,6 +14,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Actions tierces épinglées par SHA de commit (le commentaire donne la version) : un tag
+# peut être déplacé, pas un commit. Dependabot met à jour SHA et commentaire à chaque
+# version taguée ; rust-toolchain n'a qu'un tag `v1` mobile, à remonter à la main.
+#
+# `npm ci --ignore-scripts` : aucune dépendance n'a besoin de ses scripts d'installation
+# (ceux d'edgedriver et geckodriver, tirés par webdriverio, téléchargent des pilotes dont
+# les tests e2e n'ont pas l'usage : ils passent par tauri-driver et WebKitWebDriver).
+
 env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: 22
@@ -30,11 +38,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
+          toolchain: stable
           components: rustfmt
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Versions concordantes
         run: node scripts/check-version.mjs
       - run: npm run format:check
@@ -80,15 +89,16 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
+          toolchain: stable
           components: clippy
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: "./src-tauri -> target"
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Tests frontend (Vitest)
         run: npm test
@@ -150,13 +160,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: "./src-tauri -> target"
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: tauri-driver
         run: cargo install tauri-driver --locked
