@@ -1,0 +1,54 @@
+# Mises à jour des dépendances, une fois par semaine.
+#
+# Tauri : le paquet npm @tauri-apps/api et la crate tauri doivent rester sur la même version
+# mineure, sinon la CLI refuse de construire. Les groupes « tauri » de npm et de cargo arrivent
+# dans deux pull requests séparées : les fusionner ensemble.
+#
+# Les titres suivent les Conventional Commits (chore(deps): …, ci(deps): …), comme l'exige
+# .github/workflows/pr-title.yml.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Paris
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      tauri:
+        patterns: ["@tauri-apps/*"]
+      mineures:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Paris
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      tauri:
+        patterns: ["tauri", "tauri-*"]
+      mineures:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Paris
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]

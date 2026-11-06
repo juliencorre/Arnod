@@ -56,13 +56,14 @@ npm ci
 npm run tauri dev
 ```
 
-| Commande                                    | Rôle                          |
-| ------------------------------------------- | ----------------------------- |
-| `npm test`                                  | Tests frontend (Vitest)       |
-| `npm run lint` / `npm run typecheck`        | ESLint / vue-tsc              |
-| `npm run format` / `npm run format:check`   | Prettier                      |
-| `cargo test` (dans `src-tauri/`)            | Tests du cœur Rust            |
-| `cargo clippy --all-targets -- -D warnings` | Lint Rust, zéro avertissement |
+| Commande                                    | Rôle                                                              |
+| ------------------------------------------- | ----------------------------------------------------------------- |
+| `npm run check`                             | Toutes les vérifications de la CI hors build, avant chaque commit |
+| `npm test`                                  | Tests frontend (Vitest)                                           |
+| `npm run lint` / `npm run typecheck`        | ESLint / vue-tsc                                                  |
+| `npm run format` / `npm run format:check`   | Prettier                                                          |
+| `cargo test` (dans `src-tauri/`)            | Tests du cœur Rust                                                |
+| `cargo clippy --all-targets -- -D warnings` | Lint Rust, zéro avertissement                                     |
 
 ## Build
 
