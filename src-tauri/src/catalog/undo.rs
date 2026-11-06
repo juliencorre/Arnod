@@ -1,6 +1,7 @@
 //! Pile d'annulation en mémoire (R6).
 //!
-//! Retirer un projet d'un workspace ou supprimer un workspace se fait sans
+//! Retirer un projet d'un workspace, supprimer un workspace ou oublier un
+//! projet (ses fichiers restent sur le disque) se fait sans
 //! confirmation : l'interface propose « Annuler » dans une notification. La pile
 //! ne vit que le temps de la session ; au-delà de [`UndoStack::CAPACITY`]
 //! actions, les plus anciennes ne sont plus annulables.
@@ -9,7 +10,7 @@ use std::collections::VecDeque;
 
 use uuid::Uuid;
 
-use super::model::Workspace;
+use super::model::{Project, Workspace};
 use crate::error::{CommandError, CommandErrorKind};
 
 /// Ce qu'il faut rétablir pour annuler une action.
@@ -26,6 +27,13 @@ pub enum UndoAction {
         workspace_id: Uuid,
         project_id: Uuid,
         index: usize,
+    },
+    /// Réinscrit un projet oublié à sa place dans le référentiel et dans ses
+    /// workspaces (`(workspace, position)`).
+    RestoreForgottenProject {
+        project: Project,
+        index: usize,
+        memberships: Vec<(Uuid, usize)>,
     },
 }
 

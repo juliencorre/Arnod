@@ -116,6 +116,10 @@ export const ipc = {
   projectAddExisting: (path: string, workspaceId: string): Promise<ProjectCreated> =>
     call<ProjectCreated>("project_add_existing", { path, workspaceId }),
 
+  /** Oublie un projet (référentiel et workspaces), fichiers conservés ; annulable (P11). */
+  projectForget: (projectId: string): Promise<Undoable> =>
+    call<Undoable>("project_forget", { projectId }),
+
   /** Projet à ouvrir ; échoue si son dossier est introuvable (P10). */
   projectOpen: (projectId: string): Promise<ProjectView> =>
     call<ProjectView>("project_open", { projectId }),

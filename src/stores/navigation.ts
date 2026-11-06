@@ -118,7 +118,14 @@ export const useNavigationStore = defineStore("navigation", () => {
     () => catalog.snapshot,
     (snapshot) => {
       const current = view.value;
-      if (snapshot === null || current.kind === "firstRun" || current.kind === "project") return;
+      if (snapshot === null || current.kind === "firstRun") return;
+      if (current.kind === "project") {
+        // Projet oublié (P11) : retour à son workspace.
+        if (catalog.projectById(current.projectId) === null) {
+          view.value = { kind: "workspace", workspaceId: current.workspaceId };
+        }
+        return;
+      }
       if (catalog.workspaceById(current.workspaceId) !== null) return;
       view.value =
         current.kind === "workspace"

@@ -54,6 +54,11 @@ defineProps<{ disabled?: boolean }>();
   opacity: 0.55;
 }
 
+/* Activé mais non modifiable (workspace déjà par défaut) : l'état reste lisible. */
+.toggle__switch[aria-checked="true"]:disabled {
+  opacity: 0.8;
+}
+
 .toggle__switch:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;

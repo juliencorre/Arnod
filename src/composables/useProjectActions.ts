@@ -96,6 +96,23 @@ export function useProjectActions() {
     }
   }
 
+  /**
+   * Oublie un projet : il quitte le référentiel et ses workspaces, ses fichiers
+   * restent sur le disque ; « Annuler » le réinscrit (P11, R6).
+   */
+  async function forgetProject(projectId: string): Promise<void> {
+    const name = projectName(projectId);
+    try {
+      const undoToken = await catalog.forgetProject(projectId);
+      toasts.show(
+        `« ${name} » oublié : retiré du référentiel et de ses workspaces. Ses fichiers restent sur le disque.`,
+        { action: { label: "Annuler", run: () => catalog.undo(undoToken) } },
+      );
+    } catch (error) {
+      toasts.showError(error);
+    }
+  }
+
   /** Retire un projet d'un workspace, avec « Annuler » (P7, R5, R6). */
   async function removeFromWorkspace(projectId: string, workspaceId: string): Promise<void> {
     const name = projectName(projectId);
@@ -115,6 +132,7 @@ export function useProjectActions() {
     announceCreated,
     addToWorkspaces,
     addExistingProject,
+    forgetProject,
     removeFromWorkspace,
   };
 }

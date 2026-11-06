@@ -266,6 +266,30 @@ describe("référentiel des projets (2e, P6, P8, P9, P10)", () => {
     ).toEqual(["Recette sprint 42"]);
   });
 
+  it("« Oublier » retire le projet du référentiel et de ses workspaces, avec « Annuler » (P11)", async () => {
+    const core = installFakeCore(richSnapshot());
+    wrapper = await mountApp();
+    await openManage(wrapper, "Référentiel des projets3 projets");
+
+    await wrapper.get('button[aria-label="Oublier boutique-tests"]').trigger("click");
+    await flushPromises();
+
+    expect(lastArgs(core, "project_forget")).toEqual({ projectId: BOUTIQUE_TESTS });
+    expect(wrapper.get("main h1").text()).toBe("2 projets");
+    expect(core.snapshot().workspaces.some((w) => w.projectIds.includes(BOUTIQUE_TESTS))).toBe(
+      false,
+    );
+    const toast = wrapper.get(".toast");
+    expect(toast.text()).toContain(
+      "« boutique-tests » oublié : retiré du référentiel et de ses workspaces. Ses fichiers restent sur le disque.",
+    );
+
+    await button(toast, "Annuler").trigger("click");
+    await flushPromises();
+    expect(wrapper.get("main h1").text()).toBe("3 projets");
+    expect(wrapper.findAll("tbody th").map((th) => th.text())[0]).toBe("boutique-tests");
+  });
+
   it("« Afficher dans le référentiel » met le projet en évidence (P8)", async () => {
     installFakeCore(richSnapshot());
     wrapper = await mountApp();

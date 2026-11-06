@@ -154,6 +154,15 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
         }
         return { snapshot: normalize(), projectId: id };
       }
+      case "project_forget": {
+        const before = structuredClone(state);
+        project(args.projectId);
+        state.projects = state.projects.filter((p) => p.id !== args.projectId);
+        for (const w of state.workspaces) {
+          w.projectIds = w.projectIds.filter((id) => id !== args.projectId);
+        }
+        return undoable(before);
+      }
       case "project_open": {
         const found = project(args.projectId);
         if (core.missing.has(found.id)) {

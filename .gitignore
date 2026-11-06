@@ -17,3 +17,6 @@ coverage
 .DS_Store
 *.suo
 *.sw?
+
+# Tests e2e : captures et journaux
+e2e/artifacts

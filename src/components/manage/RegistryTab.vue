@@ -2,7 +2,7 @@
 /**
  * Onglet « Référentiel des projets » (2e, P9) : chaque projet une fois, ses
  * workspaces en pastilles, « Ajouter à… » (P6), projet mis en évidence (P8),
- * dossier introuvable signalé (P10).
+ * dossier introuvable signalé (P10), « Oublier » avec « Annuler » (P11).
  */
 import { computed, nextTick, onMounted, ref, useId, useTemplateRef } from "vue";
 
@@ -21,7 +21,7 @@ const props = defineProps<{ highlightProjectId: string | null }>();
 
 const catalog = useCatalogStore();
 const dialogs = useDialogStore();
-const { addToWorkspaces, addExistingProject } = useProjectActions();
+const { addToWorkspaces, addExistingProject, forgetProject } = useProjectActions();
 const titleId = useId();
 const table = useTemplateRef<HTMLElement>("table");
 
@@ -145,6 +145,15 @@ onMounted(async () => {
                   </button>
                 </template>
               </BaseMenu>
+              <button
+                type="button"
+                class="registry__forget"
+                :aria-label="`Oublier ${project.name}`"
+                title="Retirer du référentiel et des workspaces ; les fichiers restent sur le disque"
+                @click="forgetProject(project.id)"
+              >
+                Oublier
+              </button>
             </td>
           </tr>
           <tr v-if="rows.length === 0">
@@ -304,7 +313,23 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.registry__add:focus-visible {
+.registry__add:focus-visible,
+.registry__forget:focus-visible {
   outline: 2px solid var(--color-focus);
+}
+
+.registry__forget {
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  white-space: nowrap;
+  color: var(--color-danger);
+  background: none;
+  cursor: pointer;
+}
+
+.registry__action {
+  white-space: nowrap;
 }
 </style>
