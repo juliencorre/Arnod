@@ -72,7 +72,7 @@ src-tauri/              Cœur Rust
   src/menu.rs           Menu natif (Fichier > Quitter)
   src/commands/         Commandes, un fichier par domaine
 docs/                   Plan en cours, modèle de plan, maquettes, captures du README
-scripts/                Mesure de taille et tests de fumée (CI)
+scripts/                Mesure de taille, concordance des versions, tests de fumée (CI)
 .github/                Modèles d'issue et de pull request, Dependabot
   workflows/            CI de build Windows et Linux, contrôle des titres de pull request
 ```
@@ -118,6 +118,9 @@ Linux : installer d'abord les dépendances système
   suit la même forme (vérifié par `.github/workflows/pr-title.yml`) et sa description reprend les
   sections de `.github/pull_request_template.md`.
 - Chaque tâche est relue avant commit ; `npm run check` passe avant chaque commit.
+- Une version se publie par un tag `vX.Y.Z` sur `main` (README, « Publier une version ») : la CI
+  crée la release. Jamais de release créée à la main ; `scripts/check-version.mjs` garde les six
+  sources de version concordantes.
 - Tests : règles dans `cargo test` (vrais dossiers temporaires pour le stockage), parcours
   d'interface dans Vitest avec le faux cœur `tests/fakeCore.ts`, parcours complets sur
   l'application réelle dans `e2e/` (à étendre à chaque nouvelle fonctionnalité visible).
