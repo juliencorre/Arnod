@@ -1,0 +1,94 @@
+<script setup lang="ts">
+/** Carte d'un projet dans la vue d'un workspace (2a) ; signale un dossier introuvable (P10). */
+import { computed, useId } from "vue";
+
+import ProjectMenu from "@/components/projects/ProjectMenu.vue";
+import BaseButton from "@/components/ui/BaseButton.vue";
+import { useProjectActions } from "@/composables/useProjectActions";
+import type { ProjectView } from "@/types/ipc";
+
+const props = defineProps<{ project: ProjectView; workspaceId: string }>();
+
+const { openProject } = useProjectActions();
+const titleId = useId();
+const missing = computed(() => props.project.status === "missing");
+</script>
+
+<template>
+  <article class="card" :class="{ 'card--missing': missing }" :aria-labelledby="titleId">
+    <span class="card__initial" aria-hidden="true">{{ project.name.charAt(0).toUpperCase() }}</span>
+    <div class="card__titles">
+      <h2 :id="titleId" class="card__name">{{ project.name }}</h2>
+      <code class="card__path">{{ project.path }}</code>
+      <p v-if="missing" class="card__missing">
+        Dossier introuvable : déplacé ou supprimé hors d'Arnod.
+      </p>
+    </div>
+    <div class="card__actions">
+      <BaseButton :disabled="missing" @click="openProject(project.id, workspaceId)">
+        Ouvrir
+      </BaseButton>
+      <ProjectMenu :project="project" :workspace-id="workspaceId" />
+    </div>
+  </article>
+</template>
+
+<style scoped>
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 1.125rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.card--missing {
+  border-style: dashed;
+}
+
+.card__initial {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  font: 600 0.8125rem var(--font-mono);
+  color: var(--color-muted);
+  background: var(--color-chip);
+}
+
+.card__titles {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.card__name {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.card__path {
+  overflow-wrap: anywhere;
+  font: 0.8125rem var(--font-mono);
+  color: var(--color-muted);
+}
+
+.card__missing {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-danger);
+}
+
+.card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+</style>

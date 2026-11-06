@@ -410,10 +410,10 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 
 **Lot E - Workspaces au quotidien**
 
-- [ ] **T18** Vue workspace (2a) : W3, W7 (bouton « Renommer »).
-- [ ] **T19** Menu ⋯ d'un projet : P5, P6, P7 avec « Annuler », P8.
-- [ ] **T20** Sélecteur de workspace avec recherche et création (2b) : W4, W5.
-- [ ] **T21** Ajouter des projets (2c) : W6.
+- [x] **T18** Vue workspace (2a) : W3, W7 (bouton « Renommer »).
+- [x] **T19** Menu ⋯ d'un projet : P5, P6, P7 avec « Annuler », P8.
+- [x] **T20** Sélecteur de workspace avec recherche et création (2b) : W4, W5.
+- [x] **T21** Ajouter des projets (2c) : W6.
 
 **Lot F - Gestion**
 
