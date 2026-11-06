@@ -21,6 +21,10 @@ updates:
       # @types/node suit la version de Node visée (engines : Node 22), pas la dernière parue.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # TypeScript 7 (portage natif) est livré sans API : vue-tsc et typescript-eslint ne
+      # fonctionnent qu'avec TypeScript 6. Retirer cette règle quand ils gèrent TypeScript 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       tauri:
         patterns: ["@tauri-apps/*"]
