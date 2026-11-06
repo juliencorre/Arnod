@@ -417,9 +417,10 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 
 **Lot F - Gestion**
 
-- [ ] **T22** « Gérer les workspaces » (2d) : W7 à W11.
-- [ ] **T23** Référentiel (2e) : P9, P6 (« Ajouter à… »), P2, mise en évidence de P8.
-- [ ] **T24** Projet introuvable : P10. P11 une fois dessiné (Q5).
+- [x] **T22** « Gérer les workspaces » (2d) : W7 à W11.
+- [x] **T23** Référentiel (2e) : P9, P6 (« Ajouter à… »), P2, mise en évidence de P8.
+- [x] **T24** Projet introuvable : P10. P11 une fois dessiné (Q5) : non dessiné, donc non
+      implémenté.
 
 **Lot G - Finitions et CI**
 

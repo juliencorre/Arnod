@@ -11,7 +11,16 @@ import { computed, nextTick, onBeforeUnmount, ref, useId, useTemplateRef } from 
 
 import type { MenuItem, MenuTriggerAttrs } from "./menu";
 
-const props = defineProps<{ items: MenuItem[]; label: string; heading?: string }>();
+const props = withDefaults(
+  defineProps<{
+    items: MenuItem[];
+    label: string;
+    heading?: string;
+    /** Bord du déclencheur sur lequel s'aligne le menu. */
+    align?: "start" | "end";
+  }>(),
+  { heading: undefined, align: "start" },
+);
 const emit = defineEmits<{ select: [id: string] }>();
 defineSlots<{ trigger(props: { open: boolean; attrs: MenuTriggerAttrs }): unknown }>();
 
@@ -214,7 +223,12 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" {
 <template>
   <div ref="root" class="menu">
     <slot name="trigger" :open="isOpen" :attrs="triggerAttrs" />
-    <div v-if="isOpen" class="menu__popover" @keydown="onMenuKeydown">
+    <div
+      v-if="isOpen"
+      class="menu__popover"
+      :class="`menu__popover--${align}`"
+      @keydown="onMenuKeydown"
+    >
       <p v-if="heading" class="menu__heading">{{ heading }}</p>
       <ul :id="menuId" role="menu" :aria-label="label" class="menu__list">
         <template v-for="(item, index) in items" :key="item.id">
@@ -294,13 +308,25 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" {
   position: absolute;
   z-index: 20;
   top: calc(100% + 4px);
-  left: 0;
   min-width: 15rem;
   padding: 0.375rem;
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
+}
+
+.menu__popover--start {
+  left: 0;
+}
+
+.menu__popover--end {
+  right: 0;
+}
+
+.menu__popover--end .menu__list--sub {
+  right: calc(100% + 0.375rem);
+  left: auto;
 }
 
 .menu__heading {

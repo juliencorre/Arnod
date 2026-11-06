@@ -12,7 +12,14 @@ export type View =
   | { kind: "firstRun" }
   | { kind: "workspace"; workspaceId: string }
   | { kind: "project"; projectId: string; workspaceId: string }
-  | { kind: "manage"; tab: ManageTab };
+  | {
+      kind: "manage";
+      tab: ManageTab;
+      /** Workspace détaillé dans l'onglet « Workspaces » (2d). */
+      workspaceId: string;
+      /** Projet mis en évidence dans le référentiel (P8). */
+      highlightProjectId: string | null;
+    };
 
 /** Sujet du titre de fenêtre pour les onglets de gestion. */
 const MANAGE_TITLES: Record<ManageTab, string> = {
@@ -31,7 +38,7 @@ export const useNavigationStore = defineStore("navigation", () => {
   /** Workspace affiché ou contenant le projet ouvert, pour la barre latérale. */
   const currentWorkspaceId = computed<string | null>(() => {
     const current = view.value;
-    if (current.kind === "workspace" || current.kind === "project") return current.workspaceId;
+    if (current.kind !== "firstRun") return current.workspaceId;
     return catalog.snapshot?.lastWorkspaceId ?? null;
   });
 
@@ -74,20 +81,49 @@ export const useNavigationStore = defineStore("navigation", () => {
   }
 
   /** Affiche l'écran de gestion sur l'onglet voulu (2d, 2e). */
-  function showManage(tab: ManageTab): void {
-    view.value = { kind: "manage", tab };
+  function showManage(
+    tab: ManageTab,
+    options: { workspaceId?: string; highlightProjectId?: string } = {},
+  ): void {
+    const workspaceId =
+      options.workspaceId ?? currentWorkspaceId.value ?? catalog.snapshot?.defaultWorkspaceId ?? "";
+    view.value = {
+      kind: "manage",
+      tab,
+      workspaceId,
+      highlightProjectId: options.highlightProjectId ?? null,
+    };
+  }
+
+  /** Change d'onglet dans l'écran de gestion, sans mise en évidence. */
+  function selectTab(tab: ManageTab): void {
+    if (view.value.kind === "manage") view.value = { ...view.value, tab, highlightProjectId: null };
+  }
+
+  /** Choisit le workspace détaillé dans l'écran de gestion (2d). */
+  function selectManagedWorkspace(workspaceId: string): void {
+    if (view.value.kind === "manage") view.value = { ...view.value, workspaceId };
+  }
+
+  /** Quitte l'écran de gestion pour le dernier workspace ouvert. */
+  function closeManage(): void {
+    const last = catalog.snapshot?.lastWorkspaceId;
+    if (last !== undefined) view.value = { kind: "workspace", workspaceId: last };
   }
 
   // Si le workspace affiché disparaît (suppression, R8), revenir au workspace
-  // que le cœur a choisi comme dernier ouvert.
+  // que le cœur a choisi comme dernier ouvert ; dans l'écran de gestion, au
+  // workspace par défaut.
   watch(
     () => catalog.snapshot,
     (snapshot) => {
       const current = view.value;
-      if (snapshot === null || current.kind !== "workspace") return;
-      if (catalog.workspaceById(current.workspaceId) === null) {
-        view.value = { kind: "workspace", workspaceId: snapshot.lastWorkspaceId };
-      }
+      if (snapshot === null || current.kind === "firstRun" || current.kind === "project") return;
+      if (catalog.workspaceById(current.workspaceId) !== null) return;
+      view.value =
+        current.kind === "workspace"
+          ? { kind: "workspace", workspaceId: snapshot.lastWorkspaceId }
+          : { ...current, workspaceId: snapshot.defaultWorkspaceId };
     },
   );
 
@@ -100,5 +136,16 @@ export const useNavigationStore = defineStore("navigation", () => {
     { immediate: true },
   );
 
-  return { view, currentWorkspaceId, titleSubject, start, showWorkspace, showProject, showManage };
+  return {
+    view,
+    currentWorkspaceId,
+    titleSubject,
+    start,
+    showWorkspace,
+    showProject,
+    showManage,
+    selectTab,
+    selectManagedWorkspace,
+    closeManage,
+  };
 });

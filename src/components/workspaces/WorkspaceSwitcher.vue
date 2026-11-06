@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * Sélecteur de workspace en haut de la barre latérale (2b, W4) : recherche,
- * liste des workspaces, « + Nouveau workspace » (W5). Clavier : la recherche
+ * liste des workspaces, « + Nouveau workspace » (W5), accès à la gestion des
+ * workspaces (2d) et au référentiel (2e). Clavier : la recherche
  * reçoit le focus, flèches pour parcourir la liste, Échap pour fermer.
  */
 import { computed, nextTick, onBeforeUnmount, ref, useId, useTemplateRef } from "vue";
@@ -11,7 +12,7 @@ import SearchInput from "@/components/ui/SearchInput.vue";
 import { countLabel } from "@/lib/format";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
-import { useNavigationStore } from "@/stores/navigation";
+import { type ManageTab, useNavigationStore } from "@/stores/navigation";
 import type { WorkspaceView } from "@/types/ipc";
 
 const props = defineProps<{ workspace: WorkspaceView }>();
@@ -62,6 +63,11 @@ function toggle(): void {
 async function choose(workspaceId: string): Promise<void> {
   close();
   await navigation.showWorkspace(workspaceId);
+}
+
+function manage(tab: ManageTab): void {
+  close(false);
+  navigation.showManage(tab, { workspaceId: props.workspace.id });
 }
 
 function createWorkspace(): void {
@@ -156,7 +162,15 @@ function onKeydown(event: KeyboardEvent): void {
         >
           + Nouveau workspace
         </button>
-        <slot name="actions" :close="close" />
+        <button type="button" class="switcher__action" @click="manage('workspaces')">
+          Gérer les workspaces…
+        </button>
+        <button type="button" class="switcher__action" @click="manage('registry')">
+          <span class="switcher__action-label">Référentiel des projets</span>
+          <span class="switcher__count">{{
+            countLabel(catalog.projects.length, "projet", "projets")
+          }}</span>
+        </button>
       </div>
     </div>
   </div>
@@ -292,6 +306,10 @@ function onKeydown(event: KeyboardEvent): void {
 .switcher__item-name {
   flex: 1;
   min-width: 0;
+}
+
+.switcher__action-label {
+  flex: 1;
 }
 
 .switcher__count {
