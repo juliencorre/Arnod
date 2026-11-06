@@ -92,6 +92,15 @@ mod tests {
     }
 
     #[test]
+    fn couleurs_identiques_cote_typescript() {
+        let rust: std::collections::BTreeSet<String> = WorkspaceColor::ASSIGNMENT_ORDER
+            .into_iter()
+            .map(crate::ts_contract::serialized_name)
+            .collect();
+        assert_eq!(rust, crate::ts_contract::union_members("WorkspaceColor"));
+    }
+
+    #[test]
     fn ordre_d_attribution_complet_et_sans_doublon() {
         let unique: std::collections::HashSet<_> =
             WorkspaceColor::ASSIGNMENT_ORDER.into_iter().collect();

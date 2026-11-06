@@ -89,3 +89,110 @@ describe("IpcError et CommandError", () => {
     expect(error.message).toBe(`La commande « hello » a échoué : ${JSON.stringify(cause)}`);
   });
 });
+
+describe("commandes du catalogue", () => {
+  /** Appelle `run` sous un mock IPC qui renvoie `response` et capture l'appel. */
+  async function capture(
+    run: () => Promise<unknown>,
+    response: unknown = null,
+  ): Promise<{ cmd: string; args: unknown; result: unknown }> {
+    const calls: { cmd: string; args: unknown }[] = [];
+    mockIPC((cmd, args) => {
+      calls.push({ cmd, args });
+      return response;
+    });
+    const result = await run();
+    expect(calls).toHaveLength(1);
+    const [call] = calls;
+    if (call === undefined) throw new Error("aucun appel IPC");
+    return { ...call, result };
+  }
+
+  it.each([
+    ["catalogLoad", () => ipc.catalogLoad(), "catalog_load", {}],
+    ["undo", () => ipc.undo("jeton"), "undo", { undoToken: "jeton" }],
+    [
+      "projectSuggestFolder",
+      () => ipc.projectSuggestFolder("boutique", null),
+      "project_suggest_folder",
+      { name: "boutique", location: null },
+    ],
+    [
+      "projectPickFolder",
+      () => ipc.projectPickFolder("/home/julien/dev"),
+      "project_pick_folder",
+      { location: "/home/julien/dev" },
+    ],
+    [
+      "projectCreate",
+      () => ipc.projectCreate({ name: "boutique", location: null, workspaceId: "ws" }),
+      "project_create",
+      { name: "boutique", location: null, workspaceId: "ws" },
+    ],
+    ["projectOpen", () => ipc.projectOpen("p1"), "project_open", { projectId: "p1" }],
+    ["workspaceOpen", () => ipc.workspaceOpen("ws"), "workspace_open", { workspaceId: "ws" }],
+    [
+      "workspaceCreate",
+      () => ipc.workspaceCreate("Boutique"),
+      "workspace_create",
+      { name: "Boutique" },
+    ],
+    [
+      "workspaceRename",
+      () => ipc.workspaceRename("ws", "Boutique"),
+      "workspace_rename",
+      { workspaceId: "ws", name: "Boutique" },
+    ],
+    [
+      "workspaceSetColor",
+      () => ipc.workspaceSetColor("ws", "teal"),
+      "workspace_set_color",
+      { workspaceId: "ws", color: "teal" },
+    ],
+    [
+      "workspaceSetDefault",
+      () => ipc.workspaceSetDefault("ws"),
+      "workspace_set_default",
+      { workspaceId: "ws" },
+    ],
+    [
+      "workspaceAddProjects",
+      () => ipc.workspaceAddProjects("ws", ["p1", "p2"]),
+      "workspace_add_projects",
+      { workspaceId: "ws", projectIds: ["p1", "p2"] },
+    ],
+    [
+      "workspaceRemoveProject",
+      () => ipc.workspaceRemoveProject("ws", "p1"),
+      "workspace_remove_project",
+      { workspaceId: "ws", projectId: "p1" },
+    ],
+    ["workspaceDelete", () => ipc.workspaceDelete("ws"), "workspace_delete", { workspaceId: "ws" }],
+    [
+      "windowSetTitle",
+      () => ipc.windowSetTitle("Boutique"),
+      "window_set_title",
+      { subject: "Boutique" },
+    ],
+  ] as const)("%s appelle `%s` avec ses arguments en camelCase", async (_name, run, cmd, args) => {
+    const call = await capture(run);
+
+    expect(call.cmd).toBe(cmd);
+    expect(call.args).toEqual(args);
+  });
+
+  it("renvoie la réponse du cœur natif", async () => {
+    const response = { snapshot: { projects: [] }, undoToken: "jeton" };
+
+    const call = await capture(() => ipc.workspaceDelete("ws"), response);
+
+    expect(call.result).toEqual(response);
+  });
+
+  it("windowSetTitle ne renvoie rien", async () => {
+    const call = await capture(() => ipc.windowSetTitle(null));
+
+    expect(call.args).toEqual({ subject: null });
+    expect(call.result).toBeUndefined();
+  });
+});

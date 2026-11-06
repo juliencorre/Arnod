@@ -605,6 +605,15 @@ fn p10_dossier_absent_marque_introuvable() {
     assert_eq!(statuses, [ProjectStatus::Ok, ProjectStatus::Missing]);
 }
 
+#[test]
+fn p10_etats_identiques_cote_typescript() {
+    let rust: std::collections::BTreeSet<String> = [ProjectStatus::Ok, ProjectStatus::Missing]
+        .into_iter()
+        .map(crate::ts_contract::serialized_name)
+        .collect();
+    assert_eq!(rust, crate::ts_contract::union_members("ProjectStatus"));
+}
+
 // Format disque
 
 #[test]

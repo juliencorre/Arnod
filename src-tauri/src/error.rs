@@ -85,6 +85,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
+    use crate::ts_contract::{serialized_name, union_members};
 
     /// Toutes les natures, à compléter à chaque ajout de variante.
     const ALL_KINDS: [CommandErrorKind; 11] = [
@@ -101,29 +102,8 @@ mod tests {
         CommandErrorKind::NewerVersion,
     ];
 
-    /// Miroir TypeScript des types IPC, lu à la compilation des tests.
-    const IPC_TS: &str = include_str!("../../src/types/ipc.ts");
-
     fn serialized_kind(kind: CommandErrorKind) -> String {
-        match serde_json::to_value(kind).unwrap() {
-            serde_json::Value::String(name) => name,
-            other => panic!("nature sérialisée en {other}, chaîne attendue"),
-        }
-    }
-
-    /// Natures déclarées dans `export type CommandErrorKind = ...;` côté TypeScript.
-    fn typescript_kinds() -> BTreeSet<String> {
-        let start = IPC_TS
-            .find("export type CommandErrorKind =")
-            .expect("`CommandErrorKind` absent de src/types/ipc.ts");
-        let declaration = &IPC_TS[start..];
-        let declaration = &declaration[..declaration.find(';').unwrap()];
-        declaration
-            .split('"')
-            .skip(1)
-            .step_by(2)
-            .map(str::to_owned)
-            .collect()
+        serialized_name(kind)
     }
 
     #[test]
@@ -162,7 +142,7 @@ mod tests {
             ALL_KINDS.len(),
             "nature en double dans ALL_KINDS"
         );
-        assert_eq!(rust, typescript_kinds());
+        assert_eq!(rust, union_members("CommandErrorKind"));
     }
 
     #[test]
