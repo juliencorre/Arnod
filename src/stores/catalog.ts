@@ -112,6 +112,13 @@ export const useCatalogStore = defineStore("catalog", () => {
     return created.projectId;
   }
 
+  /** Inscrit un dossier projet existant et renvoie son identifiant (P12). */
+  async function addExistingProject(path: string, workspaceId: string): Promise<string> {
+    const added = await ipc.projectAddExisting(path, workspaceId);
+    apply(added.snapshot);
+    return added.projectId;
+  }
+
   /** Vérifie qu'un projet peut s'ouvrir (dossier présent) et le renvoie. */
   function openProject(projectId: string): Promise<ProjectView> {
     return ipc.projectOpen(projectId);
@@ -147,6 +154,7 @@ export const useCatalogStore = defineStore("catalog", () => {
     deleteWorkspace,
     undo,
     createProject,
+    addExistingProject,
     openProject,
     suggestFolder,
     pickFolder,

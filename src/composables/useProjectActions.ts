@@ -78,6 +78,24 @@ export function useProjectActions() {
     }
   }
 
+  /**
+   * Ajoute au référentiel un dossier projet existant choisi dans le sélecteur
+   * natif (P12), puis dans le workspace par défaut et `workspaceId`.
+   */
+  async function addExistingProject(workspaceId: string): Promise<void> {
+    try {
+      const path = await catalog.pickFolder(null);
+      if (path === null) return;
+      const projectId = await catalog.addExistingProject(path, workspaceId);
+      const workspaces = (catalog.projectById(projectId)?.workspaceIds ?? []).map(workspaceName);
+      toasts.show(
+        `« ${projectName(projectId)} » ajouté au référentiel et à ${joinNames(workspaces)}.`,
+      );
+    } catch (error) {
+      toasts.showError(error);
+    }
+  }
+
   /** Retire un projet d'un workspace, avec « Annuler » (P7, R5, R6). */
   async function removeFromWorkspace(projectId: string, workspaceId: string): Promise<void> {
     const name = projectName(projectId);
@@ -92,5 +110,11 @@ export function useProjectActions() {
     }
   }
 
-  return { openProject, announceCreated, addToWorkspaces, removeFromWorkspace };
+  return {
+    openProject,
+    announceCreated,
+    addToWorkspaces,
+    addExistingProject,
+    removeFromWorkspace,
+  };
 }

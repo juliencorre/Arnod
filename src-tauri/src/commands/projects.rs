@@ -63,6 +63,17 @@ pub fn project_create(
     state.create_project(&name, location.as_deref(), workspace_id)
 }
 
+/// Inscrit un dossier projet existant (contenant `arnod.yml`) au référentiel et
+/// l'ajoute au workspace par défaut et à `workspace_id` (P12).
+#[tauri::command]
+pub fn project_add_existing(
+    state: State<'_, AppState>,
+    path: String,
+    workspace_id: Uuid,
+) -> Result<ProjectCreated, CommandError> {
+    state.add_existing_project(&path, workspace_id)
+}
+
 /// Projet à ouvrir (P5) ; refusé si son dossier est introuvable (P10).
 #[tauri::command]
 pub fn project_open(

@@ -18,6 +18,7 @@ export type CommandName =
   | "project_suggest_folder"
   | "project_pick_folder"
   | "project_create"
+  | "project_add_existing"
   | "project_open"
   | "workspace_open"
   | "workspace_create"

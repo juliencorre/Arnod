@@ -134,6 +134,26 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
         }
         return { snapshot: normalize(), projectId: id };
       }
+      case "project_add_existing": {
+        const path = String(args.path);
+        if (path.endsWith("/vide")) {
+          fail(
+            "notAProject",
+            `Le dossier ${path} ne contient pas de projet Arnod (arnod.yml absent).`,
+          );
+        }
+        const name = path.split("/").at(-1) ?? path;
+        const taken = state.projects.find((p) => same(p.name, name));
+        if (taken)
+          fail("nameTaken", `Un projet « ${taken.name} » existe déjà dans le référentiel.`);
+        const target = workspace(args.workspaceId);
+        const id = `p-${name}`;
+        state.projects.push({ id, name, path, status: "ok", workspaceIds: [] });
+        for (const w of [workspace(state.defaultWorkspaceId), target]) {
+          if (!w.projectIds.includes(id)) w.projectIds.push(id);
+        }
+        return { snapshot: normalize(), projectId: id };
+      }
       case "project_open": {
         const found = project(args.projectId);
         if (core.missing.has(found.id)) {

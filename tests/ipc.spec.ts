@@ -129,6 +129,12 @@ describe("commandes du catalogue", () => {
       "project_create",
       { name: "boutique", location: null, workspaceId: "ws" },
     ],
+    [
+      "projectAddExisting",
+      () => ipc.projectAddExisting("/home/julien/dev/legacy", "ws"),
+      "project_add_existing",
+      { path: "/home/julien/dev/legacy", workspaceId: "ws" },
+    ],
     ["projectOpen", () => ipc.projectOpen("p1"), "project_open", { projectId: "p1" }],
     ["workspaceOpen", () => ipc.workspaceOpen("ws"), "workspace_open", { workspaceId: "ws" }],
     [
