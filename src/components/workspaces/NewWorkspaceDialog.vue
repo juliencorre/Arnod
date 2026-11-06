@@ -43,6 +43,7 @@ async function submit(): Promise<void> {
     const workspaceId = await catalog.createWorkspace(name.value);
     close();
     if (request.open) await navigation.showWorkspace(workspaceId);
+    else navigation.selectManagedWorkspace(workspaceId);
     emit("created", workspaceId);
     toasts.show(`Workspace « ${catalog.workspaceById(workspaceId)?.name ?? ""} » créé.`);
   } catch (caught) {
