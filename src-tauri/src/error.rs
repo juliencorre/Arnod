@@ -10,6 +10,8 @@
 //! côté ; un test vérifie que les deux listes de natures concordent.
 
 use std::fmt;
+use std::io;
+use std::path::Path;
 
 use serde::Serialize;
 
@@ -58,6 +60,15 @@ impl CommandError {
             kind,
             message: message.into(),
         }
+    }
+
+    /// Erreur d'entrée-sortie : `action` décrit ce qui a échoué
+    /// (« Création du dossier impossible »), `path` le fichier ou dossier visé.
+    pub fn io(action: &str, path: &Path, error: &io::Error) -> Self {
+        Self::new(
+            CommandErrorKind::Io,
+            format!("{action} ({}) : {error}", path.display()),
+        )
     }
 }
 
@@ -152,6 +163,21 @@ mod tests {
             "nature en double dans ALL_KINDS"
         );
         assert_eq!(rust, typescript_kinds());
+    }
+
+    #[test]
+    fn erreur_d_entree_sortie_avec_action_et_chemin() {
+        let cause = io::Error::new(io::ErrorKind::PermissionDenied, "accès refusé");
+        let error = CommandError::io(
+            "Création du dossier impossible",
+            Path::new("/dev/boutique"),
+            &cause,
+        );
+        assert_eq!(error.kind, CommandErrorKind::Io);
+        assert_eq!(
+            error.message,
+            "Création du dossier impossible (/dev/boutique) : accès refusé"
+        );
     }
 
     #[test]
