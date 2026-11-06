@@ -1,19 +1,24 @@
 <script setup lang="ts">
 /**
  * Barre latérale. Au premier lancement (1a) : la marque et le workspace par
- * défaut créé automatiquement. Ensuite : le workspace courant (2a), qui
- * deviendra le sélecteur de workspaces (2b, T20), et ses projets (T18).
+ * défaut créé automatiquement. Ensuite (2a) : le sélecteur de workspaces (2b),
+ * les projets du workspace courant et « + Ajouter un projet » (W6).
  */
 import { computed, useId } from "vue";
 
 import ColorDot from "@/components/ui/ColorDot.vue";
-import { countLabel } from "@/lib/format";
+import WorkspaceSwitcher from "@/components/workspaces/WorkspaceSwitcher.vue";
+import { useProjectActions } from "@/composables/useProjectActions";
 import { useCatalogStore } from "@/stores/catalog";
+import { useDialogStore } from "@/stores/dialogs";
 import { useNavigationStore } from "@/stores/navigation";
 
 const catalog = useCatalogStore();
+const dialogs = useDialogStore();
 const navigation = useNavigationStore();
+const { openProject } = useProjectActions();
 const labelId = useId();
+const projectsLabelId = useId();
 
 const isFirstRun = computed(() => navigation.view.kind === "firstRun");
 const workspace = computed(() =>
@@ -22,6 +27,10 @@ const workspace = computed(() =>
     : catalog.workspaceById(navigation.currentWorkspaceId),
 );
 const projectCount = computed(() => workspace.value?.projectIds.length ?? 0);
+const projects = computed(() => (workspace.value ? catalog.projectsOf(workspace.value.id) : []));
+const openProjectId = computed(() =>
+  navigation.view.kind === "project" ? navigation.view.projectId : null,
+);
 </script>
 
 <template>
@@ -45,18 +54,39 @@ const projectCount = computed(() => workspace.value?.projectIds.length ?? 0);
       </section>
     </template>
 
-    <header v-else-if="workspace" class="sidebar__current">
-      <ColorDot :color="workspace.color" />
-      <div class="sidebar__current-text">
-        <div class="sidebar__current-name">
-          <span class="sidebar__name">{{ workspace.name }}</span>
-          <span v-if="workspace.isDefault" class="sidebar__badge">par défaut</span>
-        </div>
-        <div class="sidebar__meta">
-          Workspace · {{ countLabel(projectCount, "projet", "projets") }}
-        </div>
-      </div>
-    </header>
+    <template v-else-if="workspace">
+      <WorkspaceSwitcher :workspace="workspace" />
+      <nav class="sidebar__section" :aria-labelledby="projectsLabelId">
+        <h2 :id="projectsLabelId" class="sidebar__label">Projets</h2>
+        <ul class="sidebar__projects">
+          <li v-for="project in projects" :key="project.id">
+            <button
+              type="button"
+              class="sidebar__project"
+              :class="{ 'sidebar__project--open': project.id === openProjectId }"
+              :aria-current="project.id === openProjectId ? 'page' : undefined"
+              @click="openProject(project.id, workspace.id)"
+            >
+              <span class="sidebar__initial" aria-hidden="true">{{
+                project.name.charAt(0).toUpperCase()
+              }}</span>
+              <span class="sidebar__project-name">{{ project.name }}</span>
+              <span
+                v-if="project.status === 'missing'"
+                class="sidebar__missing"
+                title="Dossier introuvable"
+              >
+                <span aria-hidden="true">!</span>
+                <span class="visually-hidden">(dossier introuvable)</span>
+              </span>
+            </button>
+          </li>
+        </ul>
+        <button type="button" class="sidebar__add" @click="dialogs.openAddProjects(workspace.id)">
+          + Ajouter un projet
+        </button>
+      </nav>
+    </template>
   </aside>
 </template>
 
@@ -142,33 +172,83 @@ const projectCount = computed(() => workspace.value?.projectIds.length ?? 0);
   color: var(--color-muted);
 }
 
-.sidebar__current {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.625rem;
-  padding: 0.5rem 0.5rem 0.25rem;
-}
-
-.sidebar__current .dot {
-  margin-top: 0.25rem;
-}
-
-.sidebar__current-text {
+.sidebar__projects {
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
-  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.sidebar__current-name {
+.sidebar__project {
+  box-sizing: border-box;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  color: var(--color-text);
+  background: none;
+  cursor: pointer;
 }
 
-.sidebar__meta {
-  font-size: 0.75rem;
+.sidebar__project:hover {
+  background: var(--color-surface);
+}
+
+.sidebar__project--open {
+  font-weight: 600;
+  background: var(--color-surface);
+}
+
+.sidebar__project:focus-visible,
+.sidebar__add:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.sidebar__initial {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 4px;
+  font: 600 0.6875rem var(--font-mono);
   color: var(--color-muted);
+  background: var(--color-chip);
+}
+
+.sidebar__project-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar__missing {
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.sidebar__add {
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  color: var(--color-link);
+  background: none;
+  cursor: pointer;
 }
 </style>

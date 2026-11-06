@@ -10,6 +10,8 @@ import AddToWorkspacesDialog from "@/components/projects/AddToWorkspacesDialog.v
 import FirstRun from "@/components/projects/FirstRun.vue";
 import NewProjectDialog from "@/components/projects/NewProjectDialog.vue";
 import ProjectView from "@/components/projects/ProjectView.vue";
+import AddProjectsDialog from "@/components/workspaces/AddProjectsDialog.vue";
+import NewWorkspaceDialog from "@/components/workspaces/NewWorkspaceDialog.vue";
 import WorkspaceHome from "@/components/workspaces/WorkspaceHome.vue";
 import { useNavigationStore } from "@/stores/navigation";
 
@@ -35,6 +37,8 @@ const projectView = computed(() => (navigation.view.kind === "project" ? navigat
     </main>
     <NewProjectDialog />
     <AddToWorkspacesDialog />
+    <AddProjectsDialog />
+    <NewWorkspaceDialog />
   </div>
 </template>
 
