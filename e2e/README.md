@@ -28,7 +28,8 @@ embarquée dans le binaire.
   une session WebDriver classique (WebKitWebDriver ne gère pas WebDriver BiDi).
 - `arnod.e2e.ts` enchaîne les étapes d'un utilisateur : premier lancement, création de
   projets, workspaces, ajout et retrait avec « Annuler », gestion, référentiel, redémarrage
-  (W2), dossier supprimé hors d'Arnod (P10), dossier projet existant (P12). Chaque étape
+  (W2), dossier supprimé hors d'Arnod (P10), dossier projet existant (P12), projet oublié puis
+  rétabli (P11). Chaque étape
   vérifie aussi le disque (`arnod.yml`, `arnod.json`).
 - Les captures sont enregistrées dans `e2e/artifacts/` (ignoré par Git) et publiées par la CI.
 

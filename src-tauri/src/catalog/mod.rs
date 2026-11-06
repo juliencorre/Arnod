@@ -294,6 +294,34 @@ impl Catalog {
         })
     }
 
+    /// Oublie un projet : il quitte le référentiel et tous ses workspaces, ses
+    /// fichiers restent sur le disque (P11, R6).
+    pub fn forget_project(&mut self, project_id: Uuid) -> Result<UndoAction, CommandError> {
+        let index = self
+            .projects
+            .iter()
+            .position(|project| project.id == project_id)
+            .ok_or_else(project_not_found)?;
+        let project = self.projects.remove(index);
+        let memberships = self
+            .workspaces
+            .iter_mut()
+            .filter_map(|workspace| {
+                let position = workspace
+                    .project_ids
+                    .iter()
+                    .position(|id| *id == project_id)?;
+                workspace.project_ids.remove(position);
+                Some((workspace.id, position))
+            })
+            .collect();
+        Ok(UndoAction::RestoreForgottenProject {
+            project,
+            index,
+            memberships,
+        })
+    }
+
     /// Supprime un workspace ; ses projets restent au référentiel et dans leurs
     /// autres workspaces (W11, R3, R5). S'il était ouvert, le workspace par
     /// défaut devient le workspace ouvert (R8).
@@ -364,6 +392,60 @@ impl Catalog {
                     let index = index.min(workspace.project_ids.len());
                     workspace.project_ids.insert(index, project_id);
                 }
+            }
+            UndoAction::RestoreForgottenProject {
+                project,
+                index,
+                memberships,
+            } => self.restore_forgotten(project, index, &memberships)?,
+        }
+        Ok(())
+    }
+
+    /// Réinscrit un projet oublié (annulation de P11), sauf si un autre projet a
+    /// pris son nom ou son dossier entre-temps.
+    fn restore_forgotten(
+        &mut self,
+        project: Project,
+        index: usize,
+        memberships: &[(Uuid, usize)],
+    ) -> Result<(), CommandError> {
+        if self.project(project.id).is_ok() {
+            return Ok(());
+        }
+        if let Some(existing) = self
+            .projects
+            .iter()
+            .find(|other| names::same_name(&other.name, &project.name))
+        {
+            return Err(CommandError::new(
+                CommandErrorKind::NameTaken,
+                format!(
+                    "Impossible d'annuler : un autre projet s'appelle déjà « {} ».",
+                    existing.name
+                ),
+            ));
+        }
+        if let Some(existing) = self
+            .projects
+            .iter()
+            .find(|other| same_path(&other.path, &project.path))
+        {
+            return Err(CommandError::new(
+                CommandErrorKind::AlreadyRegistered,
+                format!(
+                    "Impossible d'annuler : le projet « {} » occupe déjà ce dossier.",
+                    existing.name
+                ),
+            ));
+        }
+        let project_id = project.id;
+        let index = index.min(self.projects.len());
+        self.projects.insert(index, project);
+        for (workspace_id, position) in memberships {
+            if let Ok(workspace) = self.workspace_mut(*workspace_id) {
+                let position = (*position).min(workspace.project_ids.len());
+                workspace.project_ids.insert(position, project_id);
             }
         }
         Ok(())

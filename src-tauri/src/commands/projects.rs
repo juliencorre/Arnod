@@ -6,7 +6,7 @@ use tauri::{State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 use uuid::Uuid;
 
-use crate::catalog::snapshot::{ProjectCreated, ProjectView};
+use crate::catalog::snapshot::{ProjectCreated, ProjectView, Undoable};
 use crate::error::{CommandError, CommandErrorKind};
 use crate::state::AppState;
 
@@ -72,6 +72,16 @@ pub fn project_add_existing(
     workspace_id: Uuid,
 ) -> Result<ProjectCreated, CommandError> {
     state.add_existing_project(&path, workspace_id)
+}
+
+/// Oublie un projet : il quitte le référentiel et ses workspaces, ses fichiers
+/// restent sur le disque ; annulable (P11).
+#[tauri::command]
+pub fn project_forget(
+    state: State<'_, AppState>,
+    project_id: Uuid,
+) -> Result<Undoable, CommandError> {
+    state.mutate_undoable(|catalog| catalog.forget_project(project_id))
 }
 
 /// Projet à ouvrir (P5) ; refusé si son dossier est introuvable (P10).

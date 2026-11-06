@@ -42,6 +42,7 @@ pub fn run() {
             commands::projects::project_pick_folder,
             commands::projects::project_create,
             commands::projects::project_add_existing,
+            commands::projects::project_forget,
             commands::projects::project_open,
             commands::workspaces::workspace_open,
             commands::workspaces::workspace_create,

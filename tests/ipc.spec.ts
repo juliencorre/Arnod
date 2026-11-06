@@ -135,6 +135,7 @@ describe("commandes du catalogue", () => {
       "project_add_existing",
       { path: "/home/julien/dev/legacy", workspaceId: "ws" },
     ],
+    ["projectForget", () => ipc.projectForget("p1"), "project_forget", { projectId: "p1" }],
     ["projectOpen", () => ipc.projectOpen("p1"), "project_open", { projectId: "p1" }],
     ["workspaceOpen", () => ipc.workspaceOpen("ws"), "workspace_open", { workspaceId: "ws" }],
     [

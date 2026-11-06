@@ -19,18 +19,18 @@ suit la préférence du système._
 Cas d'usage détaillés dans [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md),
 maquettes dans [`docs/maquettes/`](docs/maquettes/).
 
-| ID      | Comportement                                                                                                                   |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| W1, P1  | Premier lancement : « Mes projets » est créé par défaut et Arnod propose de créer le premier projet (dossier `~/arnod/<nom>`). |
-| P2      | Nouveau projet depuis un workspace : rangé dans ce workspace et dans le workspace par défaut.                                  |
-| P5, P10 | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                               |
-| P6, P7  | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                              |
-| P9, P12 | Référentiel des projets : chaque projet une fois, ajout d'un dossier projet existant (`arnod.yml`).                            |
-| W2      | Les lancements suivants rouvrent le dernier workspace utilisé, conservé dans `arnod.json`.                                     |
-| W4, W5  | Sélecteur de workspaces avec recherche, création d'un workspace.                                                               |
-| W7–W11  | Gestion des workspaces : nom, couleur, workspace par défaut, projets, suppression avec « Annuler ».                            |
-| F4      | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                       |
-| N7      | Thème clair ou sombre selon le système, police système.                                                                        |
+| ID           | Comportement                                                                                                                      |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| W1, P1       | Premier lancement : « Mes projets » est créé par défaut et Arnod propose de créer le premier projet (dossier `~/arnod/<nom>`).    |
+| P2           | Nouveau projet depuis un workspace : rangé dans ce workspace et dans le workspace par défaut.                                     |
+| P5, P10      | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                                  |
+| P6, P7       | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                                 |
+| P9, P11, P12 | Référentiel des projets : chaque projet une fois, « Oublier » avec « Annuler », ajout d'un dossier projet existant (`arnod.yml`). |
+| W2           | Les lancements suivants rouvrent le dernier workspace utilisé, conservé dans `arnod.json`.                                        |
+| W4, W5       | Sélecteur de workspaces avec recherche, création d'un workspace.                                                                  |
+| W7–W11       | Gestion des workspaces : nom, couleur, workspace par défaut, projets, suppression avec « Annuler ».                               |
+| F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                          |
+| N7           | Thème clair ou sombre selon le système, police système.                                                                           |
 
 Pile : [Tauri 2](https://v2.tauri.app) (cœur Rust, WebView2 sous Windows, WebKitGTK sous
 Linux), Vue 3, TypeScript strict, Vite, Pinia. Les règles d'architecture et les conventions

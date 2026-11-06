@@ -119,6 +119,13 @@ export const useCatalogStore = defineStore("catalog", () => {
     return added.projectId;
   }
 
+  /** Oublie un projet ; renvoie le jeton d'annulation (P11). */
+  async function forgetProject(projectId: string): Promise<string> {
+    const forgotten = await ipc.projectForget(projectId);
+    apply(forgotten.snapshot);
+    return forgotten.undoToken;
+  }
+
   /** Vérifie qu'un projet peut s'ouvrir (dossier présent) et le renvoie. */
   function openProject(projectId: string): Promise<ProjectView> {
     return ipc.projectOpen(projectId);
@@ -155,6 +162,7 @@ export const useCatalogStore = defineStore("catalog", () => {
     undo,
     createProject,
     addExistingProject,
+    forgetProject,
     openProject,
     suggestFolder,
     pickFolder,

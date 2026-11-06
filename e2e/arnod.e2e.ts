@@ -282,4 +282,25 @@ describe("Arnod, de bout en bout", () => {
     const added = readState(sandbox).projects.find((p) => p.name === "catalogue-legacy");
     expect(added?.id).toBe("7f3c2a10-5b1e-4c8d-9a2f-0e6b4d3c2a10");
   });
+
+  it("oublie un projet sans toucher à ses fichiers, puis annule (P11, R6)", async () => {
+    await openSwitcher();
+    await browser.$("button*=Référentiel des projets").click();
+    await waitForHeading(browser, "3 projets");
+
+    await browser.$('button[aria-label="Oublier catalogue-legacy"]').click();
+    await waitForHeading(browser, "2 projets");
+
+    expect(await toastText(browser)).toContain("Ses fichiers restent sur le disque.");
+    const state = readState(sandbox);
+    expect(state.projects.map((p) => p.name)).not.toContain("catalogue-legacy");
+    expect(state.workspaces.flatMap((w) => w.projectIds)).not.toContain(
+      "7f3c2a10-5b1e-4c8d-9a2f-0e6b4d3c2a10",
+    );
+    expect(existsSync(path.join(sandbox.home, "dev", "catalogue-legacy", "arnod.yml"))).toBe(true);
+
+    await browser.$(".toast").$("button=Annuler").click();
+    await waitForHeading(browser, "3 projets");
+    expect(readState(sandbox).projects.map((p) => p.name)).toContain("catalogue-legacy");
+  });
 });

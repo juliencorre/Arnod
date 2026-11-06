@@ -328,6 +328,53 @@ fn r6_annuler_un_retrait_dans_un_workspace_supprime() {
     assert_eq!(kind(catalog.undo(action)), CommandErrorKind::NotFound);
 }
 
+// P11 - oublier un projet
+
+#[test]
+fn p11_oublier_retire_du_referentiel_et_des_workspaces() {
+    let mut catalog = Catalog::first_launch();
+    let default = catalog.default_workspace_id();
+    let boutique = catalog.create_workspace("Boutique").unwrap();
+    let first = add_project(&mut catalog, "a", boutique);
+    let forgotten = add_project(&mut catalog, "b", boutique);
+    let last = add_project(&mut catalog, "c", default);
+    let before = catalog.clone();
+
+    let action = catalog.forget_project(forgotten).unwrap();
+
+    assert_eq!(kind(catalog.project(forgotten)), CommandErrorKind::NotFound);
+    assert_eq!(project_ids_of(&catalog, default), vec![first, last]);
+    assert_eq!(project_ids_of(&catalog, boutique), vec![first]);
+
+    catalog.undo(action.clone()).unwrap();
+    assert_eq!(catalog, before);
+    catalog.undo(action).unwrap();
+    assert_eq!(catalog, before);
+    assert_eq!(
+        kind(catalog.forget_project(Uuid::new_v4())),
+        CommandErrorKind::NotFound
+    );
+}
+
+#[test]
+fn p11_annulation_impossible_si_le_nom_a_ete_repris() {
+    let mut catalog = Catalog::first_launch();
+    let default = catalog.default_workspace_id();
+    let forgotten = add_project(&mut catalog, "boutique", default);
+    let action = catalog.forget_project(forgotten).unwrap();
+    catalog
+        .register_project(Uuid::new_v4(), "BOUTIQUE", path("ailleurs"), default)
+        .unwrap();
+
+    let error = catalog.undo(action).unwrap_err();
+
+    assert_eq!(error.kind, CommandErrorKind::NameTaken);
+    assert_eq!(
+        error.message,
+        "Impossible d'annuler : un autre projet s'appelle déjà « BOUTIQUE »."
+    );
+}
+
 // R7 - rouvrir le dernier workspace utilisé
 
 #[test]
