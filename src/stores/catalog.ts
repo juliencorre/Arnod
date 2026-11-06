@@ -117,6 +117,16 @@ export const useCatalogStore = defineStore("catalog", () => {
     return ipc.projectOpen(projectId);
   }
 
+  /** Dossier proposé `<emplacement>/<nom>` (aperçu calculé par le cœur). */
+  function suggestFolder(name: string, location: string | null): Promise<string> {
+    return ipc.projectSuggestFolder(name, location);
+  }
+
+  /** Sélecteur de dossier natif ; `null` si l'utilisateur annule. */
+  function pickFolder(location: string | null): Promise<string | null> {
+    return ipc.projectPickFolder(location);
+  }
+
   return {
     snapshot,
     projects,
@@ -138,5 +148,7 @@ export const useCatalogStore = defineStore("catalog", () => {
     undo,
     createProject,
     openProject,
+    suggestFolder,
+    pickFolder,
   };
 });

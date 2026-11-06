@@ -404,9 +404,9 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 
 **Lot D - Projets**
 
-- [ ] **T15** Premier lancement (1a) : P1, P3, W1.
-- [ ] **T16** Vue projet vide (1b) et notification « créé dans… · Ajouter à un autre… » : P4, P5.
-- [ ] **T17** Nouveau projet en fenêtre modale (2a bis) : P2.
+- [x] **T15** Premier lancement (1a) : P1, P3, W1.
+- [x] **T16** Vue projet vide (1b) et notification « créé dans… · Ajouter à un autre… » : P4, P5.
+- [x] **T17** Nouveau projet en fenêtre modale (2a bis) : P2.
 
 **Lot E - Workspaces au quotidien**
 

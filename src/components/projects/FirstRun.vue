@@ -1,7 +1,16 @@
 <script setup lang="ts">
-/** Premier lancement (1a) : aucun projet encore. Le formulaire de création arrive avec T15. */
+/**
+ * Premier lancement (1a) : aucun projet encore. On nomme le premier ; le dossier
+ * et le workspace par défaut ont déjà une valeur.
+ */
 import { useId } from "vue";
 
+import ProjectForm from "@/components/projects/ProjectForm.vue";
+import { useProjectActions } from "@/composables/useProjectActions";
+import { useCatalogStore } from "@/stores/catalog";
+
+const catalog = useCatalogStore();
+const { announceCreated } = useProjectActions();
 const titleId = useId();
 </script>
 
@@ -13,6 +22,16 @@ const titleId = useId();
         Donnez-lui un nom : vous écrirez votre première requête juste après.
       </p>
     </div>
+    <div v-if="catalog.defaultWorkspace" class="first-run__card">
+      <ProjectForm
+        mode="firstRun"
+        :initial-workspace-id="catalog.defaultWorkspace.id"
+        @created="announceCreated"
+      />
+    </div>
+    <p class="first-run__note">
+      Une requête = un fichier YAML lisible, prêt à versionner avec Git.
+    </p>
   </section>
 </template>
 
@@ -47,6 +66,21 @@ const titleId = useId();
   margin: 0;
   max-width: 32rem;
   font-size: 0.9375rem;
+  color: var(--color-muted);
+}
+
+.first-run__card {
+  box-sizing: border-box;
+  width: min(32.5rem, 100%);
+  padding: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.first-run__note {
+  margin: 0;
+  font-size: 0.8125rem;
   color: var(--color-muted);
 }
 </style>
