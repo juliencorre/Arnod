@@ -87,7 +87,8 @@ describe("Arnod, de bout en bout", () => {
   });
 
   it("crée le premier projet sur disque et l'ouvre (P1, P4, P5)", async () => {
-    await browser.$("form input").setValue("boutique-tests");
+    // Les fenêtres fermées restent dans le DOM, hors de `main` : leurs champs ne comptent pas.
+    await browser.$("main form input").setValue("boutique-tests");
     const folder = browser.$('[data-testid="project-folder"]');
     const expected = path.join(sandbox.home, "arnod", "boutique-tests");
     await browser.waitUntil(async () => (await folder.getText()) === expected, {
