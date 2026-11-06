@@ -107,6 +107,23 @@ describe("ToggleSwitch", () => {
     expect(wrapper.emitted("update:modelValue")).toEqual([[true]]);
   });
 
+  it("associe explicitement le libellé : nom accessible et clic sur le texte", async () => {
+    const wrapper = mount(ToggleSwitch, {
+      props: { modelValue: false },
+      slots: { default: "Workspace par défaut" },
+      attachTo: document.body,
+    });
+    const toggle = wrapper.get('[role="switch"]');
+    const labelId = toggle.attributes("aria-labelledby") ?? "";
+    expect(document.getElementById(labelId)?.textContent).toBe("Workspace par défaut");
+    expect(wrapper.get("label").attributes("for")).toBe(toggle.attributes("id"));
+
+    await wrapper.get(".toggle__label").trigger("click");
+
+    expect(wrapper.emitted("update:modelValue")).toEqual([[true]]);
+    wrapper.unmount();
+  });
+
   it("ne bascule pas désactivé", async () => {
     const wrapper = mount(ToggleSwitch, { props: { modelValue: true, disabled: true } });
 
