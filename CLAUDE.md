@@ -56,8 +56,12 @@ tests/                  Tests Vitest (happy-dom, mockIPC), dont contrastes du th
 src-tauri/              Cœur Rust
   tauri.conf.json       Fenêtre, CSP, bundles (NSIS currentUser, AppImage)
   capabilities/         Permissions de la WebView
-  src/lib.rs            Builder Tauri, enregistrement des commandes
+  src/lib.rs            Builder Tauri, plugin dialog, état, enregistrement des commandes
   src/error.rs          CommandError, erreur commune des commandes
+  src/catalog/          Règles des projets et workspaces (pur : ni Tauri, ni disque)
+  src/storage.rs        Lecture / écriture atomique d'arnod.json
+  src/manifest.rs       Dossier d'un projet et manifeste arnod.yml
+  src/state.rs          AppState : catalogue + stockage + annulation (app.manage)
   src/menu.rs           Menu natif (Fichier > Quitter)
   src/commands/         Commandes, un fichier par domaine
 docs/                   Plan en cours, maquettes, captures du README
@@ -122,11 +126,13 @@ Linux : installer d'abord les dépendances système
 Référence : `docs/plan-projets-workspaces.md` (cas d'usage P1 à P12 et W1 à W11, règles R1 à
 R11, tâches T1 à T27). Cocher une tâche dans le plan quand elle est livrée.
 
-- Les règles R1 à R11 vivent dans le cœur Rust, dans un module pur sans dépendance à Tauri
-  (`src-tauri/src/catalog/`, lot B). L'interface affiche l'état et ne fait que des filtres et
-  comptages d'affichage.
-- Une commande qui modifie le catalogue renvoie l'instantané complet (`CatalogSnapshot`) ; le
-  store remplace son état. Les actions annulables renvoient aussi un jeton d'annulation.
+- Les règles R1 à R11 vivent dans `src-tauri/src/catalog/`, module pur sans dépendance à Tauri
+  ni au disque, testé règle par règle (`catalog/tests.rs`). L'interface affiche l'état et ne
+  fait que des filtres et comptages d'affichage.
+- Une commande qui modifie le catalogue passe par `AppState::mutate` (ou `mutate_undoable`) :
+  copie, règle, écriture sur disque, remplacement. Elle renvoie l'instantané complet
+  (`CatalogSnapshot`) ; le store remplace son état. Les actions annulables renvoient aussi un
+  jeton pour `undo`. Les types de réponse sont dans `catalog/snapshot.rs`.
 - État de l'application : `arnod.json` dans `app_local_data_dir()`, écrit de façon atomique
   (fichier temporaire puis renommage). Un fichier illisible ou écrit par une version plus
   récente n'est jamais écrasé.
