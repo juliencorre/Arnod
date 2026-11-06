@@ -12,15 +12,16 @@ Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 
 _AppImage release sous Linux (WebKitGTK). Le thème suit la préférence du système._
 
-## Ce que fait le squelette
+## Ce que fait Arnod aujourd'hui
 
-| ID  | Comportement                                                                             |
-| --- | ---------------------------------------------------------------------------------------- |
-| F1  | La fenêtre affiche « Hello World » au démarrage.                                         |
-| F2  | Ce texte provient de la commande Rust `hello`, appelée par l'interface via IPC.          |
-| F3  | Le bouton « Dire bonjour » rappelle la commande et affiche l'heure du cœur natif.        |
-| F4  | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre. |
-| N7  | Thème clair ou sombre selon le système, police système.                                  |
+Projets et workspaces en cours, selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md).
+
+| ID  | Comportement                                                                                                     |
+| --- | ---------------------------------------------------------------------------------------------------------------- |
+| W1  | Au premier lancement, le workspace « Mes projets » est créé et la page « Créez votre premier projet » s'affiche. |
+| W2  | Les lancements suivants rouvrent le dernier workspace utilisé, conservé dans `arnod.json`.                       |
+| F4  | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                         |
+| N7  | Thème clair ou sombre selon le système, police système.                                                          |
 
 Pile : [Tauri 2](https://v2.tauri.app) (cœur Rust, WebView2 sous Windows, WebKitGTK sous
 Linux), Vue 3, TypeScript strict, Vite, Pinia. Les règles d'architecture et les conventions
@@ -118,8 +119,8 @@ Vitest, clippy, `cargo test`, le build puis un test de fumée :
 - **Windows** (`scripts/smoke-windows.ps1`) : manifeste de l'installeur en `asInvoker`
   (aucune élévation demandée), installation silencieuse dans `%LOCALAPPDATA%\Arnod`,
   raccourci du menu Démarrer, entrée de désinstallation dans `HKCU`, lancement, attente de
-  « Hello World » dans la page (UI Automation), capture publiée en artefact, fermeture par la
-  croix (code 0), désinstallation silencieuse.
+  « Créez votre premier projet » dans la page (UI Automation), capture publiée en artefact,
+  fermeture par la croix (code 0), désinstallation silencieuse.
 - **Linux** (`scripts/smoke-linux.sh`) : AppImage construit sur Ubuntu 22.04, lancé sous
   Xvfb, capture d'écran publiée en artefact, fermeture par `Ctrl+Q` (code 0).
 

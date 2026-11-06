@@ -13,6 +13,8 @@ pub mod manifest;
 mod menu;
 pub mod state;
 pub mod storage;
+#[cfg(test)]
+mod ts_contract;
 
 use tauri::Manager;
 

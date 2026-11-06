@@ -390,16 +390,16 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
       « dossier non vide », « projet déjà inscrit ».
 - [x] **T9** `state.rs`, `commands/projects.rs`, `commands/workspaces.rs`, enregistrement dans
       `generate_handler!` ; tests de la forme JSON de `CatalogSnapshot` et des erreurs.
-- [ ] **T10** Sélecteur de dossier `project_pick_folder` (`tauri-plugin-dialog` côté Rust) et titre de fenêtre ;
-      mesure de la taille de l'installeur.
+- [x] **T10** Sélecteur de dossier `project_pick_folder` (`tauri-plugin-dialog` côté Rust) et titre de fenêtre ;
+      mesure de la taille de l'installeur (installeur Windows : 1,27 Mo).
 
 **Lot C - Frontend : socle**
 
-- [ ] **T11** `src/types/ipc.ts`, `src/lib/ipc.ts`, tests `mockIPC` de chaque commande.
-- [ ] **T12** Stores `catalog`, `navigation`, `toasts` et leurs tests.
-- [ ] **T13** Composants `ui/` (bouton, dialogue, menu et sous-menu, interrupteur, pastille,
+- [x] **T11** `src/types/ipc.ts`, `src/lib/ipc.ts`, tests `mockIPC` de chaque commande.
+- [x] **T12** Stores `catalog`, `navigation`, `toasts` et leurs tests.
+- [x] **T13** Composants `ui/` (bouton, dialogue, menu et sous-menu, interrupteur, pastille,
       recherche, notification) avec tests clavier.
-- [ ] **T14** Coquille : barre latérale et zone principale ; au démarrage, premier lancement ou
+- [x] **T14** Coquille : barre latérale et zone principale ; au démarrage, premier lancement ou
       dernier workspace (W2).
 
 **Lot D - Projets**

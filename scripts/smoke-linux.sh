@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test de fumée de l'AppImage Linux sous un serveur X virtuel (Xvfb) :
 #   1. l'application démarre et reste vivante ;
-#   2. une capture d'écran est enregistrée (vérification visuelle de F1) ;
+#   2. une capture d'écran est enregistrée (vérification visuelle du premier lancement) ;
 #   3. Ctrl+Q (menu Fichier > Quitter) ferme l'application avec le code 0 (F4).
 #
 # Usage : scripts/smoke-linux.sh [chemin/vers/Arnod.AppImage] [capture.png]

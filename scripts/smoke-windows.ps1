@@ -7,7 +7,8 @@
   2. Installe en mode silencieux (/S) pour l'utilisateur courant.
   3. Vérifie le dossier d'installation, le raccourci du menu Démarrer et
      l'entrée de désinstallation dans HKCU (Paramètres Windows).
-  4. Lance Arnod, attend que la page affiche « Hello World » (F1, F2, via UI Automation),
+  4. Lance Arnod, attend que la page affiche « Créez votre premier projet » (poste vierge :
+     premier lancement, 1a), via UI Automation,
      enregistre une capture, puis ferme la fenêtre comme avec la croix (F4).
   5. Désinstalle en mode silencieux et vérifie la suppression.
 
@@ -110,7 +111,7 @@ if (-not (Test-Path $uninstallKey)) { throw "Entrée de désinstallation absente
 $location = (Get-ItemProperty $uninstallKey).InstallLocation.Trim('"')
 Write-Host "Installé dans $location (entrée de désinstallation dans HKCU)."
 
-# 4. Lancement, attente du rendu de « Hello World » (F1/F2), puis fermeture par la croix (F4).
+# 4. Lancement, attente du premier lancement (1a), puis fermeture par la croix (F4).
 $app = Start-Process -FilePath $exe -PassThru
 # Mémorise le handle : sans cela, ExitCode peut rester vide après WaitForExit.
 $null = $app.Handle
@@ -123,18 +124,19 @@ Write-Host "Fenêtre « Arnod » ouverte (PID $($app.Id))."
 
 $failures = @()
 
-# La fenêtre native apparaît avant la WebView : on attend que la page ait rendu le texte
-# renvoyé par la commande Rust, lu via l'arbre d'accessibilité (UI Automation) de WebView2.
+# La fenêtre native apparaît avant la WebView : on attend que la page ait rendu le premier
+# lancement, affiché après le chargement du catalogue par le cœur Rust (`catalog_load`), lu
+# via l'arbre d'accessibilité (UI Automation) de WebView2.
 $started = Get-Date
 $rendered = $false
 if (Initialize-UIAutomation) {
   try {
-    Wait-Until -TimeoutSeconds 60 -Message "« Hello World » n'est pas apparu dans la fenêtre." -Condition {
+    Wait-Until -TimeoutSeconds 60 -Message "« Créez votre premier projet » n'est pas apparu dans la fenêtre." -Condition {
       if ($app.HasExited) { throw "Arnod s'est arrêté (code $($app.ExitCode))." }
-      $null -ne (Find-UIElementByName -Handle $app.MainWindowHandle -Name 'Hello World')
+      $null -ne (Find-UIElementByName -Handle $app.MainWindowHandle -Name 'Créez votre premier projet')
     }
     $rendered = $true
-    Write-Host ("« Hello World » affiché après {0:N1} s (F1, F2)." -f ((Get-Date) - $started).TotalSeconds)
+    Write-Host ("« Créez votre premier projet » affiché après {0:N1} s (1a)." -f ((Get-Date) - $started).TotalSeconds)
   } catch {
     $failures += $_.Exception.Message
   }

@@ -34,7 +34,8 @@ Travail en cours : projets et workspaces, selon `docs/plan-projets-workspaces.md
    pures testables, la commande n'étant qu'une façade. Si elle peut échouer, elle renvoie
    `Result<T, CommandError>`.
 2. L'enregistrer dans `tauri::generate_handler![...]` (`src-tauri/src/lib.rs`).
-3. Ajouter son nom à `CommandName` et ses types dans `src/types/ipc.ts`.
+3. Ajouter son nom à `CommandName` et ses types dans `src/types/ipc.ts` (un test Rust vérifie
+   que `CommandName` concorde avec `generate_handler!`, et les unions miroirs avec le Rust).
 4. L'exposer dans l'objet `ipc` de `src/lib/ipc.ts`.
 5. Tester : `#[cfg(test)]` côté Rust (dont la forme JSON sérialisée, erreurs comprises),
    Vitest avec `mockIPC` côté frontend (`tests/`).
@@ -46,11 +47,15 @@ Travail en cours : projets et workspaces, selon `docs/plan-projets-workspaces.md
 ```
 src/                    Frontend Vue
   main.ts               Création de l'app + Pinia
-  App.vue               Page principale
+  App.vue               Démarrage : chargement du catalogue, coquille ou erreur bloquante
   styles.css            Thème clair/sombre (variables CSS), police système
   lib/ipc.ts            Wrapper typé autour d'invoke (seul point d'accès IPC)
   lib/format.ts         Formatage d'affichage
-  stores/               Stores Pinia
+  stores/               catalog (instantané), navigation (vue, titre), toasts (notifications)
+  components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification
+  components/layout/    Coquille : barre latérale et zone principale
+  components/projects/  Vues des projets (premier lancement...)
+  components/workspaces/ Vues des workspaces
   types/ipc.ts          Types IPC documentés à la main
 tests/                  Tests Vitest (happy-dom, mockIPC), dont contrastes du thème
 src-tauri/              Cœur Rust
@@ -93,6 +98,10 @@ Linux : installer d'abord les dépendances système
 ## Conventions
 
 - TypeScript strict (`strict`, `noUncheckedIndexedAccess`), pas de `any`.
+- Interface : réutiliser les composants de `src/components/ui/` (`BaseButton`, `BaseDialog` sur
+  `<dialog>` natif, `BaseMenu` accessible au clavier, `ToggleSwitch`, `SearchInput`,
+  `ColorDot`) ; navigation par le store `navigation` (pas de routeur) ; notifications par le
+  store `toasts`. Chaque composant interactif est testé au clavier.
 - ESLint (`vueTsConfigs.strictTypeChecked`) et Prettier sans erreur. Imports de types
   avec `import type`. Alias `@/` pour `src/`.
 - Rust : `cargo fmt` et `cargo clippy -D warnings` sans avertissement. Pas de `unwrap()`
