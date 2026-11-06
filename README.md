@@ -1,5 +1,11 @@
 # Arnod
 
+[![Build](https://github.com/juliencorre/Arnod/actions/workflows/build.yml/badge.svg?branch=Develop)](https://github.com/juliencorre/Arnod/actions/workflows/build.yml?query=branch%3ADevelop)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=juliencorre_Arnod&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=juliencorre_Arnod)
+[![Sécurité](https://sonarcloud.io/api/project_badges/measure?project=juliencorre_Arnod&metric=security_rating)](https://sonarcloud.io/summary/overall?id=juliencorre_Arnod)
+[![Fiabilité](https://sonarcloud.io/api/project_badges/measure?project=juliencorre_Arnod&metric=reliability_rating)](https://sonarcloud.io/summary/overall?id=juliencorre_Arnod)
+[![Maintenabilité](https://sonarcloud.io/api/project_badges/measure?project=juliencorre_Arnod&metric=sqale_rating)](https://sonarcloud.io/summary/overall?id=juliencorre_Arnod)
+
 Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 
 > **Statut : projets et workspaces.** Sur le squelette technique
