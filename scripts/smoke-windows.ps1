@@ -15,7 +15,7 @@
   standard se vérifie à la main (voir README), ce script contrôle le manifeste.
 
 .EXAMPLE
-  pwsh scripts/smoke-windows.ps1 -Installer .\src-tauri\target\release\bundle\nsis\Arnod_0.1.0_x64-setup.exe
+  pwsh scripts/smoke-windows.ps1 -Installer .\src-tauri\target\release\bundle\nsis\Arnod_0.0.1_x64-setup.exe
 #>
 param(
   [Parameter(Mandatory)] [string] $Installer,
