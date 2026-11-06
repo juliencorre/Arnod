@@ -23,7 +23,12 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function button(within: AppWrapper | DOMWrapper<Element>, text: string) {
+/** Élément dans lequel chercher des boutons (application ou partie de page). */
+interface Searchable {
+  findAll: (selector: string) => DOMWrapper<Element>[];
+}
+
+function button(within: Searchable, text: string) {
   const found = within.findAll("button").find((b) => b.text().trim() === text);
   if (!found) throw new Error(`bouton « ${text} » introuvable`);
   return found;
