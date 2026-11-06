@@ -390,8 +390,8 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
       « dossier non vide », « projet déjà inscrit ».
 - [x] **T9** `state.rs`, `commands/projects.rs`, `commands/workspaces.rs`, enregistrement dans
       `generate_handler!` ; tests de la forme JSON de `CatalogSnapshot` et des erreurs.
-- [ ] **T10** Sélecteur de dossier `project_pick_folder` (`tauri-plugin-dialog` côté Rust) et titre de fenêtre ;
-      mesure de la taille de l'installeur.
+- [x] **T10** Sélecteur de dossier `project_pick_folder` (`tauri-plugin-dialog` côté Rust) et titre de fenêtre ;
+      mesure de la taille de l'installeur (installeur Windows : 1,27 Mo).
 
 **Lot C - Frontend : socle**
 
