@@ -1,9 +1,11 @@
 //! Cœur natif d'Arnod.
 //!
 //! L'interface (WebView) ne contient aucune logique métier : elle appelle
-//! les commandes typées définies dans [`commands`].
+//! les commandes typées définies dans [`commands`]. Les commandes faillibles
+//! renvoient une [`error::CommandError`].
 
 pub mod commands;
+pub mod error;
 mod menu;
 
 /// Point d'entrée de l'application, appelé par `main.rs`.
