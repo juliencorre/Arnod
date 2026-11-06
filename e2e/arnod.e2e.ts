@@ -144,7 +144,7 @@ describe("Arnod, de bout en bout", () => {
     await browser.$("main .add-card").click();
     const dialog = browser.$("dialog[open]");
     await dialog.waitForDisplayed();
-    expect(await dialog.$("h2").getText()).toBe("Ajouter des projets à « Boutique »");
+    expect(await dialog.$("h2").getText()).toBe("Ajouter un projet à « Boutique »");
 
     await dialog.$("label*=boutique-tests").click();
     await dialog.$("button=Ajouter 1 projet").click();

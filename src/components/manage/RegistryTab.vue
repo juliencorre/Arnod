@@ -84,7 +84,7 @@ onMounted(async () => {
           label="Rechercher un projet ou un dossier"
           placeholder="Rechercher…"
         />
-        <BaseButton @click="addExisting">Ajouter un dossier existant…</BaseButton>
+        <BaseButton @click="addExisting">Importer un projet existant…</BaseButton>
         <BaseButton variant="primary" @click="newProject">Nouveau projet</BaseButton>
       </div>
     </header>

@@ -191,7 +191,7 @@ async function deleteWorkspace(): Promise<void> {
         <div class="projects__head">
           <h2 :id="projectsLabelId" class="detail__label">Projets · {{ projects.length }}</h2>
           <BaseButton @click="dialogs.openAddProjects(workspace.id)"
-            >+ Ajouter des projets</BaseButton
+            >+ Ajouter un projet</BaseButton
           >
         </div>
         <ul v-if="projects.length > 0" class="projects__list">

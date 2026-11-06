@@ -71,11 +71,22 @@ function onClick(event: MouseEvent): void {
   background: var(--backdrop);
 }
 
+/* Fenêtre basse : le titre et les boutons restent visibles, le corps défile. */
 .dialog__panel {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  max-height: calc(100vh - 4rem);
   padding: 1.5rem;
+}
+
+/* Marge rendue par le retrait : les contours de focus ne sont pas rognés. */
+.dialog__body {
+  min-height: 0;
+  margin: -0.25rem;
+  padding: 0.25rem;
+  overflow-y: auto;
 }
 
 .dialog__title {

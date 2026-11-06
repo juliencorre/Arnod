@@ -22,15 +22,25 @@ async function clickButton(app: AppWrapper, selector: string, text: string): Pro
   await flushPromises();
 }
 
-describe("ajouter un dossier projet existant (P12)", () => {
-  it("depuis « Ajouter des projets », l'inscrit dans ce workspace et le défaut", async () => {
+/** Clique sur un choix de la fenêtre « Ajouter un projet » (2c), par son titre. */
+async function clickChoice(app: AppWrapper, title: string): Promise<void> {
+  const found = app
+    .findAll("dialog[open] .choice")
+    .find((c) => c.find(".choice__title").text() === title);
+  if (!found) throw new Error(`choix « ${title} » introuvable`);
+  await found.trigger("click");
+  await flushPromises();
+}
+
+describe("importer un projet existant (P12)", () => {
+  it("depuis « Ajouter un projet », l'inscrit dans ce workspace et le défaut", async () => {
     const core = installFakeCore(boutiqueSnapshot());
     core.pickedFolder = "/home/julien/dev/catalogue-legacy";
     wrapper = await mountApp();
     await wrapper.get("main .add-card").trigger("click");
     await flushPromises();
 
-    await clickButton(wrapper, "dialog[open]", "+ Ajouter un dossier existant…");
+    await clickChoice(wrapper, "Importer un projet existant…");
 
     expect(core.calls.find((c) => c.cmd === "project_add_existing")?.args).toEqual({
       path: "/home/julien/dev/catalogue-legacy",
@@ -49,7 +59,7 @@ describe("ajouter un dossier projet existant (P12)", () => {
     await wrapper.get("main .add-card").trigger("click");
     await flushPromises();
 
-    await clickButton(wrapper, "dialog[open]", "+ Ajouter un dossier existant…");
+    await clickChoice(wrapper, "Importer un projet existant…");
 
     expect(core.commands()).toContain("project_pick_folder");
     expect(core.commands()).not.toContain("project_add_existing");
@@ -63,7 +73,7 @@ describe("ajouter un dossier projet existant (P12)", () => {
     await wrapper.get("main .add-card").trigger("click");
     await flushPromises();
 
-    await clickButton(wrapper, "dialog[open]", "+ Ajouter un dossier existant…");
+    await clickChoice(wrapper, "Importer un projet existant…");
 
     const toast = wrapper.get(".toast");
     expect(toast.classes()).toContain("toast--error");
@@ -80,7 +90,7 @@ describe("ajouter un dossier projet existant (P12)", () => {
     await flushPromises();
     await clickButton(wrapper, "aside", "Référentiel des projets2 projets");
 
-    await clickButton(wrapper, "main", "Ajouter un dossier existant…");
+    await clickButton(wrapper, "main", "Importer un projet existant…");
 
     expect(core.calls.find((c) => c.cmd === "project_add_existing")?.args).toEqual({
       path: "/home/julien/dev/partenaires-v2",
