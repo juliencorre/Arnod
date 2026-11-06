@@ -1,6 +1,6 @@
 # Plan - Projets et workspaces
 
-**Version** 0.1 · **Date** 2026-11-06 · **Statut** Brouillon · **Base** squelette 0.0.1
+**Version** 0.2 · **Date** 2026-11-06 · **Statut** Questions tranchées (§ 11) · **Base** squelette 0.0.1
 
 Plan d'implémentation de deux cas d'usage d'Arnod : **la création et la gestion des projets**,
 **la création et la gestion des workspaces**. Il part du squelette décrit dans
@@ -51,8 +51,8 @@ Repris de la section 2 de la maquette :
 - **Référentiel** : liste unique de tous les projets connus d'Arnod.
 - **Workspace** : regroupement nommé et coloré d'une sélection de projets du référentiel, pour
   les afficher ensemble.
-- **Projet** : un dossier sur disque, destiné à être un dépôt Git où une requête = un fichier
-  YAML lisible.
+- **Projet** : un dossier sur disque, prêt à versionner avec Git, où une requête = un fichier YAML
+  lisible. Arnod n'initialise pas Git (Q3).
 
 | ID  | Règle                                                                                                                                                                                                                                                            |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -64,7 +64,7 @@ Repris de la section 2 de la maquette :
 | R6  | Pas de fenêtre de confirmation quand rien n'est perdu : une notification avec « Annuler » suffit.                                                                                                                                                                |
 | R7  | Au démarrage, Arnod rouvre le dernier workspace utilisé ; s'il n'existe plus, le workspace par défaut.                                                                                                                                                           |
 | R8  | Si le workspace ouvert est supprimé, Arnod bascule sur le workspace par défaut.                                                                                                                                                                                  |
-| R9  | Noms : espaces de début et de fin retirés, 1 à 64 caractères. Un nom de workspace est unique, sans tenir compte de la casse.                                                                                                                                     |
+| R9  | Noms : espaces de début et de fin retirés, 1 à 64 caractères. Un nom de workspace est unique parmi les workspaces, un nom de projet est unique dans le référentiel, sans tenir compte de la casse (Q2).                                                          |
 | R10 | Le nom d'un projet doit donner un nom de dossier valide sous Windows et Linux (pas de `<` `>` `:` `"` `/` `\` `?` `*` ni de barre verticale, de caractère de contrôle, de point ou d'espace final, ni de nom réservé `CON`, `PRN`, `AUX`, `NUL`, `COM1`…`LPT9`). |
 | R11 | Ordre d'affichage : workspace par défaut d'abord, puis les autres par nom ; projets du référentiel par ordre de création.                                                                                                                                        |
 
@@ -78,19 +78,20 @@ Priorités : **Must** (indispensable au lot), **Should** (attendu), **Could** (s
 
 ![2a bis - Nouveau projet](maquettes/2a-bis-nouveau-projet.png)
 
-| ID  | Cas d'usage                         | Écrans             | Comportement attendu                                                                                                                                                                                                                                                                                                                                              | Priorité |
-| --- | ----------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| P1  | Créer le premier projet             | 1a                 | Sans projet, la zone principale affiche « Créez votre premier projet ». Champs : nom (focus), dossier proposé `~/arnod/<nom>` recalculé tant que l'utilisateur ne l'a pas changé, workspace « Mes projets (par défaut) ». « Créer le projet » crée le dossier et le manifeste, inscrit le projet au référentiel et au workspace par défaut, puis ouvre le projet. | Must     |
-| P2  | Créer un projet depuis un workspace | 2a, 2a bis, 2c, 2e | « + Nouveau projet » (2a), « + Créer un nouveau projet » (2c) et « Nouveau projet » (2e) ouvrent une fenêtre modale : même formulaire, workspace prérempli avec le workspace ouvert, mention « Aussi ajouté à Mes projets (par défaut) » quand il diffère (R4). Boutons « Annuler » et « Créer le projet ».                                                       | Must     |
-| P3  | Choisir l'emplacement du dossier    | 1a, 2a bis         | « Changer » ouvre le sélecteur de dossier natif. Le dossier choisi est l'emplacement parent : le projet est créé dans `<emplacement>/<nom>` (voir question ouverte Q1). Erreurs affichées sous le champ : dossier déjà existant et non vide, projet Arnod déjà présent, droits insuffisants.                                                                      | Must     |
-| P4  | Notification après création         | 1b                 | « ✓ `<projet>` créé dans le workspace `<workspace>` (par défaut) · Ajouter à un autre… ». L'action ouvre la liste des autres workspaces.                                                                                                                                                                                                                          | Should   |
-| P5  | Ouvrir un projet                    | 2a, 1b             | « Ouvrir » sur une carte ou clic dans la barre latérale. Titre de fenêtre « Arnod — `<projet>` ». Vue projet vide : « Aucune requête pour l'instant ». Le contenu arrive avec le lot requêtes.                                                                                                                                                                    | Must     |
-| P6  | Ajouter un projet à un workspace    | 1b, 2a, 2e         | Depuis la notification (P4), le menu ⋯ d'un projet (« Ajouter à un autre workspace ▸ ») ou « Ajouter à… ▾ » du référentiel. Les workspaces qui contiennent déjà le projet sont cochés et inactifs.                                                                                                                                                                | Must     |
-| P7  | Retirer un projet d'un workspace    | 2a, 2d             | Menu ⋯ « Retirer de « `<workspace>` » » (sous-titre « Le projet reste dans le référentiel. ») ou « Retirer » dans 2d. Sans confirmation, notification avec « Annuler » (R5, R6).                                                                                                                                                                                  | Must     |
-| P8  | Afficher dans le référentiel        | 2a                 | Menu ⋯ « Afficher dans le référentiel » : ouvre 2e et met la ligne du projet en évidence.                                                                                                                                                                                                                                                                         | Should   |
-| P9  | Consulter le référentiel            | 2e                 | Titre « N projets », texte d'explication, recherche par nom ou dossier, tableau Projet / Dossier / Workspaces (pastilles colorées) / Dernier run (« — » pour l'instant) / Action. Mention « Un projet sans workspace reste ici… ».                                                                                                                                | Must     |
-| P10 | Projet introuvable                  | (hors maquette)    | Si le dossier a été déplacé ou supprimé hors d'Arnod, le projet est marqué « dossier introuvable » (carte, barre latérale, référentiel) et ne s'ouvre pas ; il reste retirable.                                                                                                                                                                                   | Should   |
-| P11 | Oublier un projet                   | (hors maquette)    | Retirer le projet du référentiel et de tous ses workspaces sans toucher aux fichiers, avec « Annuler ». À valider (Q5).                                                                                                                                                                                                                                           | Could    |
+| ID  | Cas d'usage                         | Écrans             | Comportement attendu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Priorité |
+| --- | ----------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| P1  | Créer le premier projet             | 1a                 | Sans projet, la zone principale affiche « Créez votre premier projet ». Champs : nom (focus), dossier proposé `~/arnod/<nom>` recalculé tant que l'utilisateur ne l'a pas changé, workspace « Mes projets (par défaut) ». « Créer le projet » crée le dossier et le manifeste, inscrit le projet au référentiel et au workspace par défaut, puis ouvre le projet. Erreur sous le champ si le nom est déjà pris (R9). Mention sous le formulaire adaptée, puisque Arnod n'initialise pas Git (Q3) : « Une requête = un fichier YAML lisible, prêt à versionner avec Git. » | Must     |
+| P2  | Créer un projet depuis un workspace | 2a, 2a bis, 2c, 2e | « + Nouveau projet » (2a), « + Créer un nouveau projet » (2c) et « Nouveau projet » (2e) ouvrent une fenêtre modale : même formulaire, workspace prérempli avec le workspace ouvert, mention « Aussi ajouté à Mes projets (par défaut) » quand il diffère (R4). Boutons « Annuler » et « Créer le projet ».                                                                                                                                                                                                                                                               | Must     |
+| P3  | Choisir l'emplacement du dossier    | 1a, 2a bis         | « Changer » ouvre le sélecteur de dossier natif. Le dossier choisi est l'emplacement parent : le projet est créé dans `<emplacement>/<nom>` (Q1). Erreurs affichées sous le champ : dossier déjà existant et non vide, projet Arnod déjà présent, droits insuffisants.                                                                                                                                                                                                                                                                                                    | Must     |
+| P4  | Notification après création         | 1b                 | « ✓ `<projet>` créé dans le workspace `<workspace>` (par défaut) · Ajouter à un autre… ». L'action ouvre la liste des autres workspaces.                                                                                                                                                                                                                                                                                                                                                                                                                                  | Should   |
+| P5  | Ouvrir un projet                    | 2a, 1b             | « Ouvrir » sur une carte ou clic dans la barre latérale. Titre de fenêtre « Arnod — `<projet>` ». Vue projet vide : « Aucune requête pour l'instant ». Le contenu arrive avec le lot requêtes.                                                                                                                                                                                                                                                                                                                                                                            | Must     |
+| P6  | Ajouter un projet à un workspace    | 1b, 2a, 2e         | Depuis la notification (P4), le menu ⋯ d'un projet (« Ajouter à un autre workspace ▸ ») ou « Ajouter à… ▾ » du référentiel. Les workspaces qui contiennent déjà le projet sont cochés et inactifs.                                                                                                                                                                                                                                                                                                                                                                        | Must     |
+| P7  | Retirer un projet d'un workspace    | 2a, 2d             | Menu ⋯ « Retirer de « `<workspace>` » » (sous-titre « Le projet reste dans le référentiel. ») ou « Retirer » dans 2d. Sans confirmation, notification avec « Annuler » (R5, R6).                                                                                                                                                                                                                                                                                                                                                                                          | Must     |
+| P8  | Afficher dans le référentiel        | 2a                 | Menu ⋯ « Afficher dans le référentiel » : ouvre 2e et met la ligne du projet en évidence.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Should   |
+| P9  | Consulter le référentiel            | 2e                 | Titre « N projets », texte d'explication, recherche par nom ou dossier, tableau Projet / Dossier / Workspaces (pastilles colorées) / Dernier run (« — » pour l'instant) / Action. Mention « Un projet sans workspace reste ici… ».                                                                                                                                                                                                                                                                                                                                        | Must     |
+| P10 | Projet introuvable                  | (hors maquette)    | Si le dossier a été déplacé ou supprimé hors d'Arnod, le projet est marqué « dossier introuvable » (carte, barre latérale, référentiel) et ne s'ouvre pas ; il reste retirable.                                                                                                                                                                                                                                                                                                                                                                                           | Should   |
+| P11 | Oublier un projet                   | (hors maquette)    | Retirer le projet du référentiel et de tous ses workspaces sans toucher aux fichiers, avec « Annuler ». À dessiner avant d'être implémenté (Q5).                                                                                                                                                                                                                                                                                                                                                                                                                          | Could    |
+| P12 | Ajouter un projet existant          | (hors maquette)    | Choisir un dossier contenant `arnod.yml`, par exemple après un clone Git : le projet est inscrit au référentiel avec l'identifiant de son manifeste et ajouté au workspace par défaut et au workspace ouvert (R4). Refus si le dossier n'a pas de manifeste, si le projet est déjà inscrit ou si son nom est pris (R9). Entrées à dessiner dans 2c et 2e (Q4).                                                                                                                                                                                                            | Should   |
 
 ### 4.2 Workspaces
 
@@ -124,7 +125,8 @@ Priorités : **Must** (indispensable au lot), **Should** (attendu), **Could** (s
   runs (1f), et donc les statistiques « endpoints », « tests », « dernier run ».
 - Recherche globale `Ctrl+K`.
 - Imports (OpenAPI, Bruno, SoapUI, Postman).
-- Initialisation Git du dossier (Q3) et ouverture d'un dossier projet existant (Q4).
+- Initialisation Git du dossier : non retenue (Q3). Arnod crée un dossier prêt à versionner,
+  l'utilisateur gère Git lui-même.
 - Glisser-déposer, réordonnancement manuel des workspaces.
 - Plusieurs instances d'Arnod en même temps (une seule instance supposée).
 
@@ -180,7 +182,7 @@ name: boutique-tests
 ```
 
 Le manifeste porte l'identifiant du projet : il permettra de reconnaître le dossier après un
-déplacement ou un clone (Q4). Le format des requêtes sera défini par le lot « requêtes ».
+déplacement ou un clone (P12). Le format des requêtes sera défini par le lot « requêtes ».
 
 ### 6.2 Cœur Rust
 
@@ -231,23 +233,24 @@ Convention : chaque mutation renvoie l'instantané complet du catalogue (`Catalo
 kilo-octets). Le store remplace son état : pas de logique de synchronisation côté Vue. Les
 actions annulables renvoient aussi un jeton d'annulation.
 
-| Commande                   | Arguments                          | Réponse                     | Écrans         |
-| -------------------------- | ---------------------------------- | --------------------------- | -------------- |
-| `catalog_load`             | -                                  | `CatalogSnapshot`           | Démarrage      |
-| `project_suggest_folder`   | `{ name, location? }`              | `string`                    | 1a, 2a bis     |
-| `project_pick_location`    | -                                  | `string \| null`            | 1a, 2a bis     |
-| `project_create`           | `{ name, location?, workspaceId }` | `{ snapshot, projectId }`   | 1a, 2a bis     |
-| `project_open`             | `{ projectId }`                    | `ProjectView`               | 2a, 1b         |
-| `workspace_open`           | `{ workspaceId }`                  | `CatalogSnapshot`           | 2a, 2b         |
-| `workspace_create`         | `{ name }`                         | `{ snapshot, workspaceId }` | 2b, 2d         |
-| `workspace_rename`         | `{ workspaceId, name }`            | `CatalogSnapshot`           | 2a, 2d         |
-| `workspace_set_color`      | `{ workspaceId, color }`           | `CatalogSnapshot`           | 2d             |
-| `workspace_set_default`    | `{ workspaceId }`                  | `CatalogSnapshot`           | 2d             |
-| `workspace_add_projects`   | `{ workspaceId, projectIds }`      | `CatalogSnapshot`           | 1b, 2a, 2c, 2e |
-| `workspace_remove_project` | `{ workspaceId, projectId }`       | `{ snapshot, undoToken }`   | 2a, 2d         |
-| `workspace_delete`         | `{ workspaceId }`                  | `{ snapshot, undoToken }`   | 2d             |
-| `undo`                     | `{ undoToken }`                    | `CatalogSnapshot`           | Notifications  |
-| `project_forget` (Could)   | `{ projectId }`                    | `{ snapshot, undoToken }`   | 2e             |
+| Commande                        | Arguments                          | Réponse                     | Écrans          |
+| ------------------------------- | ---------------------------------- | --------------------------- | --------------- |
+| `catalog_load`                  | -                                  | `CatalogSnapshot`           | Démarrage       |
+| `project_suggest_folder`        | `{ name, location? }`              | `string`                    | 1a, 2a bis      |
+| `project_pick_folder`           | -                                  | `string \| null`            | 1a, 2a bis, P12 |
+| `project_create`                | `{ name, location?, workspaceId }` | `{ snapshot, projectId }`   | 1a, 2a bis      |
+| `project_open`                  | `{ projectId }`                    | `ProjectView`               | 2a, 1b          |
+| `workspace_open`                | `{ workspaceId }`                  | `CatalogSnapshot`           | 2a, 2b          |
+| `workspace_create`              | `{ name }`                         | `{ snapshot, workspaceId }` | 2b, 2d          |
+| `workspace_rename`              | `{ workspaceId, name }`            | `CatalogSnapshot`           | 2a, 2d          |
+| `workspace_set_color`           | `{ workspaceId, color }`           | `CatalogSnapshot`           | 2d              |
+| `workspace_set_default`         | `{ workspaceId }`                  | `CatalogSnapshot`           | 2d              |
+| `workspace_add_projects`        | `{ workspaceId, projectIds }`      | `CatalogSnapshot`           | 1b, 2a, 2c, 2e  |
+| `workspace_remove_project`      | `{ workspaceId, projectId }`       | `{ snapshot, undoToken }`   | 2a, 2d          |
+| `workspace_delete`              | `{ workspaceId }`                  | `{ snapshot, undoToken }`   | 2d              |
+| `undo`                          | `{ undoToken }`                    | `CatalogSnapshot`           | Notifications   |
+| `project_add_existing` (Should) | `{ path, workspaceId }`            | `{ snapshot, projectId }`   | P12             |
+| `project_forget` (Could)        | `{ projectId }`                    | `{ snapshot, undoToken }`   | 2e              |
 
 Types miroirs dans `src/types/ipc.ts` (sérialisation `camelCase`) :
 
@@ -284,6 +287,7 @@ interface CommandError {
     | "nameTaken"
     | "folderNotEmpty"
     | "alreadyRegistered"
+    | "notAProject"
     | "notFound"
     | "defaultWorkspace"
     | "undoExpired"
@@ -325,7 +329,8 @@ src/
 
 ### 6.5 Design
 
-- Palette des maquettes traduite en variables dans `src/styles.css`, avec une déclinaison sombre :
+- Palette des maquettes traduite en variables dans `src/styles.css`, avec une déclinaison sombre ;
+  l'accent orange remplace le bleu du squelette (Q6) :
   `--color-bg` (#fbfaf8), `--color-surface` (#fff), `--color-sidebar` (#f4f2ee),
   `--color-border` (#e6e2db), `--color-text` (#1d1b18), `--color-muted` (#6b665e),
   `--color-subtle` (#8b857b), `--color-accent` (orange ≈ #e8962e), `--color-link` (#9a5a0c),
@@ -357,7 +362,7 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 
 **Lot A - Fondations**
 
-- [ ] **T1** Mettre à jour `CLAUDE.md` (§ 7) et trancher les questions ouvertes (§ 11).
+- [ ] **T1** Mettre à jour `CLAUDE.md` (§ 7) et y reporter les décisions du § 11.
 - [ ] **T2** Palette et variables CSS clair / sombre (§ 6.5), taille de fenêtre.
 - [ ] **T3** Type `CommandError { kind, message }` côté Rust et TypeScript, `IpcError.kind`, tests.
 
@@ -373,7 +378,7 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
       « dossier non vide », « projet déjà inscrit ».
 - [ ] **T9** `state.rs`, `commands/projects.rs`, `commands/workspaces.rs`, enregistrement dans
       `generate_handler!` ; tests de la forme JSON de `CatalogSnapshot` et des erreurs.
-- [ ] **T10** Sélecteur de dossier (`tauri-plugin-dialog` côté Rust) et titre de fenêtre ;
+- [ ] **T10** Sélecteur de dossier `project_pick_folder` (`tauri-plugin-dialog` côté Rust) et titre de fenêtre ;
       mesure de la taille de l'installeur.
 
 **Lot C - Frontend : socle**
@@ -402,12 +407,17 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 
 - [ ] **T22** « Gérer les workspaces » (2d) : W7 à W11.
 - [ ] **T23** Référentiel (2e) : P9, P6 (« Ajouter à… »), P2, mise en évidence de P8.
-- [ ] **T24** Projet introuvable : P10. P11 si retenu.
+- [ ] **T24** Projet introuvable : P10. P11 une fois dessiné (Q5).
 
 **Lot G - Finitions et CI**
 
 - [ ] **T25** Tests de fumée Windows et Linux adaptés (§ 7) ; captures CI relues.
 - [ ] **T26** Thème sombre et accessibilité vérifiés, README (captures, tableau des fonctions).
+
+**Lot H - Après le plan principal**
+
+- [ ] **T27** Dessiner puis implémenter l'ajout d'un projet existant (P12) : commande
+      `project_add_existing`, lecture de `arnod.yml`, entrées dans 2c et 2e.
 
 ## 9. Critères d'acceptation
 
@@ -416,6 +426,7 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 - [ ] Créer `boutique-tests` crée `~/arnod/boutique-tests/arnod.yml`, ajoute le projet au
       référentiel et à « Mes projets », l'ouvre et affiche la notification.
 - [ ] Un projet créé depuis le workspace « Boutique » est dans « Boutique » et dans « Mes projets ».
+- [ ] Un nom de projet ou de workspace déjà pris est refusé, quelle que soit la casse.
 - [ ] Un projet peut être dans plusieurs workspaces ; le référentiel l'affiche une seule fois avec
       toutes ses pastilles.
 - [ ] Retirer un projet d'un workspace ou supprimer un workspace ne touche ni au référentiel ni
@@ -435,17 +446,19 @@ Un lot = une pull request. Lint, format, typecheck, tests Vitest, `cargo fmt`, `
 | Chemins Windows (casse, `\\?\`, noms réservés)              | Doublons, dossiers impossibles | `dunce`, validation R10, tests dédiés.                                                 |
 | `arnod.json` corrompu ou écrit par une version plus récente | Perte du référentiel           | Sauvegarde du fichier, message, aucune écriture (§ 6.1).                               |
 | Deux instances d'Arnod écrivent le même fichier             | Modifications perdues          | Hors périmètre ; `tauri-plugin-single-instance` plus tard (nouveau plugin = décision). |
-| Taille de l'installeur                                      | N3 dépassé                     | Mesure à T10, crates légères, pas de libgit2.                                          |
+| Taille de l'installeur                                      | N3 dépassé                     | Mesure à T10, crates légères.                                                          |
 | Crate YAML                                                  | Maintenance                    | `serde-saphyr` actif ; repli `serde_norway` ; le manifeste reste minimal.              |
 | Annulation perdue à la fermeture                            | Faible                         | Accepté : la notification disparaît de toute façon.                                    |
 
-## 11. Questions ouvertes
+## 11. Décisions
 
-| ID  | Question                                                                                    | Recommandation                                                                                    |
-| --- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Q1  | « Changer » choisit-il l'emplacement parent ou le dossier exact du projet ?                 | Emplacement parent, le dossier du projet étant `<emplacement>/<nom>`, comme dans Bruno.           |
-| Q2  | Les noms de projet sont-ils uniques dans le référentiel ?                                   | Oui, sans tenir compte de la casse : ils nomment le dossier et apparaissent sans contexte.        |
-| Q3  | La maquette 1a annonce « Le dossier est un dépôt Git ». Initialise-t-on Git à la création ? | Lot suivant : `git init` via le `git` du système s'il est présent, ignoré sinon ; pas de libgit2. |
-| Q4  | Peut-on ajouter au référentiel un dossier projet existant (après un clone Git) ?            | Oui, en Should juste après ce plan : absent des maquettes mais vite indispensable.                |
-| Q5  | Peut-on oublier un projet (le retirer du référentiel) ?                                     | Could ; à dessiner avant de l'implémenter.                                                        |
-| Q6  | Adopte-t-on l'accent orange des maquettes à la place du bleu du squelette ?                 | Oui, avec une déclinaison sombre.                                                                 |
+Questions tranchées le 2026-11-06.
+
+| ID  | Question                                                                                    | Décision                                                                                      |
+| --- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Q1  | « Changer » choisit-il l'emplacement parent ou le dossier exact du projet ?                 | Emplacement parent : le projet est créé dans `<emplacement>/<nom>`, comme dans Bruno (P3).    |
+| Q2  | Les noms de projet sont-ils uniques dans le référentiel ?                                   | Oui, sans tenir compte de la casse (R9).                                                      |
+| Q3  | La maquette 1a annonce « Le dossier est un dépôt Git ». Initialise-t-on Git à la création ? | Non. Arnod crée un dossier prêt à versionner ; la mention de la maquette 1a est adaptée (P1). |
+| Q4  | Peut-on ajouter au référentiel un dossier projet existant (après un clone Git) ?            | Oui, en Should, dans le lot H après le plan principal (P12, T27). Interface à dessiner.       |
+| Q5  | Peut-on oublier un projet (le retirer du référentiel) ?                                     | Could ; à dessiner avant de l'implémenter (P11).                                              |
+| Q6  | Adopte-t-on l'accent orange des maquettes à la place du bleu du squelette ?                 | Oui, avec une déclinaison sombre (§ 6.5).                                                     |
