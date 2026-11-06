@@ -1,0 +1,68 @@
+name: Signaler un bug
+description: Arnod ne se comporte pas comme prévu.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de signaler ce problème. La version et le système permettent de
+        le reproduire.
+  - type: input
+    id: version
+    attributes:
+      label: Version d'Arnod
+      description: >-
+        Nom de l'installeur ou de l'AppImage (Arnod_0.0.2_x64-setup.exe donne 0.0.2), ou version
+        affichée dans Paramètres › Applications › Arnod sous Windows.
+      placeholder: "0.0.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Système
+      options:
+        - Windows 11
+        - Windows 10
+        - Linux (AppImage)
+        - Autre
+    validations:
+      required: true
+  - type: input
+    id: os-details
+    attributes:
+      label: Précisions sur le système
+      description: Version exacte, distribution Linux, compte Windows standard ou administrateur.
+      placeholder: Windows 11 24H2, compte standard
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire
+      placeholder: |
+        1. Ouvrir le workspace « … »
+        2. Cliquer sur « … »
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Résultat attendu
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Résultat obtenu
+      description: Message d'erreur affiché, comportement observé.
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Captures et fichiers
+      description: >-
+        Captures d'écran. Pour un problème de projets ou de workspaces, le fichier d'état
+        arnod.json peut aider : %LOCALAPPDATA%\io.github.juliencorre.arnod\ sous Windows,
+        ~/.local/share/io.github.juliencorre.arnod/ sous Linux. Il contient les chemins de vos
+        dossiers de projets : relisez-le avant de le joindre.
