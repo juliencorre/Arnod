@@ -5,9 +5,11 @@ Ce dépôt part du **squelette technique** décrit dans `PRD-squelette.md` : Tau
 frontend Vue 3 + TypeScript + Vite + Pinia, cœur natif Rust. Toute nouvelle
 fonctionnalité part de cette base et respecte les règles ci-dessous.
 
-Travail en cours : projets et workspaces, selon `docs/plan-projets-workspaces.md`
-(maquettes dans `docs/maquettes/`). Voir la section « Projets et workspaces ». Un nouveau lot
-commence par un plan rédigé à partir de `docs/modele-plan.md`.
+Travail en cours : premier usage (arborescence, requêtes, environnements, vérifications, run),
+selon `docs/plan-premier-usage.md` (plan rédigé, tâches T1 à T30 à cocher). Livré : projets et
+workspaces, selon `docs/plan-projets-workspaces.md` (maquettes dans `docs/maquettes/`) ; voir la
+section « Projets et workspaces ». Un nouveau lot commence par un plan rédigé à partir de
+`docs/modele-plan.md`.
 
 ## Architecture
 
