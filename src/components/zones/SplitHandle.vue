@@ -1,7 +1,10 @@
 <script setup lang="ts">
 /**
  * Séparation redimensionnable (F4, F5), selon le motif WAI-ARIA « window
- * splitter » : `role="separator"` focalisable, valeur en pourcentage.
+ * splitter » : `role="separator"` focalisable, valeur en pourcentage. Un
+ * séparateur focalisable est un widget interactif (ARIA 1.2) ; `tabindex` est lié
+ * (`:tabindex`) car l'analyse statique de SonarCloud (Web:S6845) le prend pour un
+ * élément non interactif.
  *
  * Souris : glisser (la taille des deux côtés s'affiche), double-clic pour des
  * parts égales. Clavier : flèches (ou Alt+Maj+flèches), Début et Fin.
@@ -139,7 +142,7 @@ const bubble = computed(() => {
     class="handle"
     :class="[`handle--${axis}`, { 'handle--dragging': dragging }]"
     role="separator"
-    tabindex="0"
+    :tabindex="0"
     :aria-label="label"
     :aria-orientation="axis === 'row' ? 'vertical' : 'horizontal'"
     :aria-valuenow="valueNow"

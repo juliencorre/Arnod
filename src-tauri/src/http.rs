@@ -219,9 +219,11 @@ mod tests {
 
     #[tokio::test]
     async fn serveur_injoignable() {
-        let error = send(&prepared("http://127.0.0.1:1/".into()), &Notify::new())
-            .await
-            .unwrap_err();
+        let mut request = prepared("http://127.0.0.1:1/".into());
+        // Sous Windows, un refus de connexion n'est constaté qu'après plusieurs essais
+        // (environ 2 s) : le délai du test doit les laisser aboutir.
+        request.timeout_ms = 15_000;
+        let error = send(&request, &Notify::new()).await.unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::Network);
         assert!(error.message.contains("127.0.0.1"));
     }

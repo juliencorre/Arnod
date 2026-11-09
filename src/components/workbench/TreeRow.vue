@@ -84,7 +84,7 @@ function activate(): void {
 </script>
 
 <template>
-  <li role="none">
+  <li role="presentation">
     <div
       class="row"
       :class="{ 'row--selected': isSelected }"

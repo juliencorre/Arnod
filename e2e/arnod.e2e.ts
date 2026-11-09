@@ -506,6 +506,10 @@ describe("Fenêtres et zones", () => {
       const root = readWindows(sandbox).windows[0]?.layout?.root;
       return root?.kind === "split" && Math.abs(root.ratio - 0.55) < 0.001;
     });
+    expect(readWindows(sandbox).windows[0]?.layout?.root).toMatchObject({
+      kind: "split",
+      axis: "row",
+    });
     await screenshot(browser, "06-zones");
   });
 

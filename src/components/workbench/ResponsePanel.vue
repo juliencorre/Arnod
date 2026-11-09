@@ -80,7 +80,14 @@ function messageFor(id: string): string | null {
           {{ label }}
         </button>
       </div>
-      <pre v-if="view === 'body'" class="response__body" tabindex="0">{{ prettyBody }}</pre>
+      <!-- Panneau de l'onglet « Corps », focalisable pour défiler au clavier. -->
+      <pre
+        v-if="view === 'body'"
+        class="response__body"
+        role="tabpanel"
+        aria-label="Corps de la réponse"
+        tabindex="0"
+        >{{ prettyBody }}</pre>
       <dl v-else-if="view === 'headers'" class="response__headers">
         <template v-for="[name, value] in outcome.response.headers" :key="name + value">
           <dt>{{ name }}</dt>

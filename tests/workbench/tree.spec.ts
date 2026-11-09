@@ -66,7 +66,7 @@ describe("arborescence du projet", () => {
     let core;
     ({ app, core } = await openProject());
     const row = app
-      .findAll('li[role="none"]')
+      .findAll('li[role="presentation"]')
       .find((li) => li.get('[role="treeitem"]').text().includes("Santé"));
     await row?.get(".row__more").trigger("click");
     await flushPromises();

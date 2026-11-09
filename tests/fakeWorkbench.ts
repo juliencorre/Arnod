@@ -114,7 +114,7 @@ function buildTree(wb: FakeWorkbench): TreeNode[] {
     const prefix = parent === "" ? "" : `${parent}/`;
     const folders = [...wb.folders]
       .filter((f) => f.startsWith(prefix) && !f.slice(prefix.length).includes("/"))
-      .sort();
+      .sort((a, b) => a.localeCompare(b));
     const nodes: TreeNode[] = folders.map((path) => {
       const children = build(path);
       const count = [...wb.requests.keys()].filter((r) => r.startsWith(`${path}/`)).length;
@@ -126,7 +126,9 @@ function buildTree(wb: FakeWorkbench): TreeNode[] {
         requestCount: count,
       };
     });
-    for (const [path, request] of [...wb.requests.entries()].sort()) {
+    for (const [path, request] of [...wb.requests.entries()].sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
       if (path.startsWith(prefix) && !path.slice(prefix.length).includes("/")) {
         nodes.push({
           kind: "request",

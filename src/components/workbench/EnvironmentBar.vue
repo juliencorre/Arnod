@@ -87,10 +87,10 @@ async function choose(name: string): Promise<void> {
   min-width: 0;
   max-width: 11rem;
   padding: 0.125rem 0.375rem;
-  font-size: 0.8125rem;
   border: 1px solid var(--color-border-strong);
   border-radius: 8px;
   font: inherit;
+  font-size: 0.8125rem;
   color: var(--color-text);
   background: var(--color-surface);
 }

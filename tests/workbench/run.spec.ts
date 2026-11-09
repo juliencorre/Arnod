@@ -20,7 +20,7 @@ describe("run d'un dossier", () => {
       c.workbench.runStatus.set("Clients/creer.yml", "failed");
     }));
     const row = app
-      .findAll('li[role="none"]')
+      .findAll('li[role="presentation"]')
       .find((li) => li.get('[role="treeitem"]').text().includes("Clients"));
     await row?.get(".row__more").trigger("click");
     await click(app, '[role="menuitem"]', "Exécuter le dossier");
