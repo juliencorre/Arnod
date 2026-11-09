@@ -6,7 +6,7 @@
 //! l'écriture échoue, rien ne change.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use uuid::Uuid;
 
@@ -15,9 +15,11 @@ use crate::catalog::snapshot::{
 };
 use crate::catalog::undo::{UndoAction, UndoStack};
 use crate::catalog::{Catalog, names};
+use crate::environment;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::manifest::{self, Manifest};
 use crate::storage::{self, Loaded};
+use crate::workbench::ProjectCtx;
 
 /// Dossier, dans le dossier personnel, où les projets sont créés par défaut.
 pub const DEFAULT_LOCATION_DIR: &str = "arnod";
@@ -29,7 +31,13 @@ pub struct AppState {
     /// Emplacement proposé pour les nouveaux projets (`~/arnod`).
     default_location: PathBuf,
     inner: Mutex<Inner>,
+    /// Prévenu après chaque modification enregistrée : la synchronisation des
+    /// fenêtres (F11) diffuse l'instantané. Absent dans les tests.
+    listener: OnceLock<ChangeListener>,
 }
+
+/// Fonction prévenue à chaque nouvel instantané du catalogue.
+pub type ChangeListener = Box<dyn Fn(&CatalogSnapshot) + Send + Sync>;
 
 struct Inner {
     catalog: Catalog,
@@ -80,6 +88,7 @@ impl AppState {
                 blocked,
                 warning,
             }),
+            listener: OnceLock::new(),
         }
     }
 
@@ -90,6 +99,11 @@ impl AppState {
             snapshot: snapshot_of(&inner.catalog),
             warning: inner.warning.take(),
         })
+    }
+
+    /// Instantané courant, sans consommer l'avertissement de démarrage.
+    pub fn snapshot(&self) -> Result<CatalogSnapshot, CommandError> {
+        Ok(snapshot_of(&self.lock()?.catalog))
     }
 
     /// Applique une modification du catalogue et l'enregistre.
@@ -151,7 +165,7 @@ impl AppState {
         &self,
         raw_name: &str,
         location: Option<&str>,
-        workspace_id: Uuid,
+        workspace_id: Option<Uuid>,
     ) -> Result<ProjectCreated, CommandError> {
         let location = location.map_or_else(|| self.default_location.clone(), PathBuf::from);
         if !location.is_absolute() {
@@ -174,6 +188,11 @@ impl AppState {
 
         let project_id = Uuid::new_v4();
         let created = manifest::create_project_folder(&folder, &Manifest::new(project_id, &name))?;
+        // Chaque projet démarre avec un environnement « Local » (N1).
+        if let Err(error) = environment::init(created.path()) {
+            created.rollback();
+            return Err(error);
+        }
         let mut next = inner.catalog.clone();
         let registered = next
             .register_project(project_id, &name, canonical(created.path()), workspace_id)
@@ -190,14 +209,14 @@ impl AppState {
         }
     }
 
-    /// Inscrit au référentiel un dossier projet existant, reconnu par son
-    /// manifeste `arnod.yml` (P12, après un clone Git par exemple), et l'ajoute
-    /// au workspace par défaut et à `workspace_id` (R4). Rien n'est écrit dans
-    /// le dossier du projet.
+    /// Inscrit dans « Tous les projets » un dossier projet existant, reconnu par
+    /// son manifeste `arnod.yml` (P12, après un clone Git par exemple), et
+    /// l'ajoute à `workspace_id` s'il est donné (R4). Rien n'est écrit dans le
+    /// dossier du projet.
     pub fn add_existing_project(
         &self,
         path: &str,
-        workspace_id: Uuid,
+        workspace_id: Option<Uuid>,
     ) -> Result<ProjectCreated, CommandError> {
         let folder = PathBuf::from(path);
         if !folder.is_absolute() {
@@ -245,7 +264,7 @@ impl AppState {
             .ok_or_else(|| {
                 CommandError::new(
                     CommandErrorKind::NotFound,
-                    "Ce projet n'existe plus dans le référentiel.",
+                    "Ce projet n'est plus dans « Tous les projets ».",
                 )
             })?;
         if project.status == ProjectStatus::Missing {
@@ -258,6 +277,32 @@ impl AppState {
             ));
         }
         Ok(project)
+    }
+
+    /// Dossier de données de l'application (`arnod.json`, données locales des projets).
+    pub fn data_dir(&self) -> &Path {
+        &self.data_dir
+    }
+
+    /// Dossier et données locales d'un projet dont le dossier existe encore.
+    pub fn project_ctx(&self, project_id: Uuid) -> Result<ProjectCtx, CommandError> {
+        let inner = self.lock()?;
+        let project = inner.catalog.project(project_id)?;
+        if !project.path.is_dir() {
+            return Err(CommandError::new(
+                CommandErrorKind::NotFound,
+                format!(
+                    "Le dossier du projet « {} » est introuvable : {}.",
+                    project.name,
+                    project.path.display()
+                ),
+            ));
+        }
+        Ok(ProjectCtx {
+            id: project_id,
+            root: project.path.clone(),
+            data_dir: self.data_dir.clone(),
+        })
     }
 
     fn lock(&self) -> Result<MutexGuard<'_, Inner>, CommandError> {
@@ -277,7 +322,16 @@ impl AppState {
     fn commit(&self, inner: &mut Inner, next: Catalog) -> Result<CatalogSnapshot, CommandError> {
         storage::save(&self.data_dir, &next)?;
         inner.catalog = next;
-        Ok(snapshot_of(&inner.catalog))
+        let snapshot = snapshot_of(&inner.catalog);
+        if let Some(listener) = self.listener.get() {
+            listener(&snapshot);
+        }
+        Ok(snapshot)
+    }
+
+    /// Fonction prévenue après chaque modification du catalogue (une seule).
+    pub fn on_change(&self, listener: ChangeListener) {
+        let _ = self.listener.set(listener);
     }
 }
 

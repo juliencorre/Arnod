@@ -135,9 +135,22 @@ describe("commandes du catalogue", () => {
       "project_add_existing",
       { path: "/home/julien/dev/legacy", workspaceId: "ws" },
     ],
+    [
+      "projectCreate sans workspace",
+      () => ipc.projectCreate({ name: "boutique", location: null, workspaceId: null }),
+      "project_create",
+      { name: "boutique", location: null, workspaceId: null },
+    ],
     ["projectForget", () => ipc.projectForget("p1"), "project_forget", { projectId: "p1" }],
     ["projectOpen", () => ipc.projectOpen("p1"), "project_open", { projectId: "p1" }],
     ["workspaceOpen", () => ipc.workspaceOpen("ws"), "workspace_open", { workspaceId: "ws" }],
+    [
+      "workspaceOpen (Tous les projets)",
+      () => ipc.workspaceOpen(null),
+      "workspace_open",
+      { workspaceId: null },
+    ],
+    ["projectLastRuns", () => ipc.projectLastRuns(), "project_last_runs", {}],
     [
       "workspaceCreate",
       () => ipc.workspaceCreate("Boutique"),
@@ -155,12 +168,6 @@ describe("commandes du catalogue", () => {
       () => ipc.workspaceSetColor("ws", "teal"),
       "workspace_set_color",
       { workspaceId: "ws", color: "teal" },
-    ],
-    [
-      "workspaceSetDefault",
-      () => ipc.workspaceSetDefault("ws"),
-      "workspace_set_default",
-      { workspaceId: "ws" },
     ],
     [
       "workspaceAddProjects",

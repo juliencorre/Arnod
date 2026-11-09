@@ -64,11 +64,35 @@ export function removeSandbox(sandbox: Sandbox): void {
 export function readState(sandbox: Sandbox): {
   projects: { id: string; name: string; path: string }[];
   workspaces: { id: string; name: string; projectIds: string[] }[];
-  defaultWorkspaceId: string;
-  lastWorkspaceId: string;
+  /** Dernier onglet ouvert ; `null` pour « Tous les projets ». */
+  lastWorkspaceId: string | null;
 } {
   return JSON.parse(readFileSync(path.join(sandbox.dataDir, "arnod.json"), "utf8")) as ReturnType<
     typeof readState
+  >;
+}
+
+/** Nœud de disposition enregistré (`windows.json`), réduit à ce que vérifie le parcours. */
+export type SavedNode =
+  | {
+      kind: "zone";
+      id: string;
+      tabs: { id: string; content: { kind: string; path?: string } }[];
+      activeTab: string | null;
+    }
+  | { kind: "split"; axis: "row" | "column"; ratio: number; first: SavedNode; second: SavedNode };
+
+/** État des fenêtres enregistré par l'application (`windows.json`). */
+export function readWindows(sandbox: Sandbox): {
+  windows: {
+    label: string;
+    kind: "main" | "content" | "sidebar";
+    layout: { root: SavedNode; activeZone: string } | null;
+    sidebarDetached: boolean;
+  }[];
+} {
+  return JSON.parse(readFileSync(path.join(sandbox.dataDir, "windows.json"), "utf8")) as ReturnType<
+    typeof readWindows
   >;
 }
 
@@ -142,7 +166,8 @@ export async function launchApp(): Promise<Browser> {
       "tauri:options": { application: APPLICATION },
     } as WebdriverIO.Capabilities,
   });
-  await browser.$("main h1").waitForDisplayed({ timeout: 30_000 });
+  // `main` paraît avec la vue ; son titre peut n'être lu que par les lecteurs d'écran.
+  await browser.$("main").waitForDisplayed({ timeout: 30_000 });
   return browser;
 }
 

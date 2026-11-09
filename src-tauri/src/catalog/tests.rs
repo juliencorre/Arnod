@@ -1,4 +1,5 @@
-//! Tests du catalogue, regroupés par règle du plan (R1 à R11) et cas d'usage.
+//! Tests du catalogue, regroupés par règle (R1 à R12) et cas d'usage. R3, R4,
+//! R7, R8, R11 et R12 suivent `docs/plan-workspaces-onglets.md`.
 
 use super::*;
 
@@ -12,11 +13,24 @@ fn every_folder_exists(_: &Path) -> bool {
 
 /// Inscrit un projet de dossier `/dev/<name>` dans `workspace_id`.
 fn add_project(catalog: &mut Catalog, name: &str, workspace_id: Uuid) -> Uuid {
+    add_project_to(catalog, name, Some(workspace_id))
+}
+
+/// Inscrit un projet de dossier `/dev/<name>`, dans un workspace ou aucun.
+fn add_project_to(catalog: &mut Catalog, name: &str, workspace_id: Option<Uuid>) -> Uuid {
     let id = Uuid::new_v4();
     catalog
         .register_project(id, name, path(name), workspace_id)
         .unwrap();
     id
+}
+
+/// Catalogue avec un workspace « Mes projets », ouvert.
+fn with_workspace() -> (Catalog, Uuid) {
+    let mut catalog = Catalog::first_launch();
+    let id = catalog.create_workspace("Mes projets").unwrap();
+    catalog.open_workspace(Some(id)).unwrap();
+    (catalog, id)
 }
 
 fn kind<T: std::fmt::Debug>(result: Result<T, CommandError>) -> CommandErrorKind {
@@ -36,34 +50,27 @@ fn project_ids_of(catalog: &Catalog, workspace_id: Uuid) -> Vec<Uuid> {
     catalog.workspace(workspace_id).unwrap().project_ids.clone()
 }
 
-// W1 - premier lancement
+// R3 - pas de workspace par défaut
 
 #[test]
-fn w1_premier_lancement_cree_mes_projets_par_defaut_et_ouvert() {
+fn r3_premier_lancement_sans_workspace_sur_tous_les_projets() {
     let catalog = Catalog::first_launch();
     let snapshot = catalog.snapshot(every_folder_exists);
 
     assert!(snapshot.projects.is_empty());
-    assert_eq!(snapshot.workspaces.len(), 1);
-    let workspace = &snapshot.workspaces[0];
-    assert_eq!(workspace.name, "Mes projets");
-    assert_eq!(workspace.color, WorkspaceColor::Gray);
-    assert!(workspace.is_default);
-    assert!(workspace.project_ids.is_empty());
-    assert_eq!(snapshot.default_workspace_id, workspace.id);
-    assert_eq!(snapshot.last_workspace_id, workspace.id);
+    assert!(snapshot.workspaces.is_empty());
+    assert_eq!(snapshot.last_workspace_id, None);
 }
 
 // R1 - un projet n'existe qu'une fois dans le référentiel
 
 #[test]
 fn r1_un_dossier_ne_peut_etre_inscrit_qu_une_fois() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     add_project(&mut catalog, "boutique", default);
 
     let error = catalog
-        .register_project(Uuid::new_v4(), "autre", path("boutique"), default)
+        .register_project(Uuid::new_v4(), "autre", path("boutique"), Some(default))
         .unwrap_err();
 
     assert_eq!(error.kind, CommandErrorKind::AlreadyRegistered);
@@ -76,12 +83,11 @@ fn r1_un_dossier_ne_peut_etre_inscrit_qu_une_fois() {
 
 #[test]
 fn r1_chemins_compares_par_composants() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     add_project(&mut catalog, "boutique", default);
 
     assert_eq!(
-        kind(catalog.check_new_project("autre", Path::new("/dev//boutique/"), default)),
+        kind(catalog.check_new_project("autre", Path::new("/dev//boutique/"), Some(default))),
         CommandErrorKind::AlreadyRegistered
     );
 }
@@ -101,12 +107,11 @@ fn r1_comparaison_sans_casse_par_composants() {
 
 #[test]
 fn r1_un_identifiant_ne_peut_etre_inscrit_qu_une_fois() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     let id = add_project(&mut catalog, "boutique", default);
 
     assert_eq!(
-        kind(catalog.register_project(id, "autre", path("autre"), default)),
+        kind(catalog.register_project(id, "autre", path("autre"), Some(default))),
         CommandErrorKind::AlreadyRegistered
     );
 }
@@ -115,10 +120,10 @@ fn r1_un_identifiant_ne_peut_etre_inscrit_qu_une_fois() {
 
 #[test]
 fn r2_un_projet_dans_plusieurs_workspaces_puis_dans_aucun() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     let boutique = catalog.create_workspace("Boutique").unwrap();
     let project = add_project(&mut catalog, "boutique-tests", boutique);
+    catalog.add_projects(default, &[project]).unwrap();
 
     let snapshot = catalog.snapshot(every_folder_exists);
     assert_eq!(snapshot.projects[0].workspace_ids, vec![default, boutique]);
@@ -131,71 +136,38 @@ fn r2_un_projet_dans_plusieurs_workspaces_puis_dans_aucun() {
     assert!(snapshot.projects[0].workspace_ids.is_empty());
 }
 
-// R3 - exactement un workspace par défaut, non supprimable
-
 #[test]
-fn r3_le_workspace_par_defaut_ne_peut_pas_etre_supprime() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+fn r3_tout_workspace_peut_etre_supprime() {
+    let (mut catalog, only) = with_workspace();
 
-    let error = catalog.delete_workspace(default).unwrap_err();
+    catalog.delete_workspace(only).unwrap();
 
-    assert_eq!(error.kind, CommandErrorKind::DefaultWorkspace);
-    assert!(catalog.workspace(default).is_ok());
+    assert!(catalog.snapshot(every_folder_exists).workspaces.is_empty());
 }
 
-#[test]
-fn r3_le_role_par_defaut_se_transfere() {
-    let mut catalog = Catalog::first_launch();
-    let former = catalog.default_workspace_id();
-    let boutique = catalog.create_workspace("Boutique").unwrap();
-
-    catalog.set_default_workspace(boutique).unwrap();
-
-    let snapshot = catalog.snapshot(every_folder_exists);
-    let defaults: Vec<&str> = snapshot
-        .workspaces
-        .iter()
-        .filter(|workspace| workspace.is_default)
-        .map(|workspace| workspace.name.as_str())
-        .collect();
-    assert_eq!(defaults, ["Boutique"]);
-    assert!(catalog.delete_workspace(former).is_ok());
-}
+// R4 - un nouveau projet va dans « Tous les projets », et dans le workspace choisi
 
 #[test]
-fn r3_fichier_sans_workspace_par_defaut_refuse() {
-    let mut file = Catalog::first_launch().to_file();
-    file.default_workspace_id = Uuid::new_v4();
-
-    assert_eq!(
-        Catalog::from_file(file).unwrap_err(),
-        "workspace par défaut absent"
-    );
-}
-
-// R4 - tout nouveau projet va dans le workspace par défaut
-
-#[test]
-fn r4_nouveau_projet_dans_le_defaut_et_le_workspace_choisi() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+fn r4_nouveau_projet_dans_le_seul_workspace_choisi() {
+    let (mut catalog, default) = with_workspace();
     let boutique = catalog.create_workspace("Boutique").unwrap();
 
     let project = add_project(&mut catalog, "paiements-v3", boutique);
 
-    assert_eq!(project_ids_of(&catalog, default), vec![project]);
+    assert!(project_ids_of(&catalog, default).is_empty());
     assert_eq!(project_ids_of(&catalog, boutique), vec![project]);
 }
 
 #[test]
-fn r4_nouveau_projet_dans_le_defaut_une_seule_fois() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+fn r4_nouveau_projet_sans_workspace() {
+    let (mut catalog, default) = with_workspace();
 
-    let project = add_project(&mut catalog, "boutique-tests", default);
+    let project = add_project_to(&mut catalog, "boutique-tests", None);
 
-    assert_eq!(project_ids_of(&catalog, default), vec![project]);
+    let snapshot = catalog.snapshot(every_folder_exists);
+    assert_eq!(snapshot.projects[0].id, project);
+    assert!(snapshot.projects[0].workspace_ids.is_empty());
+    assert!(project_ids_of(&catalog, default).is_empty());
 }
 
 #[test]
@@ -207,7 +179,7 @@ fn r4_workspace_inconnu_refuse_sans_rien_inscrire() {
             Uuid::new_v4(),
             "boutique",
             path("boutique"),
-            Uuid::new_v4()
+            Some(Uuid::new_v4())
         )),
         CommandErrorKind::NotFound
     );
@@ -218,8 +190,7 @@ fn r4_workspace_inconnu_refuse_sans_rien_inscrire() {
 
 #[test]
 fn r5_retirer_un_projet_le_garde_au_referentiel() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     let project = add_project(&mut catalog, "boutique-tests", default);
 
     catalog.remove_project(default, project).unwrap();
@@ -230,10 +201,10 @@ fn r5_retirer_un_projet_le_garde_au_referentiel() {
 
 #[test]
 fn r5_supprimer_un_workspace_garde_ses_projets_ailleurs() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     let boutique = catalog.create_workspace("Boutique").unwrap();
     let project = add_project(&mut catalog, "boutique-tests", boutique);
+    catalog.add_projects(default, &[project]).unwrap();
 
     catalog.delete_workspace(boutique).unwrap();
 
@@ -244,8 +215,7 @@ fn r5_supprimer_un_workspace_garde_ses_projets_ailleurs() {
 
 #[test]
 fn r5_retirer_un_projet_absent_du_workspace() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     let boutique = catalog.create_workspace("Boutique").unwrap();
     let project = add_project(&mut catalog, "boutique-tests", default);
 
@@ -259,8 +229,7 @@ fn r5_retirer_un_projet_absent_du_workspace() {
 
 #[test]
 fn r6_annuler_le_retrait_remet_le_projet_a_sa_place() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     let first = add_project(&mut catalog, "a", default);
     let second = add_project(&mut catalog, "b", default);
     let third = add_project(&mut catalog, "c", default);
@@ -287,15 +256,16 @@ fn r6_annuler_la_suppression_retablit_le_workspace_ouvert_a_sa_place() {
     let boutique = catalog.create_workspace("Boutique").unwrap();
     catalog.create_workspace("Recette").unwrap();
     let project = add_project(&mut catalog, "boutique-tests", boutique);
-    catalog.open_workspace(boutique).unwrap();
+    catalog.open_workspace(Some(boutique)).unwrap();
     let before = catalog.clone();
 
     let action = catalog.delete_workspace(boutique).unwrap();
+    assert_eq!(catalog.last_workspace_id(), None);
     catalog.undo(action.clone()).unwrap();
 
     assert_eq!(catalog, before);
     assert_eq!(project_ids_of(&catalog, boutique), vec![project]);
-    assert_eq!(catalog.last_workspace_id(), boutique);
+    assert_eq!(catalog.last_workspace_id(), Some(boutique));
 
     catalog.undo(action).unwrap();
     assert_eq!(catalog, before);
@@ -331,19 +301,19 @@ fn r6_annuler_un_retrait_dans_un_workspace_supprime() {
 // P11 - oublier un projet
 
 #[test]
-fn p11_oublier_retire_du_referentiel_et_des_workspaces() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+fn p11_oublier_retire_de_tous_les_projets_et_des_workspaces() {
+    let (mut catalog, default) = with_workspace();
     let boutique = catalog.create_workspace("Boutique").unwrap();
     let first = add_project(&mut catalog, "a", boutique);
     let forgotten = add_project(&mut catalog, "b", boutique);
     let last = add_project(&mut catalog, "c", default);
+    catalog.add_projects(default, &[first, forgotten]).unwrap();
     let before = catalog.clone();
 
     let action = catalog.forget_project(forgotten).unwrap();
 
     assert_eq!(kind(catalog.project(forgotten)), CommandErrorKind::NotFound);
-    assert_eq!(project_ids_of(&catalog, default), vec![first, last]);
+    assert_eq!(project_ids_of(&catalog, default), vec![last, first]);
     assert_eq!(project_ids_of(&catalog, boutique), vec![first]);
 
     catalog.undo(action.clone()).unwrap();
@@ -358,12 +328,11 @@ fn p11_oublier_retire_du_referentiel_et_des_workspaces() {
 
 #[test]
 fn p11_annulation_impossible_si_le_nom_a_ete_repris() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     let forgotten = add_project(&mut catalog, "boutique", default);
     let action = catalog.forget_project(forgotten).unwrap();
     catalog
-        .register_project(Uuid::new_v4(), "BOUTIQUE", path("ailleurs"), default)
+        .register_project(Uuid::new_v4(), "BOUTIQUE", path("ailleurs"), Some(default))
         .unwrap();
 
     let error = catalog.undo(action).unwrap_err();
@@ -375,63 +344,66 @@ fn p11_annulation_impossible_si_le_nom_a_ete_repris() {
     );
 }
 
-// R7 - rouvrir le dernier workspace utilisé
+// R7 - rouvrir le dernier onglet utilisé
 
 #[test]
-fn r7_le_workspace_ouvert_est_memorise() {
+fn r7_l_onglet_ouvert_est_memorise() {
     let mut catalog = Catalog::first_launch();
     let boutique = catalog.create_workspace("Boutique").unwrap();
 
-    catalog.open_workspace(boutique).unwrap();
+    catalog.open_workspace(Some(boutique)).unwrap();
+    assert_eq!(catalog.last_workspace_id(), Some(boutique));
+    assert_eq!(catalog.to_file().last_workspace_id, Some(boutique));
 
-    assert_eq!(catalog.last_workspace_id(), boutique);
-    assert_eq!(catalog.to_file().last_workspace_id, boutique);
+    catalog.open_workspace(None).unwrap();
+    assert_eq!(catalog.last_workspace_id(), None);
     assert_eq!(
-        kind(catalog.open_workspace(Uuid::new_v4())),
+        kind(catalog.open_workspace(Some(Uuid::new_v4()))),
         CommandErrorKind::NotFound
     );
+    assert_eq!(catalog.last_workspace_id(), None);
 }
 
 #[test]
-fn r7_dernier_workspace_disparu_remplace_par_le_defaut() {
-    let mut file = Catalog::first_launch().to_file();
-    file.last_workspace_id = Uuid::new_v4();
+fn r7_dernier_workspace_disparu_remplace_par_tous_les_projets() {
+    let mut file = with_workspace().0.to_file();
+    file.last_workspace_id = Some(Uuid::new_v4());
 
     let catalog = Catalog::from_file(file).unwrap();
 
-    assert_eq!(catalog.last_workspace_id(), catalog.default_workspace_id());
+    assert_eq!(catalog.last_workspace_id(), None);
 }
 
-// R8 - supprimer le workspace ouvert rouvre le workspace par défaut
+// R8 - supprimer le workspace ouvert ramène sur « Tous les projets »
 
 #[test]
-fn r8_supprimer_le_workspace_ouvert_rouvre_le_defaut() {
-    let mut catalog = Catalog::first_launch();
+fn r8_supprimer_le_workspace_ouvert_ramene_sur_tous_les_projets() {
+    let (mut catalog, _) = with_workspace();
     let boutique = catalog.create_workspace("Boutique").unwrap();
-    catalog.open_workspace(boutique).unwrap();
+    catalog.open_workspace(Some(boutique)).unwrap();
 
     catalog.delete_workspace(boutique).unwrap();
 
-    assert_eq!(catalog.last_workspace_id(), catalog.default_workspace_id());
+    assert_eq!(catalog.last_workspace_id(), None);
 }
 
 #[test]
-fn r8_supprimer_un_autre_workspace_ne_change_pas_le_workspace_ouvert() {
+fn r8_supprimer_un_autre_workspace_ne_change_pas_l_onglet_ouvert() {
     let mut catalog = Catalog::first_launch();
     let boutique = catalog.create_workspace("Boutique").unwrap();
     let recette = catalog.create_workspace("Recette").unwrap();
-    catalog.open_workspace(boutique).unwrap();
+    catalog.open_workspace(Some(boutique)).unwrap();
 
     catalog.delete_workspace(recette).unwrap();
 
-    assert_eq!(catalog.last_workspace_id(), boutique);
+    assert_eq!(catalog.last_workspace_id(), Some(boutique));
 }
 
 // R9 - noms valides et uniques sans tenir compte de la casse
 
 #[test]
 fn r9_noms_de_workspace_uniques_sans_tenir_compte_de_la_casse() {
-    let mut catalog = Catalog::first_launch();
+    let (mut catalog, _) = with_workspace();
     let boutique = catalog.create_workspace("Boutique").unwrap();
 
     let error = catalog.create_workspace("  mes PROJETS ").unwrap_err();
@@ -455,8 +427,7 @@ fn r9_renommer_en_changeant_la_casse_de_son_propre_nom() {
 
 #[test]
 fn r9_nom_de_workspace_invalide() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
 
     assert_eq!(
         kind(catalog.create_workspace(" ")),
@@ -471,18 +442,17 @@ fn r9_nom_de_workspace_invalide() {
 
 #[test]
 fn r9_noms_de_projet_uniques_sans_tenir_compte_de_la_casse() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     add_project(&mut catalog, "boutique-tests", default);
 
     let error = catalog
-        .check_new_project("Boutique-Tests", &path("ailleurs"), default)
+        .check_new_project("Boutique-Tests", &path("ailleurs"), Some(default))
         .unwrap_err();
 
     assert_eq!(error.kind, CommandErrorKind::NameTaken);
     assert_eq!(
         error.message,
-        "Un projet « boutique-tests » existe déjà dans le référentiel."
+        "Un projet « boutique-tests » existe déjà dans « Tous les projets »."
     );
 }
 
@@ -490,15 +460,14 @@ fn r9_noms_de_projet_uniques_sans_tenir_compte_de_la_casse() {
 
 #[test]
 fn r10_nom_de_projet_invalide_refuse() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
 
     assert_eq!(
-        kind(catalog.check_new_project("api/v2", &path("api"), default)),
+        kind(catalog.check_new_project("api/v2", &path("api"), Some(default))),
         CommandErrorKind::InvalidName
     );
     assert_eq!(
-        kind(catalog.register_project(Uuid::new_v4(), "nul", path("nul"), default)),
+        kind(catalog.register_project(Uuid::new_v4(), "nul", path("nul"), Some(default))),
         CommandErrorKind::InvalidName
     );
     assert!(catalog.projects.is_empty());
@@ -506,42 +475,46 @@ fn r10_nom_de_projet_invalide_refuse() {
 
 #[test]
 fn r10_nom_de_projet_normalise() {
-    let catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (catalog, _) = with_workspace();
 
     assert_eq!(
         catalog
-            .check_new_project("  boutique-tests ", &path("boutique-tests"), default)
+            .check_new_project("  boutique-tests ", &path("boutique-tests"), None)
             .unwrap(),
         "boutique-tests"
     );
 }
 
-// R11 - ordre d'affichage
+// R11 - ordre des onglets et des projets
 
 #[test]
-fn r11_workspaces_par_defaut_puis_par_nom() {
+fn r11_onglets_dans_l_ordre_de_creation() {
+    let mut catalog = Catalog::first_launch();
+    catalog.create_workspace("zeta").unwrap();
+    catalog.create_workspace("Alpha").unwrap();
+    let beta = catalog.create_workspace("beta").unwrap();
+
+    assert_eq!(workspace_names(&catalog), ["zeta", "Alpha", "beta"]);
+
+    catalog.rename_workspace(beta, "Aa").unwrap();
+    assert_eq!(workspace_names(&catalog), ["zeta", "Alpha", "Aa"]);
+}
+
+#[test]
+fn r11_workspaces_d_un_projet_dans_l_ordre_des_onglets() {
     let mut catalog = Catalog::first_launch();
     let zeta = catalog.create_workspace("zeta").unwrap();
-    catalog.create_workspace("Alpha").unwrap();
-    catalog.create_workspace("beta").unwrap();
+    let alpha = catalog.create_workspace("Alpha").unwrap();
+    let project = add_project(&mut catalog, "boutique", alpha);
+    catalog.add_projects(zeta, &[project]).unwrap();
 
-    assert_eq!(
-        workspace_names(&catalog),
-        ["Mes projets", "Alpha", "beta", "zeta"]
-    );
-
-    catalog.set_default_workspace(zeta).unwrap();
-    assert_eq!(
-        workspace_names(&catalog),
-        ["zeta", "Alpha", "beta", "Mes projets"]
-    );
+    let snapshot = catalog.snapshot(every_folder_exists);
+    assert_eq!(snapshot.projects[0].workspace_ids, vec![zeta, alpha]);
 }
 
 #[test]
 fn r11_projets_par_ordre_de_creation() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     for name in ["notifications", "api-facturation", "boutique-tests"] {
         add_project(&mut catalog, name, default);
     }
@@ -564,7 +537,7 @@ fn r11_projets_par_ordre_de_creation() {
 #[test]
 fn w5_couleurs_attribuees_sans_doublon_puis_en_rotation() {
     let mut catalog = Catalog::first_launch();
-    let colors: Vec<WorkspaceColor> = (1..=8)
+    let colors: Vec<WorkspaceColor> = (1..=9)
         .map(|index| {
             let id = catalog.create_workspace(&format!("ws {index}")).unwrap();
             catalog.workspace(id).unwrap().color
@@ -574,7 +547,7 @@ fn w5_couleurs_attribuees_sans_doublon_puis_en_rotation() {
     use WorkspaceColor::*;
     assert_eq!(
         colors,
-        [Orange, Blue, Green, Purple, Red, Yellow, Teal, Orange]
+        [Orange, Blue, Green, Purple, Red, Yellow, Teal, Gray, Orange]
     );
 }
 
@@ -601,8 +574,7 @@ fn w8_changer_la_couleur() {
 
 #[test]
 fn w6_ajouter_des_projets_ignore_ceux_deja_presents() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     let boutique = catalog.create_workspace("Boutique").unwrap();
     let first = add_project(&mut catalog, "a", boutique);
     let second = add_project(&mut catalog, "b", default);
@@ -616,8 +588,7 @@ fn w6_ajouter_des_projets_ignore_ceux_deja_presents() {
 
 #[test]
 fn w6_projet_inconnu_n_ajoute_rien() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     let boutique = catalog.create_workspace("Boutique").unwrap();
     let known = add_project(&mut catalog, "a", default);
 
@@ -628,7 +599,7 @@ fn w6_projet_inconnu_n_ajoute_rien() {
     assert_eq!(error.kind, CommandErrorKind::NotFound);
     assert_eq!(
         error.message,
-        "Ce projet n'existe plus dans le référentiel."
+        "Ce projet n'est plus dans « Tous les projets »."
     );
     assert!(project_ids_of(&catalog, boutique).is_empty());
 }
@@ -637,8 +608,7 @@ fn w6_projet_inconnu_n_ajoute_rien() {
 
 #[test]
 fn p10_dossier_absent_marque_introuvable() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     add_project(&mut catalog, "present", default);
     add_project(&mut catalog, "absent", default);
 
@@ -668,7 +638,8 @@ fn aller_retour_par_le_format_disque() {
     let mut catalog = Catalog::first_launch();
     let boutique = catalog.create_workspace("Boutique").unwrap();
     add_project(&mut catalog, "boutique-tests", boutique);
-    catalog.open_workspace(boutique).unwrap();
+    add_project_to(&mut catalog, "sans-workspace", None);
+    catalog.open_workspace(Some(boutique)).unwrap();
 
     let file = catalog.to_file();
 
@@ -678,8 +649,7 @@ fn aller_retour_par_le_format_disque() {
 
 #[test]
 fn fichier_repare_les_references_orphelines_et_doublons() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     let project = add_project(&mut catalog, "boutique-tests", default);
     let mut file = catalog.to_file();
     file.workspaces[0].project_ids = vec![Uuid::new_v4(), project, project];
@@ -691,23 +661,81 @@ fn fichier_repare_les_references_orphelines_et_doublons() {
 
 #[test]
 fn fichier_avec_identifiants_en_double_refuse() {
-    let mut catalog = Catalog::first_launch();
-    let default = catalog.default_workspace_id();
+    let (mut catalog, default) = with_workspace();
     add_project(&mut catalog, "boutique-tests", default);
     let mut file = catalog.to_file();
     file.projects.push(file.projects[0].clone());
     assert!(Catalog::from_file(file).unwrap_err().contains("en double"));
 
-    let mut file = Catalog::first_launch().to_file();
+    let mut file = with_workspace().0.to_file();
     file.workspaces.push(file.workspaces[0].clone());
     assert!(Catalog::from_file(file).unwrap_err().contains("en double"));
+}
+
+// R12 - migration du format version 1
+
+fn file_v1(default_projects: Vec<Uuid>, last: Uuid) -> (CatalogFileV1, Uuid, Uuid) {
+    let (a, b) = (Uuid::from_u128(1), Uuid::from_u128(2));
+    let (mes, boutique) = (Uuid::from_u128(10), Uuid::from_u128(11));
+    let project = |id: Uuid, name: &str| Project {
+        id,
+        name: name.to_owned(),
+        path: path(name),
+    };
+    let file = CatalogFileV1 {
+        projects: vec![project(a, "a"), project(b, "b")],
+        workspaces: vec![
+            Workspace {
+                id: mes,
+                name: "Mes projets".to_owned(),
+                color: WorkspaceColor::Gray,
+                project_ids: default_projects,
+            },
+            Workspace {
+                id: boutique,
+                name: "Boutique".to_owned(),
+                color: WorkspaceColor::Orange,
+                project_ids: vec![a],
+            },
+        ],
+        default_workspace_id: mes,
+        last_workspace_id: if last == Uuid::nil() { mes } else { last },
+    };
+    (file, mes, boutique)
+}
+
+#[test]
+fn r12_le_workspace_par_defaut_complet_disparait() {
+    let (file, _, boutique) = file_v1(vec![Uuid::from_u128(1), Uuid::from_u128(2)], Uuid::nil());
+
+    let migrated = Catalog::migrate_v1(file);
+
+    assert_eq!(migrated.version, FILE_VERSION);
+    assert_eq!(migrated.projects.len(), 2);
+    assert_eq!(
+        migrated.workspaces.iter().map(|w| w.id).collect::<Vec<_>>(),
+        [boutique]
+    );
+    assert_eq!(migrated.last_workspace_id, None);
+}
+
+#[test]
+fn r12_le_workspace_par_defaut_partiel_reste() {
+    let (file, mes, boutique) = file_v1(vec![Uuid::from_u128(2)], Uuid::from_u128(11));
+
+    let migrated = Catalog::migrate_v1(file);
+
+    assert_eq!(
+        migrated.workspaces.iter().map(|w| w.id).collect::<Vec<_>>(),
+        [mes, boutique]
+    );
+    assert_eq!(migrated.last_workspace_id, Some(boutique));
 }
 
 // Forme JSON de l'instantané (miroir TypeScript au lot C)
 
 #[test]
 fn instantane_serialise_en_camel_case() {
-    let default = Uuid::from_u128(1);
     let boutique = Uuid::from_u128(2);
     let project = Uuid::from_u128(3);
     let catalog = Catalog::from_file(CatalogFile {
@@ -717,22 +745,13 @@ fn instantane_serialise_en_camel_case() {
             name: "boutique-tests".to_owned(),
             path: PathBuf::from("/dev/boutique-tests"),
         }],
-        workspaces: vec![
-            Workspace {
-                id: default,
-                name: "Mes projets".to_owned(),
-                color: WorkspaceColor::Gray,
-                project_ids: vec![project],
-            },
-            Workspace {
-                id: boutique,
-                name: "Boutique".to_owned(),
-                color: WorkspaceColor::Orange,
-                project_ids: vec![project],
-            },
-        ],
-        default_workspace_id: default,
-        last_workspace_id: boutique,
+        workspaces: vec![Workspace {
+            id: boutique,
+            name: "Boutique".to_owned(),
+            color: WorkspaceColor::Orange,
+            project_ids: vec![project],
+        }],
+        last_workspace_id: None,
     })
     .unwrap();
 
@@ -747,14 +766,12 @@ fn instantane_serialise_en_camel_case() {
                 "name": "boutique-tests",
                 "path": PathBuf::from("/dev/boutique-tests").display().to_string(),
                 "status": "missing",
-                "workspaceIds": [id(1), id(2)]
+                "workspaceIds": [id(2)]
             }],
             "workspaces": [
-                { "id": id(1), "name": "Mes projets", "color": "gray", "isDefault": true, "projectIds": [id(3)] },
-                { "id": id(2), "name": "Boutique", "color": "orange", "isDefault": false, "projectIds": [id(3)] }
+                { "id": id(2), "name": "Boutique", "color": "orange", "projectIds": [id(3)] }
             ],
-            "defaultWorkspaceId": id(1),
-            "lastWorkspaceId": id(2)
+            "lastWorkspaceId": null
         })
     );
 }

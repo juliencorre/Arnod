@@ -62,7 +62,7 @@ describe("vue d'un workspace (2a, W3, W7)", () => {
 
     expect(cardNames(wrapper)).toEqual(["boutique-tests", "auth-sso"]);
     expect(wrapper.get("main").text()).toContain("+ Ajouter un projet");
-    const sidebarProjects = wrapper.findAll("aside nav li").map((li) => li.text());
+    const sidebarProjects = wrapper.findAll("aside .sidebar__project").map((b) => b.text());
     expect(sidebarProjects).toEqual(["Bboutique-tests", "Aauth-sso"]);
   });
 
@@ -112,7 +112,11 @@ describe("vue d'un workspace (2a, W3, W7)", () => {
 
     const dialog = wrapper.get("dialog[open]");
     expect(dialog.get("h2").text()).toBe("Nouveau projet");
-    expect(dialog.get<HTMLSelectElement>("select").element.value).toBe(BOUTIQUE);
+    expect(dialog.text()).toContain("Il sera rangé dans le workspace ouvert");
+    expect(dialog.findAll(".storage__chip").map((c) => c.text().replace(/\s+/g, " "))).toEqual([
+      "Tous les projets par défaut",
+      "Boutique workspace ouvert ×",
+    ]);
   });
 });
 
@@ -155,7 +159,7 @@ describe("menu ⋯ d'un projet (P5, P6, P7)", () => {
       workspaceId: "ws-recette",
       projectIds: [BOUTIQUE_TESTS],
     });
-    expect(wrapper.get(".toast").text()).toBe("« boutique-tests » ajouté à Recette sprint 42.");
+    expect(wrapper.get(".toast").text()).toBe("« boutique-tests » ajouté à « Recette sprint 42 ».");
   });
 
   it("retire du workspace, puis « Annuler » le remet (R5, R6)", async () => {
@@ -170,7 +174,7 @@ describe("menu ⋯ d'un projet (P5, P6, P7)", () => {
     expect(cardNames(wrapper)).toEqual(["auth-sso"]);
     const toast = wrapper.get(".toast");
     expect(toast.text()).toContain(
-      "« boutique-tests » retiré de « Boutique ». Le projet reste dans le référentiel.",
+      "« boutique-tests » retiré de « Boutique ». Le projet reste dans « Tous les projets ».",
     );
     expect(core.snapshot().projects.map((p) => p.name)).toContain("boutique-tests");
 
@@ -194,90 +198,13 @@ describe("projet introuvable (P10)", () => {
     expect(card?.get("button").attributes("disabled")).toBeDefined();
     expect(wrapper.get("aside").text()).toContain("(dossier introuvable)");
 
-    const sidebarButton = wrapper.findAll("aside nav li button")[1];
+    const sidebarButton = wrapper.findAll("aside .sidebar__project")[1];
     await sidebarButton?.trigger("click");
     await flushPromises();
     expect(wrapper.get(".toast").text()).toContain(
       "Le dossier du projet « auth-sso » est introuvable",
     );
     expect(wrapper.get("main h1").text()).toBe("Boutique");
-  });
-});
-
-describe("sélecteur de workspaces (2b, W4, W5)", () => {
-  async function openSwitcher(app: AppWrapper): Promise<void> {
-    const trigger = app.get('aside button[aria-haspopup="dialog"]');
-    (trigger.element as HTMLElement).focus();
-    await trigger.trigger("click");
-    await flushPromises();
-  }
-
-  it("liste, filtre et change de workspace", async () => {
-    const core = installFakeCore(richSnapshot());
-    wrapper = await mountApp();
-    await openSwitcher(wrapper);
-
-    const popover = wrapper.get('[role="dialog"][aria-label="Changer de workspace"]');
-    expect(document.activeElement).toBe(popover.get('input[type="search"]').element);
-    const names = () => popover.findAll(".switcher__item-name").map((n) => n.text());
-    expect(names()).toEqual(["Mes projets", "Boutique", "Recette sprint 42"]);
-    expect(popover.get('[aria-current="true"]').text()).toContain("Boutique");
-
-    await popover.get('input[type="search"]').setValue("rec");
-    expect(names()).toEqual(["Recette sprint 42"]);
-
-    await press("ArrowDown");
-    expect(document.activeElement?.textContent).toContain("Recette sprint 42");
-    (document.activeElement as HTMLElement).click();
-    await flushPromises();
-
-    expect(core.calls.find((c) => c.cmd === "workspace_open")?.args).toEqual({
-      workspaceId: "ws-recette",
-    });
-    expect(wrapper.get("main h1").text()).toBe("Recette sprint 42");
-    expect(wrapper.find('[aria-label="Changer de workspace"]').exists()).toBe(false);
-  });
-
-  it("Échap ferme et rend le focus au sélecteur", async () => {
-    installFakeCore(boutiqueSnapshot());
-    wrapper = await mountApp();
-    await openSwitcher(wrapper);
-
-    await press("Escape");
-
-    expect(wrapper.find('[aria-label="Changer de workspace"]').exists()).toBe(false);
-    expect(document.activeElement).toBe(
-      wrapper.get('aside button[aria-haspopup="dialog"]').element,
-    );
-  });
-
-  it("crée un workspace vide et l'ouvre", async () => {
-    const core = installFakeCore(boutiqueSnapshot());
-    wrapper = await mountApp();
-    await openSwitcher(wrapper);
-
-    await button(wrapper.get("aside"), "+ Nouveau workspace").trigger("click");
-    await flushPromises();
-    const dialog = wrapper.get("dialog[open]");
-    expect(dialog.get("h2").text()).toBe("Nouveau workspace");
-    expect(dialog.text()).toContain("Il démarre vide : ajoutez-y des projets du référentiel.");
-
-    await dialog.get("input").setValue("Boutique");
-    await dialog.get("form").trigger("submit");
-    await flushPromises();
-    expect(dialog.get("[role='alert']").text()).toBe("Un workspace « Boutique » existe déjà.");
-
-    await dialog.get("input").setValue("Migration paiements");
-    await dialog.get("form").trigger("submit");
-    await flushPromises();
-
-    expect(
-      core.calls.find((c) => c.cmd === "workspace_create" && c.args.name === "Migration paiements"),
-    ).toBeDefined();
-    expect(wrapper.find("dialog[open]").exists()).toBe(false);
-    expect(wrapper.get("main h1").text()).toBe("Migration paiements");
-    expect(wrapper.get("main").text()).toContain("Aucun projet pour l'instant");
-    expect(wrapper.get(".toast").text()).toBe("Workspace « Migration paiements » créé.");
   });
 });
 
@@ -298,7 +225,7 @@ describe("ajouter un projet à un workspace (2c, W6)", () => {
     return found;
   }
 
-  /** Instantané où Boutique laisse de côté `count` projets du référentiel. */
+  /** Instantané où Boutique laisse de côté `count` projets sans workspace. */
   function longRegistrySnapshot(count: number) {
     const snapshot = boutiqueSnapshot();
     for (let i = 1; i <= count; i++) {
@@ -313,10 +240,7 @@ describe("ajouter un projet à un workspace (2c, W6)", () => {
     const dialog = await openAddProjects(wrapper);
 
     expect(dialog.get("h2").text()).toBe("Ajouter un projet à « Boutique »");
-    expect(choiceTitles(dialog)).toEqual([
-      "Créer un nouveau projet",
-      "Importer un projet existant…",
-    ]);
+    expect(choiceTitles(dialog)).toEqual(["Créer un nouveau projet", "Importer…"]);
     const create = choice(dialog, "Créer un nouveau projet");
     expect(create.element.tagName).toBe("BUTTON");
     expect(create.attributes("aria-labelledby")).toBe(
@@ -325,10 +249,7 @@ describe("ajouter un projet à un workspace (2c, W6)", () => {
     expect(create.attributes("aria-describedby")).toBe(
       create.get(".choice__text").attributes("id"),
     );
-    expect(dialog.get(".note").text()).toBe(
-      "Un projet créé ou importé est aussi ajouté à « Mes projets » (par défaut).",
-    );
-    // Tous les projets du référentiel sont déjà là : ni liste, ni recherche, ni « Ajouter ».
+    // Tous les projets sont déjà là : ni liste, ni recherche, ni « Ajouter ».
     expect(dialog.find("section").exists()).toBe(false);
     expect(dialog.find('input[type="search"]').exists()).toBe(false);
     expect(dialog.findAll("footer button").map((b) => b.text())).toEqual(["Annuler"]);
@@ -344,23 +265,12 @@ describe("ajouter un projet à un workspace (2c, W6)", () => {
     expect(first).toBe(choice(dialog, "Créer un nouveau projet").element);
   });
 
-  it("dans le workspace par défaut, n'annonce pas d'ajout supplémentaire", async () => {
-    const snapshot = boutiqueSnapshot();
-    snapshot.lastWorkspaceId = MES_PROJETS;
-    installFakeCore(snapshot);
-    wrapper = await mountApp();
-    const dialog = await openAddProjects(wrapper);
-
-    expect(dialog.get("h2").text()).toBe("Ajouter un projet à « Mes projets »");
-    expect(dialog.find(".note").exists()).toBe(false);
-  });
-
   it("liste ensuite les seuls projets absents du workspace et ajoute la sélection", async () => {
     const core = installFakeCore(richSnapshot());
     wrapper = await mountApp();
     const dialog = await openAddProjects(wrapper);
 
-    expect(dialog.get("section h3").text()).toBe("Ou reprendre un projet du référentiel");
+    expect(dialog.get("section h3").text()).toBe("Ou reprendre un projet existant");
     const rows = dialog.findAll("li label");
     expect(rows.map((row) => row.get(".row__name").text())).toEqual(["notifications"]);
     expect(rows.map((row) => row.get(".row__note").text())).toEqual(["Mes projets"]);
@@ -411,6 +321,6 @@ describe("ajouter un projet à un workspace (2c, W6)", () => {
 
     const next = wrapper.get("dialog[open]");
     expect(next.get("h2").text()).toBe("Nouveau projet");
-    expect(next.get<HTMLSelectElement>("select").element.value).toBe(BOUTIQUE);
+    expect(next.findAll(".storage__chip")[1]?.text()).toContain("Boutique");
   });
 });

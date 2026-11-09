@@ -11,7 +11,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::catalog::model::CatalogFile;
+use crate::catalog::model::{CatalogFile, CatalogFileV1};
 use crate::catalog::{Catalog, FILE_VERSION};
 use crate::error::{CommandError, CommandErrorKind};
 
@@ -117,11 +117,15 @@ fn parse(bytes: &[u8]) -> Result<Catalog, Invalid> {
     if version > u64::from(FILE_VERSION) {
         return Err(Invalid::Newer(version));
     }
-    if version != u64::from(FILE_VERSION) {
-        return Err(Invalid::Corrupt(format!("version {version} inconnue")));
-    }
-    let file: CatalogFile = serde_json::from_value(value)
-        .map_err(|error| Invalid::Corrupt(format!("contenu invalide : {error}")))?;
+    let invalid =
+        |error: serde_json::Error| Invalid::Corrupt(format!("contenu invalide : {error}"));
+    let file: CatalogFile = match version {
+        // Version 1 : workspace par défaut, migré à la lecture (R12). Le
+        // fichier n'est réécrit en version 2 qu'à la prochaine modification.
+        1 => Catalog::migrate_v1(serde_json::from_value::<CatalogFileV1>(value).map_err(invalid)?),
+        2 => serde_json::from_value(value).map_err(invalid)?,
+        _ => return Err(Invalid::Corrupt(format!("version {version} inconnue"))),
+    };
     Catalog::from_file(file).map_err(Invalid::Corrupt)
 }
 
@@ -177,13 +181,8 @@ mod tests {
             panic!("premier lancement attendu");
         };
 
-        assert_eq!(
-            catalog
-                .workspace(catalog.default_workspace_id())
-                .unwrap()
-                .name,
-            "Mes projets"
-        );
+        assert!(catalog.snapshot(|_| true).workspaces.is_empty());
+        assert_eq!(catalog.last_workspace_id(), None);
         assert!(!state_file(dir.path()).exists(), "la lecture n'écrit rien");
     }
 
@@ -192,7 +191,7 @@ mod tests {
         let dir = data_dir();
         let mut catalog = Catalog::first_launch();
         let boutique = catalog.create_workspace("Boutique").unwrap();
-        catalog.open_workspace(boutique).unwrap();
+        catalog.open_workspace(Some(boutique)).unwrap();
 
         save(dir.path(), &catalog).unwrap();
 
@@ -216,7 +215,7 @@ mod tests {
         assert_eq!(names, [STATE_FILE_NAME]);
         let json: serde_json::Value =
             serde_json::from_slice(&fs::read(state_file(dir.path())).unwrap()).unwrap();
-        assert_eq!(json["version"], 1);
+        assert_eq!(json["version"], 2);
     }
 
     #[test]
@@ -289,29 +288,112 @@ mod tests {
         );
 
         let dir = data_dir();
-        let mut file = Catalog::first_launch().to_file();
-        file.default_workspace_id = uuid::Uuid::new_v4();
+        let mut catalog = Catalog::first_launch();
+        catalog.create_workspace("Boutique").unwrap();
+        let mut file = catalog.to_file();
+        file.workspaces.push(file.workspaces[0].clone());
         write_state(dir.path(), &serde_json::to_string(&file).unwrap());
-        assert_eq!(
-            expect_recovered(dir.path()).1,
-            "workspace par défaut absent"
-        );
+        assert!(expect_recovered(dir.path()).1.contains("en double"));
     }
 
     #[test]
     fn version_plus_recente_ni_lue_ni_touchee() {
         let dir = data_dir();
-        let content = r#"{ "version": 2, "nouveau": true }"#;
+        let content = r#"{ "version": 3, "nouveau": true }"#;
         write_state(dir.path(), content);
 
         let error = load(dir.path()).unwrap_err();
 
         assert_eq!(error.kind, CommandErrorKind::NewerVersion);
         assert!(
-            error.message.contains("version plus récente (format 2)"),
+            error.message.contains("version plus récente (format 3)"),
             "{}",
             error.message
         );
         assert_eq!(fs::read_to_string(state_file(dir.path())).unwrap(), content);
+    }
+
+    /// Fichier version 1 : « Mes projets » par défaut avec tous les projets,
+    /// « Boutique » ouvert avec un seul.
+    fn v1_state(default_has_all: bool) -> String {
+        let (p1, p2) = (
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+        );
+        let (mes, boutique) = (
+            "00000000-0000-0000-0000-00000000000a",
+            "00000000-0000-0000-0000-00000000000b",
+        );
+        let default_projects = if default_has_all {
+            format!(r#"["{p1}", "{p2}"]"#)
+        } else {
+            format!(r#"["{p1}"]"#)
+        };
+        format!(
+            r#"{{
+              "version": 1,
+              "projects": [
+                {{ "id": "{p1}", "name": "boutique-tests", "path": "/dev/boutique-tests" }},
+                {{ "id": "{p2}", "name": "auth-sso", "path": "/dev/auth-sso" }}
+              ],
+              "workspaces": [
+                {{ "id": "{mes}", "name": "Mes projets", "color": "gray", "projectIds": {default_projects} }},
+                {{ "id": "{boutique}", "name": "Boutique", "color": "orange", "projectIds": ["{p1}"] }}
+              ],
+              "defaultWorkspaceId": "{mes}",
+              "lastWorkspaceId": "{mes}"
+            }}"#
+        )
+    }
+
+    #[test]
+    fn r12_version_1_migree_sans_le_workspace_par_defaut_redondant() {
+        let dir = data_dir();
+        write_state(dir.path(), &v1_state(true));
+
+        let Loaded::Existing(catalog) = load(dir.path()).unwrap() else {
+            panic!("fichier existant attendu");
+        };
+
+        let snapshot = catalog.snapshot(|_| true);
+        let names: Vec<&str> = snapshot
+            .workspaces
+            .iter()
+            .map(|w| w.name.as_str())
+            .collect();
+        assert_eq!(names, ["Boutique"]);
+        assert_eq!(snapshot.projects.len(), 2);
+        assert_eq!(
+            snapshot.last_workspace_id, None,
+            "l'onglet ouvert devient « Tous les projets »"
+        );
+        // Lecture seule : le fichier reste en version 1 jusqu'à la prochaine écriture.
+        let raw = fs::read_to_string(state_file(dir.path())).unwrap();
+        assert!(raw.contains("defaultWorkspaceId"));
+
+        save(dir.path(), &catalog).unwrap();
+        let json: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(state_file(dir.path())).unwrap()).unwrap();
+        assert_eq!(json["version"], 2);
+        assert!(json.get("defaultWorkspaceId").is_none());
+    }
+
+    #[test]
+    fn r12_workspace_par_defaut_partiel_garde_comme_workspace_ordinaire() {
+        let dir = data_dir();
+        write_state(dir.path(), &v1_state(false));
+
+        let Loaded::Existing(catalog) = load(dir.path()).unwrap() else {
+            panic!("fichier existant attendu");
+        };
+
+        let snapshot = catalog.snapshot(|_| true);
+        let names: Vec<&str> = snapshot
+            .workspaces
+            .iter()
+            .map(|w| w.name.as_str())
+            .collect();
+        assert_eq!(names, ["Mes projets", "Boutique"]);
+        assert_eq!(snapshot.last_workspace_id, Some(snapshot.workspaces[0].id));
     }
 }

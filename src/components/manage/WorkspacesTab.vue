@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Onglet « Workspaces » (2d, W7 à W11) : liste à gauche, détail à droite (nom,
- * couleur, défaut, projets) et suppression avec « Annuler ».
+ * « Gérer les workspaces » (2d, O11) : liste à gauche, détail à droite (nom,
+ * couleur, projets) et suppression avec « Annuler ».
  */
 import { computed, ref, useId, watch } from "vue";
 
@@ -9,41 +9,30 @@ import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import ColorDot from "@/components/ui/ColorDot.vue";
 import type { MenuItem } from "@/components/ui/menu";
-import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
-import { useProjectActions } from "@/composables/useProjectActions";
-import { countLabel } from "@/lib/format";
+import { ALL_PROJECTS, useProjectActions } from "@/composables/useProjectActions";
+import { COLOR_LABELS, countLabel } from "@/lib/format";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
 import { useNavigationStore } from "@/stores/navigation";
 import { useToastStore } from "@/stores/toasts";
 import type { WorkspaceColor } from "@/types/ipc";
 
-const props = defineProps<{ workspaceId: string }>();
+const props = defineProps<{ workspaceId: string | null }>();
 
 const catalog = useCatalogStore();
 const dialogs = useDialogStore();
 const navigation = useNavigationStore();
 const toasts = useToastStore();
-const { removeFromWorkspace } = useProjectActions();
+const { removeFromWorkspace, deleteWorkspace } = useProjectActions();
 const listLabelId = useId();
 const nameId = useId();
 const nameErrorId = useId();
 const projectsLabelId = useId();
 
-/** Libellés français des couleurs (W8). */
-const COLOR_LABELS: Record<WorkspaceColor, string> = {
-  gray: "Gris",
-  orange: "Orange",
-  blue: "Bleu",
-  green: "Vert",
-  purple: "Violet",
-  red: "Rouge",
-  yellow: "Jaune",
-  teal: "Turquoise",
-};
-
-const workspace = computed(() => catalog.workspaceById(props.workspaceId));
-const projects = computed(() => catalog.projectsOf(props.workspaceId));
+const workspace = computed(() =>
+  props.workspaceId === null ? null : catalog.workspaceById(props.workspaceId),
+);
+const projects = computed(() => (workspace.value ? catalog.projectsOf(workspace.value.id) : []));
 const colorItems = computed<MenuItem[]>(() =>
   (Object.keys(COLOR_LABELS) as WorkspaceColor[]).map((color) => ({
     id: color,
@@ -79,38 +68,9 @@ async function saveName(): Promise<void> {
 }
 
 async function setColor(color: string): Promise<void> {
+  if (!workspace.value) return;
   try {
-    await catalog.setWorkspaceColor(props.workspaceId, color as WorkspaceColor);
-  } catch (error) {
-    toasts.showError(error);
-  }
-}
-
-async function setDefault(value: boolean): Promise<void> {
-  if (!value) return;
-  try {
-    await catalog.setDefaultWorkspace(props.workspaceId);
-    toasts.show(`« ${workspace.value?.name ?? ""} » est le workspace par défaut.`);
-  } catch (error) {
-    toasts.showError(error);
-  }
-}
-
-async function deleteWorkspace(): Promise<void> {
-  const current = workspace.value;
-  if (!current) return;
-  const kept = countLabel(current.projectIds.length, "projet conservé", "projets conservés");
-  try {
-    const undoToken = await catalog.deleteWorkspace(current.id);
-    toasts.show(`Workspace « ${current.name} » supprimé · ${kept} dans le référentiel.`, {
-      action: {
-        label: "Annuler",
-        run: async () => {
-          await catalog.undo(undoToken);
-          navigation.selectManagedWorkspace(current.id);
-        },
-      },
-    });
+    await catalog.setWorkspaceColor(workspace.value.id, color as WorkspaceColor);
   } catch (error) {
     toasts.showError(error);
   }
@@ -134,7 +94,6 @@ async function deleteWorkspace(): Promise<void> {
           >
             <ColorDot :color="item.color" size="sm" />
             <span class="list__name">{{ item.name }}</span>
-            <span v-if="item.isDefault" class="badge">par défaut</span>
             <span class="list__count">{{
               countLabel(item.projectIds.length, "projet", "projets")
             }}</span>
@@ -145,12 +104,15 @@ async function deleteWorkspace(): Promise<void> {
         + Nouveau workspace
       </BaseButton>
       <p class="list__note">
-        Le workspace par défaut reçoit chaque nouveau projet. Il ne peut pas être supprimé tant
-        qu'il a ce rôle.
+        Supprimer un workspace ne supprime aucun projet : ils restent dans « {{ ALL_PROJECTS }} ».
       </p>
     </nav>
 
-    <div v-if="workspace" class="detail">
+    <p v-if="!workspace" class="detail detail__empty">
+      Aucun workspace. Créez-en un avec « + Nouveau workspace » : il apparaîtra en onglet, après «
+      {{ ALL_PROJECTS }} ».
+    </p>
+    <div v-else class="detail">
       <form class="detail__name" novalidate @submit.prevent="saveName">
         <label :for="nameId" class="detail__label">Nom</label>
         <div class="detail__name-row">
@@ -176,17 +138,6 @@ async function deleteWorkspace(): Promise<void> {
         </p>
       </form>
 
-      <div class="detail__default">
-        <ToggleSwitch
-          :model-value="workspace.isDefault"
-          :disabled="workspace.isDefault"
-          @update:model-value="setDefault"
-        >
-          Workspace par défaut
-          <span class="detail__muted">(actuellement : {{ catalog.defaultWorkspace?.name }})</span>
-        </ToggleSwitch>
-      </div>
-
       <section class="projects" :aria-labelledby="projectsLabelId">
         <div class="projects__head">
           <h2 :id="projectsLabelId" class="detail__label">Projets · {{ projects.length }}</h2>
@@ -210,19 +161,18 @@ async function deleteWorkspace(): Promise<void> {
             </BaseButton>
           </li>
         </ul>
-        <p v-else class="detail__muted">Aucun projet : ajoutez-en depuis le référentiel.</p>
+        <p v-else class="detail__muted">
+          Aucun projet : ajoutez-en un, ou glissez-en depuis « {{ ALL_PROJECTS }} ».
+        </p>
       </section>
 
       <div class="detail__delete">
-        <BaseButton variant="danger" :disabled="workspace.isDefault" @click="deleteWorkspace">
+        <BaseButton variant="danger" @click="deleteWorkspace(workspace.id)">
           Supprimer ce workspace
         </BaseButton>
         <p class="detail__muted">
-          {{
-            workspace.isDefault
-              ? "Le workspace par défaut ne peut pas être supprimé : définissez d'abord un autre workspace par défaut."
-              : "Seul le regroupement disparaît : les projets restent dans le référentiel et dans leurs autres workspaces."
-          }}
+          Seul le regroupement disparaît : les projets restent dans « {{ ALL_PROJECTS }} » et dans
+          leurs autres workspaces.
         </p>
       </div>
     </div>
@@ -305,14 +255,6 @@ async function deleteWorkspace(): Promise<void> {
   margin: auto 0 0;
   font-size: 0.8125rem;
   color: var(--color-muted);
-}
-
-.badge {
-  padding: 0.0625rem 0.375rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  color: var(--color-muted);
-  background: var(--color-chip);
 }
 
 .detail {

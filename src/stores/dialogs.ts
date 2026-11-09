@@ -2,21 +2,24 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 
 /**
- * Fenêtres modales de l'application, ouvertes depuis plusieurs endroits
- * (barre latérale, vue workspace, référentiel, notifications) et rendues une
- * seule fois par la coquille. `null` : fenêtre fermée.
+ * Fenêtres et fenêtres surgissantes partagées, ouvertes depuis plusieurs endroits
+ * (onglets, barre latérale, vue workspace, « Tous les projets », notifications)
+ * et rendues une seule fois. `null` : fermée.
  */
 export const useDialogStore = defineStore("dialogs", () => {
-  /** « Nouveau projet » (2a bis), workspace prérempli. */
-  const newProject = ref<{ workspaceId: string } | null>(null);
+  /** « Nouveau projet » (2a bis), workspace prérempli ou aucun. */
+  const newProject = ref<{ workspaceId: string | null } | null>(null);
   /** « Ajouter à des workspaces » pour un projet (P4, P6). */
   const addToWorkspaces = ref<{ projectId: string } | null>(null);
-  /** « Ajouter un projet à un workspace » (2c) : créer, importer ou reprendre du référentiel. */
+  /** « Ajouter un projet à un workspace » (2c) : créer, importer ou reprendre. */
   const addProjects = ref<{ workspaceId: string } | null>(null);
-  /** « Nouveau workspace » (2b, 2d) ; `open` : ouvrir le workspace créé. */
+  /**
+   * « Nouveau workspace » (2b), près du « + » des onglets ; `open` : ouvrir
+   * l'onglet créé (sinon il est détaillé dans la gestion).
+   */
   const newWorkspace = ref<{ open: boolean } | null>(null);
 
-  function openNewProject(workspaceId: string): void {
+  function openNewProject(workspaceId: string | null): void {
     newProject.value = { workspaceId };
   }
 

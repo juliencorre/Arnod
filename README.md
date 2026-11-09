@@ -8,10 +8,13 @@
 
 Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 
-> **Statut : projets et workspaces.** Sur le squelette technique
+> **Statut : projets et workspaces en onglets, fenêtres et zones.** Sur le squelette technique
 > ([`PRD-squelette.md`](PRD-squelette.md)), Arnod crée et gère des projets et des
-> workspaces selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md).
-> Les requêtes, assertions et runs viendront ensuite.
+> workspaces selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md), révisé
+> par [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md) : les workspaces sont
+> des onglets, après l'onglet épinglé « Tous les projets ». Les requêtes s'ouvrent en onglets,
+> dans des zones redimensionnables et des fenêtres interconnectées
+> ([`docs/plan-fenetres-zones.md`](docs/plan-fenetres-zones.md)).
 
 | Thème clair                                      | Thème sombre                                           |
 | ------------------------------------------------ | ------------------------------------------------------ |
@@ -22,22 +25,46 @@ suit la préférence du système._
 
 ## Ce que fait Arnod aujourd'hui
 
-Cas d'usage détaillés dans [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md),
-maquettes dans [`docs/maquettes/`](docs/maquettes/).
+Cas d'usage détaillés dans [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md)
+et [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md), maquettes dans
+[`docs/maquettes/`](docs/maquettes/).
 
-| ID           | Comportement                                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| W1, P1       | Premier lancement : « Mes projets » est créé par défaut et Arnod propose de créer le premier projet (dossier `~/arnod/<nom>`). |
-| P2           | Nouveau projet depuis un workspace : rangé dans ce workspace et dans le workspace par défaut.                                  |
-| P5, P10      | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                               |
-| P6, P7       | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                              |
-| P9, P11, P12 | Référentiel des projets : chaque projet une fois, « Oublier » avec « Annuler », import d'un projet existant (`arnod.yml`).     |
-| W2           | Les lancements suivants rouvrent le dernier workspace utilisé, conservé dans `arnod.json`.                                     |
-| W4, W5       | Sélecteur de workspaces avec recherche, création d'un workspace.                                                               |
-| W6           | « Ajouter un projet » à un workspace : créer ou importer un projet existant, ou reprendre des projets du référentiel.          |
-| W7–W11       | Gestion des workspaces : nom, couleur, workspace par défaut, projets, suppression avec « Annuler ».                            |
-| F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                       |
-| N7           | Thème clair ou sombre selon le système, police système.                                                                        |
+| ID           | Comportement                                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1, O8       | Premier lancement : seul l'onglet « Tous les projets » ; Arnod propose de créer le premier projet (`~/arnod/<nom>`), workspace facultatif. |
+| P2, O8       | Nouveau projet depuis un workspace : rangé dans ce seul workspace, toujours visible dans « Tous les projets ».                             |
+| P5, P10      | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                                           |
+| P6, P7       | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                                          |
+| O1, O12, P11 | « Tous les projets » : chaque projet une fois, dernière exécution, « Oublier » avec « Annuler », import d'un projet (`arnod.yml`).         |
+| O2, R7       | Workspaces en onglets ; Arnod rouvre le dernier onglet utilisé, conservé dans `arnod.json`.                                                |
+| O3–O6        | « + » crée un onglet ; clic droit (ou Maj+F10) : renommer, couleur, gérer, supprimer avec « Annuler ».                                     |
+| O7           | Glisser une ligne de « Tous les projets » sur un onglet ajoute le projet à ce workspace.                                                   |
+| W6, O10      | « Ajouter un projet » à un workspace : créer, importer, ou reprendre des projets existants.                                                |
+| O11          | Gestion des workspaces : nom, couleur, projets, suppression avec « Annuler ».                                                              |
+| F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                                   |
+| N7           | Thème clair ou sombre selon le système, police système.                                                                                    |
+
+### Fenêtres et zones
+
+Cas F1 à F14 de [`docs/plan-fenetres-zones.md`](docs/plan-fenetres-zones.md) (maquette « Fenêtres
+et zones »).
+
+| Deux zones côte à côte                                      | Zone ouverte dans sa fenêtre                                          |
+| ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| ![Deux zones, thème clair](docs/screenshot-zones.png)       | ![Fenêtre de contenu, thème clair](docs/screenshot-fenetre.png)       |
+| ![Deux zones, thème sombre](docs/screenshot-zones-dark.png) | ![Fenêtre de contenu, thème sombre](docs/screenshot-fenetre-dark.png) |
+
+| ID       | Comportement                                                                                                                           |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| F1       | Une requête choisie dans la barre latérale s'ouvre en onglet, une seule fois par fenêtre ; ×, Suppr ou `Ctrl+W` la ferme, enregistrée. |
+| F2, F3   | Diviser : glisser un onglet sur le bord droit ou bas d'une zone, ◫, ou le menu de l'onglet (clic droit, Maj+F10) ; au plus 4 zones.    |
+| F4, F5   | Séparations et barre latérale redimensionnables : taille affichée, double-clic pour des parts égales, flèches ou `Alt+Maj+flèches`.    |
+| F6       | Résultat d'une requête à droite ou dessous ; en automatique, il passe dessous quand la zone est étroite.                               |
+| F7       | Menu **Fenêtre › Dispositions** : 1 zone, 2 colonnes, 2 lignes, 3 ou 4 zones, onglets conservés.                                       |
+| F8, F12  | ⧉ ou `Ctrl+Maj+O` ouvre la zone dans sa fenêtre ; un onglet glissé hors de la fenêtre s'ouvre là ; « Rattacher » le ramène.            |
+| F9, F10  | Barre latérale détachable (`Ctrl+Maj+D`) : elle pilote les fenêtres qui suivent la sélection ; une fenêtre peut être épinglée.         |
+| F11      | Catalogue, arborescences, requêtes enregistrées et environnements se mettent à jour dans toutes les fenêtres.                          |
+| F13, F14 | Zones, tailles et fenêtres détachées rouvertes au démarrage (`windows.json`) ; ⤢ agrandit une zone.                                    |
 
 Pile : [Tauri 2](https://v2.tauri.app) (cœur Rust, WebView2 sous Windows, WebKitGTK sous
 Linux), Vue 3, TypeScript strict, Vite, Pinia. Les règles d'architecture et les conventions

@@ -9,11 +9,12 @@ use crate::catalog::snapshot::{CatalogSnapshot, Undoable, WorkspaceCreated};
 use crate::error::CommandError;
 use crate::state::AppState;
 
-/// Ouvre un workspace et le mémorise pour le prochain démarrage (W2, R7).
+/// Ouvre l'onglet d'un workspace, ou « Tous les projets » avec `null`, et le
+/// mémorise pour le prochain démarrage (O2, R7).
 #[tauri::command]
 pub fn workspace_open(
     state: State<'_, AppState>,
-    workspace_id: Uuid,
+    workspace_id: Option<Uuid>,
 ) -> Result<CatalogSnapshot, CommandError> {
     snapshot(state.mutate(|catalog| catalog.open_workspace(workspace_id)))
 }
@@ -51,16 +52,7 @@ pub fn workspace_set_color(
     snapshot(state.mutate(|catalog| catalog.set_workspace_color(workspace_id, color)))
 }
 
-/// Transfère le rôle de workspace par défaut (W9).
-#[tauri::command]
-pub fn workspace_set_default(
-    state: State<'_, AppState>,
-    workspace_id: Uuid,
-) -> Result<CatalogSnapshot, CommandError> {
-    snapshot(state.mutate(|catalog| catalog.set_default_workspace(workspace_id)))
-}
-
-/// Ajoute des projets du référentiel à un workspace (W6, P6).
+/// Ajoute des projets de « Tous les projets » à un workspace (W6, P6, O7).
 #[tauri::command]
 pub fn workspace_add_projects(
     state: State<'_, AppState>,

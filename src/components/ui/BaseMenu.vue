@@ -5,7 +5,8 @@
  * qui reçoit les attributs à lier (`v-bind="attrs"`).
  *
  * Clavier : flèches, Début, Fin, Entrée ou Espace, flèche droite et gauche pour
- * le sous-menu, Échap pour fermer ; le focus revient au déclencheur.
+ * le sous-menu, Échap pour fermer ; le focus revient au déclencheur. `open()` et
+ * `close()` sont exposés pour un menu contextuel.
  */
 import { computed, nextTick, onBeforeUnmount, ref, useId, useTemplateRef } from "vue";
 
@@ -214,6 +215,12 @@ function onMenuKeydown(event: KeyboardEvent): void {
   event.preventDefault();
   event.stopPropagation();
 }
+
+/**
+ * Ouverture par le parent, sans passer par le déclencheur : menu contextuel
+ * (clic droit, Maj+F10). Le focus revient à l'élément actif à l'ouverture.
+ */
+defineExpose({ open, close });
 
 function role(item: MenuItem): "menuitem" | "menuitemcheckbox" {
   return item.checked === undefined ? "menuitem" : "menuitemcheckbox";

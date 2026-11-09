@@ -3,7 +3,7 @@ import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { installFakeCore } from "../fakeCore";
-import { BOUTIQUE, MES_PROJETS, boutiqueSnapshot } from "../fixtures";
+import { BOUTIQUE, boutiqueSnapshot, firstRunSnapshot } from "../fixtures";
 import { type AppWrapper, mountApp } from "../mountApp";
 
 let wrapper: AppWrapper | undefined;
@@ -33,14 +33,14 @@ async function clickChoice(app: AppWrapper, title: string): Promise<void> {
 }
 
 describe("importer un projet existant (P12)", () => {
-  it("depuis « Ajouter un projet », l'inscrit dans ce workspace et le défaut", async () => {
+  it("depuis « Ajouter un projet », l'inscrit dans « Tous les projets » et ce workspace", async () => {
     const core = installFakeCore(boutiqueSnapshot());
     core.pickedFolder = "/home/julien/dev/catalogue-legacy";
     wrapper = await mountApp();
     await wrapper.get("main .add-card").trigger("click");
     await flushPromises();
 
-    await clickChoice(wrapper, "Importer un projet existant…");
+    await clickChoice(wrapper, "Importer…");
 
     expect(core.calls.find((c) => c.cmd === "project_add_existing")?.args).toEqual({
       path: "/home/julien/dev/catalogue-legacy",
@@ -49,7 +49,7 @@ describe("importer un projet existant (P12)", () => {
     expect(wrapper.find("dialog[open]").exists()).toBe(false);
     expect(wrapper.findAll("main article h2").map((h) => h.text())).toContain("catalogue-legacy");
     expect(wrapper.get(".toast").text()).toBe(
-      "« catalogue-legacy » ajouté au référentiel et à Mes projets et Boutique.",
+      "« catalogue-legacy » ajouté à « Tous les projets » et à « Boutique ».",
     );
   });
 
@@ -59,7 +59,7 @@ describe("importer un projet existant (P12)", () => {
     await wrapper.get("main .add-card").trigger("click");
     await flushPromises();
 
-    await clickChoice(wrapper, "Importer un projet existant…");
+    await clickChoice(wrapper, "Importer…");
 
     expect(core.commands()).toContain("project_pick_folder");
     expect(core.commands()).not.toContain("project_add_existing");
@@ -73,7 +73,7 @@ describe("importer un projet existant (P12)", () => {
     await wrapper.get("main .add-card").trigger("click");
     await flushPromises();
 
-    await clickChoice(wrapper, "Importer un projet existant…");
+    await clickChoice(wrapper, "Importer…");
 
     const toast = wrapper.get(".toast");
     expect(toast.classes()).toContain("toast--error");
@@ -82,23 +82,37 @@ describe("importer un projet existant (P12)", () => {
     );
   });
 
-  it("depuis le référentiel, l'inscrit dans le dernier workspace ouvert", async () => {
+  it("depuis « Tous les projets », l'inscrit sans workspace", async () => {
     const core = installFakeCore(boutiqueSnapshot());
     core.pickedFolder = "/home/julien/dev/partenaires-v2";
     wrapper = await mountApp();
-    await wrapper.get('aside button[aria-haspopup="dialog"]').trigger("click");
-    await flushPromises();
-    await clickButton(wrapper, "aside", "Référentiel des projets2 projets");
+    await clickButton(wrapper, '[role="tablist"]', "Tous les projets");
 
-    await clickButton(wrapper, "main", "Importer un projet existant…");
+    await clickButton(wrapper, "main", "Importer…");
 
     expect(core.calls.find((c) => c.cmd === "project_add_existing")?.args).toEqual({
       path: "/home/julien/dev/partenaires-v2",
-      workspaceId: BOUTIQUE,
+      workspaceId: null,
     });
-    expect(wrapper.get("main h1").text()).toBe("3 projets");
-    expect(core.snapshot().workspaces.find((w) => w.id === MES_PROJETS)?.projectIds).toContain(
-      "p-partenaires-v2",
+    expect(wrapper.get("main h1").text()).toBe("Tous les projets · 3");
+    expect(core.snapshot().workspaces.some((w) => w.projectIds.includes("p-partenaires-v2"))).toBe(
+      false,
     );
+    expect(wrapper.get(".toast").text()).toBe("« partenaires-v2 » ajouté à « Tous les projets ».");
+  });
+
+  it("depuis le premier lancement, « Importer… » inscrit le projet sans workspace", async () => {
+    const core = installFakeCore(firstRunSnapshot());
+    core.pickedFolder = "/home/julien/dev/boutique-tests";
+    wrapper = await mountApp();
+
+    await wrapper.get(".first-run__import").trigger("click");
+    await flushPromises();
+
+    expect(core.calls.find((c) => c.cmd === "project_add_existing")?.args).toEqual({
+      path: "/home/julien/dev/boutique-tests",
+      workspaceId: null,
+    });
+    expect(wrapper.get("main h1").text()).toBe("Tous les projets · 1");
   });
 });

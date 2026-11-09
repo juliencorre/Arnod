@@ -1,18 +1,19 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
-import { ipc } from "@/lib/ipc";
+import { events, ipc } from "@/lib/ipc";
 import type {
   CatalogSnapshot,
   CommandError,
   ProjectCreateInput,
+  ProjectLastRun,
   ProjectView,
   WorkspaceColor,
   WorkspaceView,
 } from "@/types/ipc";
 
 /**
- * Catalogue des projets et workspaces, tel que renvoyé par le cœur Rust.
+ * « Tous les projets » et workspaces, tels que renvoyés par le cœur Rust.
  *
  * Aucune règle métier ici : chaque action appelle une commande, et l'instantané
  * qu'elle renvoie remplace l'état. Les recherches (`workspaceById`, `projectsOf`)
@@ -29,10 +30,6 @@ export const useCatalogStore = defineStore("catalog", () => {
 
   /** Aucun projet encore : l'application affiche le premier lancement (1a). */
   const isFirstRun = computed(() => snapshot.value !== null && projects.value.length === 0);
-
-  const defaultWorkspace = computed(() =>
-    snapshot.value === null ? null : workspaceById(snapshot.value.defaultWorkspaceId),
-  );
 
   function workspaceById(id: string): WorkspaceView | null {
     return workspacesById.value.get(id) ?? null;
@@ -53,6 +50,15 @@ export const useCatalogStore = defineStore("catalog", () => {
     snapshot.value = next;
   }
 
+  let subscribed = false;
+
+  /** Suit les modifications faites dans les autres fenêtres (F11). */
+  async function subscribe(): Promise<void> {
+    if (subscribed) return;
+    subscribed = true;
+    await events.onCatalog(apply);
+  }
+
   /** Charge le catalogue au démarrage ; renvoie l'avertissement éventuel à notifier. */
   async function load(): Promise<CommandError | null> {
     const { snapshot: next, warning } = await ipc.catalogLoad();
@@ -60,7 +66,8 @@ export const useCatalogStore = defineStore("catalog", () => {
     return warning;
   }
 
-  async function openWorkspace(workspaceId: string): Promise<void> {
+  /** Mémorise l'onglet ouvert : un workspace, ou « Tous les projets » avec `null` (R7). */
+  async function openWorkspace(workspaceId: string | null): Promise<void> {
     apply(await ipc.workspaceOpen(workspaceId));
   }
 
@@ -77,10 +84,6 @@ export const useCatalogStore = defineStore("catalog", () => {
 
   async function setWorkspaceColor(workspaceId: string, color: WorkspaceColor): Promise<void> {
     apply(await ipc.workspaceSetColor(workspaceId, color));
-  }
-
-  async function setDefaultWorkspace(workspaceId: string): Promise<void> {
-    apply(await ipc.workspaceSetDefault(workspaceId));
   }
 
   async function addProjects(workspaceId: string, projectIds: string[]): Promise<void> {
@@ -112,8 +115,8 @@ export const useCatalogStore = defineStore("catalog", () => {
     return created.projectId;
   }
 
-  /** Inscrit un dossier projet existant et renvoie son identifiant (P12). */
-  async function addExistingProject(path: string, workspaceId: string): Promise<string> {
+  /** Inscrit un dossier projet existant, dans un workspace ou aucun, et renvoie son identifiant (P12). */
+  async function addExistingProject(path: string, workspaceId: string | null): Promise<string> {
     const added = await ipc.projectAddExisting(path, workspaceId);
     apply(added.snapshot);
     return added.projectId;
@@ -136,17 +139,22 @@ export const useCatalogStore = defineStore("catalog", () => {
     return ipc.projectSuggestFolder(name, location);
   }
 
+  /** Dernier run de chaque projet qui en a un (O12). */
+  function lastRuns(): Promise<ProjectLastRun[]> {
+    return ipc.projectLastRuns();
+  }
+
   /** Sélecteur de dossier natif ; `null` si l'utilisateur annule. */
   function pickFolder(location: string | null): Promise<string | null> {
     return ipc.projectPickFolder(location);
   }
 
   return {
+    subscribe,
     snapshot,
     projects,
     workspaces,
     isFirstRun,
-    defaultWorkspace,
     workspaceById,
     projectById,
     projectsOf,
@@ -155,7 +163,6 @@ export const useCatalogStore = defineStore("catalog", () => {
     createWorkspace,
     renameWorkspace,
     setWorkspaceColor,
-    setDefaultWorkspace,
     addProjects,
     removeProject,
     deleteWorkspace,
@@ -165,6 +172,7 @@ export const useCatalogStore = defineStore("catalog", () => {
     forgetProject,
     openProject,
     suggestFolder,
+    lastRuns,
     pickFolder,
   };
 });

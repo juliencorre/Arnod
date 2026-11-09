@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
- * Menu ⋯ d'un projet dans un workspace (2a) : ouvrir, ajouter à un autre
- * workspace (sous-menu), afficher dans le référentiel, retirer du workspace
- * avec « Annuler » (P5, P6, P8, P7).
+ * Menu ⋯ d'un projet dans un workspace (2a, O9) : ouvrir, ajouter à un autre
+ * workspace (sous-menu), afficher dans « Tous les projets », retirer du
+ * workspace avec « Annuler » (P5, P6, P8, P7).
  */
 import { computed } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
-import { useProjectActions } from "@/composables/useProjectActions";
+import { ALL_PROJECTS, useProjectActions } from "@/composables/useProjectActions";
 import { useCatalogStore } from "@/stores/catalog";
 import { useNavigationStore } from "@/stores/navigation";
 import type { ProjectView } from "@/types/ipc";
@@ -34,11 +34,11 @@ const items = computed<MenuItem[]>(() => {
         return { id: `add:${w.id}`, label: w.name, checked: present, disabled: present };
       }),
     },
-    { id: "reveal", label: "Afficher dans le référentiel" },
+    { id: "reveal", label: `Afficher dans « ${ALL_PROJECTS} »` },
     {
       id: "remove",
       label: `Retirer de « ${workspace.value?.name ?? ""} »`,
-      hint: "Le projet reste dans le référentiel.",
+      hint: `Le projet reste dans « ${ALL_PROJECTS} ».`,
       tone: "danger",
       separatorBefore: true,
     },
@@ -49,7 +49,7 @@ async function onSelect(id: string): Promise<void> {
   if (id === "open") {
     await actions.openProject(props.project.id, props.workspaceId);
   } else if (id === "reveal") {
-    navigation.showManage("registry", { highlightProjectId: props.project.id });
+    await navigation.showAll(props.project.id);
   } else if (id === "remove") {
     await actions.removeFromWorkspace(props.project.id, props.workspaceId);
   } else if (id.startsWith("add:")) {

@@ -2,7 +2,7 @@
 /**
  * « Ajouter un projet à un workspace » (2c revu, W6) : d'abord les deux actions
  * principales, créer un projet (P2) ou importer un dossier projet existant
- * (P12) ; ensuite, s'il y en a, les projets du référentiel absents de ce
+ * (P12) ; ensuite, s'il y en a, les projets de « Tous les projets » absents de ce
  * workspace, à cocher. La recherche n'apparaît que pour une longue liste.
  */
 import { computed, ref, useId, watch } from "vue";
@@ -16,7 +16,7 @@ import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
 import { useToastStore } from "@/stores/toasts";
 
-/** Au-delà de ce nombre de projets proposés, la liste du référentiel se filtre. */
+/** Au-delà de ce nombre de projets proposés, la liste se filtre. */
 const SEARCH_THRESHOLD = 6;
 
 const catalog = useCatalogStore();
@@ -39,14 +39,7 @@ const workspace = computed(() =>
 const title = computed(() =>
   workspace.value ? `Ajouter un projet à « ${workspace.value.name} »` : "Ajouter un projet",
 );
-/** R4 : un projet créé ou importé va aussi dans le workspace par défaut. */
-const defaultNote = computed(() => {
-  const target = workspace.value;
-  const fallback = catalog.defaultWorkspace;
-  if (!target || !fallback || target.isDefault) return null;
-  return `Un projet créé ou importé est aussi ajouté à « ${fallback.name} » (par défaut).`;
-});
-/** Projets du référentiel qui ne sont pas encore dans ce workspace. */
+/** Projets de « Tous les projets » qui ne sont pas encore dans ce workspace. */
 const candidates = computed(() => {
   const target = workspace.value;
   if (!target) return [];
@@ -134,7 +127,7 @@ async function submit(): Promise<void> {
           </span>
           <span :id="createTitleId" class="choice__title">Créer un nouveau projet</span>
           <span :id="createTextId" class="choice__text">
-            Un dossier neuf avec son manifeste arnod.yml.
+            Un dossier neuf, prêt à être partagé.
           </span>
         </button>
         <button
@@ -151,23 +144,22 @@ async function submit(): Promise<void> {
               />
             </svg>
           </span>
-          <span :id="importTitleId" class="choice__title">Importer un projet existant…</span>
+          <span :id="importTitleId" class="choice__title">Importer…</span>
           <span :id="importTextId" class="choice__text">
-            Un dossier contenant déjà arnod.yml, par exemple un clone Git.
+            Un projet Arnod existant, par exemple après un clone Git : choisissez son dossier.
           </span>
         </button>
       </div>
-      <p v-if="defaultNote" class="note">{{ defaultNote }}</p>
 
       <section v-if="candidates.length > 0" class="registry" :aria-labelledby="registryTitleId">
-        <h3 :id="registryTitleId" class="registry__title">Ou reprendre un projet du référentiel</h3>
+        <h3 :id="registryTitleId" class="registry__title">Ou reprendre un projet existant</h3>
         <p class="registry__text">
-          Déjà connus d'Arnod. Un projet peut être dans plusieurs workspaces.
+          Ceux de l'onglet « Tous les projets ». Un projet peut être dans plusieurs workspaces.
         </p>
         <SearchInput
           v-if="searchable"
           v-model="query"
-          label="Filtrer les projets du référentiel"
+          label="Filtrer les projets existants"
           placeholder="Filtrer par nom ou dossier…"
         />
         <ul class="rows">
@@ -271,12 +263,6 @@ async function submit(): Promise<void> {
 
 .choice__text {
   font-size: 0.875rem;
-  color: var(--color-muted);
-}
-
-.note {
-  margin: 0;
-  font-size: 0.8125rem;
   color: var(--color-muted);
 }
 

@@ -33,8 +33,12 @@ ailleurs : `ARNOD_E2E_TAURI_DRIVER=/chemin/vers/tauri-driver`.
 - `arnod.e2e.ts` enchaîne les étapes d'un utilisateur : premier lancement, création de
   projets, workspaces, ajout et retrait avec « Annuler », gestion, référentiel, redémarrage
   (W2), dossier supprimé hors d'Arnod (P10), dossier projet existant (P12), projet oublié puis
-  rétabli (P11). Chaque étape
-  vérifie aussi le disque (`arnod.yml`, `arnod.json`).
+  rétabli (P11) ; puis zones et fenêtres : onglets, division, séparation au clavier, zone ouverte
+  dans sa fenêtre puis rattachée, barre latérale détachée qui pilote la fenêtre principale,
+  restauration au redémarrage. Chaque étape vérifie aussi le disque (`arnod.yml`, `arnod.json`,
+  `windows.json`).
+- Plusieurs fenêtres : `getWindowHandles()` les liste et `switchToWindow()` passe de l'une à
+  l'autre ; un bouton qui n'apparaît qu'au survol est cliqué depuis la page (`clickHidden`).
 - Les sélecteurs sont stricts (WebdriverIO 10) : `$()` échoue s'il trouve plusieurs éléments,
   y compris des éléments masqués. Les fenêtres (`<dialog>`) restent dans le DOM une fois
   fermées : viser `main`, `aside` ou `dialog[open]` plutôt qu'un sélecteur global.
