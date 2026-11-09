@@ -185,9 +185,16 @@ function generate(
             operator: "lessThan",
             value: 500,
             origin: "default",
+            enabled: true,
           },
-          { id: "statut", target: "status", operator: "equals", value: 200, origin: "default" },
-          { id: "contrat", target: "response", operator: "matchesContract", origin: "default" },
+          {
+            id: "statut",
+            target: "status",
+            operator: "equals",
+            value: 200,
+            origin: "default",
+            enabled: true,
+          },
         ],
       }),
     );

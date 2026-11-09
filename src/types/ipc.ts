@@ -250,14 +250,23 @@ export interface TreeView {
   collapsed: string[];
 }
 
+/** Emplacement d'un paramètre : adresse (`?nom=valeur`) ou chemin (`:nom`). */
+export type ParamKind = "query" | "path";
+
 /** Paire nom-valeur activable (paramètre, en-tête, champ de formulaire). */
 export interface Pair {
   name: string;
   value: string;
   enabled: boolean;
+  /** Sans objet pour un en-tête ou un champ de formulaire (`query`). */
+  kind: ParamKind;
 }
 
-export type AuthKind = "none" | "basic" | "bearer" | "apiKey";
+/**
+ * Type d'authentification. `inherit` (héritée du dossier) et `other` (digest, OAuth…)
+ * sont conservés dans le fichier mais rien n'est envoyé.
+ */
+export type AuthKind = "none" | "basic" | "bearer" | "apiKey" | "inherit" | "other";
 export type ApiKeyLocation = "header" | "query";
 
 /** Authentification (`Auth` en Rust, structure plate). */
@@ -269,42 +278,70 @@ export interface Auth {
   name: string;
   value: string;
   location: ApiKeyLocation;
+  /** Type OpenCollection d'une authentification `other` (`oauth2`…). */
+  other: string;
 }
 
-export type BodyKind = "none" | "json" | "text" | "form";
+/** Type de corps ; `other` (multipart, fichier…) est conservé mais pas envoyé. */
+export type BodyKind = "none" | "json" | "text" | "xml" | "form" | "other";
 
 export interface Body {
   kind: BodyKind;
   content: string;
   form: Pair[];
+  /** Type OpenCollection d'un corps `other` (`multipart-form`…). */
+  other: string;
 }
 
+/** Opérateurs d'OpenCollection et de Bruno (`Operator` en Rust). */
 export type AssertionOperator =
   | "equals"
   | "notEquals"
   | "exists"
   | "contains"
+  | "notContains"
   | "lessThan"
+  | "lessOrEqual"
   | "greaterThan"
+  | "greaterOrEqual"
+  | "in"
+  | "notIn"
+  | "between"
+  | "startsWith"
+  | "endsWith"
+  | "length"
+  | "matches"
+  | "notMatches"
+  | "isNull"
+  | "isUndefined"
+  | "isEmpty"
+  | "isNotEmpty"
+  | "isTruthy"
+  | "isFalsy"
+  | "isJson"
   | "isNumber"
   | "isText"
-  | "matchesContract";
+  | "isBoolean"
+  | "isArray";
+/** Origine d'une vérification, connue pendant la session seulement. */
 export type AssertionOrigin = "proposed" | "manual" | "default";
 export type Scalar = boolean | number | string;
 
 /** Vérification d'une requête (R10, R11). */
 export interface Assertion {
+  /** Identifiant de session, recalculé à chaque lecture du fichier. */
   id: string;
+  /** `status`, `responseTime`, `body.chemin`, `headers.nom` ou une autre expression. */
   target: string;
   operator: AssertionOperator;
   value?: Scalar | null;
   origin: AssertionOrigin;
+  /** Une vérification désactivée n'est pas évaluée. */
+  enabled: boolean;
 }
 
-/** Requête, telle que stockée dans son fichier YAML. */
+/** Requête éditée, lue d'un fichier OpenCollection. */
 export interface RequestDoc {
-  version: number;
-  id: string;
   name: string;
   method: HttpMethod;
   url: string;
@@ -314,8 +351,10 @@ export interface RequestDoc {
   body: Body;
   timeoutMs: number;
   assertions: Assertion[];
-  /** Opération du contrat dont la requête est issue (C7). */
+  /** Opération du contrat liée (étiquette `contract:` du fichier, C7). */
   contract?: ContractLink;
+  /** Parties du fichier conservées sans être gérées par Arnod (scripts, exemples…). */
+  preserved: string[];
 }
 
 /** Lien d'une requête à une opération de contrat (`ContractLink`). */
@@ -364,9 +403,8 @@ export interface EnvVariable {
 /** Couleurs proposées pour un environnement. */
 export type EnvironmentColor = "gray" | "blue" | "green" | "orange" | "red" | "purple";
 
-/** Contenu d'un fichier d'environnement. */
+/** Environnement, tel que l'interface l'édite. */
 export interface EnvironmentDoc {
-  version: number;
   name: string;
   color: string;
   protected?: boolean;

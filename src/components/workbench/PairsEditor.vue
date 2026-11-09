@@ -1,12 +1,25 @@
 <script setup lang="ts">
-/** Liste de paires nom-valeur activables (paramètres, en-têtes, champs de formulaire). */
-import type { Pair } from "@/types/ipc";
+/**
+ * Liste de paires nom-valeur activables (paramètres, en-têtes, champs de formulaire).
+ * `withKind` ajoute le choix de l'emplacement d'un paramètre : adresse ou chemin (`:nom`, S8).
+ */
+import type { Pair, ParamKind } from "@/types/ipc";
 
-defineProps<{ label: string; namePlaceholder?: string; valuePlaceholder?: string }>();
+defineProps<{
+  label: string;
+  namePlaceholder?: string;
+  valuePlaceholder?: string;
+  withKind?: boolean;
+}>();
 const pairs = defineModel<Pair[]>({ required: true });
 
+const KINDS: { id: ParamKind; label: string }[] = [
+  { id: "query", label: "Adresse" },
+  { id: "path", label: "Chemin" },
+];
+
 function add(): void {
-  pairs.value = [...pairs.value, { name: "", value: "", enabled: true }];
+  pairs.value = [...pairs.value, { name: "", value: "", enabled: true, kind: "query" }];
 }
 
 function remove(index: number): void {
@@ -16,7 +29,12 @@ function remove(index: number): void {
 
 <template>
   <div class="pairs" role="group" :aria-label="label">
-    <div v-for="(pair, index) in pairs" :key="index" class="pairs__row">
+    <div
+      v-for="(pair, index) in pairs"
+      :key="index"
+      class="pairs__row"
+      :class="{ 'pairs__row--kind': withKind }"
+    >
       <input
         v-model="pair.enabled"
         type="checkbox"
@@ -39,6 +57,14 @@ function remove(index: number): void {
         :placeholder="valuePlaceholder ?? 'Valeur'"
         :aria-label="`Valeur, ligne ${index + 1}`"
       />
+      <select
+        v-if="withKind"
+        v-model="pair.kind"
+        class="pairs__input pairs__kind"
+        :aria-label="`Emplacement, ligne ${index + 1}`"
+      >
+        <option v-for="k in KINDS" :key="k.id" :value="k.id">{{ k.label }}</option>
+      </select>
       <button
         type="button"
         class="pairs__remove"
@@ -66,6 +92,10 @@ function remove(index: number): void {
   align-items: center;
 }
 
+.pairs__row--kind {
+  grid-template-columns: auto 1fr 1.5fr auto auto;
+}
+
 .pairs__input {
   min-width: 0;
   padding: 0.375rem 0.5rem;
@@ -74,6 +104,10 @@ function remove(index: number): void {
   font: 0.8125rem var(--font-mono);
   color: var(--color-text);
   background: var(--color-surface);
+}
+
+.pairs__kind {
+  font-family: inherit;
 }
 
 .pairs__input:focus-visible,

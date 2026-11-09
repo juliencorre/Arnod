@@ -16,6 +16,7 @@ pub mod layout;
 pub mod local;
 pub mod manifest;
 mod menu;
+pub mod opencollection;
 pub mod request;
 pub mod secrets;
 pub mod state;

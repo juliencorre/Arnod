@@ -2,7 +2,7 @@ import { clearMocks } from "@tauri-apps/api/mocks";
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { okOutcome } from "../fakeWorkbench";
+import { newRequest, okOutcome } from "../fakeWorkbench";
 import type { AppWrapper } from "../mountApp";
 import { click, openProject } from "./helpers";
 
@@ -76,6 +76,60 @@ describe("éditer et envoyer une requête", () => {
     await click(app, ".response button", "Proposer des vérifications");
     await click(app, ".editor__tab", "Vérifications");
     expect(app.findAll(".assertion")).toHaveLength(2);
+
+    // Une vérification déjà présente n'est pas proposée deux fois.
+    await click(app, ".response button", "Proposer des vérifications");
+    expect(app.findAll(".assertion")).toHaveLength(2);
+  });
+
+  it("désactive une vérification et place un paramètre dans le chemin (S8)", async () => {
+    let core;
+    ({ app, core } = await openProject());
+    await click(app, '[role="treeitem"]', "Santé");
+    await click(app, ".editor__tab", "Paramètres");
+    await click(app, ".pairs__add");
+    await app.get('[aria-label="Nom, ligne 1"]').setValue("id");
+    await app.get('[aria-label="Valeur, ligne 1"]').setValue("42");
+    const kind = app.get('[aria-label="Emplacement, ligne 1"]');
+    expect(kind.findAll("option").map((o) => o.text())).toEqual(["Adresse", "Chemin"]);
+    await kind.setValue("path");
+
+    await click(app, ".editor__tab", "Vérifications");
+    await app.get('[aria-label="Activer la vérification 1"]').setValue(false);
+    expect(app.get(".assertion").classes()).toContain("assertion--off");
+
+    await click(app, ".editor__line button", "Enregistrer");
+    const saved = core.workbench.requests.get("sante.yml");
+    expect(saved?.params).toEqual([{ name: "id", value: "42", enabled: true, kind: "path" }]);
+    expect(saved?.assertions[0]?.enabled).toBe(false);
+  });
+
+  it("propose les opérateurs d'OpenCollection et masque la valeur inutile", async () => {
+    ({ app } = await openProject());
+    await click(app, '[role="treeitem"]', "Santé");
+    await click(app, ".editor__tab", "Vérifications");
+    const select = app.get('[aria-label="Opérateur de la vérification 1"]');
+    expect(select.findAll("option")).toHaveLength(28);
+    await select.setValue("isArray");
+    expect(app.find('[aria-label="Valeur de la vérification 1"]').exists()).toBe(false);
+    await select.setValue("between");
+    expect(app.find('[aria-label="Valeur de la vérification 1"]').exists()).toBe(true);
+  });
+
+  it("signale ce que le fichier garde sans qu'Arnod le gère", async () => {
+    ({ app } = await openProject((core) => {
+      const request = newRequest("Jeton", { preserved: ["scripts", "documentation"] });
+      request.auth = { ...request.auth, type: "other", other: "oauth2" };
+      request.body = { ...request.body, kind: "other", other: "multipart-form" };
+      core.workbench.requests.set("jeton.yml", request);
+    }));
+    await click(app, '[role="treeitem"]', "Jeton");
+    expect(app.get(".editor__preserved").text()).toContain("scripts, documentation");
+    await click(app, ".editor__tab", "Authentification");
+    expect(app.get(".editor__panel").text()).toContain("« oauth2 » conservée");
+    await click(app, ".editor__tab", "Corps");
+    expect(app.get(".editor__panel").text()).toContain("« multipart-form » conservé");
+    expect(app.find(".editor__body").exists()).toBe(false);
   });
 
   it("enregistre explicitement les modifications", async () => {

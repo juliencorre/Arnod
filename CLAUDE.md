@@ -11,9 +11,10 @@ l'installeur et les écarts listés en fin de plan). Livré : projets et
 workspaces, selon `docs/plan-projets-workspaces.md` (maquettes dans `docs/maquettes/`), puis
 workspaces en onglets selon `docs/plan-workspaces-onglets.md` ; voir la section « Projets et
 workspaces ». Livré ensuite : fenêtres et zones selon `docs/plan-fenetres-zones.md` ; voir la
-section « Fenêtres et zones ». En cours : contrats de services selon
-`docs/plan-contrats-services.md` ; voir la section « Contrats de services ». Un nouveau lot
-commence par un plan rédigé à partir de `docs/modele-plan.md`.
+section « Fenêtres et zones ». Puis contrats de services selon `docs/plan-contrats-services.md`
+(section « Contrats de services ») et format OpenCollection strict selon
+`docs/plan-opencollection.md` (section « Format OpenCollection »). Un nouveau lot commence par un
+plan rédigé à partir de `docs/modele-plan.md`.
 
 ## Architecture
 
@@ -94,11 +95,14 @@ src-tauri/              Cœur Rust
   src/contract/         Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
                         file.rs range les contrats dans contracts/ du projet
   src/windows.rs        windows.json, fenêtres natives, focus, fermetures, événements arnod://
-  src/manifest.rs       Dossier d'un projet et manifeste arnod.yml
+  src/opencollection/   Format OpenCollection 1.0.0 : schéma embarqué, YAML, requêtes, racine
+                        (opencollection.yml, extensions.arnod), conversion de l'ancien format
+  src/manifest.rs       Dossier d'un projet et sa racine opencollection.yml
   src/state.rs          AppState : catalogue + stockage + annulation (app.manage)
   src/menu.rs           Menu natif (Fichier > Quitter, Fenêtre > Dispositions, détacher, rattacher)
   src/commands/         Commandes, un fichier par domaine
-docs/                   Plan en cours, modèle de plan, maquettes, captures du README
+docs/                   Plans, modèle de plan, maquettes, captures du README, schéma
+                        OpenCollection 1.0.0 (docs/opencollection/)
 scripts/                Mesure de taille, concordance des versions, tests de fumée (CI)
 .github/                Modèles d'issue et de pull request, Dependabot
   workflows/            CI de build Windows et Linux, contrôle des titres de pull request
@@ -196,7 +200,8 @@ R12). Cocher une tâche dans le plan quand elle est livrée.
   fichier illisible ou écrit par une version plus récente n'est jamais écrasé.
 - Glisser-déposer HTML : `dragDropEnabled: false` sur la fenêtre (sinon WebView2 l'intercepte
   sous Windows). Toute action glissée a son équivalent au clavier (« Ajouter à… »).
-- Un projet est un dossier contenant un manifeste `arnod.yml`. Arnod n'initialise pas Git.
+- Un projet est un dossier contenant `opencollection.yml` (voir « Format OpenCollection »).
+  Arnod n'initialise pas Git.
 - Noms de projet et de workspace uniques, sans tenir compte de la casse. « Changer » choisit
   l'emplacement parent : le projet est créé dans `<emplacement>/<nom>`.
 - Pas de confirmation quand rien n'est perdu : une notification avec « Annuler ».
@@ -234,9 +239,29 @@ Référence : `docs/plan-contrats-services.md` (cas C1 à C12, règles R1 à R12
   `conformance` sont purs, `file` touche au disque ; tests règle par règle dans
   `contract/tests.rs`. Pas de dépendance ajoutée : la validation couvre un sous-ensemble de JSON
   Schema (pas `pattern` ni `format`).
-- Une requête créée depuis une opération porte `contract: { file, operation }` et la vérification
-  `matchesContract`, évaluée par l'établi qui relit le contrat. Une opération ne crée qu'une
-  requête ; `baseUrl` vide prend l'adresse du premier serveur du contrat.
+- Une requête créée depuis une opération est liée au contrat par l'étiquette
+  `contract:<fichier>#<opération>` ; l'établi vérifie toute requête liée contre le contrat (résultat
+  `contrat`), sans vérification écrite. Une opération ne crée qu'une requête ; `baseUrl` vide
+  prend l'adresse du premier serveur du contrat.
 - Les commandes `contract_*` qui modifient émettent `arnod://projet` en portée `contracts` (et
   `tree` pour les requêtes créées) ; supprimer un contrat ferme ses onglets dans toutes les
   fenêtres.
+
+## Format OpenCollection
+
+Référence : `docs/plan-opencollection.md` (cas S1 à S8, règles R1 à R8). Schéma officiel 1.0.0
+conservé dans `docs/opencollection/` et embarqué dans le cœur.
+
+- Strict : tout fichier écrit (racine, requête, `folder.yml`, environnement) est validé contre le
+  schéma avant écriture ; un contenu non conforme n'est jamais écrit, un fichier lu non conforme
+  est listé illisible et jamais réécrit. Aucun champ inventé.
+- Ce qui est propre à Arnod va seulement dans `extensions.arnod` de `opencollection.yml`
+  (identifiant, ordre et protection des environnements) et dans les étiquettes `info.tags` d'une
+  requête (lien au contrat). Identifiants et origines des vérifications ne sont pas écrits.
+- `src-tauri/src/opencollection/` fait la correspondance avec le modèle de l'interface
+  (`request/model.rs`, qui n'est plus écrit tel quel). Enregistrer fusionne les champs gérés dans
+  le fichier existant : scripts, exemples, docs, descriptions, autres authentifications et corps
+  sont conservés (signalés par `preserved`).
+- Un projet au format précédent (`arnod.yml`) est converti une fois à l'ouverture
+  (`opencollection::migrate`). Une version de spécification de majeure supérieure à 1 ou une
+  collection regroupée (`bundled`) sont refusées sans écriture.

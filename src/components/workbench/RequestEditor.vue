@@ -29,6 +29,7 @@ const folder = computed(() => {
 const METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const AUTH_KINDS: { id: AuthKind; label: string }[] = [
   { id: "none", label: "Aucune" },
+  { id: "inherit", label: "Héritée" },
   { id: "basic", label: "Basic" },
   { id: "bearer", label: "Bearer" },
   { id: "apiKey", label: "Clé d'API" },
@@ -37,20 +38,57 @@ const BODY_KINDS: { id: BodyKind; label: string }[] = [
   { id: "none", label: "Aucun" },
   { id: "json", label: "JSON" },
   { id: "text", label: "Texte" },
+  { id: "xml", label: "XML" },
   { id: "form", label: "Formulaire" },
 ];
+/** Opérateurs d'OpenCollection et de Bruno (R4), dans l'ordre du menu. */
 const OPERATORS: { id: AssertionOperator; label: string }[] = [
   { id: "equals", label: "est égal à" },
   { id: "notEquals", label: "est différent de" },
-  { id: "exists", label: "existe" },
   { id: "contains", label: "contient" },
+  { id: "notContains", label: "ne contient pas" },
+  { id: "startsWith", label: "commence par" },
+  { id: "endsWith", label: "se termine par" },
   { id: "lessThan", label: "est inférieur à" },
+  { id: "lessOrEqual", label: "est inférieur ou égal à" },
   { id: "greaterThan", label: "est supérieur à" },
+  { id: "greaterOrEqual", label: "est supérieur ou égal à" },
+  { id: "between", label: "est entre (min, max)" },
+  { id: "in", label: "est parmi (a, b, …)" },
+  { id: "notIn", label: "n'est pas parmi (a, b, …)" },
+  { id: "length", label: "a pour longueur" },
+  { id: "exists", label: "existe" },
+  { id: "isUndefined", label: "n'existe pas" },
+  { id: "isNull", label: "est null" },
+  { id: "isEmpty", label: "est vide" },
+  { id: "isNotEmpty", label: "n'est pas vide" },
+  { id: "isTruthy", label: "est vrai (truthy)" },
+  { id: "isFalsy", label: "est faux (falsy)" },
   { id: "isNumber", label: "est un nombre" },
   { id: "isText", label: "est un texte" },
-  { id: "matchesContract", label: "est conforme au contrat" },
+  { id: "isBoolean", label: "est un booléen" },
+  { id: "isArray", label: "est une liste" },
+  { id: "isJson", label: "est un objet JSON" },
+  { id: "matches", label: "correspond à l'expression (non évaluée)" },
+  { id: "notMatches", label: "ne correspond pas à l'expression (non évaluée)" },
 ];
-const NO_VALUE: AssertionOperator[] = ["exists", "isNumber", "isText", "matchesContract"];
+const NO_VALUE: AssertionOperator[] = [
+  "exists",
+  "isUndefined",
+  "isNull",
+  "isEmpty",
+  "isNotEmpty",
+  "isTruthy",
+  "isFalsy",
+  "isNumber",
+  "isText",
+  "isBoolean",
+  "isArray",
+  "isJson",
+];
+
+/** Identifiant du résultat de conformité au contrat lié (`CONTRACT_CHECK`, R8). */
+const CONTRACT_CHECK = "contrat";
 
 /** Contrat lié (C7) : son nom, s'il est connu, sinon son fichier. */
 const contractLabel = computed(() => {
@@ -65,17 +103,26 @@ function openContract(): void {
   if (link && editor.value) void contracts.show(editor.value.projectId, link.file);
 }
 
-/** La conformité porte sur toute la réponse : la cible n'a pas de sens. */
+/** Délier (R8) : la requête n'est plus vérifiée contre le contrat une fois enregistrée. */
+function unlinkContract(): void {
+  if (request.value) delete request.value.contract;
+}
+
 function setOperator(index: number, operator: AssertionOperator): void {
   const assertion = request.value?.assertions[index];
   if (!assertion) return;
   assertion.operator = operator;
   assertion.origin = "manual";
-  if (operator === "matchesContract") {
-    assertion.target = "response";
-    assertion.value = null;
-  } else if (assertion.target === "response") assertion.target = "status";
+  if (NO_VALUE.includes(operator)) assertion.value = null;
 }
+
+/** Libellé d'une authentification ou d'un corps conservé sans être géré. */
+const otherAuth = computed(() =>
+  request.value?.auth.type === "other" ? request.value.auth.other : null,
+);
+const otherBody = computed(() =>
+  request.value?.body.kind === "other" ? request.value.body.other : null,
+);
 
 type Tab = "params" | "headers" | "auth" | "body" | "assertions";
 const tab = ref<Tab>("params");
@@ -119,6 +166,7 @@ function addAssertion(): void {
     operator: "equals",
     value: 200,
     origin: "manual",
+    enabled: true,
   });
 }
 
@@ -138,16 +186,28 @@ function resultFor(id: string): boolean | null {
       <h2 class="editor__name">{{ request.name }}</h2>
       <span v-if="folder" class="editor__folder">{{ folder }}</span>
       <span v-if="workbench.isDirty(editorKey)" class="editor__state">● Modifiée</span>
-      <button
-        v-if="contractLabel"
-        type="button"
-        class="editor__contract"
-        :title="`Ouvrir le contrat (${request.contract?.file ?? ''})`"
-        @click="openContract"
-      >
-        Contrat : {{ contractLabel }}
-      </button>
+      <span v-if="contractLabel" class="editor__link">
+        <button
+          type="button"
+          class="editor__contract"
+          :title="`Ouvrir le contrat (${request.contract?.file ?? ''})`"
+          @click="openContract"
+        >
+          Contrat : {{ contractLabel }}
+        </button>
+        <button
+          type="button"
+          class="link"
+          title="La requête ne sera plus vérifiée contre ce contrat"
+          @click="unlinkContract"
+        >
+          Délier
+        </button>
+      </span>
     </div>
+    <p v-if="request.preserved.length > 0" class="editor__preserved" role="note">
+      Conservé dans le fichier sans être modifié par Arnod : {{ request.preserved.join(", ") }}.
+    </p>
     <p v-if="editor?.changedElsewhere" class="editor__elsewhere" role="status">
       Modifiée dans une autre fenêtre.
       <button type="button" class="link" @click="workbench.reload(editorKey)">Recharger</button>
@@ -196,7 +256,7 @@ function resultFor(id: string): boolean | null {
     </div>
 
     <div :id="`panel-${tab}`" role="tabpanel" :aria-labelledby="`tab-${tab}`" class="editor__panel">
-      <PairsEditor v-if="tab === 'params'" v-model="request.params" label="Paramètres d'adresse" />
+      <PairsEditor v-if="tab === 'params'" v-model="request.params" label="Paramètres" with-kind />
       <PairsEditor v-else-if="tab === 'headers'" v-model="request.headers" label="En-têtes" />
 
       <div v-else-if="tab === 'auth'" class="stack">
@@ -204,8 +264,16 @@ function resultFor(id: string): boolean | null {
           <span>Type</span>
           <select v-model="request.auth.type">
             <option v-for="k in AUTH_KINDS" :key="k.id" :value="k.id">{{ k.label }}</option>
+            <option v-if="otherAuth !== null" value="other">Autre ({{ otherAuth }})</option>
           </select>
         </label>
+        <p v-if="request.auth.type === 'inherit'" class="hint">
+          Héritée du dossier ou de la collection : Arnod ne l'applique pas encore, la requête part
+          sans authentification.
+        </p>
+        <p v-else-if="request.auth.type === 'other'" class="hint">
+          Authentification « {{ otherAuth }} » conservée dans le fichier ; Arnod ne l'envoie pas.
+        </p>
         <template v-if="request.auth.type === 'basic'">
           <label class="field">
             <span>Utilisateur</span>
@@ -248,10 +316,14 @@ function resultFor(id: string): boolean | null {
           <span>Type</span>
           <select v-model="request.body.kind">
             <option v-for="k in BODY_KINDS" :key="k.id" :value="k.id">{{ k.label }}</option>
+            <option v-if="otherBody !== null" value="other">Autre ({{ otherBody }})</option>
           </select>
         </label>
+        <p v-if="request.body.kind === 'other'" class="hint">
+          Corps « {{ otherBody }} » conservé dans le fichier ; Arnod ne l'envoie pas.
+        </p>
         <textarea
-          v-if="request.body.kind === 'json' || request.body.kind === 'text'"
+          v-else-if="['json', 'text', 'xml'].includes(request.body.kind)"
           v-model="request.body.content"
           class="editor__body"
           spellcheck="false"
@@ -265,8 +337,19 @@ function resultFor(id: string): boolean | null {
       </div>
 
       <div v-else class="stack">
-        <p v-if="request.assertions.length === 0" class="hint">
+        <p v-if="request.assertions.length === 0 && !request.contract" class="hint">
           Sans vérification, la requête réussit si le statut est inférieur à 400.
+        </p>
+        <p
+          v-if="request.contract"
+          class="assertion assertion--contract"
+          :class="{
+            'assertion--ok': resultFor(CONTRACT_CHECK) === true,
+            'assertion--ko': resultFor(CONTRACT_CHECK) === false,
+          }"
+        >
+          La réponse est conforme au contrat (statut prévu, corps conforme au schéma) : vérifié à
+          chaque envoi tant que la requête est liée.
         </p>
         <ul class="assertions">
           <li
@@ -274,15 +357,18 @@ function resultFor(id: string): boolean | null {
             :key="assertion.id"
             class="assertion"
             :class="{
-              'assertion--ok': resultFor(assertion.id) === true,
-              'assertion--ko': resultFor(assertion.id) === false,
+              'assertion--ok': assertion.enabled && resultFor(assertion.id) === true,
+              'assertion--ko': assertion.enabled && resultFor(assertion.id) === false,
+              'assertion--off': !assertion.enabled,
             }"
           >
-            <span v-if="assertion.operator === 'matchesContract'" class="assertion__whole">
-              La réponse
-            </span>
             <input
-              v-else
+              v-model="assertion.enabled"
+              type="checkbox"
+              class="assertion__check"
+              :aria-label="`Activer la vérification ${index + 1}`"
+            />
+            <input
               v-model="assertion.target"
               type="text"
               spellcheck="false"
@@ -310,7 +396,7 @@ function resultFor(id: string): boolean | null {
                 ? "proposée"
                 : assertion.origin === "default"
                   ? "par défaut"
-                  : "manuelle"
+                  : ""
             }}</span>
             <button
               type="button"
@@ -375,8 +461,15 @@ function resultFor(id: string): boolean | null {
   outline-offset: 1px;
 }
 
-.assertion__whole {
-  font-size: 0.875rem;
+.editor__link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+}
+
+.editor__preserved {
+  margin: 0;
+  font-size: 0.75rem;
   color: var(--color-muted);
 }
 
@@ -404,7 +497,7 @@ function resultFor(id: string): boolean | null {
 .editor__url,
 .field input,
 .field select,
-.assertion input,
+.assertion input[type="text"],
 .assertion select,
 .editor__body {
   padding: 0.5rem 0.625rem;
@@ -435,6 +528,7 @@ function resultFor(id: string): boolean | null {
   .assertion select,
   .editor__body,
   .editor__tab,
+  .editor__link .link,
   .link,
   .assertion__remove
 ):focus-visible {
@@ -514,7 +608,7 @@ function resultFor(id: string): boolean | null {
 
 .assertion {
   display: grid;
-  grid-template-columns: 1.4fr 1.2fr 1fr auto auto;
+  grid-template-columns: auto 1.4fr 1.2fr 1fr auto auto;
   gap: 0.375rem;
   align-items: center;
   padding: 0.25rem;
@@ -529,7 +623,20 @@ function resultFor(id: string): boolean | null {
   background: var(--color-danger-soft);
 }
 
-.assertion input,
+.assertion--off input[type="text"],
+.assertion--off select {
+  color: var(--color-muted);
+}
+
+.assertion--contract {
+  display: block;
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8125rem;
+  border: 1px dashed var(--color-border-strong);
+}
+
+.assertion input[type="text"],
 .assertion select {
   min-width: 0;
   padding: 0.3125rem 0.5rem;

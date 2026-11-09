@@ -1,13 +1,10 @@
-//! Modèle d'une requête et format de son fichier YAML (§ 6.1 du plan).
+//! Modèle d'une requête, tel que l'interface l'édite.
 //!
-//! Un fichier = une requête, lisible et stable pour Git. Les champs vides sont
-//! omis à l'écriture pour garder des diffs courts.
+//! Un fichier = une requête, au format OpenCollection 1.0.0
+//! (docs/plan-opencollection.md) : la correspondance avec ce modèle est dans
+//! `crate::opencollection::request`. Ce modèle n'est plus écrit tel quel.
 
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
-/// Version courante du format d'un fichier de requête.
-pub const REQUEST_VERSION: u32 = 1;
 
 /// Délai maximal d'une requête, par défaut (R12).
 pub const DEFAULT_TIMEOUT_MS: u64 = 30_000;
@@ -52,8 +49,13 @@ fn yes() -> bool {
     true
 }
 
-fn is_true(value: &bool) -> bool {
-    *value
+/// Emplacement d'un paramètre : adresse (`?nom=valeur`) ou chemin (`:nom`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ParamKind {
+    #[default]
+    Query,
+    Path,
 }
 
 /// Ligne nom / valeur : paramètre, en-tête, champ de formulaire.
@@ -63,8 +65,23 @@ pub struct Pair {
     #[serde(default)]
     pub value: String,
     /// Case d'activation du tableau (B3).
-    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    #[serde(default = "yes")]
     pub enabled: bool,
+    /// Paramètre de chemin (S8) ; sans objet pour un en-tête ou un champ.
+    #[serde(default)]
+    pub kind: ParamKind,
+}
+
+impl Pair {
+    /// Ligne active.
+    pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            value: value.into(),
+            enabled: true,
+            kind: ParamKind::Query,
+        }
+    }
 }
 
 /// Type d'authentification (B5).
@@ -76,6 +93,10 @@ pub enum AuthKind {
     Basic,
     Bearer,
     ApiKey,
+    /// Héritée du dossier ou de la collection (non gérée par Arnod : rien n'est envoyé).
+    Inherit,
+    /// Autre authentification OpenCollection (digest, OAuth…) : conservée, non envoyée.
+    Other,
 }
 
 /// Emplacement d'une clé d'API.
@@ -87,33 +108,28 @@ pub enum ApiKeyLocation {
     Query,
 }
 
-fn no_location(value: &ApiKeyLocation) -> bool {
-    *value == ApiKeyLocation::Header
-}
-
-fn is_empty(value: &str) -> bool {
-    value.is_empty()
-}
-
 /// Authentification : les valeurs acceptent `{{variable}}`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Auth {
     #[serde(rename = "type", default)]
     pub kind: AuthKind,
-    #[serde(default, skip_serializing_if = "is_empty")]
+    #[serde(default)]
     pub username: String,
-    #[serde(default, skip_serializing_if = "is_empty")]
+    #[serde(default)]
     pub password: String,
-    #[serde(default, skip_serializing_if = "is_empty")]
+    #[serde(default)]
     pub token: String,
     /// Nom de l'en-tête ou du paramètre d'une clé d'API.
-    #[serde(default, skip_serializing_if = "is_empty")]
+    #[serde(default)]
     pub name: String,
-    #[serde(default, skip_serializing_if = "is_empty")]
+    #[serde(default)]
     pub value: String,
-    #[serde(default, skip_serializing_if = "no_location")]
+    #[serde(default)]
     pub location: ApiKeyLocation,
+    /// Type d'une authentification `other` (`digest`, `oauth2`…).
+    #[serde(default)]
+    pub other: String,
 }
 
 /// Type de corps (B4).
@@ -124,7 +140,10 @@ pub enum BodyKind {
     None,
     Json,
     Text,
+    Xml,
     Form,
+    /// Autre corps OpenCollection (multipart, fichier, variantes…) : conservé, non envoyé.
+    Other,
 }
 
 /// Corps de la requête.
@@ -134,11 +153,14 @@ pub struct Body {
     #[serde(rename = "type", default)]
     pub kind: BodyKind,
     /// Contenu JSON ou texte.
-    #[serde(default, skip_serializing_if = "is_empty")]
+    #[serde(default)]
     pub content: String,
     /// Champs d'un formulaire.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub form: Vec<Pair>,
+    /// Type d'un corps `other` (`multipart-form`, `file`…).
+    #[serde(default)]
+    pub other: String,
 }
 
 /// Valeur attendue d'une vérification.
@@ -151,7 +173,8 @@ pub enum Scalar {
     Text(String),
 }
 
-/// Opérateur d'une vérification (V2).
+/// Opérateur d'une vérification (V2) : ceux d'OpenCollection et de Bruno (R4).
+/// Le nom OpenCollection de chacun est donné par `crate::opencollection::request`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Operator {
@@ -159,21 +182,40 @@ pub enum Operator {
     NotEquals,
     Exists,
     Contains,
+    NotContains,
     LessThan,
+    LessOrEqual,
     GreaterThan,
+    GreaterOrEqual,
+    In,
+    NotIn,
+    Between,
+    StartsWith,
+    EndsWith,
+    Length,
+    Matches,
+    NotMatches,
+    IsNull,
+    IsUndefined,
+    IsEmpty,
+    IsNotEmpty,
+    IsTruthy,
+    IsFalsy,
+    IsJson,
     IsNumber,
     IsText,
-    /// Statut prévu et corps conforme au schéma du contrat lié (C8).
-    MatchesContract,
+    IsBoolean,
+    IsArray,
 }
 
-/// Origine d'une vérification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Origine d'une vérification, connue pendant la session seulement (non écrite).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Origin {
     /// Calculée d'après une réponse reçue (R10).
     Proposed,
-    /// Ajoutée par l'utilisateur.
+    /// Ajoutée par l'utilisateur, ou relue d'un fichier.
+    #[default]
     Manual,
     /// Vérification de durée ajoutée à la création.
     Default,
@@ -183,14 +225,19 @@ pub enum Origin {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Assertion {
+    /// Identifiant de session, recalculé à la lecture (non écrit).
     pub id: String,
-    /// `status`, `responseTime`, `body.chemin` ou `headers.Nom`.
+    /// `status`, `responseTime`, `body.chemin`, `headers.Nom`, ou une autre
+    /// expression OpenCollection gardée telle quelle.
     pub target: String,
-    #[serde(rename = "op")]
     pub operator: Operator,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<Scalar>,
+    #[serde(default)]
     pub origin: Origin,
+    /// Une vérification désactivée n'est pas évaluée.
+    #[serde(default = "yes")]
+    pub enabled: bool,
 }
 
 /// Opération d'un contrat dont la requête est issue (C7).
@@ -203,20 +250,15 @@ pub struct ContractLink {
     pub operation: String,
 }
 
-fn default_timeout() -> u64 {
+/// Délai par défaut, quand le fichier n'en fixe pas.
+pub fn default_timeout() -> u64 {
     DEFAULT_TIMEOUT_MS
 }
 
-fn is_default_timeout(value: &u64) -> bool {
-    *value == DEFAULT_TIMEOUT_MS
-}
-
-/// Contenu d'un fichier de requête.
+/// Requête éditée.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Request {
-    pub version: u32,
-    pub id: Uuid,
     pub name: String,
     pub method: Method,
     pub url: String,
@@ -228,25 +270,23 @@ pub struct Request {
     pub auth: Auth,
     #[serde(default)]
     pub body: Body,
-    #[serde(
-        default = "default_timeout",
-        skip_serializing_if = "is_default_timeout"
-    )]
+    #[serde(default = "default_timeout")]
     pub timeout_ms: u64,
     #[serde(default)]
     pub assertions: Vec<Assertion>,
-    /// Opération du contrat liée, le cas échéant (champ ignoré par une version
-    /// d'Arnod qui ne le connaît pas).
+    /// Opération du contrat liée (étiquette `contract:` du fichier, S7).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contract: Option<ContractLink>,
+    /// Parties du fichier conservées sans être gérées par Arnod (scripts,
+    /// exemples…), pour le signaler dans l'éditeur. Ignoré à l'enregistrement.
+    #[serde(default)]
+    pub preserved: Vec<String>,
 }
 
 impl Request {
     /// Requête neuve : `GET {{baseUrl}}/` avec la vérification de durée par défaut (B1, V5).
     pub fn new(name: impl Into<String>) -> Self {
         Self {
-            version: REQUEST_VERSION,
-            id: Uuid::new_v4(),
             name: name.into(),
             method: Method::Get,
             url: "{{baseUrl}}/".to_owned(),
@@ -261,8 +301,10 @@ impl Request {
                 operator: Operator::LessThan,
                 value: Some(Scalar::Int(DEFAULT_MAX_DURATION_MS)),
                 origin: Origin::Default,
+                enabled: true,
             }],
             contract: None,
+            preserved: Vec::new(),
         }
     }
 }

@@ -200,6 +200,7 @@ async fn un_run_execute_le_dossier_et_garde_le_dernier() {
         operator: crate::request::model::Operator::Equals,
         value: Some(crate::request::model::Scalar::Int(200)),
         origin: crate::request::model::Origin::Manual,
+        enabled: true,
     });
     file::write(&full, &request).unwrap();
     add_request(&f, "Dossier", "Variable", "{{inconnue}}/x", Method::Get);
@@ -340,11 +341,13 @@ async fn c8_c10_le_run_du_contrat_verifie_la_conformite() {
         conformity.message.as_deref(),
         Some("body.nom : champ obligatoire absent ; body.id : attendu entier, reçu \"un\"")
     );
+    // Les vérifications écrites (durée, statut) passent toujours.
     assert!(
         item.assertions
             .iter()
-            .find(|a| a.id == "statut")
-            .unwrap()
-            .passed
+            .filter(|a| a.id != "contrat")
+            .all(|a| a.passed),
+        "{:?}",
+        item.assertions
     );
 }

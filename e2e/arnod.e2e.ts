@@ -216,7 +216,9 @@ describe("Arnod, de bout en bout", () => {
     expect(await toastText(browser)).toContain(
       "« boutique-tests » créé · visible dans « Tous les projets ».",
     );
-    const manifest = readFileSync(path.join(expected, "arnod.yml"), "utf8");
+    // Le projet est une collection OpenCollection 1.0.0.
+    const manifest = readFileSync(path.join(expected, "opencollection.yml"), "utf8");
+    expect(manifest).toMatch(/^opencollection: "?1\.0\.0"?\n/);
     expect(manifest).toContain("name: boutique-tests");
     const state = readState(sandbox);
     expect(state.projects.map((p) => p.name)).toEqual(["boutique-tests"]);
@@ -301,7 +303,9 @@ describe("Arnod, de bout en bout", () => {
     await dialog.$("button=Créer le projet").click();
     await waitForHeading(browser, "paiements-v3");
 
-    expect(existsSync(path.join(sandbox.home, "arnod", "paiements-v3", "arnod.yml"))).toBe(true);
+    expect(existsSync(path.join(sandbox.home, "arnod", "paiements-v3", "opencollection.yml"))).toBe(
+      true,
+    );
     const state = readState(sandbox);
     const id = state.projects.find((p) => p.name === "paiements-v3")?.id;
     expect(
@@ -439,7 +443,7 @@ describe("Arnod, de bout en bout", () => {
     expect(await heading(browser)).toBe("E-commerce");
   });
 
-  it("inscrit un dossier projet existant par son manifeste (P12)", async () => {
+  it("inscrit un projet du format précédent et le convertit (P12, R6)", async () => {
     const folder = path.join(sandbox.home, "dev", "catalogue-legacy");
     mkdirSync(folder, { recursive: true });
     writeFileSync(
@@ -468,6 +472,11 @@ describe("Arnod, de bout en bout", () => {
     expect(await cardNames(browser)).toContain("catalogue-legacy");
     const added = readState(sandbox).projects.find((p) => p.name === "catalogue-legacy");
     expect(added?.id).toBe("7f3c2a10-5b1e-4c8d-9a2f-0e6b4d3c2a10");
+    // Converti une fois en collection OpenCollection, identifiant gardé.
+    expect(existsSync(path.join(folder, "arnod.yml"))).toBe(false);
+    const root = readFileSync(path.join(folder, "opencollection.yml"), "utf8");
+    expect(root).toContain("name: catalogue-legacy");
+    expect(root).toContain("id: 7f3c2a10-5b1e-4c8d-9a2f-0e6b4d3c2a10");
   });
 
   it("oublie un projet sans toucher à ses fichiers, puis annule (P11, R6)", async () => {
@@ -483,7 +492,9 @@ describe("Arnod, de bout en bout", () => {
     expect(state.workspaces.flatMap((w) => w.projectIds)).not.toContain(
       "7f3c2a10-5b1e-4c8d-9a2f-0e6b4d3c2a10",
     );
-    expect(existsSync(path.join(sandbox.home, "dev", "catalogue-legacy", "arnod.yml"))).toBe(true);
+    expect(
+      existsSync(path.join(sandbox.home, "dev", "catalogue-legacy", "opencollection.yml")),
+    ).toBe(true);
 
     await browser.$(".toast").$("button=Annuler").click();
     await waitForHeading(browser, "Tous les projets · 3");
@@ -714,9 +725,12 @@ describe("Contrats de services", () => {
       path.join(project(), "Animalerie", "animaux", "trouver-un-animal.yml"),
       "utf8",
     );
+    // Requête OpenCollection, liée par une étiquette ; la conformité n'est pas écrite (R8).
+    expect(request).toContain("type: http");
     expect(request).toContain("{{baseUrl}}/pets/1");
-    expect(request).toContain("operation: GET /pets/{petId}");
-    expect(request).toContain("op: matchesContract");
+    expect(request).toContain("contract:contracts/animalerie.yaml#GET /pets/{petId}");
+    expect(request).toContain("operator: eq");
+    expect(request).not.toContain("matchesContract");
     expect(readFileSync(path.join(project(), "environments", "local.yml"), "utf8")).toContain(url);
     await screenshot(browser, "09-contrat");
   });
@@ -747,5 +761,39 @@ describe("Contrats de services", () => {
     expect(errors.some((text) => text.includes("body.id : attendu entier"))).toBe(true);
     await screenshot(browser, "10-run-contrat");
     broken = false;
+  });
+
+  it("une requête liée est vérifiée contre le contrat à l'envoi (R8, S3)", async () => {
+    await clickText(".zone__tab-button", "Animalerie");
+    await browser.$('[aria-label="Ouvrir la requête de GET /pets/{petId}"]').click();
+    // Éditeur de la requête liée (d'autres zones peuvent en afficher d'autres).
+    const inEditor = (action: "verifications" | "send" | "state") =>
+      browser.execute((step) => {
+        const editor = Array.from(document.querySelectorAll<HTMLElement>(".editor")).find((e) =>
+          e.querySelector(".editor__contract")?.textContent.includes("GET /pets/{petId}"),
+        );
+        if (!editor) throw new Error("éditeur de la requête liée introuvable");
+        const buttons = Array.from(editor.querySelectorAll<HTMLButtonElement>("button"));
+        if (step === "verifications")
+          buttons.find((b) => b.textContent.includes("Vérifications"))?.click();
+        if (step === "send") buttons.find((b) => b.textContent.trim() === "Envoyer")?.click();
+        const contract = editor.querySelector(".assertion--contract");
+        return {
+          contract: contract?.className ?? null,
+          operators: editor.querySelectorAll('[aria-label="Opérateur de la vérification 1"] option')
+            .length,
+        };
+      }, action);
+    await browser.waitUntil(async () => (await inEditor("verifications")).contract !== null, {
+      timeout: 10_000,
+      timeoutMsg: "conformité au contrat absente des vérifications",
+    });
+    expect((await inEditor("state")).operators).toBe(28);
+    await inEditor("send");
+    await browser.waitUntil(
+      async () => (await inEditor("state")).contract?.includes("assertion--ok") === true,
+      { timeout: 15_000, timeoutMsg: "conformité non vérifiée à l'envoi" },
+    );
+    await screenshot(browser, "11-requete-liee");
   });
 });

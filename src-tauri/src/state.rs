@@ -210,9 +210,10 @@ impl AppState {
     }
 
     /// Inscrit dans « Tous les projets » un dossier projet existant, reconnu par
-    /// son manifeste `arnod.yml` (P12, après un clone Git par exemple), et
-    /// l'ajoute à `workspace_id` s'il est donné (R4). Rien n'est écrit dans le
-    /// dossier du projet.
+    /// sa racine `opencollection.yml` (P12, après un clone Git par exemple ; une
+    /// collection Bruno 3 aussi, S5), et l'ajoute à `workspace_id` s'il est
+    /// donné (R4). Seules écritures possibles : la conversion d'un projet au
+    /// format précédent (R6), l'identifiant Arnod d'une collection qui n'en a pas (Q4).
     pub fn add_existing_project(
         &self,
         path: &str,
@@ -298,6 +299,8 @@ impl AppState {
                 ),
             ));
         }
+        // Projet au format précédent : converti en OpenCollection, une fois (R6).
+        crate::opencollection::migrate::run(&project.path)?;
         Ok(ProjectCtx {
             id: project_id,
             root: project.path.clone(),
