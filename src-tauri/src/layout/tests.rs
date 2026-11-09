@@ -35,6 +35,7 @@ fn names(layout: &Layout) -> Vec<Vec<String>> {
                 .map(|tab| match &tab.content {
                     Content::Request { path, .. } => path.trim_end_matches(".yml").to_owned(),
                     Content::Run { .. } => "run".to_owned(),
+                    Content::Contract { path, .. } => format!("contrat:{path}"),
                 })
                 .collect()
         })
@@ -550,6 +551,39 @@ fn f11_renommer_ou_supprimer_un_chemin_met_les_onglets_a_jour_partout() {
 }
 
 #[test]
+fn c11_supprimer_un_contrat_ferme_ses_onglets() {
+    let mut windows = Windows::default();
+    let project = Uuid::from_u128(1);
+    let contract = |path: &str| Content::Contract {
+        project_id: project,
+        path: path.to_owned(),
+    };
+    main_layout(&mut windows)
+        .open(contract("contracts/petstore.yaml"), None)
+        .unwrap();
+    main_layout(&mut windows)
+        .open(contract("contracts/commandes.json"), None)
+        .unwrap();
+    // Même contenu : une seule fois par fenêtre (Z3).
+    main_layout(&mut windows)
+        .open(contract("contracts/petstore.yaml"), None)
+        .unwrap();
+    assert_eq!(
+        tab_names(&windows, MAIN),
+        [[
+            "contrat:contracts/petstore.yaml",
+            "contrat:contracts/commandes.json"
+        ]]
+    );
+
+    windows.close_path(project, "contracts/petstore.yaml");
+    assert_eq!(
+        tab_names(&windows, MAIN),
+        [["contrat:contracts/commandes.json"]]
+    );
+}
+
+#[test]
 fn le_menu_fenetre_agit_sur_la_derniere_fenetre_a_zones() {
     let mut windows = Windows::default();
     let a = main_layout(&mut windows).open(request("a"), None).unwrap();
@@ -649,7 +683,8 @@ fn unions_typescript_concordantes() {
         names([
             ProjectScope::Tree,
             ProjectScope::Request,
-            ProjectScope::Environments
+            ProjectScope::Environments,
+            ProjectScope::Contracts
         ])
     );
 }

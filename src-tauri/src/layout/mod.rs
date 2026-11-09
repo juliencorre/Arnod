@@ -32,12 +32,17 @@ pub enum Content {
     /// Le run (en cours ou dernier) d'un projet.
     #[serde(rename_all = "camelCase")]
     Run { project_id: Uuid },
+    /// Un contrat du projet, par son chemin relatif (`contracts/…`).
+    #[serde(rename_all = "camelCase")]
+    Contract { project_id: Uuid, path: String },
 }
 
 impl Content {
     pub fn project_id(&self) -> Uuid {
         match self {
-            Self::Request { project_id, .. } | Self::Run { project_id } => *project_id,
+            Self::Request { project_id, .. }
+            | Self::Run { project_id }
+            | Self::Contract { project_id, .. } => *project_id,
         }
     }
 }
@@ -573,13 +578,17 @@ impl Layout {
         visit(&mut self.root, project_id, from, to);
     }
 
-    /// Ferme les onglets des requêtes situées à `path` (fichier ou dossier).
+    /// Ferme les onglets des requêtes ou du contrat situés à `path` (fichier ou dossier).
     pub fn close_path(&mut self, project_id: Uuid, path: &str) {
         let ids: Vec<Uuid> = self
             .tabs()
             .into_iter()
             .filter(|tab| match &tab.content {
                 Content::Request {
+                    project_id: id,
+                    path: tab_path,
+                }
+                | Content::Contract {
                     project_id: id,
                     path: tab_path,
                 } => *id == project_id && within(tab_path, path).is_some(),

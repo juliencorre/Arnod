@@ -4,6 +4,7 @@ import { computed, ref, useId } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
+import { useContractsStore } from "@/stores/contracts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type {
   AssertionOperator,
@@ -17,6 +18,7 @@ import type {
 const props = defineProps<{ editorKey: string }>();
 
 const workbench = useWorkbenchStore();
+const contracts = useContractsStore();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
 const request = computed<RequestDoc | null>(() => editor.value?.draft ?? null);
 const folder = computed(() => {
@@ -46,8 +48,34 @@ const OPERATORS: { id: AssertionOperator; label: string }[] = [
   { id: "greaterThan", label: "est supérieur à" },
   { id: "isNumber", label: "est un nombre" },
   { id: "isText", label: "est un texte" },
+  { id: "matchesContract", label: "est conforme au contrat" },
 ];
-const NO_VALUE: AssertionOperator[] = ["exists", "isNumber", "isText"];
+const NO_VALUE: AssertionOperator[] = ["exists", "isNumber", "isText", "matchesContract"];
+
+/** Contrat lié (C7) : son nom, s'il est connu, sinon son fichier. */
+const contractLabel = computed(() => {
+  const link = request.value?.contract;
+  if (!link || !editor.value) return null;
+  const summary = contracts.lists[editor.value.projectId]?.find((c) => c.path === link.file);
+  return `${summary?.name ?? link.file} · ${link.operation}`;
+});
+
+function openContract(): void {
+  const link = request.value?.contract;
+  if (link && editor.value) void contracts.show(editor.value.projectId, link.file);
+}
+
+/** La conformité porte sur toute la réponse : la cible n'a pas de sens. */
+function setOperator(index: number, operator: AssertionOperator): void {
+  const assertion = request.value?.assertions[index];
+  if (!assertion) return;
+  assertion.operator = operator;
+  assertion.origin = "manual";
+  if (operator === "matchesContract") {
+    assertion.target = "response";
+    assertion.value = null;
+  } else if (assertion.target === "response") assertion.target = "status";
+}
 
 type Tab = "params" | "headers" | "auth" | "body" | "assertions";
 const tab = ref<Tab>("params");
@@ -110,6 +138,15 @@ function resultFor(id: string): boolean | null {
       <h2 class="editor__name">{{ request.name }}</h2>
       <span v-if="folder" class="editor__folder">{{ folder }}</span>
       <span v-if="workbench.isDirty(editorKey)" class="editor__state">● Modifiée</span>
+      <button
+        v-if="contractLabel"
+        type="button"
+        class="editor__contract"
+        :title="`Ouvrir le contrat (${request.contract?.file ?? ''})`"
+        @click="openContract"
+      >
+        Contrat : {{ contractLabel }}
+      </button>
     </div>
     <p v-if="editor?.changedElsewhere" class="editor__elsewhere" role="status">
       Modifiée dans une autre fenêtre.
@@ -241,15 +278,22 @@ function resultFor(id: string): boolean | null {
               'assertion--ko': resultFor(assertion.id) === false,
             }"
           >
+            <span v-if="assertion.operator === 'matchesContract'" class="assertion__whole">
+              La réponse
+            </span>
             <input
+              v-else
               v-model="assertion.target"
               type="text"
               spellcheck="false"
               :aria-label="`Cible de la vérification ${index + 1}`"
             />
             <select
-              v-model="assertion.operator"
+              :value="assertion.operator"
               :aria-label="`Opérateur de la vérification ${index + 1}`"
+              @change="
+                setOperator(index, ($event.target as HTMLSelectElement).value as AssertionOperator)
+              "
             >
               <option v-for="o in OPERATORS" :key="o.id" :value="o.id">{{ o.label }}</option>
             </select>
@@ -314,9 +358,31 @@ function resultFor(id: string): boolean | null {
   color: var(--color-muted);
 }
 
+.editor__contract {
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--color-link);
+  background: none;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.editor__contract:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.assertion__whole {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+
 .editor__state {
   font-size: 0.75rem;
-  color: var(--color-accent-text);
+  color: var(--color-link);
 }
 
 .editor__elsewhere {

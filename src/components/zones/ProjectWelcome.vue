@@ -39,6 +39,9 @@ async function newRequest(): Promise<void> {
       }}
       Glissez un onglet sur un bord pour diviser la fenêtre.
     </p>
+    <p class="welcome__text">
+      Un contrat OpenAPI ? « + Contrat » dans la barre latérale crée ses requêtes.
+    </p>
     <BaseButton variant="primary" @click="newRequest">+ Nouvelle requête</BaseButton>
   </div>
 </template>

@@ -11,8 +11,9 @@ l'installeur et les écarts listés en fin de plan). Livré : projets et
 workspaces, selon `docs/plan-projets-workspaces.md` (maquettes dans `docs/maquettes/`), puis
 workspaces en onglets selon `docs/plan-workspaces-onglets.md` ; voir la section « Projets et
 workspaces ». Livré ensuite : fenêtres et zones selon `docs/plan-fenetres-zones.md` ; voir la
-section « Fenêtres et zones ». Un nouveau lot commence par un plan rédigé à partir de
-`docs/modele-plan.md`.
+section « Fenêtres et zones ». En cours : contrats de services selon
+`docs/plan-contrats-services.md` ; voir la section « Contrats de services ». Un nouveau lot
+commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
 ## Architecture
 
@@ -61,12 +62,14 @@ src/                    Frontend Vue
   lib/format.ts         Formatage d'affichage
   stores/               catalog (instantané), navigation (onglet, vue, titre), toasts (notifications),
                         windows (fenêtres, zones, onglets de contenu), workbench (par projet :
-                        arborescence, environnements, run ; par onglet : brouillon, réponse)
+                        arborescence, environnements, run ; par onglet : brouillon, réponse),
+                        contracts (contrats par projet, contrats ouverts)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification
   components/layout/    Coquille : onglets des workspaces, barre latérale, zone principale
   components/zones/     Zones : arbre, onglets, séparations (SplitHandle), onglet de requête
   components/windows/   Fenêtres détachées : contenu, barre latérale
+  components/contracts/ Contrats : section de la barre latérale, dialogue d'ajout, onglet
   components/projects/  Vues des projets (premier lancement...)
   components/workspaces/ Vues des workspaces
   components/workbench/ Arborescence, éditeur, réponse, environnements, run
@@ -88,6 +91,8 @@ src-tauri/              Cœur Rust
   src/http.rs           Envoi HTTP (reqwest), délai, annulation, troncature à 5 Mo
   src/workbench.rs      Établi : envoi, variables, environnements actifs, runs
   src/layout/           Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
+  src/contract/         Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
+                        file.rs range les contrats dans contracts/ du projet
   src/windows.rs        windows.json, fenêtres natives, focus, fermetures, événements arnod://
   src/manifest.rs       Dossier d'un projet et manifeste arnod.yml
   src/state.rs          AppState : catalogue + stockage + annulation (app.manage)
@@ -163,8 +168,11 @@ Linux : installer d'abord les dépendances système
   les composants. Tout nouveau jeton est défini pour les deux thèmes, en `#rrggbb` ;
   `tests/theme.spec.ts` vérifie les contrastes.
 - Police système uniquement : la CSP interdit les polices distantes des maquettes.
-- Hors périmètre actuel : SOAP, mocks, scripts, CLI, signature de code, updater. Les requêtes HTTP
-  sont livrées (premier usage) ; les secrets vont dans le coffre du système, jamais dans le projet.
+- Hors périmètre actuel : SOAP (et donc WSDL), mocks, scripts, CLI, signature de code, updater. Les
+  requêtes HTTP sont livrées (premier usage), les contrats OpenAPI aussi ; les secrets vont dans le
+  coffre du système, jamais dans le projet.
+- Une tâche de fond lancée depuis une commande passe par `tauri::async_runtime::spawn` : une
+  commande synchrone ne s'exécute pas dans un contexte tokio (`tokio::spawn` y panique).
 
 ## Projets et workspaces
 
@@ -213,3 +221,22 @@ Référence : `docs/plan-fenetres-zones.md` (cas F1 à F14, règles Z1 à Z8).
   enregistre ses requêtes puis appelle `window_reattach`. Fermer la principale quitte (Z7).
 - Toute séparation passe par `SplitHandle` (motif WAI-ARIA « window splitter », minimums en pixels) ;
   toute action glissée (onglet, zone) a son équivalent au clavier ou dans le menu de l'onglet.
+
+## Contrats de services
+
+Référence : `docs/plan-contrats-services.md` (cas C1 à C12, règles R1 à R12).
+
+- Un contrat est un fichier OpenAPI 3.0 ou 3.1, ou Swagger 2.0 (YAML ou JSON), rangé tel quel dans
+  `contracts/` à la racine du projet. Ce dossier est réservé comme `environments/` : absent de
+  l'arborescence, refusé comme nom de dossier racine. Un texte qui n'est pas un contrat lisible
+  n'est jamais écrit.
+- Les règles vivent dans `src-tauri/src/contract/` : `parse`, `sample`, `generate` et
+  `conformance` sont purs, `file` touche au disque ; tests règle par règle dans
+  `contract/tests.rs`. Pas de dépendance ajoutée : la validation couvre un sous-ensemble de JSON
+  Schema (pas `pattern` ni `format`).
+- Une requête créée depuis une opération porte `contract: { file, operation }` et la vérification
+  `matchesContract`, évaluée par l'établi qui relit le contrat. Une opération ne crée qu'une
+  requête ; `baseUrl` vide prend l'adresse du premier serveur du contrat.
+- Les commandes `contract_*` qui modifient émettent `arnod://projet` en portée `contracts` (et
+  `tree` pour les requêtes créées) ; supprimer un contrat ferme ses onglets dans toutes les
+  fenêtres.

@@ -153,7 +153,7 @@ function envView(wb: FakeWorkbench): EnvironmentsView {
   return { environments, active: wb.active };
 }
 
-function runOf(wb: FakeWorkbench, folder: string, only?: string[]): RunView {
+export function runOf(wb: FakeWorkbench, folder: string, only?: string[]): RunView {
   const prefix = folder === "" ? "" : `${folder}/`;
   const paths = [...wb.requests.keys()].filter(
     (p) => p.startsWith(prefix) && (!only || only.includes(p)),
@@ -165,6 +165,7 @@ function runOf(wb: FakeWorkbench, folder: string, only?: string[]): RunView {
     startedAt: 0,
     finished: true,
     cancelled: false,
+    contract: null,
     items: paths.map((path) => {
       const request = wb.requests.get(path) as RequestDoc;
       const status = wb.runStatus.get(path) ?? "passed";

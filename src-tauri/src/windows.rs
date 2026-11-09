@@ -43,6 +43,8 @@ pub enum ProjectScope {
     Tree,
     Request,
     Environments,
+    /// Contrats du projet (ajout, source, suppression).
+    Contracts,
 }
 
 /// Modification d'un projet, diffusée aux autres fenêtres (F11).

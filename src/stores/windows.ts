@@ -42,17 +42,22 @@ export function splitAround(
 
 /** Même contenu (Z3). */
 export function sameContent(a: ContentRef, b: ContentRef): boolean {
-  if (a.kind === "request" && b.kind === "request") {
-    return a.projectId === b.projectId && a.path === b.path;
+  if (a.kind === "run" || b.kind === "run") {
+    return a.kind === b.kind && a.projectId === b.projectId;
   }
-  return a.kind === b.kind && a.projectId === b.projectId;
+  return a.kind === b.kind && a.projectId === b.projectId && a.path === b.path;
 }
 
 /** Clé d'un contenu, pour les brouillons et réponses de l'établi. */
 export function contentKey(content: ContentRef): string {
-  return content.kind === "request"
-    ? `${content.projectId}::${content.path}`
-    : `${content.projectId}::run`;
+  switch (content.kind) {
+    case "request":
+      return `${content.projectId}::${content.path}`;
+    case "run":
+      return `${content.projectId}::run`;
+    case "contract":
+      return `${content.projectId}::contrat::${content.path}`;
+  }
 }
 
 /**

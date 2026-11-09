@@ -8,6 +8,7 @@
  */
 import { computed, useId } from "vue";
 
+import ContractsSection from "@/components/contracts/ContractsSection.vue";
 import EnvironmentBar from "@/components/workbench/EnvironmentBar.vue";
 import TreePanel from "@/components/workbench/TreePanel.vue";
 import { useProjectActions } from "@/composables/useProjectActions";
@@ -108,6 +109,7 @@ function add(): void {
           <div v-if="workbench.isExpanded(project.id)" class="sidebar__tree">
             <EnvironmentBar :project-id="project.id" />
             <TreePanel :project-id="project.id" />
+            <ContractsSection :project-id="project.id" />
           </div>
         </li>
       </ul>

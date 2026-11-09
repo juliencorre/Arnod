@@ -145,6 +145,11 @@ pub fn evaluate(
     };
 
     let (passed, message) = match (assertion.operator, &found) {
+        // Évaluée par l'établi, qui lit le contrat lié (`contract::conformance`).
+        (Operator::MatchesContract, _) => (
+            false,
+            Some("aucun contrat associé à cette requête".to_owned()),
+        ),
         (Operator::Exists, found) => (found.is_some(), found.is_none().then(missing)),
         (Operator::NotEquals, None) => (true, None),
         (_, None) => (false, Some(missing())),

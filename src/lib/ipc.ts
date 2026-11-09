@@ -15,6 +15,10 @@ import type {
   CommandErrorKind,
   CommandName,
   ContentRef,
+  ContractSource,
+  ContractSummary,
+  ContractView,
+  GenerateReport,
   LayoutPreset,
   Placement,
   ProjectChange,
@@ -266,6 +270,32 @@ export const ipc = {
 
   // --- Runs ----------------------------------------------------------------
 
+  contractList: (project: string): Promise<ContractSummary[]> =>
+    call<ContractSummary[]>("contract_list", { project }),
+  contractRead: (project: string, path: string): Promise<ContractView> =>
+    call<ContractView>("contract_read", { project, path }),
+  contractAdd: (project: string, source: ContractSource): Promise<ContractView> =>
+    call<ContractView>("contract_add", { project, source }),
+  /** Sélecteur de fichier natif ; `replace` remplace la source de ce contrat. `null` si annulé. */
+  contractImportFile: (project: string, replace: string | null): Promise<ContractView | null> =>
+    call<ContractView | null>("contract_import_file", { project, replace }),
+  contractSave: (project: string, path: string, text: string): Promise<ContractView> =>
+    call<ContractView>("contract_save", { project, path, text }),
+  contractDelete: (project: string, path: string, permanent: boolean): Promise<void> =>
+    call<null>("contract_delete", { project, path, permanent }).then(() => undefined),
+  contractGenerate: (
+    project: string,
+    path: string,
+    operations: string[],
+    environment: string | null,
+  ): Promise<GenerateReport> =>
+    call<GenerateReport>("contract_generate", { project, path, operations, environment }),
+  contractRun: (
+    project: string,
+    path: string,
+    environment: string,
+    confirmed: boolean,
+  ): Promise<RunView> => call<RunView>("contract_run", { project, path, environment, confirmed }),
   runStart: (
     project: string,
     folder: string,

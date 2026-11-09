@@ -10,12 +10,14 @@ import ConfirmProtectedDialog from "@/components/workbench/ConfirmProtectedDialo
 import ZoneArea from "@/components/zones/ZoneArea.vue";
 import { ipc } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
+import { contractKey, useContractsStore } from "@/stores/contracts";
 import { useWindowsStore } from "@/stores/windows";
 import { findRequest, requestKey, useWorkbenchStore } from "@/stores/workbench";
 
 const catalog = useCatalogStore();
 const windows = useWindowsStore();
 const workbench = useWorkbenchStore();
+const contracts = useContractsStore();
 
 /** Projet, dossiers et nom de l'onglet actif. */
 const crumbs = computed<string[]>(() => {
@@ -23,6 +25,13 @@ const crumbs = computed<string[]>(() => {
   if (!content) return [];
   const project = catalog.projectById(content.projectId)?.name ?? "projet";
   if (content.kind === "run") return [project, "Run"];
+  if (content.kind === "contract") {
+    const name =
+      contracts.open[contractKey(content.projectId, content.path)]?.view?.name ??
+      content.path.split("/").at(-1) ??
+      "";
+    return [project, "Contrats", name];
+  }
   const draft = workbench.editors[requestKey(content.projectId, content.path)]?.draft;
   const node = findRequest(workbench.trees[content.projectId]?.nodes ?? [], content.path);
   const folders = content.path.split("/").slice(0, -1);

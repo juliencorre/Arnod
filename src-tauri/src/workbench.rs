@@ -13,13 +13,14 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{Notify, Semaphore};
 use uuid::Uuid;
 
+use crate::contract::file as contract_file;
 use crate::environment::{self, Environment};
 use crate::error::{CommandError, CommandErrorKind};
 use crate::http::{self, HttpResponse};
 use crate::local::{self, LocalData, LocalVar};
 use crate::request::assertions::{self, AssertionResult, DEFAULT_LIMIT};
 use crate::request::file;
-use crate::request::model::{Assertion, Method, Request};
+use crate::request::model::{Method, Operator, Request};
 use crate::request::resolve::{self, Variables};
 use crate::secrets::{self, SecretStore};
 use crate::tree;
@@ -111,6 +112,9 @@ pub struct RunView {
     pub finished: bool,
     pub cancelled: bool,
     pub items: Vec<RunItem>,
+    /// Nom du contrat dont les requêtes sont exécutées (C10), sinon `None`.
+    #[serde(default)]
+    pub contract: Option<String>,
 }
 
 /// Résumé du dernier run d'un projet, pour « Tous les projets » (O12).
@@ -421,11 +425,24 @@ impl Workbench {
                 e
             })?,
         );
-        Ok(Self::outcome(&request.assertions, response))
+        Ok(Self::outcome(&ctx.root, &request, response))
     }
 
-    fn outcome(list: &[Assertion], response: HttpResponse) -> SendOutcome {
-        let results = assertions::evaluate_all(list, &response.data());
+    /// Évalue les vérifications ; celle de conformité lit le contrat lié (C8).
+    fn outcome(root: &Path, request: &Request, response: HttpResponse) -> SendOutcome {
+        let list = &request.assertions;
+        let data = response.data();
+        let mut results = assertions::evaluate_all(list, &data);
+        for (assertion, result) in list.iter().zip(results.iter_mut()) {
+            if assertion.operator == Operator::MatchesContract {
+                *result = contract_file::conformance_result(
+                    root,
+                    request.contract.as_ref(),
+                    &assertion.id,
+                    &data,
+                );
+            }
+        }
         let passed = assertions::request_passed(list, &results, response.status);
         let limit = assertions::duration_limit(list).unwrap_or(DEFAULT_LIMIT);
         let slow = i64::try_from(response.total_ms).is_ok_and(|ms| ms > limit);
@@ -479,6 +496,33 @@ impl Workbench {
         only: Option<Vec<String>>,
         confirmed: bool,
     ) -> Result<RunView, CommandError> {
+        self.launch(ctx, folder, env, only, None, confirmed)
+    }
+
+    /// Run des requêtes liées au contrat `path` (C10, R12).
+    pub fn start_contract_run(
+        self: &Arc<Self>,
+        ctx: &ProjectCtx,
+        path: &str,
+        env: &str,
+        confirmed: bool,
+    ) -> Result<RunView, CommandError> {
+        let name = contract_file::read(&ctx.root, path)
+            .map(|contract| contract.title)
+            .unwrap_or_else(|_| path.to_owned());
+        let paths = contract_file::linked_paths(&ctx.root, path);
+        self.launch(ctx, "", env, Some(paths), Some(name), confirmed)
+    }
+
+    fn launch(
+        self: &Arc<Self>,
+        ctx: &ProjectCtx,
+        folder: &str,
+        env: &str,
+        only: Option<Vec<String>>,
+        contract: Option<String>,
+        confirmed: bool,
+    ) -> Result<RunView, CommandError> {
         let (variables, environment) = self.variables(ctx, env)?;
         let mut paths = tree::requests_in(&ctx.root, folder)?;
         if let Some(only) = &only {
@@ -514,6 +558,7 @@ impl Workbench {
             finished: items.is_empty(),
             cancelled: false,
             items,
+            contract,
         };
         let handle = Arc::new(RunHandle {
             view: Mutex::new(view.clone()),
@@ -529,7 +574,9 @@ impl Workbench {
             return Ok(view);
         }
         let ctx = ctx.clone();
-        tokio::spawn(Self::execute(ctx, handle, variables));
+        // Runtime de Tauri : la commande qui lance le run n'est pas forcément
+        // exécutée dans un contexte tokio (commande synchrone, fil principal).
+        tauri::async_runtime::spawn(Self::execute(ctx, handle, variables));
         Ok(view)
     }
 
@@ -602,7 +649,8 @@ impl Workbench {
         match result {
             Ok(response) => {
                 let outcome = Self::outcome(
-                    &request.assertions,
+                    &ctx.root,
+                    &request,
                     Self::mask_response(variables, response),
                 );
                 Self::update(handle, index, |i| {
@@ -668,11 +716,12 @@ impl Workbench {
             .filter(|i| matches!(i.status, ItemStatus::Failed | ItemStatus::Error))
             .map(|i| i.path.clone())
             .collect();
-        self.start_run(
+        self.launch(
             ctx,
             &previous.folder,
             &previous.environment,
             Some(failed),
+            previous.contract,
             confirmed,
         )
     }

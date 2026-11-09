@@ -5,12 +5,18 @@ import { computed } from "vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import { formatDuration } from "@/lib/format";
 import { useWorkbenchStore } from "@/stores/workbench";
-import type { RunItemStatus } from "@/types/ipc";
+import type { AssertionResult, RunItemStatus } from "@/types/ipc";
 
 const props = defineProps<{ projectId: string }>();
 
 const workbench = useWorkbenchStore();
 const run = computed(() => workbench.runs[props.projectId] ?? null);
+const heading = computed(() => {
+  const current = run.value;
+  if (!current) return "";
+  if (current.contract) return `Run du contrat « ${current.contract} »`;
+  return `Run de ${current.folder === "" ? "tout le projet" : current.folder}`;
+});
 
 const LABELS: Record<RunItemStatus, string> = {
   pending: "En attente",
@@ -27,13 +33,21 @@ const counts = computed(() => {
   const bad = items.filter((i) => i.status === "failed" || i.status === "error").length;
   return { total: items.length, done, bad };
 });
+
+/** Nombre de vérifications en échec et détail de la première (C8). */
+function failureText(results: AssertionResult[]): string {
+  const failed = results.filter((a) => !a.passed);
+  const first = failed[0]?.message;
+  const count = `${String(failed.length)} vérification(s) en échec`;
+  return first ? `${count} : ${first}` : count;
+}
 </script>
 
 <template>
   <section v-if="run" class="run" aria-label="Run">
     <header class="run__head">
       <h2 class="run__title">
-        Run de {{ run.folder === "" ? "tout le projet" : run.folder }}
+        {{ heading }}
         <span class="run__env">· {{ run.environment }}</span>
       </h2>
       <span class="run__progress" role="status">
@@ -78,7 +92,7 @@ const counts = computed(() => {
         </span>
         <span v-if="item.error" class="run__error">{{ item.error }}</span>
         <span v-else-if="item.status === 'failed'" class="run__error">
-          {{ item.assertions.filter((a) => !a.passed).length }} vérification(s) en échec
+          {{ failureText(item.assertions) }}
         </span>
       </li>
     </ul>

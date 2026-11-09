@@ -38,6 +38,7 @@ export interface Editor {
 export type PendingConfirmation =
   | { kind: "send"; key: string }
   | { kind: "run"; projectId: string; folder: string }
+  | { kind: "contractRun"; projectId: string; path: string }
   | { kind: "retry"; projectId: string };
 
 /** Clé d'une requête ouverte. */
@@ -416,6 +417,21 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     }
   }
 
+  /** Exécute les requêtes liées au contrat `path` (C10) et ouvre l'onglet du run. */
+  async function runContract(projectId: string, path: string, confirmed = false): Promise<void> {
+    const environment = activeEnvironment(projectId);
+    if (environment === null) return;
+    await saveAll();
+    try {
+      follow(projectId, await ipc.contractRun(projectId, path, environment, confirmed));
+      await windows.openSelection({ kind: "run", projectId });
+    } catch (caught) {
+      if (caught instanceof IpcError && caught.kind === "protectedEnvironment") {
+        pending.value = { kind: "contractRun", projectId, path };
+      } else throw caught;
+    }
+  }
+
   async function cancelRun(projectId: string): Promise<void> {
     const current = runs.value[projectId];
     if (current && !current.finished) await ipc.runCancel(current.id);
@@ -440,6 +456,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     if (action === null) return;
     if (action.kind === "send") await send(action.key, true);
     else if (action.kind === "run") await runFolder(action.projectId, action.folder, true);
+    else if (action.kind === "contractRun") await runContract(action.projectId, action.path, true);
     else await retryFailures(action.projectId, true);
   }
 
@@ -459,7 +476,8 @@ export const useWorkbenchStore = defineStore("workbench", () => {
 
   /** Modification faite dans une autre fenêtre. */
   async function onProjectChange(change: ProjectChange): Promise<void> {
-    if (change.origin === windows.label) return;
+    // Les contrats ont leur store ; leurs requêtes créées arrivent en portée `tree`.
+    if (change.origin === windows.label || change.scope === "contracts") return;
     const { projectId } = change;
     if (change.scope === "environments") {
       if (environments.value[projectId]) await refreshEnvironments(projectId);
@@ -521,6 +539,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     reorderEnvironments,
     setLocal,
     runFolder,
+    runContract,
     cancelRun,
     retryFailures,
     confirmPending,

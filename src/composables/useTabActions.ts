@@ -2,6 +2,8 @@
  * Actions sur les onglets de contenu partagées par les zones : fermer (en
  * enregistrant), diviser, déplacer, détacher dans une fenêtre (F1 à F8).
  */
+import { useContractsStore } from "@/stores/contracts";
+import { useToastStore } from "@/stores/toasts";
 import { contentKey, useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { ContentTab, Side, WindowBounds } from "@/types/ipc";
@@ -12,6 +14,8 @@ const DROPPED_WINDOW = { width: 980, height: 720 };
 export function useTabActions() {
   const windows = useWindowsStore();
   const workbench = useWorkbenchStore();
+  const contracts = useContractsStore();
+  const toasts = useToastStore();
 
   function tab(id: string): ContentTab | null {
     for (const zone of windows.zones) {
@@ -21,18 +25,33 @@ export function useTabActions() {
     return null;
   }
 
-  /** Enregistre la requête de l'onglet si elle a changé : rien n'est perdu. */
-  async function saveTab(id: string): Promise<void> {
+  /**
+   * Enregistre la requête ou la source du contrat de l'onglet si elle a changé :
+   * rien n'est perdu. `false` si une source de contrat illisible n'a pas pu l'être (R10).
+   */
+  async function saveTab(id: string): Promise<boolean> {
     const found = tab(id);
     if (found?.content.kind === "request") await workbench.save(contentKey(found.content));
+    if (found?.content.kind === "contract") {
+      const key = contentKey(found.content);
+      if (!(await contracts.save(key))) {
+        toasts.show(
+          `Source du contrat non enregistrée : ${contracts.open[key]?.saveError ?? "illisible"}`,
+          { tone: "error" },
+        );
+        return false;
+      }
+    }
+    return true;
   }
 
-  /** Ferme un onglet après avoir enregistré sa requête (F1). */
+  /** Ferme un onglet après avoir enregistré sa requête ou son contrat (F1). */
   async function close(id: string): Promise<void> {
     const found = tab(id);
-    await saveTab(id);
+    if (!(await saveTab(id))) return;
     if (await windows.close(id)) {
       if (found?.content.kind === "request") workbench.release(contentKey(found.content));
+      if (found?.content.kind === "contract") contracts.release(contentKey(found.content));
     }
   }
 
