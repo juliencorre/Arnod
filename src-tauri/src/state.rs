@@ -6,7 +6,7 @@
 //! l'écriture échoue, rien ne change.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use uuid::Uuid;
 
@@ -31,7 +31,13 @@ pub struct AppState {
     /// Emplacement proposé pour les nouveaux projets (`~/arnod`).
     default_location: PathBuf,
     inner: Mutex<Inner>,
+    /// Prévenu après chaque modification enregistrée : la synchronisation des
+    /// fenêtres (F11) diffuse l'instantané. Absent dans les tests.
+    listener: OnceLock<ChangeListener>,
 }
+
+/// Fonction prévenue à chaque nouvel instantané du catalogue.
+pub type ChangeListener = Box<dyn Fn(&CatalogSnapshot) + Send + Sync>;
 
 struct Inner {
     catalog: Catalog,
@@ -82,6 +88,7 @@ impl AppState {
                 blocked,
                 warning,
             }),
+            listener: OnceLock::new(),
         }
     }
 
@@ -315,7 +322,16 @@ impl AppState {
     fn commit(&self, inner: &mut Inner, next: Catalog) -> Result<CatalogSnapshot, CommandError> {
         storage::save(&self.data_dir, &next)?;
         inner.catalog = next;
-        Ok(snapshot_of(&inner.catalog))
+        let snapshot = snapshot_of(&inner.catalog);
+        if let Some(listener) = self.listener.get() {
+            listener(&snapshot);
+        }
+        Ok(snapshot)
+    }
+
+    /// Fonction prévenue après chaque modification du catalogue (une seule).
+    pub fn on_change(&self, listener: ChangeListener) {
+        let _ = self.listener.set(listener);
     }
 }
 

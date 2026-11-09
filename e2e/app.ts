@@ -72,6 +72,30 @@ export function readState(sandbox: Sandbox): {
   >;
 }
 
+/** Nœud de disposition enregistré (`windows.json`), réduit à ce que vérifie le parcours. */
+export type SavedNode =
+  | {
+      kind: "zone";
+      id: string;
+      tabs: { id: string; content: { kind: string; path?: string } }[];
+      activeTab: string | null;
+    }
+  | { kind: "split"; axis: "row" | "column"; ratio: number; first: SavedNode; second: SavedNode };
+
+/** État des fenêtres enregistré par l'application (`windows.json`). */
+export function readWindows(sandbox: Sandbox): {
+  windows: {
+    label: string;
+    kind: "main" | "content" | "sidebar";
+    layout: { root: SavedNode; activeZone: string } | null;
+    sidebarDetached: boolean;
+  }[];
+} {
+  return JSON.parse(readFileSync(path.join(sandbox.dataDir, "windows.json"), "utf8")) as ReturnType<
+    typeof readWindows
+  >;
+}
+
 function waitForPort(port: number, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
@@ -142,7 +166,8 @@ export async function launchApp(): Promise<Browser> {
       "tauri:options": { application: APPLICATION },
     } as WebdriverIO.Capabilities,
   });
-  await browser.$("main h1").waitForDisplayed({ timeout: 30_000 });
+  // `main` paraît avec la vue ; son titre peut n'être lu que par les lecteurs d'écran.
+  await browser.$("main").waitForDisplayed({ timeout: 30_000 });
   return browser;
 }
 

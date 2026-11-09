@@ -1,10 +1,12 @@
 /**
- * Wrapper typé autour d'`invoke` : seul point d'accès aux commandes Rust.
+ * Wrapper typé autour d'`invoke` : seul point d'accès aux commandes Rust et aux
+ * événements du cœur.
  *
- * Les composants et stores n'importent jamais `@tauri-apps/api/core`
- * directement ; ils passent par `ipc`.
+ * Les composants et stores n'importent jamais `@tauri-apps/api/core` ni
+ * `@tauri-apps/api/event` directement ; ils passent par `ipc` et `events`.
  */
 import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
   CatalogLoad,
@@ -12,6 +14,14 @@ import type {
   CommandError,
   CommandErrorKind,
   CommandName,
+  ContentRef,
+  LayoutPreset,
+  Placement,
+  ProjectChange,
+  Side,
+  WindowBounds,
+  WindowContext,
+  WindowsSnapshot,
   EnvironmentDoc,
   EnvironmentsView,
   HelloResponse,
@@ -276,4 +286,103 @@ export const ipc = {
 
   /** Dernier run de chaque projet qui en a un (O12). */
   projectLastRuns: (): Promise<ProjectLastRun[]> => call<ProjectLastRun[]>("project_last_runs"),
+
+  // --- Fenêtres et zones (F1 à F13) -----------------------------------------
+
+  /** Étiquette de la fenêtre appelante et état de toutes les fenêtres. */
+  windowsLoad: (): Promise<WindowContext> => call<WindowContext>("windows_load"),
+
+  /** Ouvre un contenu dans cette fenêtre, dans `zone` ou la zone active (F1). */
+  layoutOpen: (content: ContentRef, zone: string | null): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_open", { content, zone }),
+
+  /** Ouvre la sélection de la barre latérale dans la fenêtre qui la suit (Z5). */
+  layoutOpenSelection: (content: ContentRef): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_open_selection", { content }),
+
+  layoutActivate: (zone: string, tab: string): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_activate", { zone, tab }),
+
+  layoutClose: (tab: string): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_close", { tab }),
+
+  /** Déplace un onglet vers une zone de cette fenêtre ou d'une autre (F3). */
+  layoutMove: (
+    tab: string,
+    toWindow: string,
+    zone: string | null,
+    index: number | null,
+  ): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_move", { tab, toWindow, zone, index }),
+
+  /** Ouvre l'onglet dans une nouvelle zone à droite ou en dessous de `zone` (F2). */
+  layoutSplit: (zone: string, tab: string, side: Side): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_split", { zone, tab, side }),
+
+  layoutResize: (split: string, ratio: number): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_resize", { split, ratio }),
+
+  layoutPreset: (preset: LayoutPreset): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_preset", { preset }),
+
+  layoutSetPlacement: (zone: string, placement: Placement): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_set_placement", { zone, placement }),
+
+  layoutSetFollow: (follow: boolean): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_set_follow", { follow }),
+
+  layoutSetSidebarWidth: (width: number): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_set_sidebar_width", { width }),
+
+  /** La zone devient une fenêtre, à `bounds` si donné (F8). */
+  windowDetachZone: (zone: string, bounds: WindowBounds | null): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("window_detach_zone", { zone, bounds }),
+
+  /** L'onglet seul devient une fenêtre, à `bounds` si donné (F8). */
+  windowDetachTab: (tab: string, bounds: WindowBounds | null): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("window_detach_tab", { tab, bounds }),
+
+  /** La barre latérale devient une fenêtre pilote (F9). */
+  windowDetachSidebar: (bounds: WindowBounds | null): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("window_detach_sidebar", { bounds }),
+
+  /** Rattache cette fenêtre à la fenêtre principale (F12). */
+  windowReattach: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach"),
+
+  windowReattachAll: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach_all"),
+};
+
+/** Événements diffusés par le cœur à toutes les fenêtres (F11). */
+export const EVENTS = {
+  windows: "arnod://fenetres",
+  catalog: "arnod://catalogue",
+  project: "arnod://projet",
+  close: "arnod://fermer",
+} as const;
+
+/** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
+export const events = {
+  /** Toutes les fenêtres, après chaque changement de disposition. */
+  onWindows: (handler: (snapshot: WindowsSnapshot) => void): Promise<UnlistenFn> =>
+    listen<WindowsSnapshot>(EVENTS.windows, (event) => {
+      handler(event.payload);
+    }),
+
+  /** Nouvel instantané du catalogue, après une modification dans n'importe quelle fenêtre. */
+  onCatalog: (handler: (snapshot: CatalogSnapshot) => void): Promise<UnlistenFn> =>
+    listen<CatalogSnapshot>(EVENTS.catalog, (event) => {
+      handler(event.payload);
+    }),
+
+  /** Modification d'un projet (arborescence, requête, environnements). */
+  onProject: (handler: (change: ProjectChange) => void): Promise<UnlistenFn> =>
+    listen<ProjectChange>(EVENTS.project, (event) => {
+      handler(event.payload);
+    }),
+
+  /** Fermeture demandée pour cette fenêtre détachée : enregistrer puis se rattacher. */
+  onClose: (handler: () => void): Promise<UnlistenFn> =>
+    listen(EVENTS.close, () => {
+      handler();
+    }),
 };

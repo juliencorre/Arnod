@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
-import { ipc } from "@/lib/ipc";
+import { events, ipc } from "@/lib/ipc";
 import type {
   CatalogSnapshot,
   CommandError,
@@ -48,6 +48,15 @@ export const useCatalogStore = defineStore("catalog", () => {
 
   function apply(next: CatalogSnapshot): void {
     snapshot.value = next;
+  }
+
+  let subscribed = false;
+
+  /** Suit les modifications faites dans les autres fenêtres (F11). */
+  async function subscribe(): Promise<void> {
+    if (subscribed) return;
+    subscribed = true;
+    await events.onCatalog(apply);
   }
 
   /** Charge le catalogue au démarrage ; renvoie l'avertissement éventuel à notifier. */
@@ -141,6 +150,7 @@ export const useCatalogStore = defineStore("catalog", () => {
   }
 
   return {
+    subscribe,
     snapshot,
     projects,
     workspaces,

@@ -1,304 +1,434 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { reactive, ref } from "vue";
 
-import { ipc, IpcError } from "@/lib/ipc";
+import { events, ipc, IpcError } from "@/lib/ipc";
+import { contentKey, useWindowsStore } from "@/stores/windows";
 import type {
   EnvironmentDoc,
   EnvironmentsView,
+  ProjectChange,
   RequestDoc,
   RunView,
   SendOutcome,
   TreeNode,
+  TreeView,
 } from "@/types/ipc";
 
 /** Intervalle de lecture de l'avancement d'un run. */
 export const RUN_POLL_MS = 300;
 
+/** Requête ouverte : brouillon, version enregistrée, dernière réponse. */
+export interface Editor {
+  projectId: string;
+  path: string;
+  draft: RequestDoc | null;
+  /** Brouillon tel qu'enregistré, en JSON, pour savoir s'il a changé. */
+  saved: string;
+  outcome: SendOutcome | null;
+  sending: boolean;
+  sendError: string | null;
+  /** Lecture impossible (fichier supprimé, illisible). */
+  loadError: string | null;
+  /** Modifiée dans une autre fenêtre alors qu'elle l'était aussi ici (F11). */
+  changedElsewhere: boolean;
+  execId: string | null;
+}
+
 /** Action en attente de la confirmation d'un environnement protégé (R8). */
 export type PendingConfirmation =
-  { kind: "send" } | { kind: "run"; folder: string } | { kind: "retry"; runId: string };
+  | { kind: "send"; key: string }
+  | { kind: "run"; projectId: string; folder: string }
+  | { kind: "retry"; projectId: string };
+
+/** Clé d'une requête ouverte. */
+export function requestKey(projectId: string, path: string): string {
+  return contentKey({ kind: "request", projectId, path });
+}
+
+/** Nœud de requête d'une arborescence, par son chemin. */
+export function findRequest(nodes: TreeNode[], path: string): TreeNode | null {
+  for (const node of nodes) {
+    if (node.path === path) return node;
+    if (node.kind === "folder") {
+      const found = findRequest(node.children, path);
+      if (found) return found;
+    }
+  }
+  return null;
+}
 
 /**
- * Projet ouvert : arborescence, requête en cours d'édition, réponse, environnements
- * et run. Le store n'a aucune règle métier : il affiche l'état renvoyé par le cœur.
+ * Établi : données des projets ouverts (arborescence, environnements, run) et
+ * requêtes ouvertes dans les onglets de cette fenêtre. Aucune règle métier :
+ * le store affiche l'état renvoyé par le cœur. Les modifications faites dans
+ * une autre fenêtre arrivent par `arnod://projet` (F11).
  */
 export const useWorkbenchStore = defineStore("workbench", () => {
-  const projectId = ref<string | null>(null);
-  const nodes = ref<TreeNode[]>([]);
-  const collapsed = ref<string[]>([]);
-  const selectedPath = ref<string | null>(null);
-  const draft = ref<RequestDoc | null>(null);
-  const savedSnapshot = ref("");
-  const outcome = ref<SendOutcome | null>(null);
-  const sending = ref(false);
-  const sendError = ref<string | null>(null);
-  const environments = ref<EnvironmentsView | null>(null);
-  const run = ref<RunView | null>(null);
+  const windows = useWindowsStore();
+  const trees = ref<Record<string, TreeView>>({});
+  const environments = ref<Record<string, EnvironmentsView>>({});
+  const runs = ref<Record<string, RunView | null>>({});
+  const editors = reactive<Record<string, Editor>>({});
+  /** Projets dépliés dans la barre latérale. */
+  const expanded = ref<string[]>([]);
   const pending = ref<PendingConfirmation | null>(null);
-  let execId: string | null = null;
-  let pollTimer: ReturnType<typeof setTimeout> | undefined;
+  const loading = new Map<string, Promise<void>>();
+  const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  let subscribed = false;
 
-  const dirty = computed(
-    () => draft.value !== null && JSON.stringify(draft.value) !== savedSnapshot.value,
-  );
-  const activeEnvironment = computed(
-    () =>
-      environments.value?.environments.find((e) => e.name === environments.value?.active) ?? null,
-  );
+  // --- Projets ---------------------------------------------------------------
 
-  function requireProject(): string {
-    if (projectId.value === null) throw new Error("Aucun projet ouvert.");
-    return projectId.value;
+  /** Charge un projet une fois : arborescence, environnements, dernier run. */
+  function loadProject(projectId: string): Promise<void> {
+    if (trees.value[projectId]) return Promise.resolve();
+    const existing = loading.get(projectId);
+    if (existing) return existing;
+    const load = (async () => {
+      const [tree, envs, last] = await Promise.all([
+        ipc.treeLoad(projectId),
+        ipc.environmentsLoad(projectId),
+        ipc.runLast(projectId),
+      ]);
+      trees.value[projectId] = tree;
+      environments.value[projectId] = envs;
+      if (!(projectId in runs.value)) runs.value[projectId] = last;
+    })().finally(() => loading.delete(projectId));
+    loading.set(projectId, load);
+    return load;
   }
 
-  function reset(): void {
-    stopPolling();
-    nodes.value = [];
-    collapsed.value = [];
-    selectedPath.value = null;
-    draft.value = null;
-    savedSnapshot.value = "";
-    outcome.value = null;
-    sendError.value = null;
-    environments.value = null;
-    run.value = null;
-    pending.value = null;
+  async function refreshTree(projectId: string): Promise<void> {
+    trees.value[projectId] = await ipc.treeLoad(projectId);
   }
 
-  /** Ouvre un projet : arborescence, environnements et dernier run. */
-  async function open(id: string): Promise<void> {
-    if (projectId.value !== id) reset();
-    projectId.value = id;
-    const [tree, envs, last] = await Promise.all([
-      ipc.treeLoad(id),
-      ipc.environmentsLoad(id),
-      ipc.runLast(id),
-    ]);
-    nodes.value = tree.nodes;
-    collapsed.value = tree.collapsed;
-    environments.value = envs;
-    run.value = last;
+  async function refreshEnvironments(projectId: string): Promise<void> {
+    environments.value[projectId] = await ipc.environmentsLoad(projectId);
   }
 
-  async function refreshTree(): Promise<void> {
-    const tree = await ipc.treeLoad(requireProject());
-    nodes.value = tree.nodes;
-    collapsed.value = tree.collapsed;
+  function isExpanded(projectId: string): boolean {
+    return expanded.value.includes(projectId);
   }
 
-  async function toggleFolder(path: string): Promise<void> {
-    collapsed.value = collapsed.value.includes(path)
-      ? collapsed.value.filter((p) => p !== path)
-      : [...collapsed.value, path];
-    await ipc.treeSetCollapsed(requireProject(), collapsed.value);
+  async function expand(projectId: string): Promise<void> {
+    if (!isExpanded(projectId)) expanded.value = [...expanded.value, projectId];
+    await loadProject(projectId);
   }
 
-  /** Enregistre la requête en cours si elle a changé. */
-  async function save(): Promise<void> {
-    if (draft.value === null || selectedPath.value === null || !dirty.value) return;
-    await ipc.requestSave(requireProject(), selectedPath.value, draft.value);
-    savedSnapshot.value = JSON.stringify(draft.value);
-    await refreshTree();
+  function collapse(projectId: string): void {
+    expanded.value = expanded.value.filter((id) => id !== projectId);
   }
 
-  async function select(path: string): Promise<void> {
-    if (path === selectedPath.value) return;
-    await save();
-    const request = await ipc.requestRead(requireProject(), path);
-    selectedPath.value = path;
-    draft.value = request;
-    savedSnapshot.value = JSON.stringify(request);
-    outcome.value = null;
-    sendError.value = null;
+  async function toggleFolder(projectId: string, path: string): Promise<void> {
+    const tree = trees.value[projectId];
+    if (!tree) return;
+    tree.collapsed = tree.collapsed.includes(path)
+      ? tree.collapsed.filter((p) => p !== path)
+      : [...tree.collapsed, path];
+    await ipc.treeSetCollapsed(projectId, tree.collapsed);
   }
 
-  function clearSelection(): void {
-    selectedPath.value = null;
-    draft.value = null;
-    savedSnapshot.value = "";
-    outcome.value = null;
+  function activeEnvironment(projectId: string): string | null {
+    return environments.value[projectId]?.active ?? null;
   }
 
-  async function createRequest(folder: string, name: string | null = null): Promise<string> {
-    await save();
-    const path = await ipc.treeCreateRequest(requireProject(), folder, name);
-    if (collapsed.value.includes(folder)) await toggleFolder(folder);
-    await refreshTree();
-    await select(path);
-    return path;
+  // --- Requêtes ouvertes -----------------------------------------------------
+
+  /** Brouillon d'une requête ouverte, lu une fois. */
+  async function openEditor(projectId: string, path: string): Promise<Editor> {
+    const key = requestKey(projectId, path);
+    const existing = editors[key];
+    if (existing) return existing;
+    const editor: Editor = {
+      projectId,
+      path,
+      draft: null,
+      saved: "",
+      outcome: null,
+      sending: false,
+      sendError: null,
+      loadError: null,
+      changedElsewhere: false,
+      execId: null,
+    };
+    editors[key] = editor;
+    await Promise.all([loadProject(projectId).catch(() => undefined), reload(key)]);
+    return editors[key] ?? editor;
   }
 
-  async function createFolder(parent: string, name: string): Promise<string> {
-    const path = await ipc.treeCreateFolder(requireProject(), parent, name);
-    await refreshTree();
-    return path;
-  }
-
-  async function rename(path: string, name: string): Promise<void> {
-    await save();
-    const next = await ipc.treeRename(requireProject(), path, name);
-    const wasSelected = selectedPath.value === path;
-    await refreshTree();
-    if (wasSelected) {
-      selectedPath.value = null;
-      await select(next);
-    }
-  }
-
-  async function duplicate(path: string): Promise<void> {
-    await save();
-    const copy = await ipc.treeDuplicate(requireProject(), path);
-    await refreshTree();
-    await select(copy);
-  }
-
-  async function move(path: string, targetFolder: string): Promise<void> {
-    await save();
-    const next = await ipc.treeMove(requireProject(), path, targetFolder);
-    const wasSelected = selectedPath.value === path;
-    await refreshTree();
-    if (wasSelected) {
-      selectedPath.value = null;
-      await select(next);
-    }
-  }
-
-  async function remove(path: string, permanent: boolean): Promise<void> {
-    await ipc.treeDelete(requireProject(), path, permanent);
-    const selected = selectedPath.value;
-    if (selected !== null && (selected === path || selected.startsWith(`${path}/`)))
-      clearSelection();
-    await refreshTree();
-  }
-
-  /** Envoie la requête de l'éditeur (E1) ; un environnement protégé demande confirmation (R8). */
-  async function send(confirmed = false): Promise<void> {
-    const request = draft.value;
-    const envs = environments.value;
-    if (request === null || envs === null || sending.value) return;
-    await save();
-    sending.value = true;
-    sendError.value = null;
-    execId = crypto.randomUUID();
+  async function reload(key: string): Promise<void> {
+    const editor = editors[key];
+    if (!editor) return;
     try {
-      outcome.value = await ipc.requestSend(
-        requireProject(),
-        execId,
-        envs.active,
-        request,
+      const request = await ipc.requestRead(editor.projectId, editor.path);
+      editor.draft = request;
+      editor.saved = JSON.stringify(request);
+      editor.loadError = null;
+      editor.changedElsewhere = false;
+    } catch (caught) {
+      editor.draft = null;
+      editor.loadError = caught instanceof Error ? caught.message : String(caught);
+    }
+  }
+
+  function isDirty(key: string): boolean {
+    const editor = editors[key];
+    return !!editor?.draft && JSON.stringify(editor.draft) !== editor.saved;
+  }
+
+  /** Enregistre une requête modifiée. */
+  async function save(key: string): Promise<void> {
+    const editor = editors[key];
+    if (!editor?.draft || !isDirty(key)) return;
+    await ipc.requestSave(editor.projectId, editor.path, editor.draft);
+    editor.saved = JSON.stringify(editor.draft);
+    editor.changedElsewhere = false;
+    if (trees.value[editor.projectId]) await refreshTree(editor.projectId);
+  }
+
+  /** Enregistre toutes les requêtes modifiées de la fenêtre (avant fermeture, Z6). */
+  async function saveAll(): Promise<void> {
+    for (const key of Object.keys(editors)) {
+      if (isDirty(key)) await save(key);
+    }
+  }
+
+  /** Oublie une requête qui n'est plus ouverte dans aucun onglet de la fenêtre. */
+  function release(key: string): void {
+    if (!isDirty(key)) Reflect.deleteProperty(editors, key);
+  }
+
+  /** Envoie la requête (E1) ; un environnement protégé demande confirmation (R8). */
+  async function send(key: string, confirmed = false): Promise<void> {
+    const editor = editors[key];
+    const environment = editor ? activeEnvironment(editor.projectId) : null;
+    if (!editor?.draft || environment === null || editor.sending) return;
+    await save(key);
+    editor.sending = true;
+    editor.sendError = null;
+    editor.execId = crypto.randomUUID();
+    try {
+      editor.outcome = await ipc.requestSend(
+        editor.projectId,
+        editor.execId,
+        environment,
+        editor.draft,
         confirmed,
       );
     } catch (caught) {
       if (caught instanceof IpcError && caught.kind === "protectedEnvironment") {
-        pending.value = { kind: "send" };
-      } else if (caught instanceof IpcError && caught.kind === "cancelled") {
-        sendError.value = null;
-      } else {
-        outcome.value = null;
-        sendError.value = caught instanceof Error ? caught.message : String(caught);
+        pending.value = { kind: "send", key };
+      } else if (!(caught instanceof IpcError && caught.kind === "cancelled")) {
+        editor.outcome = null;
+        editor.sendError = caught instanceof Error ? caught.message : String(caught);
       }
     } finally {
-      sending.value = false;
-      execId = null;
+      editor.sending = false;
+      editor.execId = null;
     }
   }
 
-  async function cancelSend(): Promise<void> {
-    if (execId !== null) await ipc.requestCancel(execId);
+  async function cancelSend(key: string): Promise<void> {
+    const execId = editors[key]?.execId;
+    if (execId) await ipc.requestCancel(execId);
   }
 
   /** Ajoute au brouillon les vérifications proposées d'après la réponse (R10). */
-  async function proposeAssertions(): Promise<void> {
-    const current = outcome.value;
-    const request = draft.value;
-    if (current === null || request === null) return;
+  async function proposeAssertions(key: string): Promise<void> {
+    const editor = editors[key];
+    const current = editor?.outcome;
+    if (!editor?.draft || !current) return;
     const proposed = await ipc.requestProposeAssertions({
       status: current.response.status,
       durationMs: current.response.totalMs,
       headers: current.response.headers,
       body: current.response.body,
     });
-    const known = new Set(request.assertions.map((a) => a.id));
-    request.assertions = [...request.assertions, ...proposed.filter((a) => !known.has(a.id))];
+    const known = new Set(editor.draft.assertions.map((a) => a.id));
+    editor.draft.assertions = [
+      ...editor.draft.assertions,
+      ...proposed.filter((a) => !known.has(a.id)),
+    ];
   }
 
-  async function selectEnvironment(name: string): Promise<void> {
-    environments.value = await ipc.environmentSelect(requireProject(), name);
+  // --- Arborescence ----------------------------------------------------------
+
+  /** Ouvre une requête depuis la barre latérale, dans la fenêtre qui suit la sélection (Z5). */
+  function openRequest(projectId: string, path: string): Promise<boolean> {
+    return windows.openSelection({ kind: "request", projectId, path });
   }
 
-  async function saveEnvironment(env: EnvironmentDoc, previous: string | null): Promise<void> {
-    environments.value = await ipc.environmentSave(requireProject(), env, previous);
+  async function createRequest(
+    projectId: string,
+    folder: string,
+    name: string | null = null,
+  ): Promise<string> {
+    const path = await ipc.treeCreateRequest(projectId, folder, name);
+    const tree = trees.value[projectId];
+    if (tree?.collapsed.includes(folder)) await toggleFolder(projectId, folder);
+    await refreshTree(projectId);
+    await openRequest(projectId, path);
+    return path;
   }
 
-  async function deleteEnvironment(name: string): Promise<void> {
-    environments.value = await ipc.environmentDelete(requireProject(), name);
+  async function createFolder(projectId: string, parent: string, name: string): Promise<string> {
+    const path = await ipc.treeCreateFolder(projectId, parent, name);
+    await refreshTree(projectId);
+    return path;
   }
 
-  async function reorderEnvironments(names: string[]): Promise<void> {
-    environments.value = await ipc.environmentsReorder(requireProject(), names);
+  /** Les brouillons ouverts suivent un renommage ou un déplacement. */
+  function moveEditors(projectId: string, from: string, to: string): void {
+    for (const [key, editor] of Object.entries(editors)) {
+      if (editor.projectId !== projectId) continue;
+      if (editor.path !== from && !editor.path.startsWith(`${from}/`)) continue;
+      editor.path = `${to}${editor.path.slice(from.length)}`;
+      Reflect.deleteProperty(editors, key);
+      editors[requestKey(projectId, editor.path)] = editor;
+    }
+  }
+
+  async function rename(projectId: string, path: string, name: string): Promise<void> {
+    await saveUnder(projectId, path);
+    const next = await ipc.treeRename(projectId, path, name);
+    moveEditors(projectId, path, next);
+    await refreshTree(projectId);
+    for (const editor of Object.values(editors)) {
+      if (editor.projectId === projectId && editor.path === next) {
+        await reload(requestKey(projectId, next));
+      }
+    }
+  }
+
+  async function duplicate(projectId: string, path: string): Promise<void> {
+    await saveUnder(projectId, path);
+    const copy = await ipc.treeDuplicate(projectId, path);
+    await refreshTree(projectId);
+    await openRequest(projectId, copy);
+  }
+
+  async function move(projectId: string, path: string, targetFolder: string): Promise<void> {
+    await saveUnder(projectId, path);
+    const next = await ipc.treeMove(projectId, path, targetFolder);
+    moveEditors(projectId, path, next);
+    await refreshTree(projectId);
+  }
+
+  async function remove(projectId: string, path: string, permanent: boolean): Promise<void> {
+    await ipc.treeDelete(projectId, path, permanent);
+    for (const [key, editor] of Object.entries(editors)) {
+      if (
+        editor.projectId === projectId &&
+        (editor.path === path || editor.path.startsWith(`${path}/`))
+      ) {
+        Reflect.deleteProperty(editors, key);
+      }
+    }
+    await refreshTree(projectId);
+  }
+
+  /** Enregistre les requêtes modifiées sous `path` avant de le déplacer. */
+  async function saveUnder(projectId: string, path: string): Promise<void> {
+    for (const [key, editor] of Object.entries(editors)) {
+      if (
+        editor.projectId === projectId &&
+        (editor.path === path || editor.path.startsWith(`${path}/`))
+      ) {
+        await save(key);
+      }
+    }
+  }
+
+  // --- Environnements --------------------------------------------------------
+
+  async function selectEnvironment(projectId: string, name: string): Promise<void> {
+    environments.value[projectId] = await ipc.environmentSelect(projectId, name);
+  }
+
+  async function saveEnvironment(
+    projectId: string,
+    env: EnvironmentDoc,
+    previous: string | null,
+  ): Promise<void> {
+    environments.value[projectId] = await ipc.environmentSave(projectId, env, previous);
+  }
+
+  async function deleteEnvironment(projectId: string, name: string): Promise<void> {
+    environments.value[projectId] = await ipc.environmentDelete(projectId, name);
+  }
+
+  async function reorderEnvironments(projectId: string, names: string[]): Promise<void> {
+    environments.value[projectId] = await ipc.environmentsReorder(projectId, names);
   }
 
   async function setLocal(
+    projectId: string,
     environment: string,
     name: string,
     value: string,
     secret: boolean,
   ): Promise<void> {
-    environments.value = await ipc.localSet(requireProject(), environment, name, value, secret);
+    environments.value[projectId] = await ipc.localSet(projectId, environment, name, value, secret);
   }
 
-  // --- Runs ----------------------------------------------------------------
+  // --- Runs ------------------------------------------------------------------
 
-  function stopPolling(): void {
-    if (pollTimer !== undefined) clearTimeout(pollTimer);
-    pollTimer = undefined;
+  function stopPolling(projectId: string): void {
+    const timer = pollTimers.get(projectId);
+    if (timer !== undefined) clearTimeout(timer);
+    pollTimers.delete(projectId);
   }
 
-  function poll(runId: string): void {
-    stopPolling();
-    pollTimer = setTimeout(() => {
-      ipc
-        .runStatus(runId)
-        .then((view) => {
-          run.value = view;
-          if (!view.finished) poll(runId);
-        })
-        .catch(() => {
-          stopPolling();
-        });
-    }, RUN_POLL_MS);
+  function poll(projectId: string, runId: string): void {
+    stopPolling(projectId);
+    pollTimers.set(
+      projectId,
+      setTimeout(() => {
+        ipc
+          .runStatus(runId)
+          .then((view) => {
+            runs.value[projectId] = view;
+            if (!view.finished) poll(projectId, runId);
+          })
+          .catch(() => {
+            stopPolling(projectId);
+          });
+      }, RUN_POLL_MS),
+    );
   }
 
-  function follow(view: RunView): void {
-    run.value = view;
-    if (!view.finished) poll(view.id);
+  function follow(projectId: string, view: RunView): void {
+    runs.value[projectId] = view;
+    if (!view.finished) poll(projectId, view.id);
   }
 
-  async function runFolder(folder: string, confirmed = false): Promise<void> {
-    const envs = environments.value;
-    if (envs === null) return;
-    await save();
+  /** Exécute un dossier et ouvre l'onglet du run, là où suit la sélection. */
+  async function runFolder(projectId: string, folder: string, confirmed = false): Promise<void> {
+    const environment = activeEnvironment(projectId);
+    if (environment === null) return;
+    await saveAll();
     try {
-      follow(await ipc.runStart(requireProject(), folder, envs.active, confirmed));
+      follow(projectId, await ipc.runStart(projectId, folder, environment, confirmed));
+      await windows.openSelection({ kind: "run", projectId });
     } catch (caught) {
       if (caught instanceof IpcError && caught.kind === "protectedEnvironment") {
-        pending.value = { kind: "run", folder };
+        pending.value = { kind: "run", projectId, folder };
       } else throw caught;
     }
   }
 
-  async function cancelRun(): Promise<void> {
-    if (run.value !== null && !run.value.finished) await ipc.runCancel(run.value.id);
+  async function cancelRun(projectId: string): Promise<void> {
+    const current = runs.value[projectId];
+    if (current && !current.finished) await ipc.runCancel(current.id);
   }
 
-  async function retryFailures(confirmed = false): Promise<void> {
-    const current = run.value;
-    if (current === null) return;
+  async function retryFailures(projectId: string, confirmed = false): Promise<void> {
+    const current = runs.value[projectId];
+    if (!current) return;
     try {
-      follow(await ipc.runRetryFailures(requireProject(), current.id, confirmed));
+      follow(projectId, await ipc.runRetryFailures(projectId, current.id, confirmed));
     } catch (caught) {
       if (caught instanceof IpcError && caught.kind === "protectedEnvironment") {
-        pending.value = { kind: "retry", runId: current.id };
+        pending.value = { kind: "retry", projectId };
       } else throw caught;
     }
   }
@@ -308,48 +438,83 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     const action = pending.value;
     pending.value = null;
     if (action === null) return;
-    if (action.kind === "send") await send(true);
-    else if (action.kind === "run") await runFolder(action.folder, true);
-    else await retryFailures(true);
+    if (action.kind === "send") await send(action.key, true);
+    else if (action.kind === "run") await runFolder(action.projectId, action.folder, true);
+    else await retryFailures(action.projectId, true);
   }
 
   function dismissPending(): void {
     pending.value = null;
   }
 
-  function closeRun(): void {
-    stopPolling();
-    run.value = null;
+  /** Environnement concerné par la confirmation en attente. */
+  function pendingEnvironment(): string {
+    const action = pending.value;
+    if (action === null) return "";
+    const projectId = action.kind === "send" ? editors[action.key]?.projectId : action.projectId;
+    return projectId ? (activeEnvironment(projectId) ?? "") : "";
+  }
+
+  // --- Interconnexion (F11) --------------------------------------------------
+
+  /** Modification faite dans une autre fenêtre. */
+  async function onProjectChange(change: ProjectChange): Promise<void> {
+    if (change.origin === windows.label) return;
+    const { projectId } = change;
+    if (change.scope === "environments") {
+      if (environments.value[projectId]) await refreshEnvironments(projectId);
+      return;
+    }
+    if (trees.value[projectId]) await refreshTree(projectId);
+    if (change.scope === "request" && change.path !== null) {
+      const key = requestKey(projectId, change.path);
+      if (!editors[key]) return;
+      if (isDirty(key)) {
+        const editor = editors[key];
+        editor.changedElsewhere = true;
+      } else await reload(key);
+    }
+  }
+
+  async function subscribe(): Promise<void> {
+    if (subscribed) return;
+    subscribed = true;
+    await events.onProject((change) => {
+      void onProjectChange(change);
+    });
   }
 
   return {
-    projectId,
-    nodes,
-    collapsed,
-    selectedPath,
-    draft,
-    dirty,
-    outcome,
-    sending,
-    sendError,
+    trees,
     environments,
-    activeEnvironment,
-    run,
+    runs,
+    editors,
+    expanded,
     pending,
-    open,
+    loadProject,
     refreshTree,
+    refreshEnvironments,
+    isExpanded,
+    expand,
+    collapse,
     toggleFolder,
+    activeEnvironment,
+    openEditor,
+    reload,
+    isDirty,
     save,
-    select,
+    saveAll,
+    release,
+    send,
+    cancelSend,
+    proposeAssertions,
+    openRequest,
     createRequest,
     createFolder,
     rename,
     duplicate,
     move,
     remove,
-    send,
-    cancelSend,
-    proposeAssertions,
     selectEnvironment,
     saveEnvironment,
     deleteEnvironment,
@@ -360,7 +525,8 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     retryFailures,
     confirmPending,
     dismissPending,
-    closeRun,
-    reset,
+    pendingEnvironment,
+    onProjectChange,
+    subscribe,
   };
 });

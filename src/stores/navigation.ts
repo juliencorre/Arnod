@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 
 import { ipc } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
+import { useWindowsStore } from "@/stores/windows";
 
 /** Vue affichée dans la zone principale. */
 export type View =
@@ -26,6 +27,7 @@ export type View =
  */
 export const useNavigationStore = defineStore("navigation", () => {
   const catalog = useCatalogStore();
+  const windows = useWindowsStore();
   const view = ref<View>({ kind: "all", highlightProjectId: null });
 
   /** Onglet actif : workspace affiché ou contenant le projet ouvert ; `null` pour « Tous les projets ». */
@@ -65,6 +67,12 @@ export const useNavigationStore = defineStore("navigation", () => {
       last !== null && catalog.workspaceById(last) !== null
         ? { kind: "workspace", workspaceId: last }
         : { kind: "all", highlightProjectId: null };
+    // Onglets restaurés dans la fenêtre principale (Z8) : la zone de travail.
+    const content = windows.activeTab?.content;
+    const project = content ? catalog.projectById(content.projectId) : null;
+    if (windows.kind === "main" && project && project.status !== "missing") {
+      view.value = { kind: "project", projectId: project.id, workspaceId: last };
+    }
   }
 
   /** Ouvre l'onglet d'un workspace et le mémorise pour le prochain démarrage. */
@@ -152,9 +160,25 @@ export const useNavigationStore = defineStore("navigation", () => {
     },
   );
 
+  // Fenêtre principale : une requête ouverte depuis la barre latérale (ici ou
+  // détachée) affiche les zones (F1, Z5).
+  watch(
+    () => windows.activeTab?.id ?? null,
+    (tab, previous) => {
+      const content = windows.activeTab?.content;
+      if (windows.kind !== "main" || tab === null || tab === previous || !content) return;
+      const current = view.value;
+      if (current.kind === "project" && current.projectId === content.projectId) return;
+      if (catalog.projectById(content.projectId) === null) return;
+      showProject(content.projectId, currentWorkspaceId.value);
+    },
+  );
+
   watch(
     titleSubject,
     (subject) => {
+      // Une fenêtre de contenu gère son titre ; ailleurs, il suit la vue.
+      if (windows.kind === "content") return;
       // Titre purement cosmétique : un échec n'empêche pas de travailler.
       ipc.windowSetTitle(subject).catch(() => undefined);
     },

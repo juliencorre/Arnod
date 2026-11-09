@@ -29,6 +29,23 @@ export type CommandName =
   | "workspace_remove_project"
   | "workspace_delete"
   | "window_set_title"
+  | "windows_load"
+  | "layout_open"
+  | "layout_open_selection"
+  | "layout_activate"
+  | "layout_close"
+  | "layout_move"
+  | "layout_split"
+  | "layout_resize"
+  | "layout_preset"
+  | "layout_set_placement"
+  | "layout_set_follow"
+  | "layout_set_sidebar_width"
+  | "window_detach_zone"
+  | "window_detach_tab"
+  | "window_detach_sidebar"
+  | "window_reattach"
+  | "window_reattach_all"
   | "tree_load"
   | "tree_set_collapsed"
   | "tree_create_folder"
@@ -385,4 +402,107 @@ export interface ProposeInput {
   durationMs: number;
   headers: [string, string][];
   body: string;
+}
+
+// ---------------------------------------------------------------------------
+// Fenêtres et zones (docs/plan-fenetres-zones.md)
+// ---------------------------------------------------------------------------
+
+/** Ce qu'affiche un onglet de contenu (`Content` en Rust). */
+export type ContentRef =
+  { kind: "request"; projectId: string; path: string } | { kind: "run"; projectId: string };
+
+/** Onglet de contenu d'une zone (`Tab`). */
+export interface ContentTab {
+  id: string;
+  content: ContentRef;
+}
+
+/** Place du résultat d'une requête dans sa zone (F6). */
+export type Placement = "auto" | "right" | "below";
+
+/** Orientation d'une séparation : `row` côte à côte, `column` l'une sous l'autre. */
+export type Axis = "row" | "column";
+
+/** Côté d'une nouvelle zone (F2, F3). */
+export type Side = "right" | "bottom";
+
+/** Découpages du menu Fenêtre › Dispositions (F7). */
+export type LayoutPreset = "one" | "twoColumns" | "twoRows" | "three" | "four";
+
+/** Zone : onglets, onglet actif, place du résultat. */
+export interface ZoneView {
+  id: string;
+  tabs: ContentTab[];
+  activeTab: string | null;
+  placement: Placement;
+}
+
+/** Nœud de la disposition : une zone ou une séparation (`Node`). */
+export type LayoutNode =
+  | ({ kind: "zone" } & ZoneView)
+  | {
+      kind: "split";
+      id: string;
+      axis: Axis;
+      /** Part de `first`, entre 0,1 et 0,9. */
+      ratio: number;
+      first: LayoutNode;
+      second: LayoutNode;
+    };
+
+/** Disposition d'une fenêtre (`Layout`). */
+export interface WindowLayout {
+  root: LayoutNode;
+  activeZone: string;
+}
+
+/** Rôle d'une fenêtre (`WindowKind`). */
+export type WindowKind = "main" | "content" | "sidebar";
+
+/** Position et taille logiques d'une fenêtre (`Bounds`). */
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** État d'une fenêtre (`WindowState`). */
+export interface WindowView {
+  label: string;
+  kind: WindowKind;
+  /** Zones ; `null` pour la barre latérale détachée. */
+  layout: WindowLayout | null;
+  /** Fenêtre de contenu : suit la sélection (sinon épinglée). */
+  follow: boolean;
+  /** Fenêtre principale : largeur de la barre latérale, en pixels. */
+  sidebarWidth: number;
+  /** Fenêtre principale : barre latérale détachée. */
+  sidebarDetached: boolean;
+  bounds: WindowBounds | null;
+}
+
+/** Toutes les fenêtres (`WindowsFile`), aussi diffusé par `arnod://fenetres`. */
+export interface WindowsSnapshot {
+  version: number;
+  windows: WindowView[];
+}
+
+/** Fenêtre appelante et état de toutes les fenêtres (`WindowContext`). */
+export interface WindowContext {
+  label: string;
+  windows: WindowsSnapshot;
+}
+
+/** Partie d'un projet modifiée (`ProjectScope`). */
+export type ProjectScope = "tree" | "request" | "environments";
+
+/** Modification d'un projet diffusée par `arnod://projet` (`ProjectChange`). */
+export interface ProjectChange {
+  projectId: string;
+  scope: ProjectScope;
+  path: string | null;
+  /** Fenêtre à l'origine du changement, qui l'a déjà appliqué. */
+  origin: string;
 }

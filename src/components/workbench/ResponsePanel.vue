@@ -6,8 +6,11 @@ import BaseButton from "@/components/ui/BaseButton.vue";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useWorkbenchStore } from "@/stores/workbench";
 
+const props = defineProps<{ editorKey: string }>();
+
 const workbench = useWorkbenchStore();
-const outcome = computed(() => workbench.outcome);
+const editor = computed(() => workbench.editors[props.editorKey] ?? null);
+const outcome = computed(() => editor.value?.outcome ?? null);
 const view = ref<"body" | "headers" | "checks">("body");
 
 /** Corps JSON réindenté pour la lecture ; texte brut sinon. */
@@ -23,15 +26,16 @@ const prettyBody = computed(() => {
 const failed = computed(() => outcome.value?.assertions.filter((a) => !a.passed).length ?? 0);
 
 function messageFor(id: string): string | null {
-  return workbench.draft?.assertions.find((a) => a.id === id)?.target ?? null;
+  return editor.value?.draft?.assertions.find((a) => a.id === id)?.target ?? null;
 }
 </script>
 
 <template>
   <section class="response" aria-label="Réponse" aria-live="polite">
-    <p v-if="workbench.sending" class="response__info">Envoi en cours…</p>
-    <p v-else-if="workbench.sendError" class="response__error" role="alert">
-      {{ workbench.sendError }}
+    <slot name="tools" />
+    <p v-if="editor?.sending" class="response__info">Envoi en cours…</p>
+    <p v-else-if="editor?.sendError" class="response__error" role="alert">
+      {{ editor.sendError }}
     </p>
     <p v-else-if="!outcome" class="response__info">Envoyez la requête pour voir la réponse.</p>
     <template v-else>
@@ -95,7 +99,9 @@ function messageFor(id: string): string | null {
             <span v-if="check.message" class="check__message">{{ check.message }}</span>
           </li>
         </ul>
-        <BaseButton @click="workbench.proposeAssertions()">Proposer des vérifications</BaseButton>
+        <BaseButton @click="workbench.proposeAssertions(editorKey)">
+          Proposer des vérifications
+        </BaseButton>
       </div>
     </template>
   </section>

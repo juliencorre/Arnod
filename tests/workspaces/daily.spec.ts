@@ -62,7 +62,7 @@ describe("vue d'un workspace (2a, W3, W7)", () => {
 
     expect(cardNames(wrapper)).toEqual(["boutique-tests", "auth-sso"]);
     expect(wrapper.get("main").text()).toContain("+ Ajouter un projet");
-    const sidebarProjects = wrapper.findAll("aside nav li").map((li) => li.text());
+    const sidebarProjects = wrapper.findAll("aside .sidebar__project").map((b) => b.text());
     expect(sidebarProjects).toEqual(["Bboutique-tests", "Aauth-sso"]);
   });
 
@@ -198,7 +198,7 @@ describe("projet introuvable (P10)", () => {
     expect(card?.get("button").attributes("disabled")).toBeDefined();
     expect(wrapper.get("aside").text()).toContain("(dossier introuvable)");
 
-    const sidebarButton = wrapper.findAll("aside nav li button")[1];
+    const sidebarButton = wrapper.findAll("aside .sidebar__project")[1];
     await sidebarButton?.trigger("click");
     await flushPromises();
     expect(wrapper.get(".toast").text()).toContain(

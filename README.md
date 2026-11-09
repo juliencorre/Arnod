@@ -8,11 +8,13 @@
 
 Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 
-> **Statut : projets et workspaces en onglets.** Sur le squelette technique
+> **Statut : projets et workspaces en onglets, fenêtres et zones.** Sur le squelette technique
 > ([`PRD-squelette.md`](PRD-squelette.md)), Arnod crée et gère des projets et des
 > workspaces selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md), révisé
 > par [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md) : les workspaces sont
-> des onglets, après l'onglet épinglé « Tous les projets ».
+> des onglets, après l'onglet épinglé « Tous les projets ». Les requêtes s'ouvrent en onglets,
+> dans des zones redimensionnables et des fenêtres interconnectées
+> ([`docs/plan-fenetres-zones.md`](docs/plan-fenetres-zones.md)).
 
 | Thème clair                                      | Thème sombre                                           |
 | ------------------------------------------------ | ------------------------------------------------------ |
@@ -41,6 +43,28 @@ et [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md), maquett
 | O11          | Gestion des workspaces : nom, couleur, projets, suppression avec « Annuler ».                                                              |
 | F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                                   |
 | N7           | Thème clair ou sombre selon le système, police système.                                                                                    |
+
+### Fenêtres et zones
+
+Cas F1 à F14 de [`docs/plan-fenetres-zones.md`](docs/plan-fenetres-zones.md) (maquette « Fenêtres
+et zones »).
+
+| Deux zones côte à côte                                      | Zone ouverte dans sa fenêtre                                          |
+| ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| ![Deux zones, thème clair](docs/screenshot-zones.png)       | ![Fenêtre de contenu, thème clair](docs/screenshot-fenetre.png)       |
+| ![Deux zones, thème sombre](docs/screenshot-zones-dark.png) | ![Fenêtre de contenu, thème sombre](docs/screenshot-fenetre-dark.png) |
+
+| ID       | Comportement                                                                                                                           |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| F1       | Une requête choisie dans la barre latérale s'ouvre en onglet, une seule fois par fenêtre ; ×, Suppr ou `Ctrl+W` la ferme, enregistrée. |
+| F2, F3   | Diviser : glisser un onglet sur le bord droit ou bas d'une zone, ◫, ou le menu de l'onglet (clic droit, Maj+F10) ; au plus 4 zones.    |
+| F4, F5   | Séparations et barre latérale redimensionnables : taille affichée, double-clic pour des parts égales, flèches ou `Alt+Maj+flèches`.    |
+| F6       | Résultat d'une requête à droite ou dessous ; en automatique, il passe dessous quand la zone est étroite.                               |
+| F7       | Menu **Fenêtre › Dispositions** : 1 zone, 2 colonnes, 2 lignes, 3 ou 4 zones, onglets conservés.                                       |
+| F8, F12  | ⧉ ou `Ctrl+Maj+O` ouvre la zone dans sa fenêtre ; un onglet glissé hors de la fenêtre s'ouvre là ; « Rattacher » le ramène.            |
+| F9, F10  | Barre latérale détachable (`Ctrl+Maj+D`) : elle pilote les fenêtres qui suivent la sélection ; une fenêtre peut être épinglée.         |
+| F11      | Catalogue, arborescences, requêtes enregistrées et environnements se mettent à jour dans toutes les fenêtres.                          |
+| F13, F14 | Zones, tailles et fenêtres détachées rouvertes au démarrage (`windows.json`) ; ⤢ agrandit une zone.                                    |
 
 Pile : [Tauri 2](https://v2.tauri.app) (cœur Rust, WebView2 sous Windows, WebKitGTK sous
 Linux), Vue 3, TypeScript strict, Vite, Pinia. Les règles d'architecture et les conventions

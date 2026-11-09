@@ -10,7 +10,8 @@ selon `docs/plan-premier-usage.md` (cœur Rust et interface livrés ; restent le
 l'installeur et les écarts listés en fin de plan). Livré : projets et
 workspaces, selon `docs/plan-projets-workspaces.md` (maquettes dans `docs/maquettes/`), puis
 workspaces en onglets selon `docs/plan-workspaces-onglets.md` ; voir la section « Projets et
-workspaces ». Un nouveau lot commence par un plan rédigé à partir de
+workspaces ». Livré ensuite : fenêtres et zones selon `docs/plan-fenetres-zones.md` ; voir la
+section « Fenêtres et zones ». Un nouveau lot commence par un plan rédigé à partir de
 `docs/modele-plan.md`.
 
 ## Architecture
@@ -20,8 +21,9 @@ workspaces ». Un nouveau lot commence par un plan rédigé à partir de
   dans le cœur Rust.
 - Chaîne d'appel : composant Vue → store Pinia (`src/stores/`) → `ipc` (`src/lib/ipc.ts`)
   → `invoke` → commande Rust (`src-tauri/src/commands/`).
-- Les composants et les stores n'importent **jamais** `@tauri-apps/api/core` : seul
-  `src/lib/ipc.ts` appelle `invoke`.
+- Les composants et les stores n'importent **jamais** `@tauri-apps/api/core` ni
+  `@tauri-apps/api/event` : seul `src/lib/ipc.ts` appelle `invoke` et écoute les événements du
+  cœur (`events`, `EVENTS`).
 - Les commandes Rust vivent dans `src-tauri/src/commands/`, un fichier par domaine
   (`hello.rs`, plus tard `http.rs`, `mocks.rs`...).
 - Les types échangés sont écrits à la main dans `src/types/ipc.ts` et doivent refléter
@@ -52,17 +54,22 @@ workspaces ». Un nouveau lot commence par un plan rédigé à partir de
 ```
 src/                    Frontend Vue
   main.ts               Création de l'app + Pinia
-  App.vue               Démarrage : chargement du catalogue, coquille ou erreur bloquante
+  App.vue               Démarrage : catalogue et fenêtres, puis fenêtre principale, de contenu ou
+                        barre latérale détachée ; ou erreur bloquante
   styles.css            Thème clair/sombre (variables CSS), police système
-  lib/ipc.ts            Wrapper typé autour d'invoke (seul point d'accès IPC)
+  lib/ipc.ts            Wrapper typé autour d'invoke et des événements (seul point d'accès IPC)
   lib/format.ts         Formatage d'affichage
   stores/               catalog (instantané), navigation (onglet, vue, titre), toasts (notifications),
-                        workbench (projet ouvert : arborescence, requête, réponse, environnements, run)
+                        windows (fenêtres, zones, onglets de contenu), workbench (par projet :
+                        arborescence, environnements, run ; par onglet : brouillon, réponse)
+  composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification
   components/layout/    Coquille : onglets des workspaces, barre latérale, zone principale
+  components/zones/     Zones : arbre, onglets, séparations (SplitHandle), onglet de requête
+  components/windows/   Fenêtres détachées : contenu, barre latérale
   components/projects/  Vues des projets (premier lancement...)
   components/workspaces/ Vues des workspaces
-  components/workbench/ Zone de travail d'un projet : arborescence, éditeur, réponse, environnements, run
+  components/workbench/ Arborescence, éditeur, réponse, environnements, run
   types/ipc.ts          Types IPC documentés à la main
 tests/                  Tests Vitest (happy-dom, mockIPC, faux cœur fakeCore.ts), dont contrastes
 e2e/                    Tests e2e sur l'application réelle (tauri-driver, WebdriverIO)
@@ -80,9 +87,11 @@ src-tauri/              Cœur Rust
   src/secrets.rs        Coffre des secrets (trait SecretStore, keyring du système)
   src/http.rs           Envoi HTTP (reqwest), délai, annulation, troncature à 5 Mo
   src/workbench.rs      Établi : envoi, variables, environnements actifs, runs
+  src/layout/           Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
+  src/windows.rs        windows.json, fenêtres natives, focus, fermetures, événements arnod://
   src/manifest.rs       Dossier d'un projet et manifeste arnod.yml
   src/state.rs          AppState : catalogue + stockage + annulation (app.manage)
-  src/menu.rs           Menu natif (Fichier > Quitter)
+  src/menu.rs           Menu natif (Fichier > Quitter, Fenêtre > Dispositions, détacher, rattacher)
   src/commands/         Commandes, un fichier par domaine
 docs/                   Plan en cours, modèle de plan, maquettes, captures du README
 scripts/                Mesure de taille, concordance des versions, tests de fumée (CI)
@@ -183,3 +192,24 @@ R12). Cocher une tâche dans le plan quand elle est livrée.
 - Noms de projet et de workspace uniques, sans tenir compte de la casse. « Changer » choisit
   l'emplacement parent : le projet est créé dans `<emplacement>/<nom>`.
 - Pas de confirmation quand rien n'est perdu : une notification avec « Annuler ».
+
+## Fenêtres et zones
+
+Référence : `docs/plan-fenetres-zones.md` (cas F1 à F14, règles Z1 à Z8).
+
+- La disposition vit dans le cœur : `src-tauri/src/layout/` (pur, testé dans `layout/tests.rs`)
+  tient les onglets, les zones, l'arbre des séparations et les fenêtres ; `windows.rs` l'enregistre
+  dans `windows.json` (même dossier qu'`arnod.json`, écriture atomique) et crée ou ferme les
+  fenêtres natives. Chaque commande `layout_*` ou `window_*` renvoie l'état de toutes les fenêtres
+  et le diffuse par `arnod://fenetres` ; le store `windows` le remplace. Seul l'agrandissement d'une
+  zone (⤢) reste local à la fenêtre.
+- Fenêtres : `main` (principale) et `fenetre-<8 hex>` (contenu ou barre latérale détachée). La
+  capacité `default` couvre `["main", "fenetre-*"]`, sans permission ajoutée. Les fenêtres sont
+  créées par Rust, hors du fil de la commande (interblocage WebView2 sous Windows).
+- Interconnexion : toute modification du catalogue émet `arnod://catalogue` ; l'arborescence, une
+  requête enregistrée ou les environnements émettent `arnod://projet` (avec la fenêtre d'origine,
+  qui l'ignore). Une nouvelle commande qui modifie un projet émet ce même événement.
+- Fermer une fenêtre détachée la rattache (Z6) : le cœur émet `arnod://fermer`, la fenêtre
+  enregistre ses requêtes puis appelle `window_reattach`. Fermer la principale quitte (Z7).
+- Toute séparation passe par `SplitHandle` (motif WAI-ARIA « window splitter », minimums en pixels) ;
+  toute action glissée (onglet, zone) a son équivalent au clavier ou dans le menu de l'onglet.

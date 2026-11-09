@@ -24,6 +24,9 @@ import { useNavigationStore } from "@/stores/navigation";
 import { useToastStore } from "@/stores/toasts";
 import type { WorkspaceColor } from "@/types/ipc";
 
+/** `compact` : barre latérale détachée, plus étroite. */
+defineProps<{ compact?: boolean }>();
+
 /** Clé d'un onglet : l'identifiant du workspace, ou `null` pour « Tous les projets ». */
 type TabKey = string | null;
 
@@ -293,7 +296,7 @@ const dropLabel = computed(() =>
 </script>
 
 <template>
-  <header ref="bar" class="tabs">
+  <header ref="bar" class="tabs" :class="{ 'tabs--compact': compact }">
     <div class="tabs__list" role="tablist" aria-label="Workspaces">
       <button
         type="button"
@@ -424,6 +427,15 @@ const dropLabel = computed(() =>
   padding: 0 0.5rem 0 0.75rem;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-sidebar);
+}
+
+.tabs--compact {
+  padding-left: 0.5rem;
+}
+
+.tabs--compact .tab {
+  max-width: 10rem;
+  padding: 0 0.625rem;
 }
 
 .tabs__list {

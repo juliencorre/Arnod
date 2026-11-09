@@ -1,15 +1,23 @@
 <script setup lang="ts">
-/** Arborescence du projet (A1 à A8) : dossiers, requêtes et actions. */
+/**
+ * Arborescence d'un projet (A1 à A8), sous son nom dans la barre latérale :
+ * dossiers, requêtes et actions. Une requête choisie s'ouvre en onglet, dans
+ * la fenêtre qui suit la sélection (Z5).
+ */
 import { computed, ref } from "vue";
 
-import BaseButton from "@/components/ui/BaseButton.vue";
 import NameDialog from "@/components/workbench/NameDialog.vue";
 import TreeRow from "@/components/workbench/TreeRow.vue";
+import { useCatalogStore } from "@/stores/catalog";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
 
+const props = defineProps<{ projectId: string }>();
+
 const workbench = useWorkbenchStore();
+const nodes = computed(() => workbench.trees[props.projectId]?.nodes ?? []);
+const projectName = computed(() => useCatalogStore().projectById(props.projectId)?.name ?? "");
 const toasts = useToastStore();
 
 type NameAction =
@@ -31,7 +39,7 @@ const folders = computed(() => {
       }
     }
   };
-  walk(workbench.nodes);
+  walk(nodes.value);
   return found;
 });
 
@@ -83,17 +91,17 @@ async function onAction(id: string, node: TreeNode, target?: string): Promise<vo
       openName({ kind: "rename", node });
       break;
     case "duplicate":
-      await guard(() => workbench.duplicate(node.path));
+      await guard(() => workbench.duplicate(props.projectId, node.path));
       break;
     case "move":
-      await guard(() => workbench.move(node.path, target ?? ""));
+      await guard(() => workbench.move(props.projectId, node.path, target ?? ""));
       break;
     case "run":
-      await guard(() => workbench.runFolder(node.path));
+      await guard(() => workbench.runFolder(props.projectId, node.path));
       break;
     case "delete":
       await guard(async () => {
-        await workbench.remove(node.path, false);
+        await workbench.remove(props.projectId, node.path, false);
         toasts.show(`« ${node.name} » mis à la corbeille.`);
       });
       break;
@@ -104,9 +112,11 @@ async function submitName(name: string): Promise<void> {
   const action = nameAction.value;
   if (action === null) return;
   try {
-    if (action.kind === "new-folder") await workbench.createFolder(action.parent, name);
-    else if (action.kind === "new-request") await workbench.createRequest(action.folder, name);
-    else await workbench.rename(action.node.path, name);
+    if (action.kind === "new-folder")
+      await workbench.createFolder(props.projectId, action.parent, name);
+    else if (action.kind === "new-request")
+      await workbench.createRequest(props.projectId, action.folder, name);
+    else await workbench.rename(props.projectId, action.node.path, name);
     nameAction.value = null;
   } catch (caught) {
     nameError.value = caught instanceof Error ? caught.message : String(caught);
@@ -115,23 +125,48 @@ async function submitName(name: string): Promise<void> {
 </script>
 
 <template>
-  <nav class="tree" aria-label="Requêtes du projet">
+  <div class="tree">
     <div class="tree__head">
-      <BaseButton @click="openName({ kind: 'new-request', folder: '' })">+ Requête</BaseButton>
-      <BaseButton @click="openName({ kind: 'new-folder', parent: '' })">+ Dossier</BaseButton>
-      <BaseButton variant="link" @click="workbench.runFolder('')">Tout exécuter</BaseButton>
+      <button
+        type="button"
+        class="tree__tool"
+        @click="openName({ kind: 'new-request', folder: '' })"
+      >
+        + Requête
+      </button>
+      <button
+        type="button"
+        class="tree__tool"
+        @click="openName({ kind: 'new-folder', parent: '' })"
+      >
+        + Dossier
+      </button>
+      <button
+        type="button"
+        class="tree__tool"
+        :aria-label="`Tout exécuter dans ${projectName}`"
+        @click="guard(() => workbench.runFolder(projectId, ''))"
+      >
+        ▶ Tout exécuter
+      </button>
     </div>
-    <ul v-if="workbench.nodes.length > 0" role="tree" class="tree__list">
+    <ul
+      v-if="nodes.length > 0"
+      role="tree"
+      class="tree__list"
+      :aria-label="`Requêtes de ${projectName}`"
+    >
       <TreeRow
-        v-for="node in workbench.nodes"
+        v-for="node in nodes"
         :key="node.path"
         :node="node"
         :depth="0"
         :folders="folders"
+        :project-id="projectId"
         @action="onAction"
       />
     </ul>
-    <p v-else class="tree__empty">Aucune requête. Créez la première avec « + Requête ».</p>
+    <p v-else class="tree__empty">Aucune requête : « + Requête » crée la première.</p>
     <NameDialog
       :open="nameAction !== null"
       :title="dialog.title"
@@ -142,21 +177,39 @@ async function submitName(name: string): Promise<void> {
       @close="nameAction = null"
       @submit="submitName"
     />
-  </nav>
+  </div>
 </template>
 
 <style scoped>
 .tree {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
   min-width: 0;
 }
 
 .tree__head {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.375rem;
+  gap: 0.125rem 0.625rem;
+  padding: 0 0.25rem;
+}
+
+.tree__tool {
+  padding: 0.125rem 0;
+  border: none;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-link);
+  background: none;
+  cursor: pointer;
+}
+
+.tree__tool:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+  border-radius: 4px;
 }
 
 .tree__list {
@@ -166,8 +219,8 @@ async function submitName(name: string): Promise<void> {
 }
 
 .tree__empty {
-  margin: 0.5rem 0;
-  font-size: 0.875rem;
+  margin: 0.25rem 0.25rem 0.5rem;
+  font-size: 0.8125rem;
   color: var(--color-muted);
 }
 </style>

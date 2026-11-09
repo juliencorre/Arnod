@@ -273,15 +273,15 @@ describe("ajouter un projet à d'autres workspaces (P4, P6)", () => {
 });
 
 describe("vue projet (1b, P5)", () => {
-  it("revient à « Tous les projets » par le lien de retour", async () => {
+  it("revient à « Tous les projets » par l'onglet épinglé", async () => {
     const core = installFakeCore(firstRunSnapshot());
     wrapper = await mountApp();
     await wrapper.get("form input").setValue("boutique-tests");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
-    expect(wrapper.get(".project-view__back").text()).toBe("← Tous les projets");
+    expect(wrapper.get("main h1").text()).toBe("boutique-tests");
 
-    await wrapper.get(".project-view__back").trigger("click");
+    await wrapper.findAll('[role="tab"]')[0]?.trigger("click");
     await flushPromises();
 
     expect(core.calls.filter((c) => c.cmd === "workspace_open").at(-1)?.args).toEqual({

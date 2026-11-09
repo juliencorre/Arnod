@@ -4,6 +4,7 @@ import { computed } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
+import { useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
 
@@ -11,13 +12,29 @@ const props = defineProps<{
   node: TreeNode;
   depth: number;
   folders: { path: string; name: string }[];
+  projectId: string;
 }>();
 const emit = defineEmits<{ action: [id: string, node: TreeNode, target?: string] }>();
 
 const workbench = useWorkbenchStore();
+const windows = useWindowsStore();
 
-const isOpen = computed(() => !workbench.collapsed.includes(props.node.path));
-const isSelected = computed(() => workbench.selectedPath === props.node.path);
+const isOpen = computed(
+  () => !(workbench.trees[props.projectId]?.collapsed ?? []).includes(props.node.path),
+);
+/** Requête affichée dans l'onglet actif de cette fenêtre. */
+const isSelected = computed(() => {
+  const content = windows.activeTab?.content;
+  return (
+    content?.kind === "request" &&
+    content.projectId === props.projectId &&
+    content.path === props.node.path
+  );
+});
+const dirty = computed(
+  () =>
+    props.node.kind === "request" && workbench.isDirty(`${props.projectId}::${props.node.path}`),
+);
 
 const items = computed<MenuItem[]>(() => {
   const move: MenuItem = {
@@ -61,8 +78,8 @@ function onSelect(id: string): void {
 }
 
 function activate(): void {
-  if (props.node.kind === "folder") void workbench.toggleFolder(props.node.path);
-  else void workbench.select(props.node.path);
+  if (props.node.kind === "folder") void workbench.toggleFolder(props.projectId, props.node.path);
+  else void workbench.openRequest(props.projectId, props.node.path);
 }
 </script>
 
@@ -92,6 +109,7 @@ function activate(): void {
             {{ node.method }}
           </span>
           <span class="row__name">{{ node.name }}</span>
+          <span v-if="dirty" class="row__dirty" title="Modifiée, non enregistrée">●</span>
           <span v-if="node.invalid" class="row__invalid" title="Fichier illisible">⚠</span>
         </template>
       </button>
@@ -115,6 +133,7 @@ function activate(): void {
         :node="child"
         :depth="depth + 1"
         :folders="folders"
+        :project-id="projectId"
         @action="(id, n, target) => emit('action', id, n, target)"
       />
     </ul>
@@ -191,6 +210,12 @@ function activate(): void {
 
 .row__method--delete {
   color: var(--color-danger);
+}
+
+.row__dirty {
+  margin-left: auto;
+  font-size: 0.625rem;
+  color: var(--color-accent);
 }
 
 .row__invalid {

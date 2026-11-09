@@ -6,7 +6,8 @@
  * premier usage puis l'usage quotidien d'un utilisateur, avec les workspaces en
  * onglets et l'onglet épinglé « Tous les projets ». Le sélecteur de dossier
  * natif (« Changer », P3) ne se pilote pas par WebDriver : il est couvert par les
- * tests Rust et Vitest.
+ * tests Rust et Vitest. Les dernières étapes divisent la fenêtre en zones et
+ * ouvrent des fenêtres interconnectées (docs/plan-fenetres-zones.md).
  */
 import type { ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -23,6 +24,8 @@ import {
   launchApp,
   removeSandbox,
   readState,
+  readWindows,
+  type SavedNode,
   screenshot,
   startDriver,
   stopDriver,
@@ -119,6 +122,46 @@ async function dismissToast(): Promise<void> {
   });
 }
 
+/** Noms des onglets de chaque zone de la fenêtre courante. */
+async function zoneTabs(): Promise<string[][]> {
+  return browser.execute(() =>
+    Array.from(document.querySelectorAll("section.zone")).map((zone) =>
+      Array.from(zone.querySelectorAll(".zone__tab-button .zone__name")).map((name) =>
+        name.textContent.trim(),
+      ),
+    ),
+  );
+}
+
+async function waitForZoneTabs(expected: string[][]): Promise<void> {
+  await browser.waitUntil(
+    async () => JSON.stringify(await zoneTabs()) === JSON.stringify(expected),
+    { timeout: 10_000, timeoutMsg: `onglets ${JSON.stringify(expected)} attendus` },
+  );
+}
+
+/** Clic émis dans la WebView, pour un bouton qui n'apparaît qu'au survol. */
+async function clickHidden(selector: string): Promise<void> {
+  await browser.execute((css) => {
+    const target = document.querySelector<HTMLElement>(css);
+    if (!target) throw new Error(`élément « ${css} » introuvable`);
+    target.click();
+  }, selector);
+}
+
+/** Attend `count` fenêtres et renvoie leurs identifiants WebDriver. */
+async function waitForWindows(count: number): Promise<string[]> {
+  await browser.waitUntil(async () => (await browser.getWindowHandles()).length === count, {
+    timeout: 15_000,
+    timeoutMsg: `${count} fenêtre(s) attendue(s)`,
+  });
+  return browser.getWindowHandles();
+}
+
+function zonesOf(node: SavedNode): Extract<SavedNode, { kind: "zone" }>[] {
+  return node.kind === "zone" ? [node] : [...zonesOf(node.first), ...zonesOf(node.second)];
+}
+
 function workspaceNamed(name: string) {
   return readState(sandbox).workspaces.find((w) => w.name === name);
 }
@@ -163,7 +206,8 @@ describe("Arnod, de bout en bout", () => {
   });
 
   it("refuse un nom déjà pris, message du cœur sous le champ (R9)", async () => {
-    await browser.$("button=← Tous les projets").click();
+    // Depuis un projet, l'onglet de départ ramène à sa liste.
+    await tab("Tous les projets").click();
     await waitForHeading(browser, "Tous les projets · 1");
     await browser.$("main").$("button=Nouveau projet").click();
     const dialog = browser.$("dialog[open]");
@@ -245,7 +289,7 @@ describe("Arnod, de bout en bout", () => {
       state.workspaces.map((w) => [w.name, id !== undefined && w.projectIds.includes(id)]),
     ).toEqual([["Boutique", true]]);
 
-    await browser.$("button=← Boutique").click();
+    await tab("Boutique").click();
     await waitForHeading(browser, "Boutique");
     expect(await cardNames(browser)).toEqual(["boutique-tests", "paiements-v3"]);
     await screenshot(browser, "03-workspace-boutique");
@@ -425,5 +469,100 @@ describe("Arnod, de bout en bout", () => {
     await browser.$(".toast").$("button=Annuler").click();
     await waitForHeading(browser, "Tous les projets · 3");
     expect(readState(sandbox).projects.map((p) => p.name)).toContain("catalogue-legacy");
+  });
+});
+
+describe("Fenêtres et zones", () => {
+  let mainWindow: string;
+
+  it("ouvre les requêtes en onglets et divise la zone (F1, F2, F4)", async () => {
+    await tab("E-commerce").click();
+    await waitForHeading(browser, "E-commerce");
+    await browser.$("aside nav").$("button*=boutique-tests").click();
+    await waitForHeading(browser, "boutique-tests");
+
+    await browser.$("main").$("button=+ Nouvelle requête").click();
+    await waitForZoneTabs([["Nouvelle requête"]]);
+    await browser.$("aside").$("button*=+ Requête").click();
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForDisplayed();
+    await dialog.$("input").setValue("lister");
+    await browser.keys("Enter");
+    await waitForZoneTabs([["Nouvelle requête", "lister"]]);
+
+    await browser.$('button[aria-label="Diviser à droite"]').click();
+    await waitForZoneTabs([["Nouvelle requête"], ["lister"]]);
+
+    // Au clavier : la séparation prend le focus, la flèche droite élargit la première zone.
+    await browser.execute(() => {
+      document
+        .querySelector<HTMLElement>('[role="separator"][aria-label="Largeur des zones"]')
+        ?.focus();
+    });
+    await browser.keys("ArrowRight");
+    const handle = browser.$('[role="separator"][aria-label="Largeur des zones"]');
+    await browser.waitUntil(async () => (await handle.getAttribute("aria-valuenow")) === "55");
+    await browser.waitUntil(() => {
+      const root = readWindows(sandbox).windows[0]?.layout?.root;
+      return root?.kind === "split" && Math.abs(root.ratio - 0.55) < 0.001;
+    });
+    await screenshot(browser, "06-zones");
+  });
+
+  it("ouvre une zone dans sa fenêtre, puis la rattache (F8, F12)", async () => {
+    mainWindow = await browser.getWindowHandle();
+    const tools = await browser.$$('button[aria-label="Ouvrir la zone dans une fenêtre"]');
+    await tools[1]?.click();
+    const handles = await waitForWindows(2);
+    await waitForZoneTabs([["Nouvelle requête"]]);
+    expect(readWindows(sandbox).windows.map((w) => w.kind)).toEqual(["main", "content"]);
+
+    const detached = handles.find((h) => h !== mainWindow) ?? "";
+    await browser.switchToWindow(detached);
+    const crumbs = browser.$('nav[aria-label="Emplacement"]');
+    await crumbs.waitForDisplayed({ timeout: 15_000 });
+    await browser.waitUntil(async () => (await crumbs.getText()).includes("lister"));
+    expect(await crumbs.getText()).toContain("boutique-tests");
+    expect(await browser.$(".content-window__follow").getAttribute("aria-pressed")).toBe("true");
+    await screenshot(browser, "07-fenetre-contenu");
+
+    await browser.$(".content-window__bar").$("button=Rattacher").click();
+    await waitForWindows(1);
+    await browser.switchToWindow(mainWindow);
+    await waitForZoneTabs([["Nouvelle requête", "lister"]]);
+    expect(readWindows(sandbox).windows.map((w) => w.kind)).toEqual(["main"]);
+  });
+
+  it("détache la barre latérale, qui pilote la fenêtre principale (F9, Z5)", async () => {
+    await clickHidden('button[aria-label="Détacher la barre latérale dans une fenêtre"]');
+    const handles = await waitForWindows(2);
+    await browser.waitUntil(async () => !(await browser.$("aside").isExisting()));
+
+    await browser.switchToWindow(handles.find((h) => h !== mainWindow) ?? "");
+    const pilot = browser.$(".sidebar-window__pilot");
+    await pilot.waitForDisplayed({ timeout: 15_000 });
+    expect(await pilot.getText()).toBe("Pilote 1 fenêtre de contenu");
+    const expand = browser.$('button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await browser.$('[role="tree"]').$("button*=Nouvelle requête").click();
+    await browser.waitUntil(() => {
+      const layout = readWindows(sandbox).windows[0]?.layout;
+      const zone = layout ? zonesOf(layout.root).find((z) => z.id === layout.activeZone) : null;
+      const active = zone?.tabs.find((t) => t.id === zone.activeTab);
+      return active?.content.path?.includes("nouvelle") ?? false;
+    });
+    await screenshot(browser, "08-barre-detachee");
+
+    await browser.$(".sidebar-window__footer").$("button=Rattacher").click();
+    await waitForWindows(1);
+    await browser.switchToWindow(mainWindow);
+    await browser.$("aside").waitForDisplayed();
+    expect(readWindows(sandbox).windows[0]?.sidebarDetached).toBe(false);
+  });
+
+  it("au redémarrage, rouvre les onglets dans leurs zones (Z8)", async () => {
+    await restart();
+    await waitForZoneTabs([["Nouvelle requête", "lister"]]);
+    expect(await browser.$("aside").isExisting()).toBe(true);
   });
 });

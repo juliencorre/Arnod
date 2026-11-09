@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import App from "@/App.vue";
 import type { CatalogSnapshot, CommandError } from "@/types/ipc";
 
+import { createFakeWindows, handleWindows } from "./fakeWindows";
 import { boutiqueSnapshot, firstRunSnapshot } from "./fixtures";
 
 let titles: (string | null)[];
@@ -17,15 +18,20 @@ function mockCore(options: {
   failure?: CommandError;
 }): void {
   titles = [];
-  mockIPC((cmd, args) => {
-    if (cmd === "window_set_title") {
-      titles.push((args as { subject: string | null }).subject);
-      return null;
-    }
-    if (cmd !== "catalog_load") throw new Error(`commande inattendue : ${cmd}`);
-    if (options.failure) throw options.failure;
-    return { snapshot: options.snapshot, warning: options.warning ?? null };
-  });
+  const windows = createFakeWindows();
+  mockIPC(
+    (cmd, args) => {
+      if (cmd === "window_set_title") {
+        titles.push((args as { subject: string | null }).subject);
+        return null;
+      }
+      if (cmd === "windows_load") return handleWindows(windows, cmd, {});
+      if (cmd !== "catalog_load") throw new Error(`commande inattendue : ${cmd}`);
+      if (options.failure) throw options.failure;
+      return { snapshot: options.snapshot, warning: options.warning ?? null };
+    },
+    { shouldMockEvents: true },
+  );
 }
 
 async function mountApp() {

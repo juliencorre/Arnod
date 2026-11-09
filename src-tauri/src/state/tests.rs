@@ -435,3 +435,24 @@ fn chemin_relatif_ou_manifeste_plus_recent_refuse() {
         CommandErrorKind::NewerVersion
     );
 }
+
+#[test]
+fn f11_chaque_modification_enregistree_previent_l_ecouteur() {
+    use std::sync::{Arc, Mutex};
+
+    let fixture = Fixture::new();
+    let state = fixture.load();
+    let seen: Arc<Mutex<Vec<usize>>> = Arc::default();
+    let sink = Arc::clone(&seen);
+    state.on_change(Box::new(move |snapshot| {
+        sink.lock().unwrap().push(snapshot.workspaces.len());
+    }));
+
+    state
+        .mutate(|catalog| catalog.create_workspace("Boutique"))
+        .unwrap();
+    let _ = state.mutate(|catalog| catalog.create_workspace("boutique"));
+
+    // L'écouteur voit le nouvel instantané, pas la modification refusée.
+    assert_eq!(*seen.lock().unwrap(), [1]);
+}

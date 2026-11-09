@@ -14,8 +14,15 @@ import type {
   Scalar,
 } from "@/types/ipc";
 
+const props = defineProps<{ editorKey: string }>();
+
 const workbench = useWorkbenchStore();
-const request = computed<RequestDoc | null>(() => workbench.draft);
+const editor = computed(() => workbench.editors[props.editorKey] ?? null);
+const request = computed<RequestDoc | null>(() => editor.value?.draft ?? null);
+const folder = computed(() => {
+  const path = editor.value?.path ?? "";
+  return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+});
 
 const METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const AUTH_KINDS: { id: AuthKind; label: string }[] = [
@@ -92,14 +99,23 @@ function removeAssertion(index: number): void {
 }
 
 function resultFor(id: string): boolean | null {
-  const found = workbench.outcome?.assertions.find((a) => a.id === id);
+  const found = editor.value?.outcome?.assertions.find((a) => a.id === id);
   return found ? found.passed : null;
 }
 </script>
 
 <template>
   <section v-if="request" class="editor" aria-label="Requête">
-    <form class="editor__line" @submit.prevent="workbench.send()">
+    <div class="editor__title">
+      <h2 class="editor__name">{{ request.name }}</h2>
+      <span v-if="folder" class="editor__folder">{{ folder }}</span>
+      <span v-if="workbench.isDirty(editorKey)" class="editor__state">● Modifiée</span>
+    </div>
+    <p v-if="editor?.changedElsewhere" class="editor__elsewhere" role="status">
+      Modifiée dans une autre fenêtre.
+      <button type="button" class="link" @click="workbench.reload(editorKey)">Recharger</button>
+    </p>
+    <form class="editor__line" @submit.prevent="workbench.send(editorKey)">
       <label :for="methodId" class="sr-only">Méthode</label>
       <select :id="methodId" v-model="request.method" class="editor__method">
         <option v-for="m in METHODS" :key="m" :value="m">{{ m }}</option>
@@ -114,11 +130,15 @@ function resultFor(id: string): boolean | null {
         autocomplete="off"
         :placeholder="URL_PLACEHOLDER"
       />
-      <BaseButton v-if="workbench.sending" @click="workbench.cancelSend()">Annuler</BaseButton>
+      <BaseButton v-if="editor?.sending" @click="workbench.cancelSend(editorKey)">
+        Annuler
+      </BaseButton>
       <BaseButton v-else variant="primary" type="submit" :disabled="request.url.trim() === ''">
         Envoyer
       </BaseButton>
-      <BaseButton :disabled="!workbench.dirty" @click="workbench.save()">Enregistrer</BaseButton>
+      <BaseButton :disabled="!workbench.isDirty(editorKey)" @click="workbench.save(editorKey)">
+        Enregistrer
+      </BaseButton>
     </form>
 
     <div role="tablist" aria-label="Sections de la requête" class="editor__tabs">
@@ -276,8 +296,41 @@ function resultFor(id: string): boolean | null {
   min-width: 0;
 }
 
+.editor__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.625rem;
+}
+
+.editor__name {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+
+.editor__folder {
+  font: 0.8125rem var(--font-mono);
+  color: var(--color-muted);
+}
+
+.editor__state {
+  font-size: 0.75rem;
+  color: var(--color-accent-text);
+}
+
+.editor__elsewhere {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  background: var(--color-accent-soft);
+}
+
+/* Zone étroite (jusqu'à 280 px, Z4) : les boutons passent sous l'adresse. */
 .editor__line {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -301,7 +354,7 @@ function resultFor(id: string): boolean | null {
 }
 
 .editor__url {
-  flex: 1;
+  flex: 1 1 12rem;
   min-width: 0;
   font-family: var(--font-mono);
   font-size: 0.875rem;
@@ -326,11 +379,15 @@ function resultFor(id: string): boolean | null {
 .editor__tabs {
   display: flex;
   gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--color-border);
 }
 
 .editor__tab {
+  flex: none;
   padding: 0.5rem 0.75rem;
+  white-space: nowrap;
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;

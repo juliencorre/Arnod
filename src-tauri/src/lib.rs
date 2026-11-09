@@ -11,6 +11,7 @@ pub mod commands;
 pub mod environment;
 pub mod error;
 pub mod http;
+pub mod layout;
 pub mod local;
 pub mod manifest;
 mod menu;
@@ -21,6 +22,7 @@ pub mod storage;
 pub mod tree;
 #[cfg(test)]
 mod ts_contract;
+pub mod windows;
 pub mod workbench;
 
 use std::sync::Arc;
@@ -29,6 +31,7 @@ use tauri::Manager;
 
 use crate::secrets::SystemSecretStore;
 use crate::state::{AppState, DEFAULT_LOCATION_DIR};
+use crate::windows::WindowsState;
 use crate::workbench::Workbench;
 
 /// Point d'entrée de l'application, appelé par `main.rs`.
@@ -42,10 +45,18 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_local_data_dir()?;
             let default_location = app.path().home_dir()?.join(DEFAULT_LOCATION_DIR);
-            app.manage(AppState::load(data_dir, default_location));
+            app.manage(AppState::load(data_dir.clone(), default_location));
             app.manage(Arc::new(Workbench::new(Arc::new(SystemSecretStore))));
+            app.manage(WindowsState::load(data_dir));
+            // Chaque modification du catalogue est diffusée à toutes les fenêtres (F11).
+            let handle = app.handle().clone();
+            app.state::<AppState>().on_change(Box::new(move |snapshot| {
+                windows::catalog_changed(&handle, snapshot)
+            }));
+            windows::restore(app.handle());
             Ok(())
         })
+        .on_window_event(windows::on_window_event)
         .invoke_handler(tauri::generate_handler![
             commands::hello::hello,
             commands::catalog::catalog_load,
@@ -64,6 +75,23 @@ pub fn run() {
             commands::workspaces::workspace_remove_project,
             commands::workspaces::workspace_delete,
             commands::window::window_set_title,
+            commands::window::windows_load,
+            commands::window::layout_open,
+            commands::window::layout_open_selection,
+            commands::window::layout_activate,
+            commands::window::layout_close,
+            commands::window::layout_move,
+            commands::window::layout_split,
+            commands::window::layout_resize,
+            commands::window::layout_preset,
+            commands::window::layout_set_placement,
+            commands::window::layout_set_follow,
+            commands::window::layout_set_sidebar_width,
+            commands::window::window_detach_zone,
+            commands::window::window_detach_tab,
+            commands::window::window_detach_sidebar,
+            commands::window::window_reattach,
+            commands::window::window_reattach_all,
             commands::tree::tree_load,
             commands::tree::tree_set_collapsed,
             commands::tree::tree_create_folder,
@@ -90,6 +118,12 @@ pub fn run() {
             commands::runs::run_last,
             commands::runs::project_last_runs,
         ])
-        .run(tauri::generate_context!())
-        .expect("erreur au lancement d'Arnod");
+        .build(tauri::generate_context!())
+        .expect("erreur au lancement d'Arnod")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Positions et tailles des fenêtres détachées, pour la restauration (F13).
+                app.state::<WindowsState>().flush();
+            }
+        });
 }

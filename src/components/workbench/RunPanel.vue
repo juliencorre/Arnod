@@ -7,8 +7,10 @@ import { formatDuration } from "@/lib/format";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { RunItemStatus } from "@/types/ipc";
 
+const props = defineProps<{ projectId: string }>();
+
 const workbench = useWorkbenchStore();
-const run = computed(() => workbench.run);
+const run = computed(() => workbench.runs[props.projectId] ?? null);
 
 const LABELS: Record<RunItemStatus, string> = {
   pending: "En attente",
@@ -48,11 +50,10 @@ const counts = computed(() => {
         </template>
       </span>
       <span class="run__spacer" />
-      <BaseButton v-if="!run.finished" @click="workbench.cancelRun()">Annuler</BaseButton>
-      <BaseButton v-else-if="counts.bad > 0" @click="workbench.retryFailures()">
+      <BaseButton v-if="!run.finished" @click="workbench.cancelRun(projectId)">Annuler</BaseButton>
+      <BaseButton v-else-if="counts.bad > 0" @click="workbench.retryFailures(projectId)">
         Relancer les échecs
       </BaseButton>
-      <BaseButton variant="link" @click="workbench.closeRun()">Fermer</BaseButton>
     </header>
     <ul class="run__items">
       <li
@@ -62,7 +63,11 @@ const counts = computed(() => {
         :class="`run__item--${item.status}`"
       >
         <span class="run__method">{{ item.method }}</span>
-        <button type="button" class="run__name" @click="workbench.select(item.path)">
+        <button
+          type="button"
+          class="run__name"
+          @click="workbench.openRequest(projectId, item.path)"
+        >
           {{ item.name }}
         </button>
         <span class="run__status">{{ LABELS[item.status] }}</span>
@@ -78,9 +83,19 @@ const counts = computed(() => {
       </li>
     </ul>
   </section>
+  <p v-else class="run-none">
+    Aucun run pour l'instant : « ▶ Tout exécuter » ou « Exécuter le dossier » dans la barre
+    latérale.
+  </p>
 </template>
 
 <style scoped>
+.run-none {
+  margin: 2rem 0;
+  text-align: center;
+  color: var(--color-muted);
+}
+
 .run {
   display: flex;
   flex-direction: column;

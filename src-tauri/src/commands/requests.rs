@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use serde::Deserialize;
-use tauri::State;
+use tauri::{Manager, State, WebviewWindow};
 use uuid::Uuid;
 
 use crate::error::CommandError;
@@ -12,6 +12,7 @@ use crate::request::file;
 use crate::request::model::{Assertion, Request};
 use crate::state::AppState;
 use crate::tree;
+use crate::windows::{self, ProjectScope};
 use crate::workbench::{SendOutcome, Workbench};
 
 #[tauri::command]
@@ -26,13 +27,27 @@ pub fn request_read(
 
 #[tauri::command]
 pub fn request_save(
+    window: WebviewWindow,
     state: State<'_, AppState>,
     project: Uuid,
     path: String,
     request: Request,
 ) -> Result<(), CommandError> {
-    let root = state.project_ctx(project)?.root;
-    file::write(&tree::resolve(&root, &path)?, &request)
+    let run = || {
+        let root = state.project_ctx(project)?.root;
+        file::write(&tree::resolve(&root, &path)?, &request)
+    };
+    let result = run();
+    if result.is_ok() {
+        windows::project_changed(
+            window.app_handle(),
+            window.label(),
+            project,
+            ProjectScope::Request,
+            Some(path.as_str()),
+        );
+    }
+    result
 }
 
 /// Envoie la requête telle qu'elle est dans l'éditeur, enregistrée ou non (E1).

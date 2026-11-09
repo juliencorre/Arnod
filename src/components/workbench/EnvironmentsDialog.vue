@@ -11,7 +11,7 @@ import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { EnvironmentDoc, EnvironmentView } from "@/types/ipc";
 
-const props = defineProps<{ open: boolean }>();
+const props = defineProps<{ open: boolean; projectId: string }>();
 const emit = defineEmits<{ close: [] }>();
 
 const workbench = useWorkbenchStore();
@@ -34,7 +34,8 @@ const newLocal = ref("");
 const localValues = ref<Record<string, string>>({});
 const error = ref<string | null>(null);
 
-const list = computed(() => workbench.environments?.environments ?? []);
+const view = computed(() => workbench.environments[props.projectId] ?? null);
+const list = computed(() => view.value?.environments ?? []);
 const current = computed<EnvironmentView | null>(
   () => list.value.find((e) => e.name === editing.value) ?? null,
 );
@@ -61,8 +62,7 @@ function load(env: EnvironmentView | undefined): void {
 watch(
   () => props.open,
   (open) => {
-    if (open)
-      load(list.value.find((e) => e.name === workbench.environments?.active) ?? list.value[0]);
+    if (open) load(list.value.find((e) => e.name === view.value?.active) ?? list.value[0]);
   },
   { immediate: true },
 );
@@ -81,7 +81,7 @@ async function save(): Promise<void> {
   if (!doc) return;
   await guard(async () => {
     const previous = editing.value;
-    await workbench.saveEnvironment(doc, previous);
+    await workbench.saveEnvironment(props.projectId, doc, previous);
     editing.value = doc.name;
     toasts.show(`Environnement « ${doc.name} » enregistré.`);
   });
@@ -93,10 +93,11 @@ async function create(): Promise<void> {
     for (let n = 2; list.value.some((e) => e.name === name); n++)
       name = `Nouvel environnement ${n}`;
     await workbench.saveEnvironment(
+      props.projectId,
       { version: 1, name, color: "gray", protected: false, variables: [], locals: [] },
       null,
     );
-    load(workbench.environments?.environments.find((e) => e.name === name));
+    load(view.value?.environments.find((e) => e.name === name));
   });
 }
 
@@ -104,7 +105,7 @@ async function remove(): Promise<void> {
   const name = editing.value;
   if (name === null) return;
   await guard(async () => {
-    await workbench.deleteEnvironment(name);
+    await workbench.deleteEnvironment(props.projectId, name);
     load(list.value[0]);
     toasts.show(`Environnement « ${name} » supprimé.`);
   });
@@ -119,7 +120,7 @@ async function move(delta: -1 | 1): Promise<void> {
   if (a === undefined || b === undefined) return;
   names[index] = b;
   names[target] = a;
-  await guard(() => workbench.reorderEnvironments(names));
+  await guard(() => workbench.reorderEnvironments(props.projectId, names));
 }
 
 function addVariable(): void {
@@ -141,7 +142,7 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
   const env = editing.value;
   if (env === null) return;
   await guard(async () => {
-    await workbench.setLocal(env, name, localValues.value[name] ?? "", secret);
+    await workbench.setLocal(props.projectId, env, name, localValues.value[name] ?? "", secret);
     localValues.value[name] = "";
     toasts.show(
       secret

@@ -11,7 +11,7 @@ const workbench = useWorkbenchStore();
   <BaseDialog
     :open="workbench.pending !== null"
     title="Environnement protégé"
-    :description="`L'environnement « ${workbench.environments?.active ?? ''} » est protégé. Cette exécution peut modifier des données.`"
+    :description="`L'environnement « ${workbench.pendingEnvironment()} » est protégé. Cette exécution peut modifier des données.`"
     @close="workbench.dismissPending()"
   >
     <div class="confirm__actions">
