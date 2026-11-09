@@ -29,7 +29,31 @@ export type CommandName =
   | "workspace_add_projects"
   | "workspace_remove_project"
   | "workspace_delete"
-  | "window_set_title";
+  | "window_set_title"
+  | "tree_load"
+  | "tree_set_collapsed"
+  | "tree_create_folder"
+  | "tree_create_request"
+  | "tree_rename"
+  | "tree_move"
+  | "tree_duplicate"
+  | "tree_delete"
+  | "request_read"
+  | "request_save"
+  | "request_send"
+  | "request_cancel"
+  | "request_propose_assertions"
+  | "environments_load"
+  | "environment_select"
+  | "environment_save"
+  | "environment_delete"
+  | "environments_reorder"
+  | "local_set"
+  | "run_start"
+  | "run_status"
+  | "run_cancel"
+  | "run_retry_failures"
+  | "run_last";
 
 /**
  * Nature d'une erreur de commande.
@@ -49,7 +73,14 @@ export type CommandErrorKind =
   | "undoExpired" // Le jeton d'annulation n'est plus valable.
   | "io" // Erreur d'entrée-sortie : disque, droits, chemin.
   | "corruptState" // Le fichier d'état de l'application est illisible.
-  | "newerVersion"; // Fichier d'état écrit par une version plus récente d'Arnod.
+  | "newerVersion" // Fichier d'état écrit par une version plus récente d'Arnod.
+  | "unknownVariable" // Une variable {{nom}} n'existe pas dans l'environnement actif.
+  | "invalidRequest" // Fichier de requête invalide ou opération impossible dessus.
+  | "network" // Échec réseau : hôte introuvable, connexion refusée, certificat.
+  | "timeout" // Délai dépassé.
+  | "cancelled" // Exécution annulée par l'utilisateur.
+  | "secretStore" // Le coffre du système est indisponible.
+  | "protectedEnvironment"; // Envoi sur un environnement protégé sans confirmation.
 
 /**
  * Erreur renvoyée par une commande Rust qui échoue : la promesse d'`invoke` est
@@ -159,4 +190,191 @@ export interface ProjectCreateInput {
   location: string | null;
   /** Workspace choisi ; le projet va aussi dans le workspace par défaut. */
   workspaceId: string;
+}
+
+// ---------------------------------------------------------------------------
+// Premier usage : arborescence, requêtes, environnements, runs
+// ---------------------------------------------------------------------------
+
+/** Méthode HTTP (`Method` en Rust). */
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+
+/** Noeud de l'arborescence d'un projet (`TreeNode` en Rust). */
+export type TreeNode =
+  | { kind: "folder"; name: string; path: string; children: TreeNode[]; requestCount: number }
+  | {
+      kind: "request";
+      name: string;
+      path: string;
+      method: HttpMethod;
+      assertionCount: number;
+      invalid: boolean;
+    };
+
+/** Arborescence et dossiers repliés (`TreeView`). */
+export interface TreeView {
+  nodes: TreeNode[];
+  collapsed: string[];
+}
+
+/** Paire nom-valeur activable (paramètre, en-tête, champ de formulaire). */
+export interface Pair {
+  name: string;
+  value: string;
+  enabled: boolean;
+}
+
+export type AuthKind = "none" | "basic" | "bearer" | "apiKey";
+export type ApiKeyLocation = "header" | "query";
+
+/** Authentification (`Auth` en Rust, structure plate). */
+export interface Auth {
+  type: AuthKind;
+  username: string;
+  password: string;
+  token: string;
+  name: string;
+  value: string;
+  location: ApiKeyLocation;
+}
+
+export type BodyKind = "none" | "json" | "text" | "form";
+
+export interface Body {
+  kind: BodyKind;
+  content: string;
+  form: Pair[];
+}
+
+export type AssertionOperator =
+  | "equals"
+  | "notEquals"
+  | "exists"
+  | "contains"
+  | "lessThan"
+  | "greaterThan"
+  | "isNumber"
+  | "isText";
+export type AssertionOrigin = "proposed" | "manual" | "default";
+export type Scalar = boolean | number | string;
+
+/** Vérification d'une requête (R10, R11). */
+export interface Assertion {
+  id: string;
+  target: string;
+  operator: AssertionOperator;
+  value?: Scalar | null;
+  origin: AssertionOrigin;
+}
+
+/** Requête, telle que stockée dans son fichier YAML. */
+export interface RequestDoc {
+  version: number;
+  id: string;
+  name: string;
+  method: HttpMethod;
+  url: string;
+  params: Pair[];
+  headers: Pair[];
+  auth: Auth;
+  body: Body;
+  timeoutMs: number;
+  assertions: Assertion[];
+}
+
+/** Résultat d'une vérification (V3). */
+export interface AssertionResult {
+  id: string;
+  passed: boolean;
+  message: string | null;
+  actual: string | null;
+}
+
+/** Réponse HTTP reçue. */
+export interface HttpResponse {
+  status: number;
+  statusText: string;
+  headers: [string, string][];
+  body: string;
+  truncated: boolean;
+  sizeBytes: number;
+  waitMs: number;
+  receiveMs: number;
+  totalMs: number;
+}
+
+/** Résultat d'un envoi. */
+export interface SendOutcome {
+  response: HttpResponse;
+  assertions: AssertionResult[];
+  passed: boolean;
+  slow: boolean;
+}
+
+/** Variable partagée d'un environnement. */
+export interface EnvVariable {
+  name: string;
+  value: string;
+}
+
+/** Couleurs proposées pour un environnement. */
+export type EnvironmentColor = "gray" | "blue" | "green" | "orange" | "red" | "purple";
+
+/** Contenu d'un fichier d'environnement. */
+export interface EnvironmentDoc {
+  version: number;
+  name: string;
+  color: string;
+  protected?: boolean;
+  variables: EnvVariable[];
+  locals: string[];
+}
+
+/** Variable locale ; un secret n'expose jamais sa valeur (R9). */
+export interface LocalVarView {
+  name: string;
+  secret: boolean;
+  value: string | null;
+  hasValue: boolean;
+}
+
+export interface EnvironmentView extends EnvironmentDoc {
+  localVars: LocalVarView[];
+}
+
+export interface EnvironmentsView {
+  environments: EnvironmentView[];
+  active: string;
+}
+
+export type RunItemStatus = "pending" | "running" | "passed" | "failed" | "error" | "cancelled";
+
+export interface RunItem {
+  path: string;
+  name: string;
+  method: HttpMethod;
+  status: RunItemStatus;
+  httpStatus: number | null;
+  durationMs: number | null;
+  slow: boolean;
+  assertions: AssertionResult[];
+  error: string | null;
+}
+
+export interface RunView {
+  id: string;
+  folder: string;
+  environment: string;
+  startedAt: number;
+  finished: boolean;
+  cancelled: boolean;
+  items: RunItem[];
+}
+
+/** Réponse sur laquelle proposer des vérifications. */
+export interface ProposeInput {
+  status: number;
+  durationMs: number;
+  headers: [string, string][];
+  body: string;
 }

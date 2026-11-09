@@ -12,7 +12,15 @@ import type {
   CommandError,
   CommandErrorKind,
   CommandName,
+  EnvironmentDoc,
+  EnvironmentsView,
   HelloResponse,
+  Assertion,
+  ProposeInput,
+  RequestDoc,
+  RunView,
+  SendOutcome,
+  TreeView,
   ProjectCreated,
   ProjectCreateInput,
   ProjectView,
@@ -34,6 +42,13 @@ const COMMAND_ERROR_KINDS: Record<CommandErrorKind, true> = {
   io: true,
   corruptState: true,
   newerVersion: true,
+  unknownVariable: true,
+  invalidRequest: true,
+  network: true,
+  timeout: true,
+  cancelled: true,
+  secretStore: true,
+  protectedEnvironment: true,
 };
 
 /** Indique si la cause d'un rejet est une `CommandError` renvoyée par le cœur natif. */
@@ -159,4 +174,104 @@ export const ipc = {
   /** Titre de la fenêtre : « Arnod — <sujet> », ou « Arnod » si `subject` vaut `null`. */
   windowSetTitle: (subject: string | null): Promise<void> =>
     call<null>("window_set_title", { subject }).then(() => undefined),
+
+  // --- Arborescence --------------------------------------------------------
+
+  treeLoad: (project: string): Promise<TreeView> => call<TreeView>("tree_load", { project }),
+
+  treeSetCollapsed: (project: string, collapsed: string[]): Promise<void> =>
+    call<void>("tree_set_collapsed", { project, collapsed }),
+
+  treeCreateFolder: (project: string, parent: string, name: string): Promise<string> =>
+    call<string>("tree_create_folder", { project, parent, name }),
+
+  /** Crée une requête ; sans `name`, un nom par défaut est choisi. Renvoie son chemin. */
+  treeCreateRequest: (project: string, folder: string, name: string | null): Promise<string> =>
+    call<string>("tree_create_request", { project, folder, name }),
+
+  treeRename: (project: string, path: string, name: string): Promise<string> =>
+    call<string>("tree_rename", { project, path, name }),
+
+  treeMove: (project: string, path: string, targetFolder: string): Promise<string> =>
+    call<string>("tree_move", { project, path, targetFolder }),
+
+  treeDuplicate: (project: string, path: string): Promise<string> =>
+    call<string>("tree_duplicate", { project, path }),
+
+  treeDelete: (project: string, path: string, permanent: boolean): Promise<void> =>
+    call<void>("tree_delete", { project, path, permanent }),
+
+  // --- Requêtes ------------------------------------------------------------
+
+  requestRead: (project: string, path: string): Promise<RequestDoc> =>
+    call<RequestDoc>("request_read", { project, path }),
+
+  requestSave: (project: string, path: string, request: RequestDoc): Promise<void> =>
+    call<void>("request_save", { project, path, request }),
+
+  /** Envoie la requête de l'éditeur ; `execId` permet de l'annuler. */
+  requestSend: (
+    project: string,
+    execId: string,
+    environment: string,
+    request: RequestDoc,
+    confirmed: boolean,
+  ): Promise<SendOutcome> =>
+    call<SendOutcome>("request_send", { project, execId, environment, request, confirmed }),
+
+  requestCancel: (execId: string): Promise<void> => call<void>("request_cancel", { execId }),
+
+  requestProposeAssertions: (response: ProposeInput): Promise<Assertion[]> =>
+    call<Assertion[]>("request_propose_assertions", { response }),
+
+  // --- Environnements ------------------------------------------------------
+
+  environmentsLoad: (project: string): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environments_load", { project }),
+
+  environmentSelect: (project: string, name: string): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environment_select", { project, name }),
+
+  /** Enregistre un environnement ; `previous` est l'ancien nom en cas de renommage. */
+  environmentSave: (
+    project: string,
+    environment: EnvironmentDoc,
+    previous: string | null,
+  ): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environment_save", { project, environment, previous }),
+
+  environmentDelete: (project: string, name: string): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environment_delete", { project, name }),
+
+  environmentsReorder: (project: string, names: string[]): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environments_reorder", { project, names }),
+
+  /** Valeur d'une variable locale ; un secret va dans le coffre du système (R9). */
+  localSet: (
+    project: string,
+    environment: string,
+    name: string,
+    value: string,
+    secret: boolean,
+  ): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("local_set", { project, environment, name, value, secret }),
+
+  // --- Runs ----------------------------------------------------------------
+
+  runStart: (
+    project: string,
+    folder: string,
+    environment: string,
+    confirmed: boolean,
+  ): Promise<RunView> => call<RunView>("run_start", { project, folder, environment, confirmed }),
+
+  runStatus: (run: string): Promise<RunView> => call<RunView>("run_status", { run }),
+
+  runCancel: (run: string): Promise<void> => call<void>("run_cancel", { run }),
+
+  runRetryFailures: (project: string, run: string, confirmed: boolean): Promise<RunView> =>
+    call<RunView>("run_retry_failures", { project, run, confirmed }),
+
+  runLast: (project: string): Promise<RunView | null> =>
+    call<RunView | null>("run_last", { project }),
 };

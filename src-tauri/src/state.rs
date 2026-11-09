@@ -15,9 +15,11 @@ use crate::catalog::snapshot::{
 };
 use crate::catalog::undo::{UndoAction, UndoStack};
 use crate::catalog::{Catalog, names};
+use crate::environment;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::manifest::{self, Manifest};
 use crate::storage::{self, Loaded};
+use crate::workbench::ProjectCtx;
 
 /// Dossier, dans le dossier personnel, où les projets sont créés par défaut.
 pub const DEFAULT_LOCATION_DIR: &str = "arnod";
@@ -174,6 +176,11 @@ impl AppState {
 
         let project_id = Uuid::new_v4();
         let created = manifest::create_project_folder(&folder, &Manifest::new(project_id, &name))?;
+        // Chaque projet démarre avec un environnement « Local » (N1).
+        if let Err(error) = environment::init(created.path()) {
+            created.rollback();
+            return Err(error);
+        }
         let mut next = inner.catalog.clone();
         let registered = next
             .register_project(project_id, &name, canonical(created.path()), workspace_id)
@@ -258,6 +265,27 @@ impl AppState {
             ));
         }
         Ok(project)
+    }
+
+    /// Dossier et données locales d'un projet dont le dossier existe encore.
+    pub fn project_ctx(&self, project_id: Uuid) -> Result<ProjectCtx, CommandError> {
+        let inner = self.lock()?;
+        let project = inner.catalog.project(project_id)?;
+        if !project.path.is_dir() {
+            return Err(CommandError::new(
+                CommandErrorKind::NotFound,
+                format!(
+                    "Le dossier du projet « {} » est introuvable : {}.",
+                    project.name,
+                    project.path.display()
+                ),
+            ));
+        }
+        Ok(ProjectCtx {
+            id: project_id,
+            root: project.path.clone(),
+            data_dir: self.data_dir.clone(),
+        })
     }
 
     fn lock(&self) -> Result<MutexGuard<'_, Inner>, CommandError> {

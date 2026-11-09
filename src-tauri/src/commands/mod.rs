@@ -8,8 +8,12 @@
 //! [`crate::state`].
 
 pub mod catalog;
+pub mod environments;
 pub mod hello;
 pub mod projects;
+pub mod requests;
+pub mod runs;
+pub mod tree;
 pub mod window;
 pub mod workspaces;
 

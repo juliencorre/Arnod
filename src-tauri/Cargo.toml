@@ -28,9 +28,23 @@ uuid = { version = "1", features = ["v4", "serde"] }
 tauri-plugin-dialog = "2"
 # Chemins canoniques sans préfixe \\?\ sous Windows.
 dunce = "1"
+# Client HTTP : TLS rustls (pas d'OpenSSL), appelé uniquement depuis Rust.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# Tâches, annulation et concurrence des envois et des runs (déjà tiré par Tauri).
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+# Coffre du système pour les secrets (Windows : gestionnaire d'identification).
+keyring = { version = "3", default-features = false, features = ["windows-native", "apple-native", "sync-secret-service"] }
+# Corbeille du système pour la suppression des dossiers et requêtes.
+trash = "5"
+# En-tête Authorization Basic.
+base64 = "0.22"
+# Encodage des paramètres d'adresse et des formulaires.
+percent-encoding = "2"
 
 [dev-dependencies]
 tempfile = "3"
+# Serveur HTTP simulé pour les tests des envois et des runs.
+wiremock = "0.6"
 
 # Optimisations de taille, voir https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

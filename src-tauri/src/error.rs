@@ -41,6 +41,20 @@ pub enum CommandErrorKind {
     CorruptState,
     /// Le fichier d'état a été écrit par une version plus récente d'Arnod.
     NewerVersion,
+    /// Une variable `{{nom}}` n'existe pas dans l'environnement actif.
+    UnknownVariable,
+    /// Fichier de requête ou de dossier invalide, ou opération impossible dessus.
+    InvalidRequest,
+    /// Échec réseau : hôte introuvable, connexion refusée, certificat.
+    Network,
+    /// Délai dépassé.
+    Timeout,
+    /// Exécution annulée par l'utilisateur.
+    Cancelled,
+    /// Le coffre du système est indisponible.
+    SecretStore,
+    /// Envoi sur un environnement protégé sans confirmation.
+    ProtectedEnvironment,
 }
 
 /// Erreur renvoyée par une commande : une nature et un message prêt à afficher.
@@ -88,7 +102,7 @@ mod tests {
     use crate::ts_contract::{serialized_name, union_members};
 
     /// Toutes les natures, à compléter à chaque ajout de variante.
-    const ALL_KINDS: [CommandErrorKind; 11] = [
+    const ALL_KINDS: [CommandErrorKind; 18] = [
         CommandErrorKind::InvalidName,
         CommandErrorKind::NameTaken,
         CommandErrorKind::FolderNotEmpty,
@@ -100,6 +114,13 @@ mod tests {
         CommandErrorKind::Io,
         CommandErrorKind::CorruptState,
         CommandErrorKind::NewerVersion,
+        CommandErrorKind::UnknownVariable,
+        CommandErrorKind::InvalidRequest,
+        CommandErrorKind::Network,
+        CommandErrorKind::Timeout,
+        CommandErrorKind::Cancelled,
+        CommandErrorKind::SecretStore,
+        CommandErrorKind::ProtectedEnvironment,
     ];
 
     fn serialized_kind(kind: CommandErrorKind) -> String {
