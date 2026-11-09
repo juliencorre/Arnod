@@ -70,7 +70,15 @@ export type CommandName =
   | "run_cancel"
   | "run_retry_failures"
   | "run_last"
-  | "project_last_runs";
+  | "project_last_runs"
+  | "contract_list"
+  | "contract_read"
+  | "contract_add"
+  | "contract_import_file"
+  | "contract_save"
+  | "contract_delete"
+  | "contract_generate"
+  | "contract_run";
 
 /**
  * Nature d'une erreur de commande.
@@ -279,7 +287,8 @@ export type AssertionOperator =
   | "lessThan"
   | "greaterThan"
   | "isNumber"
-  | "isText";
+  | "isText"
+  | "matchesContract";
 export type AssertionOrigin = "proposed" | "manual" | "default";
 export type Scalar = boolean | number | string;
 
@@ -305,6 +314,16 @@ export interface RequestDoc {
   body: Body;
   timeoutMs: number;
   assertions: Assertion[];
+  /** Opération du contrat dont la requête est issue (C7). */
+  contract?: ContractLink;
+}
+
+/** Lien d'une requête à une opération de contrat (`ContractLink`). */
+export interface ContractLink {
+  /** Fichier du contrat : `contracts/petstore.yaml`. */
+  file: string;
+  /** Clé de l'opération : `GET /pets/{petId}`. */
+  operation: string;
 }
 
 /** Résultat d'une vérification (V3). */
@@ -394,6 +413,8 @@ export interface RunView {
   finished: boolean;
   cancelled: boolean;
   items: RunItem[];
+  /** Nom du contrat exécuté (C10), sinon `null`. */
+  contract: string | null;
 }
 
 /** Réponse sur laquelle proposer des vérifications. */
@@ -410,7 +431,9 @@ export interface ProposeInput {
 
 /** Ce qu'affiche un onglet de contenu (`Content` en Rust). */
 export type ContentRef =
-  { kind: "request"; projectId: string; path: string } | { kind: "run"; projectId: string };
+  | { kind: "request"; projectId: string; path: string }
+  | { kind: "run"; projectId: string }
+  | { kind: "contract"; projectId: string; path: string };
 
 /** Onglet de contenu d'une zone (`Tab`). */
 export interface ContentTab {
@@ -496,7 +519,7 @@ export interface WindowContext {
 }
 
 /** Partie d'un projet modifiée (`ProjectScope`). */
-export type ProjectScope = "tree" | "request" | "environments";
+export type ProjectScope = "tree" | "request" | "environments" | "contracts";
 
 /** Modification d'un projet diffusée par `arnod://projet` (`ProjectChange`). */
 export interface ProjectChange {
@@ -505,4 +528,84 @@ export interface ProjectChange {
   path: string | null;
   /** Fenêtre à l'origine du changement, qui l'a déjà appliqué. */
   origin: string;
+}
+
+// --- Contrats de services (docs/plan-contrats-services.md) ---
+
+/** Famille de spécification d'un contrat (`SpecKind`). */
+export type SpecKind = "openApi3" | "swagger2";
+
+/** Contrat de la barre latérale (`ContractSummary`). */
+export interface ContractSummary {
+  /** Chemin relatif au projet : `contracts/petstore.yaml`. */
+  path: string;
+  name: string;
+  version: string;
+  operationCount: number;
+  /** Fichier illisible (R10) : la raison. */
+  error: string | null;
+}
+
+/** Opération affichée dans l'onglet du contrat (`OperationView`). */
+export interface OperationView {
+  key: string;
+  method: string;
+  path: string;
+  summary: string | null;
+  operationId: string | null;
+  tag: string | null;
+  deprecated: boolean;
+  /** Méthode envoyable (TRACE ne l'est pas). */
+  supported: boolean;
+  externalRefs: boolean;
+  /** Requête liée (R4), s'il y en a une. */
+  request: string | null;
+}
+
+/** Requête liée dont l'opération n'est plus dans le contrat (R11). */
+export interface OrphanView {
+  path: string;
+  name: string;
+  operation: string;
+}
+
+/** Contrat affiché dans son onglet (`ContractView`). */
+export interface ContractView {
+  path: string;
+  name: string;
+  version: string;
+  kind: SpecKind | null;
+  specVersion: string;
+  description: string | null;
+  servers: string[];
+  source: string;
+  error: string | null;
+  operations: OperationView[];
+  orphans: OrphanView[];
+}
+
+/** Origine d'un contrat ajouté (`ContractSource`). */
+export type ContractSource =
+  | { kind: "text"; text: string }
+  | { kind: "url"; url: string }
+  | { kind: "template"; name: string };
+
+/** Opération sans requête créée, et pourquoi. */
+export interface SkippedOperation {
+  operation: string;
+  reason: string;
+}
+
+/** `baseUrl` renseignée à la création des requêtes (R8). */
+export interface BaseUrlSet {
+  environment: string;
+  value: string;
+}
+
+/** Bilan de « Créer les requêtes » (`GenerateReport`). */
+export interface GenerateReport {
+  folder: string;
+  created: string[];
+  skipped: SkippedOperation[];
+  baseUrl: BaseUrlSet | null;
 }

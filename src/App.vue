@@ -15,6 +15,7 @@ import ContentWindow from "@/components/windows/ContentWindow.vue";
 import SidebarWindow from "@/components/windows/SidebarWindow.vue";
 import { events } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
+import { useContractsStore } from "@/stores/contracts";
 import { useNavigationStore } from "@/stores/navigation";
 import { useToastStore } from "@/stores/toasts";
 import { useWindowsStore } from "@/stores/windows";
@@ -25,6 +26,7 @@ const navigation = useNavigationStore();
 const toasts = useToastStore();
 const windows = useWindowsStore();
 const workbench = useWorkbenchStore();
+const contracts = useContractsStore();
 const startupError = ref<string | null>(null);
 const ready = ref(false);
 
@@ -32,11 +34,13 @@ onMounted(async () => {
   try {
     const warning = await catalog.load();
     await windows.load();
-    await Promise.all([catalog.subscribe(), workbench.subscribe()]);
+    await Promise.all([catalog.subscribe(), workbench.subscribe(), contracts.subscribe()]);
     if (windows.kind !== "main") {
       // Fermeture d'une fenêtre détachée : enregistrer, puis se rattacher (Z6).
       await events.onClose(() => {
-        void workbench.saveAll().finally(() => windows.reattach());
+        void Promise.all(Object.keys(contracts.open).map((key) => contracts.save(key)))
+          .then(() => workbench.saveAll())
+          .finally(() => windows.reattach());
       });
     }
     navigation.start();

@@ -8,6 +8,7 @@
 
 pub mod catalog;
 pub mod commands;
+pub mod contract;
 pub mod environment;
 pub mod error;
 pub mod http;
@@ -92,6 +93,14 @@ pub fn run() {
             commands::window::window_detach_sidebar,
             commands::window::window_reattach,
             commands::window::window_reattach_all,
+            commands::contracts::contract_list,
+            commands::contracts::contract_read,
+            commands::contracts::contract_add,
+            commands::contracts::contract_import_file,
+            commands::contracts::contract_save,
+            commands::contracts::contract_delete,
+            commands::contracts::contract_generate,
+            commands::contracts::contract_run,
             commands::tree::tree_load,
             commands::tree::tree_set_collapsed,
             commands::tree::tree_create_folder,

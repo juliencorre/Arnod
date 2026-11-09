@@ -8,6 +8,7 @@
 //! [`crate::state`].
 
 pub mod catalog;
+pub mod contracts;
 pub mod environments;
 pub mod hello;
 pub mod projects;

@@ -163,6 +163,8 @@ pub enum Operator {
     GreaterThan,
     IsNumber,
     IsText,
+    /// Statut prévu et corps conforme au schéma du contrat lié (C8).
+    MatchesContract,
 }
 
 /// Origine d'une vérification.
@@ -189,6 +191,16 @@ pub struct Assertion {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<Scalar>,
     pub origin: Origin,
+}
+
+/// Opération d'un contrat dont la requête est issue (C7).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContractLink {
+    /// Fichier du contrat, relatif au projet (`contracts/petstore.yaml`).
+    pub file: String,
+    /// Clé de l'opération : `GET /pets/{petId}`.
+    pub operation: String,
 }
 
 fn default_timeout() -> u64 {
@@ -223,6 +235,10 @@ pub struct Request {
     pub timeout_ms: u64,
     #[serde(default)]
     pub assertions: Vec<Assertion>,
+    /// Opération du contrat liée, le cas échéant (champ ignoré par une version
+    /// d'Arnod qui ne le connaît pas).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contract: Option<ContractLink>,
 }
 
 impl Request {
@@ -246,6 +262,7 @@ impl Request {
                 value: Some(Scalar::Int(DEFAULT_MAX_DURATION_MS)),
                 origin: Origin::Default,
             }],
+            contract: None,
         }
     }
 }

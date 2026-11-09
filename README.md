@@ -8,13 +8,15 @@
 
 Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 
-> **Statut : projets et workspaces en onglets, fenêtres et zones.** Sur le squelette technique
+> **Statut : projets et workspaces en onglets, fenêtres et zones, contrats de services.** Sur le squelette technique
 > ([`PRD-squelette.md`](PRD-squelette.md)), Arnod crée et gère des projets et des
 > workspaces selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md), révisé
 > par [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md) : les workspaces sont
 > des onglets, après l'onglet épinglé « Tous les projets ». Les requêtes s'ouvrent en onglets,
 > dans des zones redimensionnables et des fenêtres interconnectées
-> ([`docs/plan-fenetres-zones.md`](docs/plan-fenetres-zones.md)).
+> ([`docs/plan-fenetres-zones.md`](docs/plan-fenetres-zones.md)). Un contrat OpenAPI crée les
+> requêtes de ses opérations et vérifie la conformité des réponses
+> ([`docs/plan-contrats-services.md`](docs/plan-contrats-services.md)).
 
 | Thème clair                                      | Thème sombre                                           |
 | ------------------------------------------------ | ------------------------------------------------------ |
@@ -65,6 +67,24 @@ et zones »).
 | F9, F10  | Barre latérale détachable (`Ctrl+Maj+D`) : elle pilote les fenêtres qui suivent la sélection ; une fenêtre peut être épinglée.         |
 | F11      | Catalogue, arborescences, requêtes enregistrées et environnements se mettent à jour dans toutes les fenêtres.                          |
 | F13, F14 | Zones, tailles et fenêtres détachées rouvertes au démarrage (`windows.json`) ; ⤢ agrandit une zone.                                    |
+
+### Contrats de services
+
+Cas C1 à C12 de [`docs/plan-contrats-services.md`](docs/plan-contrats-services.md).
+
+| Thème clair                                                          | Thème sombre                                                               |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| ![Contrat et ses requêtes, thème clair](docs/screenshot-contrat.png) | ![Contrat et ses requêtes, thème sombre](docs/screenshot-contrat-dark.png) |
+
+| ID       | Comportement                                                                                                                                                                         |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C1 à C4  | « + Contrat » : importer un fichier, coller un contrat, le lire à une adresse ou en créer un vide ; OpenAPI 3.0, 3.1 ou Swagger 2.0, JSON ou YAML, rangé dans `contracts/`.          |
+| C5       | Onglet du contrat : version, format, serveurs, opérations groupées par tag, couverture « n opérations · m avec requête ».                                                            |
+| C6, C7   | « Créer les requêtes » : une requête prête à envoyer par opération cochée (exemples, authentification, vérifications), liée au contrat ; `baseUrl` vide prend le serveur du contrat. |
+| C8       | Vérification « est conforme au contrat » : statut prévu et corps conforme au schéma, avec le chemin du premier écart.                                                                |
+| C9       | Vue « Source » : texte modifiable, enregistré seulement s'il reste un contrat lisible (Ctrl+S), ou remplacé par un fichier.                                                          |
+| C10      | « Exécuter » lance le run des requêtes du contrat.                                                                                                                                   |
+| C11, C12 | Contrat mis à la corbeille ; requêtes dont l'opération a disparu signalées « hors contrat ».                                                                                         |
 
 Pile : [Tauri 2](https://v2.tauri.app) (cœur Rust, WebView2 sous Windows, WebKitGTK sous
 Linux), Vue 3, TypeScript strict, Vite, Pinia. Les règles d'architecture et les conventions

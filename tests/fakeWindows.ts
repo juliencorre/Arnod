@@ -276,7 +276,7 @@ function selectionTarget(fw: FakeWindows): string {
   return "main";
 }
 
-/** Ferme les onglets d'une requête supprimée (ou de ce qu'elle contenait). */
+/** Ferme les onglets d'une requête ou d'un contrat supprimé (ou de ce qu'il contenait). */
 export function closePath(fw: FakeWindows, projectId: string, path: string): void {
   for (const w of fw.windows) {
     if (!w.layout) continue;
@@ -284,7 +284,7 @@ export function closePath(fw: FakeWindows, projectId: string, path: string): voi
       for (const t of [...z.tabs]) {
         const c = t.content;
         if (
-          c.kind === "request" &&
+          c.kind !== "run" &&
           c.projectId === projectId &&
           (c.path === path || c.path.startsWith(`${path}/`))
         ) {

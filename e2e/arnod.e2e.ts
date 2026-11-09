@@ -7,9 +7,13 @@
  * onglets et l'onglet épinglé « Tous les projets ». Le sélecteur de dossier
  * natif (« Changer », P3) ne se pilote pas par WebDriver : il est couvert par les
  * tests Rust et Vitest. Les dernières étapes divisent la fenêtre en zones et
- * ouvrent des fenêtres interconnectées (docs/plan-fenetres-zones.md).
+ * ouvrent des fenêtres interconnectées (docs/plan-fenetres-zones.md), puis
+ * ajoutent un contrat de service et exécutent ses requêtes contre un serveur
+ * HTTP local (docs/plan-contrats-services.md).
  */
 import type { ChildProcess } from "node:child_process";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -147,6 +151,21 @@ async function clickHidden(selector: string): Promise<void> {
     if (!target) throw new Error(`élément « ${css} » introuvable`);
     target.click();
   }, selector);
+}
+
+/** Clique, depuis la page, le premier élément `selector` dont le texte contient `text`. */
+async function clickText(selector: string, text: string): Promise<void> {
+  await browser.execute(
+    (css, label) => {
+      const target = Array.from(document.querySelectorAll<HTMLElement>(css)).find((element) =>
+        element.textContent.includes(label),
+      );
+      if (!target) throw new Error(`« ${label} » introuvable dans ${css}`);
+      target.click();
+    },
+    selector,
+    text,
+  );
 }
 
 /** Attend `count` fenêtres et renvoie leurs identifiants WebDriver. */
@@ -568,5 +587,165 @@ describe("Fenêtres et zones", () => {
     await restart();
     await waitForZoneTabs([["Nouvelle requête", "lister"]]);
     expect(await browser.$("aside").isExisting()).toBe(true);
+  });
+});
+
+/** Contrat OpenAPI du serveur de test, servi à `url`. */
+function animalerie(url: string): string {
+  return `openapi: 3.0.3
+info:
+  title: Animalerie
+  version: 2.1.0
+servers:
+  - url: ${url}
+paths:
+  /pets:
+    get:
+      tags: [animaux]
+      summary: Lister les animaux
+      responses:
+        "200":
+          description: Liste
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Pet" }
+    post:
+      tags: [animaux]
+      summary: Créer un animal
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Pet" }
+      responses:
+        "201":
+          description: Créé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+  /pets/{petId}:
+    get:
+      tags: [animaux]
+      summary: Trouver un animal
+      parameters:
+        - { name: petId, in: path, required: true, schema: { type: integer }, example: 1 }
+      responses:
+        "200":
+          description: Un animal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+components:
+  schemas:
+    Pet:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+`;
+}
+
+describe("Contrats de services", () => {
+  let server: Server;
+  let url = "";
+  /** Le serveur répond un identifiant texte : écart au contrat. */
+  let broken = false;
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      const json = (status: number, body: unknown): void => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      const pet = { id: broken ? "un" : 1, name: "Rex" };
+      if (request.method === "GET" && request.url === "/pets") json(200, [pet]);
+      else if (request.method === "GET" && request.url === "/pets/1") json(200, pet);
+      else if (request.method === "POST" && request.url === "/pets") json(201, pet);
+      else json(404, { message: "absent" });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  it("ajoute un contrat collé, présenté dans son onglet (C2, C5)", async () => {
+    await browser.$('button[aria-label="Ajouter un contrat à boutique-tests"]').click();
+    await clickText('[role="menuitem"]', "Coller un contrat");
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForDisplayed();
+    // Texte collé d'un bloc, comme un Ctrl+V.
+    await browser.execute((text) => {
+      const area = document.querySelector<HTMLTextAreaElement>("dialog[open] textarea");
+      if (!area) throw new Error("zone de texte introuvable");
+      area.value = text;
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    }, animalerie(url));
+    await dialog.$("button=Ajouter").click();
+
+    const name = browser.$(".contract__name");
+    await name.waitForDisplayed({ timeout: 10_000 });
+    expect(await name.getText()).toBe("Animalerie");
+    expect(await browser.$(".contract__coverage").getText()).toBe("3 opérations · 0 avec requête");
+    expect(await browser.$(".contract-row__version").getText()).toBe("2.1.0");
+    expect(readFileSync(path.join(project(), "contracts", "animalerie.yaml"), "utf8")).toBe(
+      animalerie(url),
+    );
+  });
+
+  it("crée les requêtes du contrat et renseigne baseUrl (C6, R8)", async () => {
+    await browser.$(".contract__actions").$("button*=Créer les requêtes (3)").click();
+    await browser.waitUntil(
+      async () =>
+        (await browser.$(".contract__coverage").getText()) === "3 opérations · 3 avec requête",
+      { timeout: 10_000 },
+    );
+    const request = readFileSync(
+      path.join(project(), "Animalerie", "animaux", "trouver-un-animal.yml"),
+      "utf8",
+    );
+    expect(request).toContain("{{baseUrl}}/pets/1");
+    expect(request).toContain("operation: GET /pets/{petId}");
+    expect(request).toContain("op: matchesContract");
+    expect(readFileSync(path.join(project(), "environments", "local.yml"), "utf8")).toContain(url);
+    await screenshot(browser, "09-contrat");
+  });
+
+  it("exécute le contrat : réponses conformes (C10)", async () => {
+    await browser.$(".contract__actions").$("button*=Exécuter (3)").click();
+    const progress = browser.$(".run__progress");
+    await progress.waitForDisplayed({ timeout: 10_000 });
+    await browser.waitUntil(async () => (await progress.getText()).includes("tout est réussi"), {
+      timeout: 15_000,
+      timeoutMsg: "run du contrat non réussi",
+    });
+    expect(await browser.$(".run__title").getText()).toContain("Run du contrat « Animalerie »");
+    expect(await browser.$$(".run__item--passed").length).toBe(3);
+  });
+
+  it("un écart au contrat fait échouer la conformité, avec le chemin (C8)", async () => {
+    broken = true;
+    await clickText(".zone__tab-button", "Animalerie");
+    await browser.$(".contract__actions").$("button*=Exécuter (3)").click();
+    const progress = browser.$(".run__progress");
+    await browser.waitUntil(async () => (await progress.getText()).includes("3 en échec"), {
+      timeout: 15_000,
+      timeoutMsg: "écart au contrat non détecté",
+    });
+    const errors = await browser.$$(".run__error").map((e) => e.getText());
+    expect(errors.some((text) => text.includes("body[0].id : attendu entier"))).toBe(true);
+    expect(errors.some((text) => text.includes("body.id : attendu entier"))).toBe(true);
+    await screenshot(browser, "10-run-contrat");
+    broken = false;
   });
 });

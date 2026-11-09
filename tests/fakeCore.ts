@@ -8,6 +8,7 @@ import { mockIPC } from "@tauri-apps/api/mocks";
 
 import type { CatalogSnapshot, CommandError, WorkspaceColor } from "@/types/ipc";
 
+import { createFakeContracts, handleContracts, type FakeContracts } from "./fakeContracts";
 import {
   closePath,
   createFakeWindows,
@@ -34,6 +35,8 @@ export interface FakeCore {
   workbench: FakeWorkbench;
   /** Fenêtres et zones ; `windows.label` est la fenêtre servie par l'interface. */
   windows: FakeWindows;
+  /** Contrats de services, communs à tous les projets. */
+  contracts: FakeContracts;
   /** Diffuse un évènement du cœur (`arnod://…`) aux abonnés de l'interface. */
   emit: (event: string, payload: unknown) => Promise<void>;
   /** Diffuse l'état des fenêtres, comme après une opération faite ailleurs. */
@@ -71,6 +74,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     },
     workbench: createFakeWorkbench(),
     windows: createFakeWindows(),
+    contracts: createFakeContracts(),
     emit: (event, payload) => emit(event, payload),
     emitWindows: () => emit("arnod://fenetres", snapshotOf(core.windows)),
   };
@@ -237,11 +241,13 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
         default: {
           const windows = handleWindows(core.windows, cmd, args);
           if (windows !== undefined) return windows;
-          const handled = handleWorkbench(core.workbench, cmd, args);
+          const contracts = handleContracts(core.contracts, core.workbench, cmd, args);
+          const handled =
+            contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);
           if (handled === undefined) throw new Error(`commande inattendue : ${cmd}`);
-          if (cmd === "tree_delete") {
+          if (cmd === "tree_delete" || cmd === "contract_delete") {
             // Le cœur ferme les onglets de ce qui est supprimé et le diffuse.
-            closePath(core.windows, String(args.projectId), String(args.path));
+            closePath(core.windows, String(args.project), String(args.path));
             void core.emitWindows();
           }
           return handled;

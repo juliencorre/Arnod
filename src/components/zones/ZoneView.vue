@@ -12,6 +12,7 @@ import { computed, nextTick, ref, useTemplateRef } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
+import ContractTab from "@/components/contracts/ContractTab.vue";
 import RunPanel from "@/components/workbench/RunPanel.vue";
 import ProjectWelcome from "@/components/zones/ProjectWelcome.vue";
 import RequestTab from "@/components/zones/RequestTab.vue";
@@ -25,6 +26,7 @@ import {
   startTabDrag,
 } from "@/lib/dnd";
 import { useCatalogStore } from "@/stores/catalog";
+import { contractKey, useContractsStore } from "@/stores/contracts";
 import { useWindowsStore, zonesOf } from "@/stores/windows";
 import { findRequest, requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type { ContentTab, ZoneView } from "@/types/ipc";
@@ -34,6 +36,7 @@ const props = defineProps<{ zone: ZoneView; projectId: string | null }>();
 const windows = useWindowsStore();
 const workbench = useWorkbenchStore();
 const catalog = useCatalogStore();
+const contracts = useContractsStore();
 const actions = useTabActions();
 const strip = useTemplateRef<HTMLElement>("strip");
 const body = useTemplateRef<HTMLElement>("body");
@@ -55,6 +58,19 @@ function info(tab: ContentTab): { name: string; badge: string; dirty: boolean } 
       name: `Run · ${catalog.projectById(content.projectId)?.name ?? "projet"}`,
       badge: "RUN",
       dirty: false,
+    };
+  }
+  if (content.kind === "contract") {
+    const key = contractKey(content.projectId, content.path);
+    const summary = contracts.lists[content.projectId]?.find((c) => c.path === content.path);
+    return {
+      name:
+        contracts.open[key]?.view?.name ??
+        summary?.name ??
+        content.path.split("/").at(-1) ??
+        content.path,
+      badge: "API",
+      dirty: contracts.isDirty(key),
     };
   }
   const key = requestKey(content.projectId, content.path);
@@ -394,6 +410,12 @@ const welcome = computed(
           :path="activeTab.content.path"
           :placement="zone.placement"
         />
+        <ContractTab
+          v-else-if="activeTab.content.kind === 'contract'"
+          :key="activeTab.id"
+          :project-id="activeTab.content.projectId"
+          :path="activeTab.content.path"
+        />
         <div v-else class="zone__run">
           <RunPanel :project-id="activeTab.content.projectId" />
         </div>
@@ -581,7 +603,7 @@ const welcome = computed(
 }
 
 .zone__tool[aria-pressed="true"] {
-  color: var(--color-accent-text);
+  color: var(--color-link);
   background: var(--color-accent-soft);
 }
 

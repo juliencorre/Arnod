@@ -7,7 +7,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::*;
 use crate::environment::Variable;
-use crate::request::model::Request;
+use crate::request::model::{Assertion, Request};
 use crate::secrets::MemorySecretStore;
 
 struct Fixture {
@@ -265,4 +265,86 @@ fn le_dernier_environnement_utilise_est_retenu() {
     assert_eq!(f.bench.environments(&f.ctx).active, "Recette");
     f.bench.delete_environment(&f.ctx, "Recette").unwrap();
     assert_eq!(f.bench.environments(&f.ctx).active, "Local");
+}
+
+/// Petit contrat : `GET /animaux/{id}` renvoie un animal `{ id, nom }`.
+const CONTRAT: &str = r#"openapi: 3.0.3
+info: { title: Animaux, version: 1.0.0 }
+paths:
+  /animaux/{id}:
+    get:
+      summary: Un animal
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer }, example: 1 }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, nom]
+                properties:
+                  id: { type: integer }
+                  nom: { type: string }
+"#;
+
+#[tokio::test]
+async fn c8_c10_le_run_du_contrat_verifie_la_conformite() {
+    use crate::contract::file as contracts;
+
+    let server = MockServer::start().await;
+    Mock::given(path("/animaux/1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{ "id": 1, "nom": "Rex" }"#))
+        .mount(&server)
+        .await;
+    let f = fixture();
+    set_base_url(&f, &server.uri());
+    let contract = contracts::add(&f.ctx.root, CONTRAT).unwrap();
+    contracts::generate(
+        &f.ctx.root,
+        &contract,
+        &["GET /animaux/{id}".to_owned()],
+        None,
+    )
+    .unwrap();
+    add_request(&f, "", "Hors contrat", "{{baseUrl}}/autre", Method::Get);
+
+    let run = f
+        .bench
+        .start_contract_run(&f.ctx, &contract, "Local", false)
+        .unwrap();
+    assert_eq!(run.contract.as_deref(), Some("Animaux"));
+    assert_eq!(run.items.len(), 1, "seules les requêtes liées");
+    let done = wait(&f.bench, run.id).await;
+    let item = &done.items[0];
+    assert_eq!(item.status, ItemStatus::Passed, "{:?}", item.assertions);
+    let conformity = item.assertions.iter().find(|a| a.id == "contrat").unwrap();
+    assert!(conformity.passed);
+
+    // Un écart de schéma fait échouer la seule vérification de conformité.
+    server.reset().await;
+    Mock::given(path("/animaux/1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{ "id": "un" }"#))
+        .mount(&server)
+        .await;
+    let retry = f
+        .bench
+        .start_contract_run(&f.ctx, &contract, "Local", false)
+        .unwrap();
+    let done = wait(&f.bench, retry.id).await;
+    let item = &done.items[0];
+    assert_eq!(item.status, ItemStatus::Failed);
+    let conformity = item.assertions.iter().find(|a| a.id == "contrat").unwrap();
+    assert_eq!(
+        conformity.message.as_deref(),
+        Some("body.nom : champ obligatoire absent ; body.id : attendu entier, reçu \"un\"")
+    );
+    assert!(
+        item.assertions
+            .iter()
+            .find(|a| a.id == "statut")
+            .unwrap()
+            .passed
+    );
 }

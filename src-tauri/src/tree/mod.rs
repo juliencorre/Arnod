@@ -9,6 +9,7 @@ use std::path::{Component, Path, PathBuf};
 use serde::Serialize;
 
 use crate::catalog::names::{self, sort_key};
+use crate::contract::CONTRACTS_DIR;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::manifest::MANIFEST_FILE_NAME;
 use crate::request::file;
@@ -80,7 +81,7 @@ fn read_dir(root: &Path, dir: &Path, top: bool) -> Result<Vec<TreeNode>, Command
         let path = entry.path();
         let relative = relative_path(root, &path);
         if path.is_dir() {
-            if top && name == ENVIRONMENTS_DIR {
+            if top && (name == ENVIRONMENTS_DIR || name == CONTRACTS_DIR) {
                 continue;
             }
             let children = read_dir(root, &path, false)?;
@@ -204,7 +205,8 @@ fn name_taken(name: &str) -> CommandError {
     )
 }
 
-fn request_name_taken(dir: &Path, name: &str, except: Option<&Path>) -> bool {
+/// Une requête de `dir` (autre que `except`) porte déjà ce nom.
+pub(crate) fn request_name_taken(dir: &Path, name: &str, except: Option<&Path>) -> bool {
     fs::read_dir(dir).is_ok_and(|entries| {
         entries.flatten().any(|entry| {
             let path = entry.path();
@@ -217,7 +219,7 @@ fn request_name_taken(dir: &Path, name: &str, except: Option<&Path>) -> bool {
 }
 
 /// Nom de fichier libre dans `dir` pour `base` : `base.yml`, `base-2.yml`…
-fn free_file_name(dir: &Path, base: &str) -> String {
+pub(crate) fn free_file_name(dir: &Path, base: &str) -> String {
     let mut candidate = format!("{base}.yml");
     let mut n = 2;
     while exists_ignoring_case(dir, &candidate) {
@@ -238,7 +240,9 @@ pub fn create_folder(root: &Path, parent: &str, name: &str) -> Result<String, Co
         ));
     }
     if exists_ignoring_case(&parent_dir, &name)
-        || (parent.is_empty() && name.eq_ignore_ascii_case(ENVIRONMENTS_DIR))
+        || (parent.is_empty()
+            && (name.eq_ignore_ascii_case(ENVIRONMENTS_DIR)
+                || name.eq_ignore_ascii_case(CONTRACTS_DIR)))
     {
         return Err(name_taken(&name));
     }
