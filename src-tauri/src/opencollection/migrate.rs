@@ -13,8 +13,8 @@ use crate::opencollection::ROOT_FILE;
 use crate::opencollection::collection::{self, ArnodMeta};
 use crate::request::file as request_file;
 use crate::request::model::{
-    ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, ContractLink, Method, Operator,
-    Origin, Pair, ParamKind, Request, Scalar, default_timeout,
+    ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, ContractLink, DEFAULT_TIMEOUT_MS,
+    Method, Operator, Origin, Pair, Request, Scalar, Settings,
 };
 use crate::tree::ENVIRONMENTS_DIR;
 
@@ -128,10 +128,8 @@ struct LegacyRequest {
 fn pairs(list: Vec<LegacyPair>) -> Vec<Pair> {
     list.into_iter()
         .map(|pair| Pair {
-            name: pair.name,
-            value: pair.value,
             enabled: pair.enabled,
-            kind: ParamKind::Query,
+            ..Pair::new(pair.name, pair.value)
         })
         .collect()
 }
@@ -179,21 +177,9 @@ fn convert(legacy: LegacyRequest) -> Request {
         _ => Auth::default(),
     };
     let body = match legacy.body.kind.as_str() {
-        "json" => Body {
-            kind: BodyKind::Json,
-            content: legacy.body.content,
-            ..Body::default()
-        },
-        "text" => Body {
-            kind: BodyKind::Text,
-            content: legacy.body.content,
-            ..Body::default()
-        },
-        "form" => Body {
-            kind: BodyKind::Form,
-            form: pairs(legacy.body.form),
-            ..Body::default()
-        },
+        "json" => Body::raw(BodyKind::Json, legacy.body.content),
+        "text" => Body::raw(BodyKind::Text, legacy.body.content),
+        "form" => Body::form(pairs(legacy.body.form)),
         _ => Body::default(),
     };
     let assertions = legacy
@@ -210,19 +196,21 @@ fn convert(legacy: LegacyRequest) -> Request {
             })
         })
         .collect();
-    Request {
-        name: legacy.name,
-        method: legacy.method,
-        url: legacy.url,
-        params: pairs(legacy.params),
-        headers: pairs(legacy.headers),
-        auth,
-        body,
-        timeout_ms: legacy.timeout_ms.unwrap_or_else(default_timeout),
-        assertions,
-        contract: legacy.contract,
-        preserved: Vec::new(),
-    }
+    let mut request = Request::new(legacy.name);
+    request.method = legacy.method;
+    request.url = legacy.url;
+    request.params = pairs(legacy.params);
+    request.headers = pairs(legacy.headers);
+    request.auth = auth;
+    request.body = body;
+    // Le délai par défaut du format précédent est celui d'Arnod : hérité.
+    request.settings = Settings {
+        timeout_ms: legacy.timeout_ms.filter(|ms| *ms != DEFAULT_TIMEOUT_MS),
+        ..Settings::default()
+    };
+    request.assertions = assertions;
+    request.contract = legacy.contract;
+    request
 }
 
 fn convert_requests(dir: &Path, top: bool) -> Result<(), CommandError> {

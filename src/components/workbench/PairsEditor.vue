@@ -1,80 +1,102 @@
 <script setup lang="ts">
 /**
- * Liste de paires nom-valeur activables (paramètres, en-têtes, champs de formulaire).
- * `withKind` ajoute le choix de l'emplacement d'un paramètre : adresse ou chemin (`:nom`, S8).
+ * Liste de paires nom-valeur activables, avec leur description (paramètres, en-têtes, champs
+ * de formulaire, EP2, EP4). `kind` restreint la liste aux paramètres de requête : les
+ * paramètres de chemin, tirés de l'adresse, sont édités à part.
  */
+import { computed } from "vue";
+
 import type { Pair, ParamKind } from "@/types/ipc";
 
-defineProps<{
+const props = defineProps<{
   label: string;
-  namePlaceholder?: string;
-  valuePlaceholder?: string;
-  withKind?: boolean;
+  /** Libellé du bouton d'ajout (« + Paramètre », « + En-tête »). */
+  addLabel?: string;
+  /** Intitulé de la colonne des valeurs. */
+  valueTitle?: string;
+  kind?: ParamKind;
 }>();
 const pairs = defineModel<Pair[]>({ required: true });
 
-const KINDS: { id: ParamKind; label: string }[] = [
-  { id: "query", label: "Adresse" },
-  { id: "path", label: "Chemin" },
-];
+/** Lignes affichées, avec leur place dans la liste complète. */
+const rows = computed(() =>
+  pairs.value
+    .map((pair, index) => ({ pair, index }))
+    .filter(({ pair }) => props.kind === undefined || pair.kind === props.kind),
+);
 
 function add(): void {
-  pairs.value = [...pairs.value, { name: "", value: "", enabled: true, kind: "query" }];
+  pairs.value = [
+    ...pairs.value,
+    { name: "", value: "", enabled: true, kind: props.kind ?? "query", description: "" },
+  ];
 }
 
 function remove(index: number): void {
   pairs.value = pairs.value.filter((_, i) => i !== index);
 }
+
+function nameOf(pair: Pair, position: number): string {
+  return pair.name.trim() === "" ? `la ligne ${String(position + 1)}` : pair.name;
+}
 </script>
 
 <template>
   <div class="pairs" role="group" :aria-label="label">
+    <div v-if="rows.length > 0" class="pairs__head" aria-hidden="true">
+      <span />
+      <span>Nom</span>
+      <span>{{ valueTitle ?? "Valeur" }}</span>
+      <span />
+    </div>
     <div
-      v-for="(pair, index) in pairs"
+      v-for="({ pair, index }, position) in rows"
       :key="index"
       class="pairs__row"
-      :class="{ 'pairs__row--kind': withKind }"
+      :class="{ 'pairs__row--off': !pair.enabled }"
     >
       <input
         v-model="pair.enabled"
         type="checkbox"
-        :aria-label="`Activer la ligne ${index + 1}`"
+        :aria-label="`${pair.enabled ? 'Désactiver' : 'Activer'} ${nameOf(pair, position)}`"
         class="pairs__check"
       />
       <input
         v-model="pair.name"
-        class="pairs__input"
+        class="pairs__input pairs__input--mono"
         type="text"
         autocomplete="off"
-        :placeholder="namePlaceholder ?? 'Nom'"
-        :aria-label="`Nom, ligne ${index + 1}`"
+        spellcheck="false"
+        placeholder="Nom"
+        :aria-label="`Nom, ligne ${String(position + 1)}`"
       />
       <input
         v-model="pair.value"
-        class="pairs__input"
+        class="pairs__input pairs__input--mono"
         type="text"
         autocomplete="off"
-        :placeholder="valuePlaceholder ?? 'Valeur'"
-        :aria-label="`Valeur, ligne ${index + 1}`"
+        spellcheck="false"
+        :placeholder="valueTitle ?? 'Valeur'"
+        :aria-label="`Valeur, ligne ${String(position + 1)}`"
       />
-      <select
-        v-if="withKind"
-        v-model="pair.kind"
-        class="pairs__input pairs__kind"
-        :aria-label="`Emplacement, ligne ${index + 1}`"
-      >
-        <option v-for="k in KINDS" :key="k.id" :value="k.id">{{ k.label }}</option>
-      </select>
       <button
         type="button"
         class="pairs__remove"
-        :aria-label="`Supprimer la ligne ${index + 1}`"
+        :aria-label="`Supprimer ${nameOf(pair, position)}`"
         @click="remove(index)"
       >
-        ×
+        ✕
       </button>
+      <input
+        v-model="pair.description"
+        class="pairs__input pairs__description"
+        type="text"
+        autocomplete="off"
+        placeholder="Description"
+        :aria-label="`Description, ligne ${String(position + 1)}`"
+      />
     </div>
-    <button type="button" class="pairs__add" @click="add">+ Ajouter une ligne</button>
+    <button type="button" class="pairs__add" @click="add">{{ addLabel ?? "+ Ligne" }}</button>
   </div>
 </template>
 
@@ -82,18 +104,37 @@ function remove(index: number): void {
 .pairs {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.5rem;
 }
 
+.pairs__head,
 .pairs__row {
   display: grid;
-  grid-template-columns: auto 1fr 1.5fr auto;
-  gap: 0.5rem;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 0.25rem 0.5rem;
   align-items: center;
 }
 
-.pairs__row--kind {
-  grid-template-columns: auto 1fr 1.5fr auto auto;
+.pairs__head {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.pairs__row {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pairs__row--off .pairs__input {
+  color: var(--color-muted);
+}
+
+.pairs__description {
+  grid-column: 2 / 4;
+  font-size: 0.75rem;
 }
 
 .pairs__input {
@@ -101,13 +142,14 @@ function remove(index: number): void {
   padding: 0.375rem 0.5rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  font: 0.8125rem var(--font-mono);
+  font: inherit;
+  font-size: 0.8125rem;
   color: var(--color-text);
   background: var(--color-surface);
 }
 
-.pairs__kind {
-  font-family: inherit;
+.pairs__input--mono {
+  font-family: var(--font-mono);
 }
 
 .pairs__input:focus-visible,
@@ -121,7 +163,7 @@ function remove(index: number): void {
 .pairs__remove {
   border: 0;
   background: none;
-  font-size: 1.125rem;
+  font-size: 0.875rem;
   line-height: 1;
   color: var(--color-muted);
   cursor: pointer;
@@ -129,13 +171,13 @@ function remove(index: number): void {
 
 .pairs__add {
   align-self: flex-start;
-  padding: 0.25rem 0;
-  border: 0;
-  background: none;
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
   font: inherit;
   font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--color-link);
+  color: var(--color-text);
   cursor: pointer;
 }
 </style>

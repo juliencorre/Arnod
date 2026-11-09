@@ -19,8 +19,8 @@ use crate::error::{CommandError, CommandErrorKind};
 use crate::http::{self, HttpResponse};
 use crate::local::{self, LocalData, LocalVar};
 use crate::request::assertions::{self, AssertionResult, DEFAULT_LIMIT};
-use crate::request::file;
 use crate::request::model::{Method, Request};
+use crate::request::{file, inherit};
 
 /// Identifiant du résultat de conformité au contrat d'une requête liée.
 pub const CONTRACT_CHECK: &str = "contrat";
@@ -632,7 +632,9 @@ impl Workbench {
         Self::update(handle, index, |i| i.status = ItemStatus::Running);
         let prepared = tree::resolve(&ctx.root, &path)
             .and_then(|p| file::read(&p))
-            .and_then(|request| {
+            .and_then(|mut request| {
+                // Héritage des dossiers et de la collection (R3, R4).
+                request.inherited = inherit::resolve(&ctx.root, &path);
                 let prepared = resolve::prepare(&request, variables)?;
                 Ok((request, prepared))
             });

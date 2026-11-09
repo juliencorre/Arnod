@@ -115,6 +115,7 @@ pub fn run() {
             commands::requests::request_send,
             commands::requests::request_cancel,
             commands::requests::request_propose_assertions,
+            commands::requests::request_example_from_response,
             commands::environments::environments_load,
             commands::environments::environment_select,
             commands::environments::environment_save,

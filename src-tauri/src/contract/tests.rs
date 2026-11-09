@@ -481,7 +481,40 @@ fn r6_requete_prete_a_envoyer() {
     let request = request_for(&contract, show, "contracts/petstore.yaml").unwrap();
     // Sans résumé : l'operationId ; paramètre de chemin commun, avec son exemple.
     assert_eq!(request.name, "showPetById");
-    assert_eq!(request.url, "{{baseUrl}}/pets/42");
+    assert_eq!(request.url, "{{baseUrl}}/pets/:petId");
+    let path: Vec<(&str, &str)> = request
+        .params
+        .iter()
+        .filter(|p| p.kind == crate::request::model::ParamKind::Path)
+        .map(|p| (p.name.as_str(), p.value.as_str()))
+        .collect();
+    assert_eq!(path, [("petId", "42")]);
+}
+
+#[test]
+fn r8_endpoint_cree_avec_ses_reponses_attendues() {
+    use crate::request::model::ExampleBodyKind;
+    let contract = load(PETSTORE).unwrap();
+    let create = contract.operation("POST /pets").unwrap();
+    let request = request_for(&contract, create, "c").unwrap();
+    let examples: Vec<(Option<u16>, &str, ExampleBodyKind)> = request
+        .examples
+        .iter()
+        .map(|e| (e.status, e.status_text.as_str(), e.body_kind))
+        .collect();
+    assert!(!examples.is_empty(), "{:?}", request.examples);
+    assert_eq!(examples[0].0, Some(201));
+    assert_eq!(examples[0].1, "Created");
+    let first = &request.examples[0];
+    if first.body_kind == ExampleBodyKind::Json {
+        assert!(serde_json::from_str::<serde_json::Value>(&first.body).is_ok());
+        assert_eq!(first.headers[0].name, "Content-Type");
+    }
+    // Les codes sont dans l'ordre.
+    let codes: Vec<u16> = request.examples.iter().filter_map(|e| e.status).collect();
+    let mut sorted = codes.clone();
+    sorted.sort_unstable();
+    assert_eq!(codes, sorted);
 }
 
 #[test]
@@ -490,7 +523,7 @@ fn r6_corps_json_et_formulaire() {
     let create = contract.operation("POST /pets").unwrap();
     let request = request_for(&contract, create, "c").unwrap();
     assert_eq!(request.body.kind, BodyKind::Json);
-    let body: serde_json::Value = serde_json::from_str(&request.body.content).unwrap();
+    let body: serde_json::Value = serde_json::from_str(request.body.content()).unwrap();
     assert_eq!(body["name"], json!("texte"));
     assert!(
         request
@@ -508,7 +541,7 @@ fn r6_corps_json_et_formulaire() {
     assert_eq!(request.body.kind, BodyKind::Form);
     let fields: Vec<(&str, &str)> = request
         .body
-        .form
+        .fields()
         .iter()
         .map(|p| (p.name.as_str(), p.value.as_str()))
         .collect();
@@ -523,12 +556,17 @@ fn r6_swagger_2_corps_formulaire_et_basic() {
     let contract = load(SWAGGER).unwrap();
     let put = contract.operation("PUT /orders/{id}").unwrap();
     let request = request_for(&contract, put, "c").unwrap();
+    assert_eq!(request.url, "{{baseUrl}}/orders/:id");
     assert_eq!(
-        request.url,
-        "{{baseUrl}}/orders/00000000-0000-0000-0000-000000000001"
+        request.params[0].kind,
+        crate::request::model::ParamKind::Path
+    );
+    assert_eq!(
+        request.params[0].value,
+        "00000000-0000-0000-0000-000000000001"
     );
     assert_eq!(request.body.kind, BodyKind::Json);
-    assert!(request.body.content.contains("\"qty\": 1"));
+    assert!(request.body.content().contains("\"qty\": 1"));
     assert_eq!(request.auth.kind, AuthKind::Basic);
     assert_eq!(request.auth.username, "{{username}}");
 
@@ -538,7 +576,7 @@ fn r6_swagger_2_corps_formulaire_et_basic() {
     assert_eq!(request.body.kind, BodyKind::Form);
     let fields: Vec<(&str, bool)> = request
         .body
-        .form
+        .fields()
         .iter()
         .map(|p| (p.name.as_str(), p.enabled))
         .collect();

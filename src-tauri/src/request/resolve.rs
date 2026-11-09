@@ -7,7 +7,9 @@ use base64::engine::general_purpose::STANDARD;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 
 use crate::error::{CommandError, CommandErrorKind};
-use crate::request::model::{ApiKeyLocation, AuthKind, BodyKind, Method, Pair, ParamKind, Request};
+use crate::request::model::{
+    ApiKeyLocation, Auth, AuthKind, BodyKind, Method, Pair, ParamKind, Request,
+};
 
 /// Texte affiché à la place d'un secret (R9).
 pub const MASK: &str = "••••";
@@ -56,7 +58,10 @@ pub struct Prepared {
     pub url: String,
     pub headers: Vec<(String, String)>,
     pub body: Option<String>,
-    pub timeout_ms: u64,
+    /// Délai ; `None` : aucun (R5).
+    pub timeout_ms: Option<u64>,
+    /// Redirections suivies au plus ; 0 : aucune (R3).
+    pub max_redirects: u32,
 }
 
 /// Remplace `{{nom}}` ; les noms inconnus sont ajoutés à `unknown`.
@@ -109,12 +114,17 @@ fn active(pairs: &[Pair]) -> impl Iterator<Item = &Pair> {
         .filter(|pair| pair.enabled && !pair.name.trim().is_empty())
 }
 
-/// Remplace le segment `:name` d'une adresse (suivi de `/`, `?`, `#` ou de la fin).
+/// Remplace le segment `:name` ou `{name}` d'une adresse (suivi de `/`, `?`,
+/// `#` ou de la fin), R1.
 fn replace_path_param(url: &str, name: &str, value: &str) -> String {
-    let marker = format!(":{name}");
+    let url = replace_marker(url, &format!(":{name}"), value);
+    replace_marker(&url, &format!("{{{name}}}"), value)
+}
+
+fn replace_marker(url: &str, marker: &str, value: &str) -> String {
     let mut out = String::new();
     let mut rest = url;
-    while let Some(index) = rest.find(&marker) {
+    while let Some(index) = rest.find(marker) {
         let after = &rest[index + marker.len()..];
         let boundary = after.is_empty() || after.starts_with(['/', '?', '#']);
         let segment = rest[..index].ends_with('/');
@@ -122,7 +132,7 @@ fn replace_path_param(url: &str, name: &str, value: &str) -> String {
         if boundary && segment {
             out.push_str(value);
         } else {
-            out.push_str(&marker);
+            out.push_str(marker);
         }
         rest = after;
     }
@@ -143,23 +153,50 @@ pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, Com
     let mut unknown = BTreeSet::new();
     let mut sub = |text: &str| substitute(text, variables, &mut unknown);
 
+    let settings = request.settings.resolve(&request.inherited.settings);
+    // Adresse non encodée : les valeurs partent telles quelles (R5).
+    let enc = |text: &str| {
+        if settings.encode_url {
+            encode(text)
+        } else {
+            text.to_owned()
+        }
+    };
+
     let mut url = sub(&request.url);
-    // Paramètres de chemin (S8) : `:nom` de l'adresse remplacé par la valeur.
+    // Paramètres de chemin (S8, R1) : `:nom` ou `{nom}` remplacé par la valeur.
     for pair in active(&request.params).filter(|p| p.kind == ParamKind::Path) {
-        url = replace_path_param(&url, &sub(&pair.name), &encode(&sub(&pair.value)));
+        url = replace_path_param(&url, &sub(&pair.name), &enc(&sub(&pair.value)));
     }
     let mut query: Vec<String> = active(&request.params)
         .filter(|pair| pair.kind == ParamKind::Query)
-        .map(|pair| format!("{}={}", encode(&sub(&pair.name)), encode(&sub(&pair.value))))
+        .map(|pair| format!("{}={}", enc(&sub(&pair.name)), enc(&sub(&pair.value))))
         .collect();
 
-    let mut headers: Vec<(String, String)> = active(&request.headers)
+    let own: Vec<(String, String)> = active(&request.headers)
         .map(|pair| (sub(&pair.name), sub(&pair.value)))
         .collect();
+    // En-têtes hérités d'abord, sauf ceux que la requête redéfinit (R4).
+    let mut headers: Vec<(String, String)> = request
+        .inherited
+        .headers
+        .iter()
+        .filter(|h| !h.name.trim().is_empty() && !has_header(&own, &h.name))
+        .map(|h| (sub(&h.name), sub(&h.value)))
+        .collect();
+    headers.extend(own);
 
-    let auth = &request.auth;
+    // Authentification héritée : celle du dossier ou de la collection (R4).
+    let auth: &Auth = match request.auth.kind {
+        AuthKind::Inherit => request
+            .inherited
+            .auth
+            .as_ref()
+            .map_or(&request.auth, |inherited| &inherited.auth),
+        _ => &request.auth,
+    };
     match auth.kind {
-        // Héritée ou autre : non gérée par Arnod, rien n'est envoyé (hors périmètre).
+        // Aucune, héritée sans source, ou autre (non gérée) : rien n'est envoyé.
         AuthKind::None | AuthKind::Inherit | AuthKind::Other => {}
         AuthKind::Basic => {
             let credentials = format!("{}:{}", sub(&auth.username), sub(&auth.password));
@@ -179,24 +216,23 @@ pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, Com
             ApiKeyLocation::Query => {
                 query.push(format!(
                     "{}={}",
-                    encode(&sub(&auth.name)),
-                    encode(&sub(&auth.value))
+                    enc(&sub(&auth.name)),
+                    enc(&sub(&auth.value))
                 ));
             }
         },
         AuthKind::ApiKey => {}
     }
 
-    let (body, content_type) = match request.body.kind {
+    // Seule la variante sélectionnée part (R2).
+    let body = &request.body;
+    let (body, content_type) = match body.kind {
         BodyKind::None | BodyKind::Other => (None, None),
-        BodyKind::Xml => (Some(sub(&request.body.content)), Some("application/xml")),
-        BodyKind::Json => (Some(sub(&request.body.content)), Some("application/json")),
-        BodyKind::Text => (
-            Some(sub(&request.body.content)),
-            Some("text/plain; charset=utf-8"),
-        ),
+        BodyKind::Xml => (Some(sub(body.content())), Some("application/xml")),
+        BodyKind::Json => (Some(sub(body.content())), Some("application/json")),
+        BodyKind::Text => (Some(sub(body.content())), Some("text/plain; charset=utf-8")),
         BodyKind::Form => {
-            let fields: Vec<String> = active(&request.body.form)
+            let fields: Vec<String> = active(body.fields())
                 .map(|pair| format!("{}={}", encode(&sub(&pair.name)), encode(&sub(&pair.value))))
                 .collect();
             (
@@ -247,7 +283,12 @@ pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, Com
         url,
         headers,
         body,
-        timeout_ms: request.timeout_ms,
+        timeout_ms: (settings.timeout_ms > 0).then_some(settings.timeout_ms),
+        max_redirects: if settings.follow_redirects {
+            settings.max_redirects
+        } else {
+            0
+        },
     })
 }
 
@@ -364,11 +405,7 @@ mod tests {
         let v = vars(&[("baseUrl", "https://api.test")], &[]);
         let mut r = request("{{baseUrl}}/x");
         r.method = Method::Post;
-        r.body = Body {
-            kind: BodyKind::Json,
-            content: "{}".into(),
-            ..Body::default()
-        };
+        r.body = Body::raw(BodyKind::Json, "{}");
         let p = prepare(&r, &v).unwrap();
         assert_eq!(p.body.as_deref(), Some("{}"));
         assert!(

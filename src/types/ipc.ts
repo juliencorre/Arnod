@@ -59,6 +59,7 @@ export type CommandName =
   | "request_send"
   | "request_cancel"
   | "request_propose_assertions"
+  | "request_example_from_response"
   | "environments_load"
   | "environment_select"
   | "environment_save"
@@ -260,6 +261,8 @@ export interface Pair {
   enabled: boolean;
   /** Sans objet pour un en-tête ou un champ de formulaire (`query`). */
   kind: ParamKind;
+  /** Description de la ligne (EP2, EP4). */
+  description: string;
 }
 
 /**
@@ -282,15 +285,67 @@ export interface Auth {
   other: string;
 }
 
-/** Type de corps ; `other` (multipart, fichier…) est conservé mais pas envoyé. */
+/** Type de corps, commun aux variantes ; `other` (multipart, fichier…) est conservé mais pas envoyé. */
 export type BodyKind = "none" | "json" | "text" | "xml" | "form" | "other";
 
-export interface Body {
-  kind: BodyKind;
+/** Variante d'un corps (EP3) ; un titre vide pour un corps simple. */
+export interface BodyVariant {
+  title: string;
   content: string;
   form: Pair[];
+}
+
+/** Corps : une ou plusieurs variantes, la sélectionnée part à l'envoi (R2). */
+export interface Body {
+  kind: BodyKind;
+  variants: BodyVariant[];
+  selected: number;
   /** Type OpenCollection d'un corps `other` (`multipart-form`…). */
   other: string;
+}
+
+/** Réglages propres à la requête (EP7) ; `null` : hérité (R3). */
+export interface RequestSettings {
+  /** Délai en millisecondes ; 0 : aucun délai. */
+  timeoutMs: number | null;
+  followRedirects: boolean | null;
+  maxRedirects: number | null;
+  encodeUrl: boolean | null;
+}
+
+/** Réglages effectifs, après héritage (`ResolvedSettings`). */
+export interface ResolvedSettings {
+  timeoutMs: number;
+  followRedirects: boolean;
+  maxRedirects: number;
+  encodeUrl: boolean;
+}
+
+/** Type du corps d'une réponse attendue. */
+export type ExampleBodyKind = "none" | "json" | "text" | "xml" | "html" | "binary";
+
+/** En-tête d'une réponse attendue. */
+export interface ResponseHeader {
+  name: string;
+  value: string;
+}
+
+/** Réponse attendue (EP8) : un exemple OpenCollection. */
+export interface Example {
+  name: string;
+  description: string;
+  status: number | null;
+  statusText: string;
+  headers: ResponseHeader[];
+  bodyKind: ExampleBodyKind;
+  body: string;
+}
+
+/** Ce que la requête hérite de ses dossiers et de la collection (R3, R4). */
+export interface Inherited {
+  auth: { auth: Auth; source: string } | null;
+  headers: { name: string; value: string; source: string }[];
+  settings: ResolvedSettings;
 }
 
 /** Opérateurs d'OpenCollection et de Bruno (`Operator` en Rust). */
@@ -340,21 +395,31 @@ export interface Assertion {
   enabled: boolean;
 }
 
-/** Requête éditée, lue d'un fichier OpenCollection. */
+/** Requête éditée, lue d'un fichier OpenCollection : un endpoint. */
 export interface RequestDoc {
   name: string;
+  /** Description courte (EP1). */
+  description: string;
+  /** Étiquettes, sans celle du lien au contrat. */
+  tags: string[];
   method: HttpMethod;
   url: string;
   params: Pair[];
   headers: Pair[];
   auth: Auth;
   body: Body;
-  timeoutMs: number;
+  settings: RequestSettings;
+  /** Documentation en Markdown (EP6). */
+  docs: string;
   assertions: Assertion[];
+  /** Réponses attendues (EP8). */
+  examples: Example[];
   /** Opération du contrat liée (étiquette `contract:` du fichier, C7). */
   contract?: ContractLink;
-  /** Parties du fichier conservées sans être gérées par Arnod (scripts, exemples…). */
+  /** Parties du fichier conservées sans être gérées par Arnod (scripts, variables…). */
   preserved: string[];
+  /** Héritage, calculé à la lecture ; ignoré à l'enregistrement. */
+  inherited: Inherited;
 }
 
 /** Lien d'une requête à une opération de contrat (`ContractLink`). */
@@ -459,6 +524,14 @@ export interface RunView {
 export interface ProposeInput {
   status: number;
   durationMs: number;
+  headers: [string, string][];
+  body: string;
+}
+
+/** Réponse reçue à reprendre comme réponse attendue (R7). */
+export interface ExampleInput {
+  status: number;
+  statusText: string;
   headers: [string, string][];
   body: string;
 }

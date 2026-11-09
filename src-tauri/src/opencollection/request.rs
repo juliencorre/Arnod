@@ -1,16 +1,17 @@
 //! Requête Arnod ↔ `HttpRequest` d'OpenCollection 1.0.0 (S2, S3, S7, R3, R4).
 //!
 //! La lecture traduit les champs gérés par Arnod ; l'écriture part du fichier
-//! existant et ne remplace que ces champs : scripts, variables, exemples,
-//! docs, descriptions, réglages et autres authentifications ou corps restent
-//! tels quels (R3).
+//! existant et ne remplace que ces champs : scripts, variables, actions, la
+//! partie `request` des exemples et les autres authentifications ou corps
+//! restent tels quels (R3 ; plan de configuration d'un endpoint, R6, R9).
 
 use serde_json::{Map, Value, json};
 
 use crate::opencollection::schema::{self, Part};
 use crate::request::model::{
-    ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, ContractLink, Method, Operator,
-    Origin, Pair, ParamKind, Request, Scalar, default_timeout,
+    ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, BodyVariant, ContractLink, Example,
+    ExampleBodyKind, Method, Operator, Origin, Pair, ParamKind, Request, ResponseHeader, Scalar,
+    Settings,
 };
 
 /// Préfixe de l'étiquette qui lie une requête à une opération de contrat (S7).
@@ -180,6 +181,14 @@ fn text(value: Option<&Value>) -> String {
     }
 }
 
+/// Texte d'une description OpenCollection : texte, ou objet `{ content, type }`.
+fn description_text(value: Option<&Value>) -> String {
+    match value {
+        Some(Value::Object(object)) => text(object.get("content")),
+        other => text(other),
+    }
+}
+
 fn disabled(item: &Value) -> bool {
     item.get("disabled").and_then(Value::as_bool) == Some(true)
 }
@@ -198,6 +207,7 @@ fn pairs(list: Option<&Value>) -> Vec<Pair> {
                     } else {
                         ParamKind::Query
                     },
+                    description: description_text(item.get("description")),
                 })
                 .collect()
         })
@@ -217,7 +227,7 @@ fn method_from(name: &str) -> Option<Method> {
     })
 }
 
-fn auth_from(value: Option<&Value>) -> Auth {
+pub(crate) fn auth_from(value: Option<&Value>) -> Auth {
     let Some(value) = value else {
         return Auth::default();
     };
@@ -259,46 +269,171 @@ fn auth_from(value: Option<&Value>) -> Auth {
     }
 }
 
+/// Type et contenu d'un corps OpenCollection simple.
+fn single_body(value: &Value) -> Result<(BodyKind, BodyVariant), String> {
+    let kind = value.get("type").and_then(Value::as_str).unwrap_or("");
+    let data = value.get("data");
+    let raw = |kind| {
+        Ok((
+            kind,
+            BodyVariant {
+                content: text(data),
+                ..BodyVariant::default()
+            },
+        ))
+    };
+    match kind {
+        "json" => raw(BodyKind::Json),
+        "text" => raw(BodyKind::Text),
+        "xml" => raw(BodyKind::Xml),
+        "form-urlencoded" => Ok((
+            BodyKind::Form,
+            BodyVariant {
+                form: pairs(data),
+                ..BodyVariant::default()
+            },
+        )),
+        other => Err(other.to_owned()),
+    }
+}
+
+fn other_body(label: &str) -> Body {
+    Body {
+        kind: BodyKind::Other,
+        other: label.to_owned(),
+        ..Body::default()
+    }
+}
+
+/// Corps simple ou variantes (R2) ; un corps qu'Arnod ne sait pas éditer
+/// (multipart, fichier, variantes de types différents) devient `other`.
 fn body_from(value: Option<&Value>) -> Body {
     let Some(value) = value else {
         return Body::default();
     };
-    if value.is_array() {
-        return Body {
-            kind: BodyKind::Other,
-            other: "variantes".to_owned(),
-            ..Body::default()
+    let Some(list) = value.as_array() else {
+        return match single_body(value) {
+            Ok((kind, variant)) => Body {
+                kind,
+                variants: vec![variant],
+                ..Body::default()
+            },
+            Err(other) => other_body(&other),
         };
+    };
+    let mut kind = None;
+    let mut variants = Vec::new();
+    let mut selected = 0;
+    for (index, item) in list.iter().enumerate() {
+        let Some(body) = item.get("body") else {
+            return other_body("variantes");
+        };
+        match single_body(body) {
+            Ok((k, mut variant)) if kind.is_none_or(|known| known == k) => {
+                kind = Some(k);
+                variant.title = text(item.get("title"));
+                variants.push(variant);
+            }
+            _ => return other_body("variantes"),
+        }
+        if item.get("selected").and_then(Value::as_bool) == Some(true) {
+            selected = index;
+        }
     }
-    let kind = value.get("type").and_then(Value::as_str).unwrap_or("");
-    let data = value.get("data");
     match kind {
-        "json" => Body {
-            kind: BodyKind::Json,
-            content: text(data),
+        Some(kind) => Body {
+            kind,
+            variants,
+            selected,
             ..Body::default()
         },
-        "text" => Body {
-            kind: BodyKind::Text,
-            content: text(data),
-            ..Body::default()
-        },
-        "xml" => Body {
-            kind: BodyKind::Xml,
-            content: text(data),
-            ..Body::default()
-        },
-        "form-urlencoded" => Body {
-            kind: BodyKind::Form,
-            form: pairs(data),
-            ..Body::default()
-        },
-        other => Body {
-            kind: BodyKind::Other,
-            other: other.to_owned(),
-            ..Body::default()
-        },
+        None => Body::default(),
     }
+}
+
+fn settings_from(value: Option<&Value>) -> Settings {
+    let get = |key: &str| value.and_then(|s| s.get(key));
+    let number = |key: &str| {
+        get(key)
+            .and_then(Value::as_f64)
+            .filter(|n| *n >= 0.0)
+            .map(|n| n as u64)
+    };
+    Settings {
+        timeout_ms: number("timeout"),
+        follow_redirects: get("followRedirects").and_then(Value::as_bool),
+        max_redirects: number("maxRedirects").map(|n| u32::try_from(n).unwrap_or(u32::MAX)),
+        encode_url: get("encodeUrl").and_then(Value::as_bool),
+    }
+}
+
+fn example_body_kind(name: &str) -> ExampleBodyKind {
+    match name {
+        "json" => ExampleBodyKind::Json,
+        "text" => ExampleBodyKind::Text,
+        "xml" => ExampleBodyKind::Xml,
+        "html" => ExampleBodyKind::Html,
+        "binary" => ExampleBodyKind::Binary,
+        _ => ExampleBodyKind::None,
+    }
+}
+
+fn example_body_name(kind: ExampleBodyKind) -> Option<&'static str> {
+    Some(match kind {
+        ExampleBodyKind::None => return None,
+        ExampleBodyKind::Json => "json",
+        ExampleBodyKind::Text => "text",
+        ExampleBodyKind::Xml => "xml",
+        ExampleBodyKind::Html => "html",
+        ExampleBodyKind::Binary => "binary",
+    })
+}
+
+/// Réponses attendues (R6).
+fn examples_from(value: Option<&Value>) -> Vec<Example> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|item| {
+            let response = item.get("response");
+            let get = |key: &str| response.and_then(|r| r.get(key));
+            let body = get("body");
+            Example {
+                name: text(item.get("name")),
+                description: description_text(item.get("description")),
+                status: get("status")
+                    .and_then(Value::as_f64)
+                    .and_then(|s| u16::try_from(s as i64).ok()),
+                status_text: text(get("statusText")),
+                headers: get("headers")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .map(|h| ResponseHeader {
+                        name: text(h.get("name")),
+                        value: text(h.get("value")),
+                    })
+                    .collect(),
+                body_kind: body
+                    .and_then(|b| b.get("type"))
+                    .and_then(Value::as_str)
+                    .map_or(ExampleBodyKind::None, example_body_kind),
+                body: text(body.and_then(|b| b.get("data"))),
+            }
+        })
+        .collect()
+}
+
+/// Étiquettes de l'utilisateur, sans celle du lien au contrat (R9).
+fn tags_from(tags: Option<&Value>) -> Vec<String> {
+    tags.and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|tag| !tag.starts_with(CONTRACT_TAG))
+        .map(str::to_owned)
+        .collect()
 }
 
 /// Lien au contrat porté par une étiquette `contract:<fichier>#<opération>`.
@@ -320,31 +455,20 @@ pub fn contract_tag(link: &ContractLink) -> String {
 
 /// Parties du fichier conservées sans être gérées par Arnod.
 fn preserved(value: &Value) -> Vec<String> {
-    let mut list = Vec::new();
     let present = |pointer: &str| {
         value
             .pointer(pointer)
             .is_some_and(|v| !(v.is_null() || v.as_array().is_some_and(Vec::is_empty)))
     };
-    for (pointer, label) in [
+    [
         ("/runtime/scripts", "scripts"),
         ("/runtime/variables", "variables de requête"),
         ("/runtime/actions", "actions"),
-        ("/examples", "exemples"),
-        ("/docs", "documentation"),
-    ] {
-        if present(pointer) {
-            list.push(label.to_owned());
-        }
-    }
-    let other_settings = value
-        .get("settings")
-        .and_then(Value::as_object)
-        .is_some_and(|settings| settings.keys().any(|k| k != "timeout"));
-    if other_settings {
-        list.push("réglages".to_owned());
-    }
-    list
+    ]
+    .into_iter()
+    .filter(|(pointer, _)| present(pointer))
+    .map(|(_, label)| label.to_owned())
+    .collect()
 }
 
 /// Nom de la requête d'un fichier, s'il en a un.
@@ -397,23 +521,23 @@ pub fn from_value(value: &Value, fallback: &str) -> Result<Request, String> {
             });
         }
     }
-    let timeout_ms = value
-        .pointer("/settings/timeout")
-        .and_then(Value::as_f64)
-        .filter(|ms| *ms >= 0.0)
-        .map_or_else(default_timeout, |ms| ms as u64);
     Ok(Request {
         name: name_of(value).unwrap_or_else(|| fallback.to_owned()),
+        description: description_text(value.pointer("/info/description")),
+        tags: tags_from(value.pointer("/info/tags")),
         method,
         url: text(http.and_then(|h| h.get("url"))),
         params: pairs(http.and_then(|h| h.get("params"))),
         headers: pairs(http.and_then(|h| h.get("headers"))),
         auth: auth_from(http.and_then(|h| h.get("auth"))),
         body: body_from(http.and_then(|h| h.get("body"))),
-        timeout_ms,
+        settings: settings_from(value.get("settings")),
+        docs: description_text(value.get("docs")),
         assertions,
+        examples: examples_from(value.get("examples")),
         contract: contract_from(value.pointer("/info/tags")),
         preserved: preserved(value),
+        inherited: crate::request::model::Inherited::default(),
     })
 }
 
@@ -466,6 +590,22 @@ fn description(previous: Option<&Value>, matches: impl Fn(&Value) -> bool) -> Op
         .cloned()
 }
 
+/// Description écrite : texte, ou objet `{ content, type }` si le fichier en
+/// avait un (son type est gardé).
+fn description_value(text: &str, previous: Option<&Value>) -> Option<Value> {
+    if text.is_empty() {
+        return None;
+    }
+    if let Some(Value::Object(object)) = previous
+        && object.contains_key("type")
+    {
+        let mut object = object.clone();
+        object.insert("content".to_owned(), Value::from(text));
+        return Some(Value::Object(object));
+    }
+    Some(Value::from(text))
+}
+
 fn pair_values(list: &[Pair], previous: Option<&Value>, params: bool) -> Option<Value> {
     if list.is_empty() {
         return None;
@@ -481,9 +621,10 @@ fn pair_values(list: &[Pair], previous: Option<&Value>, params: bool) -> Option<
             } else {
                 "query"
             };
-            if let Some(text) = description(previous, |p| {
+            let old = description(previous, |p| {
                 p.get("name").and_then(Value::as_str) == Some(pair.name.as_str())
-            }) {
+            });
+            if let Some(text) = description_value(&pair.description, old.as_ref()) {
                 item.insert("description".to_owned(), text);
             }
             if params {
@@ -518,20 +659,136 @@ fn auth_value(auth: &Auth, previous: Option<&Value>) -> Option<Value> {
     }
 }
 
-fn body_value(body: &Body, previous: Option<&Value>) -> Option<Value> {
-    let raw = |kind: &str| Some(json!({ "type": kind, "data": body.content }));
-    match body.kind {
-        BodyKind::None => None,
-        BodyKind::Other => previous.cloned(),
+fn variant_body(kind: BodyKind, variant: &BodyVariant, previous: Option<&Value>) -> Value {
+    let raw = |name: &str| json!({ "type": name, "data": variant.content });
+    match kind {
         BodyKind::Json => raw("json"),
         BodyKind::Text => raw("text"),
         BodyKind::Xml => raw("xml"),
-        BodyKind::Form => Some(json!({
+        _ => json!({
             "type": "form-urlencoded",
-            "data": pair_values(&body.form, previous.and_then(|p| p.get("data")), false)
+            "data": pair_values(&variant.form, previous.and_then(|p| p.get("data")), false)
                 .unwrap_or_else(|| Value::Array(Vec::new())),
-        })),
+        }),
     }
+}
+
+/// Corps écrit (R2) : simple sans variante nommée, sinon tableau de variantes.
+fn body_value(body: &Body, previous: Option<&Value>) -> Option<Value> {
+    match body.kind {
+        BodyKind::None => return None,
+        BodyKind::Other => return previous.cloned(),
+        _ => {}
+    }
+    let empty = BodyVariant::default();
+    let simple = body.variants.len() <= 1 && body.variants.iter().all(|v| v.title.is_empty());
+    if simple {
+        let variant = body.variants.first().unwrap_or(&empty);
+        let previous = previous.filter(|p| p.is_object());
+        return Some(variant_body(body.kind, variant, previous));
+    }
+    let selected = body.selected.min(body.variants.len().saturating_sub(1));
+    let items = body
+        .variants
+        .iter()
+        .enumerate()
+        .map(|(index, variant)| {
+            let old = previous
+                .and_then(Value::as_array)
+                .and_then(|list| {
+                    list.iter().find(|item| {
+                        item.get("title").and_then(Value::as_str) == Some(variant.title.as_str())
+                    })
+                })
+                .and_then(|item| item.get("body"));
+            let mut item = Map::new();
+            item.insert("title".to_owned(), Value::from(variant.title.clone()));
+            if index == selected {
+                item.insert("selected".to_owned(), Value::Bool(true));
+            }
+            item.insert("body".to_owned(), variant_body(body.kind, variant, old));
+            Value::Object(item)
+        })
+        .collect();
+    Some(Value::Array(items))
+}
+
+/// Réglages propres écrits ; un réglage hérité est absent (R3).
+fn settings_value(settings: &Settings, previous: Option<&Value>) -> Option<Value> {
+    let mut map = previous
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    set(&mut map, "timeout", settings.timeout_ms.map(Value::from));
+    set(
+        &mut map,
+        "followRedirects",
+        settings.follow_redirects.map(Value::Bool),
+    );
+    set(
+        &mut map,
+        "maxRedirects",
+        settings.max_redirects.map(Value::from),
+    );
+    set(&mut map, "encodeUrl", settings.encode_url.map(Value::Bool));
+    (!map.is_empty()).then_some(Value::Object(map))
+}
+
+/// Réponses attendues écrites ; la partie `request` d'un exemple de même nom
+/// est conservée (R6).
+fn example_values(list: &[Example], previous: Option<&Value>) -> Option<Value> {
+    if list.is_empty() {
+        return None;
+    }
+    let items = list
+        .iter()
+        .map(|example| {
+            let old = previous.and_then(Value::as_array).and_then(|items| {
+                items.iter().find(|item| {
+                    item.get("name").and_then(Value::as_str) == Some(example.name.as_str())
+                })
+            });
+            let mut item = Map::new();
+            item.insert("name".to_owned(), Value::from(example.name.clone()));
+            if let Some(text) =
+                description_value(&example.description, old.and_then(|o| o.get("description")))
+            {
+                item.insert("description".to_owned(), text);
+            }
+            if let Some(request) = old.and_then(|o| o.get("request")) {
+                item.insert("request".to_owned(), request.clone());
+            }
+            let mut response = Map::new();
+            if let Some(status) = example.status {
+                response.insert("status".to_owned(), Value::from(status));
+            }
+            if !example.status_text.is_empty() {
+                response.insert(
+                    "statusText".to_owned(),
+                    Value::from(example.status_text.clone()),
+                );
+            }
+            if !example.headers.is_empty() {
+                let headers = example
+                    .headers
+                    .iter()
+                    .map(|h| json!({ "name": h.name, "value": h.value }))
+                    .collect();
+                response.insert("headers".to_owned(), Value::Array(headers));
+            }
+            if let Some(kind) = example_body_name(example.body_kind) {
+                response.insert(
+                    "body".to_owned(),
+                    json!({ "type": kind, "data": example.body }),
+                );
+            }
+            if !response.is_empty() {
+                item.insert("response".to_owned(), Value::Object(response));
+            }
+            Value::Object(item)
+        })
+        .collect();
+    Some(Value::Array(items))
 }
 
 fn assertion_values(list: &[Assertion], previous: Option<&Value>) -> Option<Value> {
@@ -581,6 +838,10 @@ pub fn set_name(value: &mut Value, name: &str) {
 /// Fichier OpenCollection d'une requête : `existing` (le fichier actuel) dont
 /// seuls les champs gérés par Arnod sont remplacés (R3).
 pub fn into_value(request: &Request, existing: Option<&Value>) -> Value {
+    // Paramètres de chemin alignés sur l'adresse (R1 de la configuration d'un endpoint).
+    let mut normalized = request.clone();
+    crate::request::model::normalize_path_params(&mut normalized);
+    let request = &normalized;
     let mut root = existing
         .filter(|v| v.is_object())
         .cloned()
@@ -590,18 +851,25 @@ pub fn into_value(request: &Request, existing: Option<&Value>) -> Value {
     };
 
     with_object(map, "info", |info| {
-        info.insert("name".to_owned(), Value::from(request.name.clone()));
+        // Un nom effacé dans l'éditeur garde celui du fichier.
+        let name = request.name.trim();
+        if !name.is_empty() || info.get("name").and_then(Value::as_str).is_none() {
+            info.insert("name".to_owned(), Value::from(name));
+        }
+        let old = info.get("description").cloned();
+        set(
+            info,
+            "description",
+            description_value(&request.description, old.as_ref()),
+        );
         info.insert("type".to_owned(), Value::from("http"));
-        let mut tags: Vec<Value> = info
-            .get("tags")
-            .and_then(Value::as_array)
-            .map(|tags| {
-                tags.iter()
-                    .filter(|t| !t.as_str().is_some_and(|t| t.starts_with(CONTRACT_TAG)))
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default();
+        let mut tags: Vec<Value> = request
+            .tags
+            .iter()
+            .map(|tag| tag.trim())
+            .filter(|tag| !tag.is_empty() && !tag.starts_with(CONTRACT_TAG))
+            .map(Value::from)
+            .collect();
         if let Some(link) = &request.contract {
             tags.push(Value::from(contract_tag(link)));
         }
@@ -648,15 +916,22 @@ pub fn into_value(request: &Request, existing: Option<&Value>) -> Value {
     });
     prune(map, "runtime");
 
-    with_object(map, "settings", |settings| {
-        if request.timeout_ms == default_timeout() {
-            if settings.get("timeout").is_some_and(Value::is_number) {
-                settings.remove("timeout");
-            }
-        } else {
-            settings.insert("timeout".to_owned(), Value::from(request.timeout_ms));
-        }
-    });
-    prune(map, "settings");
+    let old = map.get("settings").cloned();
+    set(
+        map,
+        "settings",
+        settings_value(&request.settings, old.as_ref()),
+    );
+    set(
+        map,
+        "docs",
+        (!request.docs.is_empty()).then(|| Value::from(request.docs.clone())),
+    );
+    let old = map.get("examples").cloned();
+    set(
+        map,
+        "examples",
+        example_values(&request.examples, old.as_ref()),
+    );
     root
 }

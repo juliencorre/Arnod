@@ -1,29 +1,14 @@
 //! Requête prête à envoyer pour une opération du contrat (R5 à R7).
 
-use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 use serde_json::Value;
 
 use crate::catalog::names::MAX_NAME_CHARS;
 use crate::contract::parse::{Contract, Operation, Parameter, SpecKind, resolve};
 use crate::contract::sample::{as_param, declared_example, sample};
 use crate::request::model::{
-    ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, ContractLink, Method, Operator,
-    Origin, Pair, ParamKind, Request, Scalar,
+    ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, ContractLink, Example,
+    ExampleBodyKind, Method, Operator, Origin, Pair, Request, ResponseHeader, Scalar,
 };
-
-/// Caractères encodés dans un segment de chemin.
-const SEGMENT: &AsciiSet = &CONTROLS
-    .add(b' ')
-    .add(b'"')
-    .add(b'#')
-    .add(b'%')
-    .add(b'/')
-    .add(b'<')
-    .add(b'>')
-    .add(b'?')
-    .add(b'`')
-    .add(b'{')
-    .add(b'}');
 
 /// Caractères interdits dans un nom de requête ou de dossier (R10 des projets).
 const FORBIDDEN: [char; 9] = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
@@ -111,11 +96,18 @@ pub fn request_for(
     request.method = method;
     let parameters = contract.parameters(operation);
 
+    // Paramètres de chemin déclarés : `:nom` dans l'adresse, valeur d'exemple
+    // dans le paramètre (R8 de la configuration d'un endpoint).
     let mut path = operation.path.clone();
     for parameter in parameters.iter().filter(|p| p.location == "path") {
-        let value = parameter_value(contract, parameter);
-        let encoded = utf8_percent_encode(&value, SEGMENT).to_string();
-        path = path.replace(&format!("{{{}}}", parameter.name), &encoded);
+        path = path.replace(
+            &format!("{{{}}}", parameter.name),
+            &format!(":{}", parameter.name),
+        );
+        request.params.push(Pair {
+            description: parameter_description(parameter),
+            ..Pair::path(parameter.name.clone(), parameter_value(contract, parameter))
+        });
     }
     // Paramètre de chemin non déclaré : variable, nommée à l'envoi si elle manque.
     let path = undeclared_to_variables(&path);
@@ -123,10 +115,9 @@ pub fn request_for(
 
     for parameter in &parameters {
         let pair = Pair {
-            name: parameter.name.clone(),
-            value: parameter_value(contract, parameter),
             enabled: parameter.required,
-            kind: ParamKind::Query,
+            description: parameter_description(parameter),
+            ..Pair::new(parameter.name.clone(), parameter_value(contract, parameter))
         };
         match parameter.location.as_str() {
             "query" => request.params.push(pair),
@@ -142,23 +133,19 @@ pub fn request_for(
 
     let (body, media) = body_for(contract, operation, &parameters);
     if let Some(media) = media {
-        request.headers.push(Pair {
-            name: "Content-Type".to_owned(),
-            value: media,
-            enabled: true,
-            kind: ParamKind::Query,
-        });
+        request.headers.push(Pair::new("Content-Type", media));
     }
     request.body = body;
     if let Some(accept) = accept_for(contract, operation) {
-        request.headers.push(Pair {
-            name: "Accept".to_owned(),
-            value: accept,
-            enabled: true,
-            kind: ParamKind::Query,
-        });
+        request.headers.push(Pair::new("Accept", accept));
     }
     request.auth = auth_for(contract, operation);
+    // Le résumé donne déjà le nom : la description reprend seulement celle du contrat.
+    request.description = operation_text(contract, operation, "description").unwrap_or_default();
+    if let Some(tag) = &operation.tag {
+        request.tags.push(tag.clone());
+    }
+    request.examples = examples_for(contract, operation);
 
     if let Some(status) = contract.success_status(operation) {
         request.assertions.push(Assertion {
@@ -176,6 +163,151 @@ pub fn request_for(
         operation: operation.key.clone(),
     });
     Ok(request)
+}
+
+/// Description d'un paramètre du contrat.
+fn parameter_description(parameter: &Parameter<'_>) -> String {
+    parameter
+        .value
+        .get("description")
+        .and_then(Value::as_str)
+        .map(|d| d.trim().to_owned())
+        .unwrap_or_default()
+}
+
+/// Texte d'un champ de l'opération (`summary`, `description`).
+fn operation_text(contract: &Contract, operation: &Operation, key: &str) -> Option<String> {
+    contract
+        .operation_value(operation)?
+        .get(key)?
+        .as_str()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(str::to_owned)
+}
+
+/// Type d'un corps de réponse attendue, d'après son type de contenu.
+fn example_kind(media: &str) -> ExampleBodyKind {
+    let media = media.to_lowercase();
+    if is_json(&media) {
+        ExampleBodyKind::Json
+    } else if media.contains("xml") {
+        ExampleBodyKind::Xml
+    } else if media.contains("html") {
+        ExampleBodyKind::Html
+    } else if media.starts_with("text/") {
+        ExampleBodyKind::Text
+    } else {
+        ExampleBodyKind::Binary
+    }
+}
+
+fn produces_v2(contract: &Contract, operation: &Operation) -> Vec<String> {
+    contract
+        .operation_value(operation)
+        .and_then(|o| o.get("produces"))
+        .or_else(|| contract.doc.get("produces"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Réponses attendues de l'opération : une par code documenté (R8).
+fn examples_for(contract: &Contract, operation: &Operation) -> Vec<Example> {
+    let doc = &contract.doc;
+    let Some(responses) = contract.responses(operation) else {
+        return Vec::new();
+    };
+    let mut codes: Vec<(u16, &Value)> = responses
+        .iter()
+        .filter_map(|(code, value)| Some((code.parse::<u16>().ok()?, value)))
+        .collect();
+    codes.sort_by_key(|(code, _)| *code);
+    codes
+        .into_iter()
+        .map(|(code, value)| {
+            let response = resolve(doc, value);
+            let reason = reqwest::StatusCode::from_u16(code)
+                .ok()
+                .and_then(|status| status.canonical_reason())
+                .unwrap_or("")
+                .to_owned();
+            let description = response
+                .get("description")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .unwrap_or("")
+                .to_owned();
+            let first_line = description.lines().next().unwrap_or("").trim();
+            let name = if first_line.is_empty() {
+                format!("{code} {reason}").trim().to_owned()
+            } else {
+                safe_name(first_line, &reason)
+            };
+            let (media, example) = match contract.kind {
+                SpecKind::OpenApi3 => response
+                    .get("content")
+                    .and_then(Value::as_object)
+                    .and_then(|content| {
+                        let media = preferred_media(content.keys())?;
+                        let entry = &content[media];
+                        let example = declared_example(doc, entry)
+                            .or_else(|| entry.get("schema").map(|schema| sample(doc, schema)));
+                        Some((Some(media.clone()), example))
+                    })
+                    .unwrap_or((None, None)),
+                SpecKind::Swagger2 => match response.get("schema") {
+                    Some(schema) => {
+                        let produces = produces_v2(contract, operation);
+                        let media = preferred_media(produces.iter())
+                            .cloned()
+                            .unwrap_or_else(|| "application/json".to_owned());
+                        let example =
+                            declared_example(doc, response).or_else(|| Some(sample(doc, schema)));
+                        (Some(media), example)
+                    }
+                    None => (None, None),
+                },
+            };
+            let (body_kind, body) = match (&media, example) {
+                (Some(media), Some(example)) => {
+                    let kind = example_kind(media);
+                    let text = match example {
+                        Value::String(text) if kind != ExampleBodyKind::Json => text,
+                        other => pretty(&other),
+                    };
+                    (kind, text)
+                }
+                _ => (ExampleBodyKind::None, String::new()),
+            };
+            Example {
+                name,
+                description: if description == first_line {
+                    String::new()
+                } else {
+                    description
+                },
+                status: Some(code),
+                status_text: reason,
+                headers: media
+                    .map(|media| {
+                        vec![ResponseHeader {
+                            name: "Content-Type".to_owned(),
+                            value: media,
+                        }]
+                    })
+                    .unwrap_or_default(),
+                body_kind,
+                body,
+            }
+        })
+        .collect()
 }
 
 fn undeclared_to_variables(path: &str) -> String {
@@ -221,14 +353,14 @@ fn form_pairs(value: &Value) -> Vec<Pair> {
         .as_object()
         .map(|map| {
             map.iter()
-                .map(|(name, value)| Pair {
-                    name: name.clone(),
-                    value: match value {
-                        Value::Object(_) => value.to_string(),
-                        other => as_param(other),
-                    },
-                    enabled: true,
-                    kind: ParamKind::Query,
+                .map(|(name, value)| {
+                    Pair::new(
+                        name.clone(),
+                        match value {
+                            Value::Object(_) => value.to_string(),
+                            other => as_param(other),
+                        },
+                    )
                 })
                 .collect()
         })
@@ -237,32 +369,23 @@ fn form_pairs(value: &Value) -> Vec<Pair> {
 
 fn body_from(media: &str, example: Value) -> Body {
     if is_json(media) {
-        Body {
-            kind: BodyKind::Json,
-            content: pretty(&example),
-            form: Vec::new(),
-            other: String::new(),
-        }
+        Body::raw(BodyKind::Json, pretty(&example))
     } else if media.starts_with("application/x-www-form-urlencoded")
         || media.starts_with("multipart/form-data")
     {
-        Body {
-            kind: BodyKind::Form,
-            content: String::new(),
-            form: form_pairs(&example),
-            other: String::new(),
-        }
+        Body::form(form_pairs(&example))
     } else {
-        Body {
-            kind: BodyKind::Text,
-            content: match example {
-                Value::String(text) => text,
-                Value::Null => String::new(),
-                other => pretty(&other),
-            },
-            form: Vec::new(),
-            other: String::new(),
-        }
+        let text = match example {
+            Value::String(text) => text,
+            Value::Null => String::new(),
+            other => pretty(&other),
+        };
+        let kind = if media.to_lowercase().contains("xml") {
+            BodyKind::Xml
+        } else {
+            BodyKind::Text
+        };
+        Body::raw(kind, text)
     }
 }
 
@@ -315,22 +438,16 @@ fn body_for(
                 .iter()
                 .filter(|p| p.location == "formData")
                 .map(|p| Pair {
-                    name: p.name.clone(),
-                    value: parameter_value(contract, p),
                     enabled: p.required,
-                    kind: ParamKind::Query,
+                    description: parameter_description(p),
+                    ..Pair::new(p.name.clone(), parameter_value(contract, p))
                 })
                 .collect();
             if fields.is_empty() {
                 return (Body::default(), None);
             }
             (
-                Body {
-                    kind: BodyKind::Form,
-                    content: String::new(),
-                    form: fields,
-                    other: String::new(),
-                },
+                Body::form(fields),
                 Some("application/x-www-form-urlencoded".to_owned()),
             )
         }
@@ -377,20 +494,7 @@ fn accept_for(contract: &Contract, operation: &Operation) -> Option<String> {
             .and_then(|content| content.keys().find(|t| is_json(t)).cloned()),
         SpecKind::Swagger2 => {
             response.get("schema")?;
-            let produces = contract
-                .operation_value(operation)
-                .and_then(|o| o.get("produces"))
-                .or_else(|| contract.doc.get("produces"))
-                .and_then(Value::as_array)
-                .map(|items| {
-                    items
-                        .iter()
-                        .filter_map(Value::as_str)
-                        .map(str::to_owned)
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            produces
+            produces_v2(contract, operation)
                 .into_iter()
                 .find(|t| is_json(t))
                 .or_else(|| Some("application/json".to_owned()))
