@@ -85,8 +85,14 @@ fn response_schema<'a>(contract: &'a Contract, declared: &'a Value) -> Option<&'
 
 /// Écarts entre une valeur et un schéma (R9), chemins préfixés par `body`.
 pub fn validate(doc: &Value, schema: &Value, value: &Value) -> Vec<String> {
+    validate_at(doc, schema, value, "body")
+}
+
+/// Écarts entre une valeur et un schéma, chemins préfixés par `root`. Sert
+/// aussi à valider les fichiers OpenCollection contre leur schéma officiel.
+pub fn validate_at(doc: &Value, schema: &Value, value: &Value, root: &str) -> Vec<String> {
     let mut errors = Vec::new();
-    walk(doc, schema, value, "body", &mut errors, 0);
+    walk(doc, schema, value, root, &mut errors, 0);
     errors
 }
 

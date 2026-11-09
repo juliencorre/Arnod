@@ -8,7 +8,8 @@
 
 Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 
-> **Statut : projets et workspaces en onglets, fenêtres et zones, contrats de services.** Sur le squelette technique
+> **Statut : projets et workspaces en onglets, fenêtres et zones, contrats de services, format
+> OpenCollection.** Sur le squelette technique
 > ([`PRD-squelette.md`](PRD-squelette.md)), Arnod crée et gère des projets et des
 > workspaces selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md), révisé
 > par [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md) : les workspaces sont
@@ -16,7 +17,9 @@ Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 > dans des zones redimensionnables et des fenêtres interconnectées
 > ([`docs/plan-fenetres-zones.md`](docs/plan-fenetres-zones.md)). Un contrat OpenAPI crée les
 > requêtes de ses opérations et vérifie la conformité des réponses
-> ([`docs/plan-contrats-services.md`](docs/plan-contrats-services.md)).
+> ([`docs/plan-contrats-services.md`](docs/plan-contrats-services.md)). Un projet est une
+> collection [OpenCollection](https://spec.opencollection.com) 1.0.0, format ouvert lu aussi par
+> Bruno ([`docs/plan-opencollection.md`](docs/plan-opencollection.md)).
 
 | Thème clair                                      | Thème sombre                                           |
 | ------------------------------------------------ | ------------------------------------------------------ |
@@ -31,20 +34,20 @@ Cas d'usage détaillés dans [`docs/plan-projets-workspaces.md`](docs/plan-proje
 et [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md), maquettes dans
 [`docs/maquettes/`](docs/maquettes/).
 
-| ID           | Comportement                                                                                                                               |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| P1, O8       | Premier lancement : seul l'onglet « Tous les projets » ; Arnod propose de créer le premier projet (`~/arnod/<nom>`), workspace facultatif. |
-| P2, O8       | Nouveau projet depuis un workspace : rangé dans ce seul workspace, toujours visible dans « Tous les projets ».                             |
-| P5, P10      | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                                           |
-| P6, P7       | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                                          |
-| O1, O12, P11 | « Tous les projets » : chaque projet une fois, dernière exécution, « Oublier » avec « Annuler », import d'un projet (`arnod.yml`).         |
-| O2, R7       | Workspaces en onglets ; Arnod rouvre le dernier onglet utilisé, conservé dans `arnod.json`.                                                |
-| O3–O6        | « + » crée un onglet ; clic droit (ou Maj+F10) : renommer, couleur, gérer, supprimer avec « Annuler ».                                     |
-| O7           | Glisser une ligne de « Tous les projets » sur un onglet ajoute le projet à ce workspace.                                                   |
-| W6, O10      | « Ajouter un projet » à un workspace : créer, importer, ou reprendre des projets existants.                                                |
-| O11          | Gestion des workspaces : nom, couleur, projets, suppression avec « Annuler ».                                                              |
-| F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                                   |
-| N7           | Thème clair ou sombre selon le système, police système.                                                                                    |
+| ID           | Comportement                                                                                                                                   |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1, O8       | Premier lancement : seul l'onglet « Tous les projets » ; Arnod propose de créer le premier projet (`~/arnod/<nom>`), workspace facultatif.     |
+| P2, O8       | Nouveau projet depuis un workspace : rangé dans ce seul workspace, toujours visible dans « Tous les projets ».                                 |
+| P5, P10      | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                                               |
+| P6, P7       | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                                              |
+| O1, O12, P11 | « Tous les projets » : chaque projet une fois, dernière exécution, « Oublier » avec « Annuler », import d'un projet ou d'une collection Bruno. |
+| O2, R7       | Workspaces en onglets ; Arnod rouvre le dernier onglet utilisé, conservé dans `arnod.json`.                                                    |
+| O3–O6        | « + » crée un onglet ; clic droit (ou Maj+F10) : renommer, couleur, gérer, supprimer avec « Annuler ».                                         |
+| O7           | Glisser une ligne de « Tous les projets » sur un onglet ajoute le projet à ce workspace.                                                       |
+| W6, O10      | « Ajouter un projet » à un workspace : créer, importer, ou reprendre des projets existants.                                                    |
+| O11          | Gestion des workspaces : nom, couleur, projets, suppression avec « Annuler ».                                                                  |
+| F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                                       |
+| N7           | Thème clair ou sombre selon le système, police système.                                                                                        |
 
 ### Fenêtres et zones
 
@@ -81,10 +84,35 @@ Cas C1 à C12 de [`docs/plan-contrats-services.md`](docs/plan-contrats-services.
 | C1 à C4  | « + Contrat » : importer un fichier, coller un contrat, le lire à une adresse ou en créer un vide ; OpenAPI 3.0, 3.1 ou Swagger 2.0, JSON ou YAML, rangé dans `contracts/`.          |
 | C5       | Onglet du contrat : version, format, serveurs, opérations groupées par tag, couverture « n opérations · m avec requête ».                                                            |
 | C6, C7   | « Créer les requêtes » : une requête prête à envoyer par opération cochée (exemples, authentification, vérifications), liée au contrat ; `baseUrl` vide prend le serveur du contrat. |
-| C8       | Vérification « est conforme au contrat » : statut prévu et corps conforme au schéma, avec le chemin du premier écart.                                                                |
+| C8       | Toute requête liée est vérifiée « conforme au contrat » : statut prévu et corps conforme au schéma, avec le chemin du premier écart ; « Délier » retire le lien.                     |
 | C9       | Vue « Source » : texte modifiable, enregistré seulement s'il reste un contrat lisible (Ctrl+S), ou remplacé par un fichier.                                                          |
 | C10      | « Exécuter » lance le run des requêtes du contrat.                                                                                                                                   |
 | C11, C12 | Contrat mis à la corbeille ; requêtes dont l'opération a disparu signalées « hors contrat ».                                                                                         |
+
+### Format des fichiers : OpenCollection
+
+Cas S1 à S8 de [`docs/plan-opencollection.md`](docs/plan-opencollection.md). Les fichiers d'un
+projet suivent strictement [OpenCollection](https://spec.opencollection.com) 1.0.0 : chaque
+fichier écrit est validé contre le schéma officiel, conservé dans
+[`docs/opencollection/`](docs/opencollection/opencollection-v1.0.0.schema.json), et rien n'est
+écrit s'il ne l'est pas.
+
+```text
+boutique-tests/
+  opencollection.yml      racine : nom, extensions.arnod (identifiant, ordre des environnements)
+  environments/local.yml  variables ; une variable locale est une variable secrète
+  contracts/petstore.yaml contrats OpenAPI, tels quels
+  Clients/lister.yml      une requête : info, http, runtime.assertions, settings
+```
+
+| ID     | Comportement                                                                                                                                   |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1, S5 | Un projet est un dossier contenant `opencollection.yml` ; une collection Bruno s'ajoute comme projet existant.                                 |
+| S2     | Enregistrer ne change que ce qu'Arnod gère : scripts, exemples, documentation, descriptions, autres authentifications et corps sont conservés. |
+| S3     | Vérifications avec les 28 opérateurs d'OpenCollection et de Bruno (`eq`, `lt`, `isDefined`, `between`…), activables une à une.                 |
+| S6     | Un projet d'une version précédente d'Arnod (`arnod.yml`) est converti à l'ouverture, une fois, sans perte.                                     |
+| S7     | Lien au contrat écrit en étiquette (`contract:contracts/petstore.yaml#GET /pets`).                                                             |
+| S8     | Paramètres de chemin (`:id`) remplacés à l'envoi.                                                                                              |
 
 Pile : [Tauri 2](https://v2.tauri.app) (cœur Rust, WebView2 sous Windows, WebKitGTK sous
 Linux), Vue 3, TypeScript strict, Vite, Pinia. Les règles d'architecture et les conventions

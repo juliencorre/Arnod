@@ -50,7 +50,6 @@ function load(env: EnvironmentView | undefined): void {
   }
   editing.value = env.name;
   draft.value = {
-    version: env.version,
     name: env.name,
     color: env.color,
     protected: env.protected ?? false,
@@ -94,7 +93,7 @@ async function create(): Promise<void> {
       name = `Nouvel environnement ${n}`;
     await workbench.saveEnvironment(
       props.projectId,
-      { version: 1, name, color: "gray", protected: false, variables: [], locals: [] },
+      { name, color: "gray", protected: false, variables: [], locals: [] },
       null,
     );
     load(view.value?.environments.find((e) => e.name === name));

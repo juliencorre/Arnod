@@ -6,7 +6,7 @@ use serde_json::json;
 
 use super::conformance::{check, validate};
 use super::file::{self, ContractSource};
-use super::generate::{CONTRACT_ASSERTION, STATUS_ASSERTION, request_for, safe_name};
+use super::generate::{STATUS_ASSERTION, request_for, safe_name};
 use super::parse::{SpecKind, load};
 use super::sample::sample;
 use crate::environment;
@@ -568,7 +568,6 @@ fn r7_verifications_de_la_requete_creee() {
         [
             ("duree", Operator::LessThan),
             (STATUS_ASSERTION, Operator::Equals),
-            (CONTRACT_ASSERTION, Operator::MatchesContract),
         ]
     );
     assert_eq!(
@@ -936,16 +935,10 @@ fn unions_typescript_concordantes() {
     );
     assert_eq!(
         union_members("AssertionOperator"),
-        names([
-            Operator::Equals,
-            Operator::NotEquals,
-            Operator::Exists,
-            Operator::Contains,
-            Operator::LessThan,
-            Operator::GreaterThan,
-            Operator::IsNumber,
-            Operator::IsText,
-            Operator::MatchesContract,
-        ])
+        names(
+            crate::opencollection::request::OPERATORS
+                .iter()
+                .map(|(op, _)| *op)
+        )
     );
 }

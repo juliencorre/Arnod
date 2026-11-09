@@ -19,7 +19,6 @@ describe("environnements du projet", () => {
     let core;
     ({ app, core } = await openProject((c) => {
       c.workbench.envs.push({
-        version: 1,
         name: "Recette",
         color: "blue",
         protected: true,

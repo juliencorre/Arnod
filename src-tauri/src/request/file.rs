@@ -1,82 +1,104 @@
-//! Lecture et écriture du fichier YAML d'une requête.
+//! Lecture et écriture du fichier d'une requête, au format OpenCollection
+//! 1.0.0 (docs/plan-opencollection.md, S2, R1 à R3).
 
-use std::fs;
-use std::io;
 use std::path::Path;
 
+use serde_json::Value;
+
 use crate::error::{CommandError, CommandErrorKind};
-use crate::request::model::{REQUEST_VERSION, Request};
+use crate::opencollection::request::{from_value, into_value, name_of, set_name};
+use crate::opencollection::schema::{self, Part};
+use crate::opencollection::yaml;
+use crate::request::model::Request;
 
-/// Commentaire placé en tête de chaque fichier de requête.
-const HEADER: &str = "# Requête Arnod\n";
+fn stem(path: &Path) -> String {
+    path.file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
 
-/// Lit une requête. Une version plus récente est refusée (`newerVersion`), un
-/// fichier illisible donne `invalidRequest`.
+fn invalid(path: &Path, reason: &str) -> CommandError {
+    CommandError::new(
+        CommandErrorKind::InvalidRequest,
+        format!("Le fichier {} est illisible : {reason}", path.display()),
+    )
+}
+
+/// Lit une requête. Un fichier absent donne `notFound`, un fichier qui n'est
+/// pas une requête HTTP OpenCollection valide `invalidRequest` (R2).
 pub fn read(path: &Path) -> Result<Request, CommandError> {
-    let text = fs::read_to_string(path).map_err(|error| {
-        if error.kind() == io::ErrorKind::NotFound {
+    let value = yaml::read(path).map_err(|error| {
+        if error.kind == CommandErrorKind::NotFound {
             CommandError::new(
                 CommandErrorKind::NotFound,
                 format!("La requête {} n'existe plus.", path.display()),
             )
         } else {
-            CommandError::io("Lecture de la requête impossible", path, &error)
+            error
         }
     })?;
-    parse(&text, path)
+    from_value(&value, &stem(path)).map_err(|reason| invalid(path, &reason))
+}
+
+/// Nom d'une requête lisible, sans la traduire entièrement.
+pub fn read_name(path: &Path) -> Option<String> {
+    let value = yaml::read(path).ok()?;
+    from_value(&value, &stem(path)).ok()?;
+    Some(name_of(&value).unwrap_or_else(|| stem(path)))
 }
 
 /// Interprète le texte d'un fichier de requête.
 pub fn parse(text: &str, path: &Path) -> Result<Request, CommandError> {
-    let request: Request = serde_saphyr::from_str(text).map_err(|error| {
-        CommandError::new(
-            CommandErrorKind::InvalidRequest,
-            format!("Le fichier {} est illisible : {error}", path.display()),
-        )
-    })?;
-    if request.version > REQUEST_VERSION {
-        return Err(CommandError::new(
-            CommandErrorKind::NewerVersion,
-            format!(
-                "Le fichier {} a été écrit par une version plus récente d'Arnod.",
-                path.display()
-            ),
-        ));
-    }
-    Ok(request)
+    let value = yaml::parse(text).map_err(|reason| invalid(path, &reason))?;
+    from_value(&value, &stem(path)).map_err(|reason| invalid(path, &reason))
 }
 
-/// Texte YAML d'une requête.
+/// Fichier actuel, s'il est une requête lisible : base de la fusion (R3).
+fn existing(path: &Path) -> Option<Value> {
+    let value = yaml::read(path).ok()?;
+    schema::check(Part::HttpRequest, &value).ok()?;
+    Some(value)
+}
+
+fn write_value(path: &Path, value: &Value, name: &str) -> Result<(), CommandError> {
+    schema::check(Part::HttpRequest, value).map_err(|reason| {
+        CommandError::new(
+            CommandErrorKind::InvalidRequest,
+            format!("La requête « {name} » n'a pas pu être écrite : {reason}"),
+        )
+    })?;
+    yaml::write(path, value)
+}
+
+/// Texte YAML d'une requête neuve (sans fichier existant).
 pub fn render(request: &Request) -> Result<String, CommandError> {
-    let body = serde_saphyr::to_string(request).map_err(|error| {
-        CommandError::new(
-            CommandErrorKind::InvalidRequest,
-            format!(
-                "La requête « {} » n'a pas pu être écrite : {error}",
-                request.name
-            ),
-        )
-    })?;
-    Ok(format!("{HEADER}{body}"))
+    yaml::render(&into_value(request, None))
 }
 
-/// Écrit une requête ; rien n'est réécrit si le contenu n'a pas changé (Git).
+/// Écrit une requête : seuls les champs gérés par Arnod remplacent ceux du
+/// fichier existant (R3) ; rien n'est réécrit si le contenu n'a pas changé.
 pub fn write(path: &Path, request: &Request) -> Result<(), CommandError> {
-    let text = render(request)?;
-    if fs::read_to_string(path).is_ok_and(|current| current == text) {
-        return Ok(());
-    }
-    let tmp = path.with_extension("yml.tmp");
-    fs::write(&tmp, &text)
-        .map_err(|error| CommandError::io("Écriture impossible", &tmp, &error))?;
-    fs::rename(&tmp, path).map_err(|error| {
-        let _ = fs::remove_file(&tmp);
-        CommandError::io("Écriture impossible", path, &error)
-    })
+    let value = into_value(request, existing(path).as_ref());
+    write_value(path, &value, &request.name)
+}
+
+/// Copie d'une requête sous un autre nom, tout le contenu conservé (A9).
+pub fn copy_as(source: &Path, target: &Path, name: &str) -> Result<(), CommandError> {
+    let mut value = yaml::read(source)?;
+    read(source)?;
+    set_name(&mut value, name);
+    write_value(target, &value, name)
+}
+
+/// Renomme une requête dans son fichier, tout le contenu conservé.
+pub fn rename(path: &Path, name: &str) -> Result<(), CommandError> {
+    copy_as(path, path, name)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
     use crate::request::model::*;
 
@@ -84,11 +106,9 @@ mod tests {
         let mut request = Request::new("Créer une commande");
         request.method = Method::Post;
         request.url = "{{baseUrl}}/orders".to_owned();
-        request.headers.push(Pair {
-            name: "Content-Type".to_owned(),
-            value: "application/json".to_owned(),
-            enabled: true,
-        });
+        request
+            .headers
+            .push(Pair::new("Content-Type", "application/json"));
         request.auth = Auth {
             kind: AuthKind::Bearer,
             token: "{{token}}".to_owned(),
@@ -96,8 +116,8 @@ mod tests {
         };
         request.body = Body {
             kind: BodyKind::Json,
-            content: "{ \"qty\": 2 }\n".to_owned(),
-            form: Vec::new(),
+            content: "{\n  \"qty\": 2\n}".to_owned(),
+            ..Body::default()
         };
         request.assertions.push(Assertion {
             id: "a1".to_owned(),
@@ -105,6 +125,7 @@ mod tests {
             operator: Operator::Equals,
             value: Some(Scalar::Int(201)),
             origin: Origin::Proposed,
+            enabled: true,
         });
         request.assertions.push(Assertion {
             id: "a2".to_owned(),
@@ -112,7 +133,17 @@ mod tests {
             operator: Operator::Equals,
             value: Some(Scalar::Text("pending".to_owned())),
             origin: Origin::Manual,
+            enabled: true,
         });
+        request
+    }
+
+    /// Identifiants et origines sont de session : recalculés à la lecture (Q2).
+    fn session_free(mut request: Request) -> Request {
+        for (index, assertion) in request.assertions.iter_mut().enumerate() {
+            assertion.id = format!("a{index}");
+            assertion.origin = Origin::Manual;
+        }
         request
     }
 
@@ -121,7 +152,7 @@ mod tests {
         let request = sample();
         let text = render(&request).unwrap();
         let back = parse(&text, Path::new("x.yml")).unwrap();
-        assert_eq!(back, request);
+        assert_eq!(back, session_free(request));
         assert_eq!(render(&back).unwrap(), text);
     }
 
@@ -137,18 +168,21 @@ mod tests {
     }
 
     #[test]
-    fn version_plus_recente_refusee() {
-        let text = render(&sample())
-            .unwrap()
-            .replace("version: 1", "version: 9");
-        let error = parse(&text, Path::new("x.yml")).unwrap_err();
-        assert_eq!(error.kind, CommandErrorKind::NewerVersion);
+    fn corps_multiligne_en_bloc_litteral() {
+        let text = render(&sample()).unwrap();
+        assert!(text.contains("data: |-\n"), "{text}");
     }
 
     #[test]
     fn fichier_illisible() {
-        let error = parse("name: [", Path::new("x.yml")).unwrap_err();
+        let error = parse("info: [", Path::new("x.yml")).unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::InvalidRequest);
+        let error = parse("info:\n  name: x\n  couleur: rouge\n", Path::new("x.yml")).unwrap_err();
+        assert!(
+            error.message.contains("non conforme à OpenCollection"),
+            "{}",
+            error.message
+        );
     }
 
     #[test]

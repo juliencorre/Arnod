@@ -178,10 +178,14 @@ describe("onglet du contrat (C5, C6, C10)", () => {
     const chip = app?.get(".editor__contract");
     expect(chip?.text()).toBe("Contrat : Petstore · GET /pets");
 
+    // La conformité est déduite du lien : aucune vérification écrite pour elle (R8).
     await click(app as AppWrapper, ".editor__tab", "Vérifications");
     const selects = app?.findAll(".assertion select") ?? [];
-    expect((selects.at(-1)?.element as HTMLSelectElement).value).toBe("matchesContract");
-    expect(app?.findAll(".assertion__whole").map((s) => s.text())).toEqual(["La réponse"]);
+    expect(selects.map((s) => (s.element as HTMLSelectElement).value)).toEqual([
+      "lessThan",
+      "equals",
+    ]);
+    expect(app?.get(".assertion--contract").text()).toContain("conforme au contrat");
 
     await chip?.trigger("click");
     await flushPromises();
@@ -189,6 +193,24 @@ describe("onglet du contrat (C5, C6, C10)", () => {
     expect(core.calls.filter((c) => c.cmd === "layout_open_selection").at(-1)?.args).toEqual({
       content: { kind: "contract", projectId: BOUTIQUE_TESTS, path: "contracts/petstore.yaml" },
     });
+  });
+
+  it("délie la requête du contrat (R8)", async () => {
+    const { core } = await setup(true);
+    await openContract(app as AppWrapper);
+    await click(app as AppWrapper, ".contract__actions button", "Créer les requêtes");
+    await app?.get('[aria-label="Ouvrir la requête de GET /pets"]').trigger("click");
+    await flushPromises();
+
+    await click(app as AppWrapper, ".editor__link button", "Délier");
+    expect(app?.find(".editor__contract").exists()).toBe(false);
+    expect(app?.get(".editor__state").text()).toContain("Modifiée");
+
+    await click(app as AppWrapper, ".editor__line button", "Enregistrer");
+    const saved = core.calls.filter((c) => c.cmd === "request_save").at(-1)?.args as {
+      request: Record<string, unknown>;
+    };
+    expect(saved.request).not.toHaveProperty("contract");
   });
 
   it("exécute les requêtes du contrat (C10)", async () => {

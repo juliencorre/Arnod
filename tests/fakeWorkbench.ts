@@ -17,8 +17,6 @@ import type {
 
 export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): RequestDoc {
   return {
-    version: 1,
-    id: `id-${name}`,
     name,
     method: "GET",
     url: "{{baseUrl}}/",
@@ -32,12 +30,21 @@ export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): R
       name: "",
       value: "",
       location: "header",
+      other: "",
     },
-    body: { kind: "none", content: "", form: [] },
+    body: { kind: "none", content: "", form: [], other: "" },
     timeoutMs: 30000,
     assertions: [
-      { id: "duree", target: "responseTime", operator: "lessThan", value: 500, origin: "default" },
+      {
+        id: "duree",
+        target: "responseTime",
+        operator: "lessThan",
+        value: 500,
+        origin: "default",
+        enabled: true,
+      },
     ],
+    preserved: [],
     ...overrides,
   };
 }
@@ -84,7 +91,6 @@ export function createFakeWorkbench(): FakeWorkbench {
     folders: new Set(),
     envs: [
       {
-        version: 1,
         name: "Local",
         color: "gray",
         variables: [{ name: "baseUrl", value: "" }],
@@ -250,7 +256,14 @@ export function handleWorkbench(
       return null;
     case "request_propose_assertions":
       return [
-        { id: "status", target: "status", operator: "equals", value: 200, origin: "proposed" },
+        {
+          id: "status",
+          target: "status",
+          operator: "equals",
+          value: 200,
+          origin: "proposed",
+          enabled: true,
+        },
       ] satisfies Assertion[];
     case "environments_load":
       return envView(wb);

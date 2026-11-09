@@ -8,7 +8,7 @@ use crate::contract::parse::{Contract, Operation, Parameter, SpecKind, resolve};
 use crate::contract::sample::{as_param, declared_example, sample};
 use crate::request::model::{
     ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, ContractLink, Method, Operator,
-    Origin, Pair, Request, Scalar,
+    Origin, Pair, ParamKind, Request, Scalar,
 };
 
 /// Caractères encodés dans un segment de chemin.
@@ -28,9 +28,8 @@ const SEGMENT: &AsciiSet = &CONTROLS
 /// Caractères interdits dans un nom de requête ou de dossier (R10 des projets).
 const FORBIDDEN: [char; 9] = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
 
-/// Identifiants des vérifications ajoutées à la création (R7).
+/// Identifiant de la vérification de statut ajoutée à la création (R7).
 pub const STATUS_ASSERTION: &str = "statut";
-pub const CONTRACT_ASSERTION: &str = "contrat";
 
 /// Nom utilisable comme nom de requête ou de dossier : caractères interdits
 /// remplacés, espaces réduits, 64 caractères au plus.
@@ -127,6 +126,7 @@ pub fn request_for(
             name: parameter.name.clone(),
             value: parameter_value(contract, parameter),
             enabled: parameter.required,
+            kind: ParamKind::Query,
         };
         match parameter.location.as_str() {
             "query" => request.params.push(pair),
@@ -146,6 +146,7 @@ pub fn request_for(
             name: "Content-Type".to_owned(),
             value: media,
             enabled: true,
+            kind: ParamKind::Query,
         });
     }
     request.body = body;
@@ -154,6 +155,7 @@ pub fn request_for(
             name: "Accept".to_owned(),
             value: accept,
             enabled: true,
+            kind: ParamKind::Query,
         });
     }
     request.auth = auth_for(contract, operation);
@@ -165,15 +167,10 @@ pub fn request_for(
             operator: Operator::Equals,
             value: Some(Scalar::Int(i64::from(status))),
             origin: Origin::Default,
+            enabled: true,
         });
     }
-    request.assertions.push(Assertion {
-        id: CONTRACT_ASSERTION.to_owned(),
-        target: "response".to_owned(),
-        operator: Operator::MatchesContract,
-        value: None,
-        origin: Origin::Default,
-    });
+    // La conformité n'est pas une vérification écrite : elle se déduit du lien (S7).
     request.contract = Some(ContractLink {
         file: file.to_owned(),
         operation: operation.key.clone(),
@@ -231,6 +228,7 @@ fn form_pairs(value: &Value) -> Vec<Pair> {
                         other => as_param(other),
                     },
                     enabled: true,
+                    kind: ParamKind::Query,
                 })
                 .collect()
         })
@@ -243,6 +241,7 @@ fn body_from(media: &str, example: Value) -> Body {
             kind: BodyKind::Json,
             content: pretty(&example),
             form: Vec::new(),
+            other: String::new(),
         }
     } else if media.starts_with("application/x-www-form-urlencoded")
         || media.starts_with("multipart/form-data")
@@ -251,6 +250,7 @@ fn body_from(media: &str, example: Value) -> Body {
             kind: BodyKind::Form,
             content: String::new(),
             form: form_pairs(&example),
+            other: String::new(),
         }
     } else {
         Body {
@@ -261,6 +261,7 @@ fn body_from(media: &str, example: Value) -> Body {
                 other => pretty(&other),
             },
             form: Vec::new(),
+            other: String::new(),
         }
     }
 }
@@ -317,6 +318,7 @@ fn body_for(
                     name: p.name.clone(),
                     value: parameter_value(contract, p),
                     enabled: p.required,
+                    kind: ParamKind::Query,
                 })
                 .collect();
             if fields.is_empty() {
@@ -327,6 +329,7 @@ fn body_for(
                     kind: BodyKind::Form,
                     content: String::new(),
                     form: fields,
+                    other: String::new(),
                 },
                 Some("application/x-www-form-urlencoded".to_owned()),
             )

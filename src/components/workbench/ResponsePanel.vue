@@ -25,7 +25,9 @@ const prettyBody = computed(() => {
 
 const failed = computed(() => outcome.value?.assertions.filter((a) => !a.passed).length ?? 0);
 
+/** Libellé d'un résultat : cible de la vérification, ou conformité au contrat lié (R8). */
 function messageFor(id: string): string | null {
+  if (id === "contrat") return "Conformité au contrat";
   return editor.value?.draft?.assertions.find((a) => a.id === id)?.target ?? null;
 }
 </script>

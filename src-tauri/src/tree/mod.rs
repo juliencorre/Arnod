@@ -11,7 +11,8 @@ use serde::Serialize;
 use crate::catalog::names::{self, sort_key};
 use crate::contract::CONTRACTS_DIR;
 use crate::error::{CommandError, CommandErrorKind};
-use crate::manifest::MANIFEST_FILE_NAME;
+use crate::opencollection::schema::{self, Part};
+use crate::opencollection::{FOLDER_FILE, ROOT_FILE, yaml};
 use crate::request::file;
 use crate::request::model::{Method, Request};
 
@@ -63,7 +64,8 @@ fn is_request_file(path: &Path) -> bool {
 }
 
 /// Lit l'arborescence du projet (R1) : dossiers d'abord, puis requêtes, chacun
-/// par nom sans tenir compte de la casse ; éléments cachés et manifeste ignorés.
+/// par nom sans tenir compte de la casse ; éléments cachés, racine de la
+/// collection et réglages de dossier (`folder.yml`) ignorés (R7 du format).
 pub fn read(root: &Path) -> Result<Vec<TreeNode>, CommandError> {
     read_dir(root, root, true)
 }
@@ -75,7 +77,7 @@ fn read_dir(root: &Path, dir: &Path, top: bool) -> Result<Vec<TreeNode>, Command
     let mut requests = Vec::new();
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') || (top && name == MANIFEST_FILE_NAME) {
+        if name.starts_with('.') || (top && name == ROOT_FILE) || name == FOLDER_FILE {
             continue;
         }
         let path = entry.path();
@@ -213,7 +215,7 @@ pub(crate) fn request_name_taken(dir: &Path, name: &str, except: Option<&Path>) 
             if Some(path.as_path()) == except || !is_request_file(&path) {
                 return false;
             }
-            file::read(&path).is_ok_and(|request| names::same_name(&request.name, name))
+            file::read_name(&path).is_some_and(|other| names::same_name(&other, name))
         })
     })
 }
@@ -311,9 +313,10 @@ pub fn rename(root: &Path, path: &str, name: &str) -> Result<String, CommandErro
             fs::rename(&tmp, &target)
                 .map_err(|e| CommandError::io("Renommage impossible", &target, &e))?;
         }
+        rename_folder_settings(&target, &name);
         return Ok(relative_path(root, &target));
     }
-    let mut request = file::read(&source)?;
+    let request = file::read(&source)?;
     if request_name_taken(&parent, &name, Some(&source)) {
         return Err(name_taken(&name));
     }
@@ -328,8 +331,7 @@ pub fn rename(root: &Path, path: &str, name: &str) -> Result<String, CommandErro
                 .strip_prefix(&format!("{base}-"))
                 .is_some_and(|rest| rest.parse::<u32>().is_ok())
     };
-    request.name = name.clone();
-    file::write(&source, &request)?;
+    file::rename(&source, &name)?;
     if derived {
         let new_base = slug(&name);
         if new_base != old_stem {
@@ -383,7 +385,7 @@ pub fn move_to(root: &Path, path: &str, target_folder: &str) -> Result<String, C
 pub fn duplicate(root: &Path, path: &str) -> Result<String, CommandError> {
     let source = resolve(root, path)?;
     let dir = source.parent().unwrap_or(root).to_path_buf();
-    let mut request = file::read(&source)?;
+    let request = file::read(&source)?;
     let base = format!("{} (copie)", request.name);
     let mut name = base.clone();
     let mut n = 2;
@@ -391,11 +393,28 @@ pub fn duplicate(root: &Path, path: &str) -> Result<String, CommandError> {
         name = format!("{base} {n}");
         n += 1;
     }
-    request.id = uuid::Uuid::new_v4();
-    request.name = name.clone();
     let target = dir.join(free_file_name(&dir, &slug(&name)));
-    file::write(&target, &request)?;
+    file::copy_as(&source, &target, &name)?;
     Ok(relative_path(root, &target))
+}
+
+/// Le nom d'un dossier dans son `folder.yml`, s'il en a un, suit le renommage
+/// (Bruno l'affiche à la place du nom du dossier).
+fn rename_folder_settings(folder: &Path, name: &str) {
+    let path = folder.join(FOLDER_FILE);
+    let Ok(mut value) = yaml::read(&path) else {
+        return;
+    };
+    if let Some(info) = value
+        .get_mut("info")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        info.insert("name".to_owned(), serde_json::Value::from(name));
+        // Un fichier non conforme n'est jamais réécrit (R1, R2).
+        if schema::check(Part::Folder, &value).is_ok() {
+            let _ = yaml::write(&path, &value);
+        }
+    }
 }
 
 /// Supprime un dossier ou une requête : corbeille du système, ou suppression

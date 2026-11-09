@@ -7,7 +7,7 @@ use base64::engine::general_purpose::STANDARD;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 
 use crate::error::{CommandError, CommandErrorKind};
-use crate::request::model::{ApiKeyLocation, AuthKind, BodyKind, Method, Pair, Request};
+use crate::request::model::{ApiKeyLocation, AuthKind, BodyKind, Method, Pair, ParamKind, Request};
 
 /// Texte affiché à la place d'un secret (R9).
 pub const MASK: &str = "••••";
@@ -109,6 +109,27 @@ fn active(pairs: &[Pair]) -> impl Iterator<Item = &Pair> {
         .filter(|pair| pair.enabled && !pair.name.trim().is_empty())
 }
 
+/// Remplace le segment `:name` d'une adresse (suivi de `/`, `?`, `#` ou de la fin).
+fn replace_path_param(url: &str, name: &str, value: &str) -> String {
+    let marker = format!(":{name}");
+    let mut out = String::new();
+    let mut rest = url;
+    while let Some(index) = rest.find(&marker) {
+        let after = &rest[index + marker.len()..];
+        let boundary = after.is_empty() || after.starts_with(['/', '?', '#']);
+        let segment = rest[..index].ends_with('/');
+        out.push_str(&rest[..index]);
+        if boundary && segment {
+            out.push_str(value);
+        } else {
+            out.push_str(&marker);
+        }
+        rest = after;
+    }
+    out.push_str(rest);
+    out
+}
+
 fn has_header(headers: &[(String, String)], name: &str) -> bool {
     headers
         .iter()
@@ -123,7 +144,12 @@ pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, Com
     let mut sub = |text: &str| substitute(text, variables, &mut unknown);
 
     let mut url = sub(&request.url);
+    // Paramètres de chemin (S8) : `:nom` de l'adresse remplacé par la valeur.
+    for pair in active(&request.params).filter(|p| p.kind == ParamKind::Path) {
+        url = replace_path_param(&url, &sub(&pair.name), &encode(&sub(&pair.value)));
+    }
     let mut query: Vec<String> = active(&request.params)
+        .filter(|pair| pair.kind == ParamKind::Query)
         .map(|pair| format!("{}={}", encode(&sub(&pair.name)), encode(&sub(&pair.value))))
         .collect();
 
@@ -133,7 +159,8 @@ pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, Com
 
     let auth = &request.auth;
     match auth.kind {
-        AuthKind::None => {}
+        // Héritée ou autre : non gérée par Arnod, rien n'est envoyé (hors périmètre).
+        AuthKind::None | AuthKind::Inherit | AuthKind::Other => {}
         AuthKind::Basic => {
             let credentials = format!("{}:{}", sub(&auth.username), sub(&auth.password));
             headers.push((
@@ -161,7 +188,8 @@ pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, Com
     }
 
     let (body, content_type) = match request.body.kind {
-        BodyKind::None => (None, None),
+        BodyKind::None | BodyKind::Other => (None, None),
+        BodyKind::Xml => (Some(sub(&request.body.content)), Some("application/xml")),
         BodyKind::Json => (Some(sub(&request.body.content)), Some("application/json")),
         BodyKind::Text => (
             Some(sub(&request.body.content)),
@@ -272,15 +300,10 @@ mod tests {
         let v = vars(&[("baseUrl", "https://api.test")], &[]);
         let mut r = request("{{baseUrl}}/s");
         r.params = vec![
+            Pair::new("q", "a b&c"),
             Pair {
-                name: "q".into(),
-                value: "a b&c".into(),
-                enabled: true,
-            },
-            Pair {
-                name: "off".into(),
-                value: "x".into(),
                 enabled: false,
+                ..Pair::new("off", "x")
             },
         ];
         assert_eq!(
@@ -344,7 +367,7 @@ mod tests {
         r.body = Body {
             kind: BodyKind::Json,
             content: "{}".into(),
-            form: vec![],
+            ..Body::default()
         };
         let p = prepare(&r, &v).unwrap();
         assert_eq!(p.body.as_deref(), Some("{}"));
@@ -352,11 +375,8 @@ mod tests {
             p.headers
                 .contains(&("Content-Type".into(), "application/json".into()))
         );
-        r.headers.push(Pair {
-            name: "content-type".into(),
-            value: "application/vnd.x+json".into(),
-            enabled: true,
-        });
+        r.headers
+            .push(Pair::new("content-type", "application/vnd.x+json"));
         let p = prepare(&r, &v).unwrap();
         assert_eq!(
             p.headers

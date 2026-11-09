@@ -20,7 +20,10 @@ use crate::http::{self, HttpResponse};
 use crate::local::{self, LocalData, LocalVar};
 use crate::request::assertions::{self, AssertionResult, DEFAULT_LIMIT};
 use crate::request::file;
-use crate::request::model::{Method, Operator, Request};
+use crate::request::model::{Method, Request};
+
+/// Identifiant du résultat de conformité au contrat d'une requête liée.
+pub const CONTRACT_CHECK: &str = "contrat";
 use crate::request::resolve::{self, Variables};
 use crate::secrets::{self, SecretStore};
 use crate::tree;
@@ -433,17 +436,16 @@ impl Workbench {
         let list = &request.assertions;
         let data = response.data();
         let mut results = assertions::evaluate_all(list, &data);
-        for (assertion, result) in list.iter().zip(results.iter_mut()) {
-            if assertion.operator == Operator::MatchesContract {
-                *result = contract_file::conformance_result(
-                    root,
-                    request.contract.as_ref(),
-                    &assertion.id,
-                    &data,
-                );
-            }
+        // Requête liée à un contrat : sa conformité est vérifiée (S7, R8).
+        if request.contract.is_some() {
+            results.push(contract_file::conformance_result(
+                root,
+                request.contract.as_ref(),
+                CONTRACT_CHECK,
+                &data,
+            ));
         }
-        let passed = assertions::request_passed(list, &results, response.status);
+        let passed = assertions::request_passed(&results, response.status);
         let limit = assertions::duration_limit(list).unwrap_or(DEFAULT_LIMIT);
         let slow = i64::try_from(response.total_ms).is_ok_and(|ms| ms > limit);
         SendOutcome {

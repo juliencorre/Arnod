@@ -244,10 +244,19 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       headers: current.response.headers,
       body: current.response.body,
     });
-    const known = new Set(editor.draft.assertions.map((a) => a.id));
+    // Les identifiants sont de session : une vérification déjà présente se reconnaît
+    // à sa cible et à son opérateur.
+    const signature = (a: { target: string; operator: string }): string =>
+      `${a.target}\u0000${a.operator}`;
+    const known = new Set(editor.draft.assertions.map(signature));
+    const ids = new Set(editor.draft.assertions.map((a) => a.id));
     editor.draft.assertions = [
       ...editor.draft.assertions,
-      ...proposed.filter((a) => !known.has(a.id)),
+      ...proposed
+        .filter((a) => !known.has(signature(a)))
+        .map((a) =>
+          ids.has(a.id) ? { ...a, id: `${a.id}-${crypto.randomUUID().slice(0, 8)}` } : a,
+        ),
     ];
   }
 

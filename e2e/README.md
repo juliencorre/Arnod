@@ -35,7 +35,7 @@ ailleurs : `ARNOD_E2E_TAURI_DRIVER=/chemin/vers/tauri-driver`.
   (W2), dossier supprimé hors d'Arnod (P10), dossier projet existant (P12), projet oublié puis
   rétabli (P11) ; puis zones et fenêtres : onglets, division, séparation au clavier, zone ouverte
   dans sa fenêtre puis rattachée, barre latérale détachée qui pilote la fenêtre principale,
-  restauration au redémarrage. Chaque étape vérifie aussi le disque (`arnod.yml`, `arnod.json`,
+  restauration au redémarrage. Chaque étape vérifie aussi le disque (`opencollection.yml`, `arnod.json`,
   `windows.json`).
 - Plusieurs fenêtres : `getWindowHandles()` les liste et `switchToWindow()` passe de l'une à
   l'autre ; un bouton qui n'apparaît qu'au survol est cliqué depuis la page (`clickHidden`).

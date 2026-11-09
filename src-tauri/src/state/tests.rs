@@ -427,11 +427,24 @@ fn chemin_relatif_ou_manifeste_plus_recent_refuse() {
     fs::create_dir_all(&newer).unwrap();
     fs::write(
         newer.join(MANIFEST_FILE_NAME),
-        format!("version: 2\nid: {}\nname: futur\n", Uuid::new_v4()),
+        "opencollection: 2.0.0\ninfo:\n  name: futur\n",
     )
     .unwrap();
     assert_eq!(
         kind(state.add_existing_project(&newer.display().to_string(), Some(default))),
+        CommandErrorKind::NewerVersion
+    );
+
+    // Format précédent d'Arnod, écrit par une version plus récente.
+    let legacy = fixture.root.path().join("ancien");
+    fs::create_dir_all(&legacy).unwrap();
+    fs::write(
+        legacy.join("arnod.yml"),
+        format!("version: 2\nid: {}\nname: ancien\n", Uuid::new_v4()),
+    )
+    .unwrap();
+    assert_eq!(
+        kind(state.add_existing_project(&legacy.display().to_string(), Some(default))),
         CommandErrorKind::NewerVersion
     );
 }

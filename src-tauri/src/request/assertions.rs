@@ -126,13 +126,67 @@ fn equals(actual: &Value, expected: &Scalar) -> bool {
     }
 }
 
-/// Évalue une vérification (R11).
+fn number_of(value: &Value) -> Option<f64> {
+    value
+        .as_f64()
+        .or_else(|| value.as_str().and_then(|text| text.trim().parse().ok()))
+}
+
+fn expected_text(expected: Option<&Scalar>) -> String {
+    match expected {
+        Some(Scalar::Text(text)) => text.clone(),
+        Some(Scalar::Bool(flag)) => flag.to_string(),
+        Some(Scalar::Int(n)) => n.to_string(),
+        Some(Scalar::Float(n)) => n.to_string(),
+        None => String::new(),
+    }
+}
+
+/// Éléments d'une liste attendue : `a,b`, ou `[a, b]` (opérateurs `in`, `between`).
+fn list_items(expected: Option<&Scalar>) -> Vec<Scalar> {
+    let text = expected_text(expected);
+    let inner = text
+        .trim()
+        .strip_prefix('[')
+        .and_then(|t| t.strip_suffix(']'))
+        .unwrap_or(text.trim());
+    inner
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(crate::opencollection::request::scalar_from)
+        .collect()
+}
+
+fn is_empty_value(value: &Value) -> bool {
+    match value {
+        Value::String(text) => text.is_empty(),
+        Value::Array(items) => items.is_empty(),
+        Value::Object(map) => map.is_empty(),
+        Value::Null => true,
+        _ => false,
+    }
+}
+
+/// Vrai au sens de JavaScript, comme dans Bruno.
+fn truthy(value: Option<&Value>) -> bool {
+    match value {
+        None | Some(Value::Null) => false,
+        Some(Value::Bool(flag)) => *flag,
+        Some(Value::Number(n)) => n.as_f64().is_some_and(|n| n != 0.0 && !n.is_nan()),
+        Some(Value::String(text)) => !text.is_empty(),
+        Some(_) => true,
+    }
+}
+
+/// Évalue une vérification (R11, R4 du format OpenCollection).
 pub fn evaluate(
     assertion: &Assertion,
     response: &ResponseData,
     json: Option<&Value>,
 ) -> AssertionResult {
-    let found = lookup(&assertion.target, response, json).filter(|value| !value.is_null());
+    let raw = lookup(&assertion.target, response, json);
+    let found = raw.clone().filter(|value| !value.is_null());
     let actual = found.as_ref().map(show);
     let expected = assertion.value.as_ref();
     let expected_text = expected.map(scalar_text).unwrap_or_default();
@@ -143,80 +197,197 @@ pub fn evaluate(
             "valeur absente de la réponse".to_owned()
         }
     };
+    let fail = |ok: bool, message: String| (ok, (!ok).then_some(message));
 
     let (passed, message) = match (assertion.operator, &found) {
-        // Évaluée par l'établi, qui lit le contrat lié (`contract::conformance`).
-        (Operator::MatchesContract, _) => (
-            false,
-            Some("aucun contrat associé à cette requête".to_owned()),
-        ),
         (Operator::Exists, found) => (found.is_some(), found.is_none().then(missing)),
-        (Operator::NotEquals, None) => (true, None),
+        (Operator::IsUndefined, _) => fail(
+            raw.is_none(),
+            format!(
+                "devait être absent, reçu {}",
+                raw.as_ref().map(show).unwrap_or_default()
+            ),
+        ),
+        (Operator::IsNull, _) => fail(
+            raw.as_ref().is_some_and(Value::is_null),
+            format!(
+                "attendu null, reçu {}",
+                raw.as_ref().map_or_else(|| "rien".to_owned(), show)
+            ),
+        ),
+        (Operator::IsTruthy, _) => fail(
+            truthy(found.as_ref()),
+            format!(
+                "attendu une valeur vraie, reçu {}",
+                actual.clone().unwrap_or_default()
+            ),
+        ),
+        (Operator::IsFalsy, _) => fail(
+            !truthy(found.as_ref()),
+            format!(
+                "attendu une valeur fausse, reçu {}",
+                actual.clone().unwrap_or_default()
+            ),
+        ),
+        (Operator::Matches | Operator::NotMatches, _) => (
+            false,
+            Some("opérateur non évalué par Arnod (expression régulière)".to_owned()),
+        ),
+        (Operator::NotEquals | Operator::NotContains | Operator::NotIn, None) => (true, None),
         (_, None) => (false, Some(missing())),
-        (Operator::Equals, Some(value)) => {
-            let ok = expected.is_some_and(|expected| equals(value, expected));
-            (
-                ok,
-                (!ok).then(|| format!("attendu {expected_text}, reçu {}", show(value))),
-            )
-        }
-        (Operator::NotEquals, Some(value)) => {
-            let ok = !expected.is_some_and(|expected| equals(value, expected));
-            (
-                ok,
-                (!ok).then(|| format!("ne devait pas valoir {expected_text}")),
-            )
-        }
-        (Operator::Contains, Some(value)) => {
-            let ok = match (value, expected) {
-                (Value::String(text), Some(Scalar::Text(part))) => text.contains(part.as_str()),
+        (Operator::Equals, Some(value)) => fail(
+            expected.is_some_and(|expected| equals(value, expected)),
+            format!("attendu {expected_text}, reçu {}", show(value)),
+        ),
+        (Operator::NotEquals, Some(value)) => fail(
+            !expected.is_some_and(|expected| equals(value, expected)),
+            format!("ne devait pas valoir {expected_text}"),
+        ),
+        (Operator::Contains | Operator::NotContains, Some(value)) => {
+            let contains = match (value, expected) {
+                (Value::String(text), Some(part)) => {
+                    text.contains(self::expected_text(Some(part)).as_str())
+                }
                 (Value::Array(items), Some(expected)) => {
                     items.iter().any(|item| equals(item, expected))
                 }
                 _ => false,
             };
-            (
-                ok,
-                (!ok).then(|| format!("devait contenir {expected_text}, reçu {}", show(value))),
-            )
+            if assertion.operator == Operator::Contains {
+                fail(
+                    contains,
+                    format!("devait contenir {expected_text}, reçu {}", show(value)),
+                )
+            } else {
+                fail(
+                    !contains,
+                    format!(
+                        "ne devait pas contenir {expected_text}, reçu {}",
+                        show(value)
+                    ),
+                )
+            }
         }
-        (Operator::LessThan | Operator::GreaterThan, Some(value)) => {
-            let number = value
-                .as_f64()
-                .or_else(|| value.as_str().and_then(|text| text.trim().parse().ok()));
-            let limit = expected.and_then(as_f64);
-            match (number, limit) {
-                (Some(number), Some(limit)) => {
-                    let less = assertion.operator == Operator::LessThan;
-                    let ok = if less { number < limit } else { number > limit };
-                    let word = if less { "inférieur" } else { "supérieur" };
-                    (
-                        ok,
-                        (!ok).then(|| {
-                            format!("attendu {word} à {expected_text}, reçu {}", show(value))
-                        }),
-                    )
-                }
+        (
+            Operator::LessThan
+            | Operator::LessOrEqual
+            | Operator::GreaterThan
+            | Operator::GreaterOrEqual,
+            Some(value),
+        ) => match (number_of(value), expected.and_then(as_f64)) {
+            (Some(number), Some(limit)) => {
+                let (ok, word) = match assertion.operator {
+                    Operator::LessThan => (number < limit, "inférieur à"),
+                    Operator::LessOrEqual => (number <= limit, "inférieur ou égal à"),
+                    Operator::GreaterThan => (number > limit, "supérieur à"),
+                    _ => (number >= limit, "supérieur ou égal à"),
+                };
+                fail(
+                    ok,
+                    format!("attendu {word} {expected_text}, reçu {}", show(value)),
+                )
+            }
+            _ => (
+                false,
+                Some(format!("« {} » n'est pas un nombre", show(value))),
+            ),
+        },
+        (Operator::Between, Some(value)) => {
+            let bounds: Vec<f64> = list_items(expected).iter().filter_map(as_f64).collect();
+            match (number_of(value), bounds.as_slice()) {
+                (Some(number), [min, max]) => fail(
+                    *min <= number && number <= *max,
+                    format!("attendu entre {min} et {max}, reçu {}", show(value)),
+                ),
                 _ => (
                     false,
-                    Some(format!("« {} » n'est pas un nombre", show(value))),
+                    Some("bornes attendues sous la forme min,max".to_owned()),
                 ),
             }
         }
-        (Operator::IsNumber, Some(value)) => {
-            let ok = value.is_number();
-            (
+        (Operator::In | Operator::NotIn, Some(value)) => {
+            let listed = list_items(expected).iter().any(|item| equals(value, item));
+            if assertion.operator == Operator::In {
+                fail(
+                    listed,
+                    format!(
+                        "attendu parmi {}, reçu {}",
+                        self::expected_text(expected),
+                        show(value)
+                    ),
+                )
+            } else {
+                fail(
+                    !listed,
+                    format!("ne devait pas être parmi {}", self::expected_text(expected)),
+                )
+            }
+        }
+        (Operator::StartsWith | Operator::EndsWith, Some(value)) => {
+            let part = self::expected_text(expected);
+            let ok = value.as_str().is_some_and(|text| {
+                if assertion.operator == Operator::StartsWith {
+                    text.starts_with(&part)
+                } else {
+                    text.ends_with(&part)
+                }
+            });
+            let word = if assertion.operator == Operator::StartsWith {
+                "commencer"
+            } else {
+                "finir"
+            };
+            fail(
                 ok,
-                (!ok).then(|| format!("attendu number, reçu {}", show(value))),
+                format!("devait {word} par {expected_text}, reçu {}", show(value)),
             )
         }
-        (Operator::IsText, Some(value)) => {
-            let ok = value.is_string();
-            (
-                ok,
-                (!ok).then(|| format!("attendu texte, reçu {}", show(value))),
+        (Operator::Length, Some(value)) => {
+            let length = match value {
+                Value::String(text) => Some(text.chars().count()),
+                Value::Array(items) => Some(items.len()),
+                Value::Object(map) => Some(map.len()),
+                _ => None,
+            };
+            let wanted = expected.and_then(as_f64);
+            fail(
+                length
+                    .zip(wanted)
+                    .is_some_and(|(l, w)| (l as f64 - w).abs() < f64::EPSILON),
+                format!(
+                    "longueur attendue {expected_text}, reçue {}",
+                    length.map_or_else(|| "aucune".to_owned(), |l| l.to_string())
+                ),
             )
         }
+        (Operator::IsEmpty, Some(value)) => fail(
+            is_empty_value(value),
+            format!("attendu vide, reçu {}", show(value)),
+        ),
+        (Operator::IsNotEmpty, Some(value)) => fail(
+            !is_empty_value(value),
+            "attendu non vide, reçu une valeur vide".to_owned(),
+        ),
+        (Operator::IsJson, Some(value)) => fail(
+            value.is_object() || value.is_array(),
+            format!("attendu un objet JSON, reçu {}", show(value)),
+        ),
+        (Operator::IsNumber, Some(value)) => fail(
+            value.is_number(),
+            format!("attendu number, reçu {}", show(value)),
+        ),
+        (Operator::IsText, Some(value)) => fail(
+            value.is_string(),
+            format!("attendu texte, reçu {}", show(value)),
+        ),
+        (Operator::IsBoolean, Some(value)) => fail(
+            value.is_boolean(),
+            format!("attendu un booléen, reçu {}", show(value)),
+        ),
+        (Operator::IsArray, Some(value)) => fail(
+            value.is_array(),
+            format!("attendu un tableau, reçu {}", show(value)),
+        ),
     };
     AssertionResult {
         id: assertion.id.clone(),
@@ -226,19 +397,21 @@ pub fn evaluate(
     }
 }
 
-/// Évalue toutes les vérifications d'une réponse (R11).
+/// Évalue les vérifications actives d'une réponse (R11) ; une vérification
+/// désactivée n'a pas de résultat.
 pub fn evaluate_all(assertions: &[Assertion], response: &ResponseData) -> Vec<AssertionResult> {
     let json: Option<Value> = serde_json::from_str(&response.body).ok();
     assertions
         .iter()
+        .filter(|assertion| assertion.enabled)
         .map(|assertion| evaluate(assertion, response, json.as_ref()))
         .collect()
 }
 
 /// Une requête réussit si toutes ses vérifications réussissent ; sans aucune,
 /// si le statut est inférieur à 400 (R11).
-pub fn request_passed(assertions: &[Assertion], results: &[AssertionResult], status: u16) -> bool {
-    if assertions.is_empty() {
+pub fn request_passed(results: &[AssertionResult], status: u16) -> bool {
+    if results.is_empty() {
         status < 400
     } else {
         results.iter().all(|result| result.passed)
@@ -269,6 +442,7 @@ pub fn propose(response: &ResponseData) -> Vec<Assertion> {
         operator: Operator::Equals,
         value: Some(Scalar::Int(i64::from(response.status))),
         origin: Origin::Proposed,
+        enabled: true,
     }];
     if let Ok(Value::Object(map)) = serde_json::from_str::<Value>(&response.body) {
         for (key, value) in &map {
@@ -295,6 +469,7 @@ pub fn propose(response: &ResponseData) -> Vec<Assertion> {
                 operator,
                 value,
                 origin: Origin::Proposed,
+                enabled: true,
             });
         }
     }
@@ -305,7 +480,7 @@ pub fn propose(response: &ResponseData) -> Vec<Assertion> {
 pub fn duration_limit(assertions: &[Assertion]) -> Option<i64> {
     assertions
         .iter()
-        .find(|a| a.target == "responseTime" && a.operator == Operator::LessThan)
+        .find(|a| a.enabled && a.target == "responseTime" && a.operator == Operator::LessThan)
         .and_then(|a| match a.value {
             Some(Scalar::Int(limit)) => Some(limit),
             Some(Scalar::Float(limit)) => Some(limit as i64),
@@ -336,6 +511,7 @@ mod tests {
             operator,
             value,
             origin: Origin::Manual,
+            enabled: true,
         }
     }
 
@@ -463,9 +639,83 @@ mod tests {
         let a = assertion("status", Operator::Equals, Some(Scalar::Int(200)));
         let r = response(200, "{}");
         let results = evaluate_all(std::slice::from_ref(&a), &r);
-        assert!(request_passed(std::slice::from_ref(&a), &results, 200));
-        assert!(request_passed(&[], &[], 399));
-        assert!(!request_passed(&[], &[], 404));
+        assert!(request_passed(&results, 200));
+        assert!(request_passed(&[], 399));
+        assert!(!request_passed(&[], 404));
+        // Désactivée : pas de résultat, et le statut décide.
+        let mut off = a.clone();
+        off.enabled = false;
+        assert!(evaluate_all(std::slice::from_ref(&off), &r).is_empty());
+    }
+
+    #[test]
+    fn r4_operateurs_d_opencollection() {
+        let r = response(
+            200,
+            r#"{ "nom": "Alice", "age": 30, "tags": ["a", "b"], "vide": "", "rien": null, "ok": true }"#,
+        );
+        let text = |t: &str| Some(Scalar::Text(t.to_owned()));
+        let cases = [
+            (
+                assertion("body.age", Operator::GreaterOrEqual, Some(Scalar::Int(30))),
+                true,
+            ),
+            (
+                assertion("body.age", Operator::LessOrEqual, Some(Scalar::Int(29))),
+                false,
+            ),
+            (
+                assertion("body.age", Operator::Between, text("18,65")),
+                true,
+            ),
+            (
+                assertion("body.age", Operator::Between, text("[40, 65]")),
+                false,
+            ),
+            (assertion("body.nom", Operator::In, text("Alice,Bob")), true),
+            (
+                assertion("body.nom", Operator::NotIn, text("[Alice, Bob]")),
+                false,
+            ),
+            (
+                assertion("body.nom", Operator::StartsWith, text("Al")),
+                true,
+            ),
+            (assertion("body.nom", Operator::EndsWith, text("ce")), true),
+            (
+                assertion("body.nom", Operator::NotContains, text("lic")),
+                false,
+            ),
+            (
+                assertion("body.tags", Operator::Length, Some(Scalar::Int(2))),
+                true,
+            ),
+            (assertion("body.vide", Operator::IsEmpty, None), true),
+            (assertion("body.tags", Operator::IsNotEmpty, None), true),
+            (assertion("body.rien", Operator::IsNull, None), true),
+            (assertion("body.absent", Operator::IsUndefined, None), true),
+            (assertion("body.nom", Operator::IsUndefined, None), false),
+            (assertion("body.ok", Operator::IsTruthy, None), true),
+            (assertion("body.vide", Operator::IsFalsy, None), true),
+            (assertion("body", Operator::IsJson, None), true),
+            (assertion("body.ok", Operator::IsBoolean, None), true),
+            (assertion("body.tags", Operator::IsArray, None), true),
+            (assertion("body.nom", Operator::Matches, text("^A")), false),
+        ];
+        for (a, expected) in cases {
+            assert_eq!(
+                check(&a, &r).passed,
+                expected,
+                "{:?} {:?}",
+                a.target,
+                a.operator
+            );
+        }
+        let regex = check(&assertion("body.nom", Operator::Matches, text("^A")), &r);
+        assert_eq!(
+            regex.message.as_deref(),
+            Some("opérateur non évalué par Arnod (expression régulière)")
+        );
     }
 
     #[test]

@@ -3,7 +3,11 @@ use tempfile::TempDir;
 
 fn project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join(MANIFEST_FILE_NAME), "version: 1\n").unwrap();
+    fs::write(
+        dir.path().join(ROOT_FILE),
+        "opencollection: 1.0.0\ninfo:\n  name: Projet\n",
+    )
+    .unwrap();
     dir
 }
 
@@ -162,14 +166,14 @@ fn deplacer_refuse_une_collision() {
 }
 
 #[test]
-fn dupliquer_donne_un_nouvel_id() {
+fn dupliquer_garde_le_contenu() {
     let dir = project();
     let r = create_request(dir.path(), "", Some("Lire")).unwrap();
     let copy = duplicate(dir.path(), &r).unwrap();
     let a = file::read(&dir.path().join(&r)).unwrap();
     let b = file::read(&dir.path().join(&copy)).unwrap();
     assert_eq!(b.name, "Lire (copie)");
-    assert_ne!(a.id, b.id);
+    assert_ne!(r, copy);
     assert_eq!(a.assertions, b.assertions);
 }
 
