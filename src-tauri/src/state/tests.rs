@@ -33,8 +33,18 @@ impl Fixture {
     }
 }
 
+/// Workspace « Mes projets », créé au premier appel.
 fn default_workspace(state: &AppState) -> Uuid {
-    state.load_catalog().unwrap().snapshot.default_workspace_id
+    let snapshot = state.snapshot().unwrap();
+    match snapshot.workspaces.iter().find(|w| w.name == "Mes projets") {
+        Some(workspace) => workspace.id,
+        None => {
+            state
+                .mutate(|catalog| catalog.create_workspace("Mes projets"))
+                .unwrap()
+                .0
+        }
+    }
 }
 
 fn kind<T: std::fmt::Debug>(result: Result<T, CommandError>) -> CommandErrorKind {
@@ -50,7 +60,8 @@ fn premier_lancement_enregistre_l_etat() {
 
     assert!(state_file(&fixture.data_dir()).is_file());
     assert!(loaded.warning.is_none());
-    assert_eq!(loaded.snapshot.workspaces[0].name, "Mes projets");
+    assert!(loaded.snapshot.workspaces.is_empty());
+    assert_eq!(loaded.snapshot.last_workspace_id, None);
     // Les identifiants survivent au redémarrage.
     assert_eq!(
         fixture.load().load_catalog().unwrap().snapshot,
@@ -65,7 +76,7 @@ fn creer_un_projet_cree_son_dossier_et_l_inscrit() {
     let default = default_workspace(&state);
 
     let created = state
-        .create_project(" boutique-tests ", None, default)
+        .create_project(" boutique-tests ", None, Some(default))
         .unwrap();
 
     let folder = fixture.default_location().join("boutique-tests");
@@ -92,7 +103,7 @@ fn creer_un_projet_dans_un_autre_emplacement_et_workspace() {
         .create_project(
             "paiements-v3",
             Some(&location.display().to_string()),
-            boutique,
+            Some(boutique),
         )
         .unwrap();
 
@@ -103,10 +114,7 @@ fn creer_un_projet_dans_un_autre_emplacement_et_workspace() {
             .is_file()
     );
     let project = &created.snapshot.projects[0];
-    assert_eq!(
-        project.workspace_ids,
-        vec![default_workspace(&state), boutique]
-    );
+    assert_eq!(project.workspace_ids, vec![boutique]);
 }
 
 #[test]
@@ -114,7 +122,7 @@ fn le_projet_cree_survit_au_redemarrage() {
     let fixture = Fixture::new();
     let state = fixture.load();
     let created = state
-        .create_project("boutique-tests", None, default_workspace(&state))
+        .create_project("boutique-tests", None, Some(default_workspace(&state)))
         .unwrap();
 
     let reloaded = fixture.load().load_catalog().unwrap().snapshot;
@@ -127,14 +135,16 @@ fn nom_deja_pris_refuse_avant_de_toucher_au_disque() {
     let fixture = Fixture::new();
     let state = fixture.load();
     let default = default_workspace(&state);
-    state.create_project("boutique", None, default).unwrap();
+    state
+        .create_project("boutique", None, Some(default))
+        .unwrap();
     let other_location = fixture.root.path().join("ailleurs");
 
     let error = state
         .create_project(
             "BOUTIQUE",
             Some(&other_location.display().to_string()),
-            default,
+            Some(default),
         )
         .unwrap_err();
 
@@ -149,11 +159,11 @@ fn nom_invalide_ou_emplacement_relatif_refuse() {
     let default = default_workspace(&state);
 
     assert_eq!(
-        kind(state.create_project("api/v2", None, default)),
+        kind(state.create_project("api/v2", None, Some(default))),
         CommandErrorKind::InvalidName
     );
     let error = state
-        .create_project("boutique", Some("relatif/dev"), default)
+        .create_project("boutique", Some("relatif/dev"), Some(default))
         .unwrap_err();
     assert_eq!(error.kind, CommandErrorKind::Io);
     assert!(
@@ -173,7 +183,7 @@ fn dossier_non_vide_refuse_sans_inscription() {
     fs::write(folder.join("notes.txt"), "").unwrap();
 
     let error = state
-        .create_project("boutique", None, default_workspace(&state))
+        .create_project("boutique", None, Some(default_workspace(&state)))
         .unwrap_err();
 
     assert_eq!(error.kind, CommandErrorKind::FolderNotEmpty);
@@ -188,7 +198,9 @@ fn echec_d_enregistrement_supprime_le_dossier_cree() {
     // Un dossier à la place du fichier temporaire fait échouer l'écriture de l'état.
     fs::create_dir(fixture.data_dir().join(format!("{STATE_FILE_NAME}.tmp"))).unwrap();
 
-    let error = state.create_project("boutique", None, default).unwrap_err();
+    let error = state
+        .create_project("boutique", None, Some(default))
+        .unwrap_err();
 
     assert_eq!(error.kind, CommandErrorKind::Io);
     assert!(!fixture.default_location().join("boutique").exists());
@@ -199,6 +211,7 @@ fn echec_d_enregistrement_supprime_le_dossier_cree() {
 fn modification_refusee_ne_change_rien() {
     let fixture = Fixture::new();
     let state = fixture.load();
+    default_workspace(&state);
     let before = state.load_catalog().unwrap().snapshot;
 
     let error = state
@@ -220,7 +233,7 @@ fn annuler_une_suppression_puis_jeton_expire() {
     let deleted = state
         .mutate_undoable(|catalog| catalog.delete_workspace(boutique))
         .unwrap();
-    assert_eq!(deleted.snapshot.workspaces.len(), 1);
+    assert!(deleted.snapshot.workspaces.is_empty());
 
     let restored = state.undo(deleted.undo_token).unwrap();
     assert_eq!(restored, before);
@@ -266,7 +279,7 @@ fn version_plus_recente_bloque_tout_sans_ecrire() {
         CommandErrorKind::NewerVersion
     );
     assert_eq!(
-        kind(state.create_project("boutique", None, Uuid::new_v4())),
+        kind(state.create_project("boutique", None, Some(Uuid::new_v4()))),
         CommandErrorKind::NewerVersion
     );
     assert_eq!(
@@ -280,7 +293,7 @@ fn ouvrir_un_projet_dont_le_dossier_a_disparu() {
     let fixture = Fixture::new();
     let state = fixture.load();
     let created = state
-        .create_project("boutique", None, default_workspace(&state))
+        .create_project("boutique", None, Some(default_workspace(&state)))
         .unwrap();
     assert_eq!(
         state.open_project(created.project_id).unwrap().name,
@@ -331,7 +344,7 @@ fn dossier_propose_pour_un_nom() {
 fn existing_project(fixture: &Fixture, name: &str) -> (PathBuf, Uuid) {
     let state = fixture.load();
     let created = state
-        .create_project(name, None, default_workspace(&state))
+        .create_project(name, None, Some(default_workspace(&state)))
         .unwrap();
     (fixture.default_location().join(name), created.project_id)
 }
@@ -347,17 +360,14 @@ fn ajoute_un_dossier_projet_existant_avec_son_identifiant() {
         .unwrap();
 
     let added = state
-        .add_existing_project(&folder.display().to_string(), boutique)
+        .add_existing_project(&folder.display().to_string(), Some(boutique))
         .unwrap();
 
     assert_eq!(added.project_id, id);
     let project = &added.snapshot.projects[0];
     assert_eq!(project.name, "boutique-tests");
     assert_eq!(project.path, canonical(&folder).display().to_string());
-    assert_eq!(
-        project.workspace_ids,
-        vec![default_workspace(&state), boutique]
-    );
+    assert_eq!(project.workspace_ids, vec![boutique]);
     assert_eq!(read_manifest(&folder).unwrap().id, id, "manifeste intact");
 }
 
@@ -369,7 +379,10 @@ fn dossier_sans_manifeste_refuse() {
     fs::create_dir_all(&empty).unwrap();
 
     let error = state
-        .add_existing_project(&empty.display().to_string(), default_workspace(&state))
+        .add_existing_project(
+            &empty.display().to_string(),
+            Some(default_workspace(&state)),
+        )
         .unwrap_err();
 
     assert_eq!(error.kind, CommandErrorKind::NotAProject);
@@ -381,18 +394,20 @@ fn projet_deja_inscrit_ou_nom_pris_refuse() {
     let fixture = Fixture::new();
     let state = fixture.load();
     let default = default_workspace(&state);
-    state.create_project("boutique", None, default).unwrap();
+    state
+        .create_project("boutique", None, Some(default))
+        .unwrap();
     let folder = fixture.default_location().join("boutique");
 
     assert_eq!(
-        kind(state.add_existing_project(&folder.display().to_string(), default)),
+        kind(state.add_existing_project(&folder.display().to_string(), Some(default))),
         CommandErrorKind::AlreadyRegistered
     );
 
     let other = Fixture::new();
     let (homonym, _) = existing_project(&other, "BOUTIQUE");
     assert_eq!(
-        kind(state.add_existing_project(&homonym.display().to_string(), default)),
+        kind(state.add_existing_project(&homonym.display().to_string(), Some(default))),
         CommandErrorKind::NameTaken
     );
     assert_eq!(state.load_catalog().unwrap().snapshot.projects.len(), 1);
@@ -404,7 +419,7 @@ fn chemin_relatif_ou_manifeste_plus_recent_refuse() {
     let state = fixture.load();
     let default = default_workspace(&state);
     assert_eq!(
-        kind(state.add_existing_project("relatif/boutique", default)),
+        kind(state.add_existing_project("relatif/boutique", Some(default))),
         CommandErrorKind::Io
     );
 
@@ -416,7 +431,7 @@ fn chemin_relatif_ou_manifeste_plus_recent_refuse() {
     )
     .unwrap();
     assert_eq!(
-        kind(state.add_existing_project(&newer.display().to_string(), default)),
+        kind(state.add_existing_project(&newer.display().to_string(), Some(default))),
         CommandErrorKind::NewerVersion
     );
 }

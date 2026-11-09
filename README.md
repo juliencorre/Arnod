@@ -8,10 +8,11 @@
 
 Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 
-> **Statut : projets et workspaces.** Sur le squelette technique
+> **Statut : projets et workspaces en onglets.** Sur le squelette technique
 > ([`PRD-squelette.md`](PRD-squelette.md)), Arnod crée et gère des projets et des
-> workspaces selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md).
-> Les requêtes, assertions et runs viendront ensuite.
+> workspaces selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md), révisé
+> par [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md) : les workspaces sont
+> des onglets, après l'onglet épinglé « Tous les projets ».
 
 | Thème clair                                      | Thème sombre                                           |
 | ------------------------------------------------ | ------------------------------------------------------ |
@@ -22,22 +23,24 @@ suit la préférence du système._
 
 ## Ce que fait Arnod aujourd'hui
 
-Cas d'usage détaillés dans [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md),
-maquettes dans [`docs/maquettes/`](docs/maquettes/).
+Cas d'usage détaillés dans [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md)
+et [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md), maquettes dans
+[`docs/maquettes/`](docs/maquettes/).
 
-| ID           | Comportement                                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| W1, P1       | Premier lancement : « Mes projets » est créé par défaut et Arnod propose de créer le premier projet (dossier `~/arnod/<nom>`). |
-| P2           | Nouveau projet depuis un workspace : rangé dans ce workspace et dans le workspace par défaut.                                  |
-| P5, P10      | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                               |
-| P6, P7       | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                              |
-| P9, P11, P12 | Référentiel des projets : chaque projet une fois, « Oublier » avec « Annuler », import d'un projet existant (`arnod.yml`).     |
-| W2           | Les lancements suivants rouvrent le dernier workspace utilisé, conservé dans `arnod.json`.                                     |
-| W4, W5       | Sélecteur de workspaces avec recherche, création d'un workspace.                                                               |
-| W6           | « Ajouter un projet » à un workspace : créer ou importer un projet existant, ou reprendre des projets du référentiel.          |
-| W7–W11       | Gestion des workspaces : nom, couleur, workspace par défaut, projets, suppression avec « Annuler ».                            |
-| F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                       |
-| N7           | Thème clair ou sombre selon le système, police système.                                                                        |
+| ID           | Comportement                                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1, O8       | Premier lancement : seul l'onglet « Tous les projets » ; Arnod propose de créer le premier projet (`~/arnod/<nom>`), workspace facultatif. |
+| P2, O8       | Nouveau projet depuis un workspace : rangé dans ce seul workspace, toujours visible dans « Tous les projets ».                             |
+| P5, P10      | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                                           |
+| P6, P7       | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                                          |
+| O1, O12, P11 | « Tous les projets » : chaque projet une fois, dernière exécution, « Oublier » avec « Annuler », import d'un projet (`arnod.yml`).         |
+| O2, R7       | Workspaces en onglets ; Arnod rouvre le dernier onglet utilisé, conservé dans `arnod.json`.                                                |
+| O3–O6        | « + » crée un onglet ; clic droit (ou Maj+F10) : renommer, couleur, gérer, supprimer avec « Annuler ».                                     |
+| O7           | Glisser une ligne de « Tous les projets » sur un onglet ajoute le projet à ce workspace.                                                   |
+| W6, O10      | « Ajouter un projet » à un workspace : créer, importer, ou reprendre des projets existants.                                                |
+| O11          | Gestion des workspaces : nom, couleur, projets, suppression avec « Annuler ».                                                              |
+| F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                                   |
+| N7           | Thème clair ou sombre selon le système, police système.                                                                                    |
 
 Pile : [Tauri 2](https://v2.tauri.app) (cœur Rust, WebView2 sous Windows, WebKitGTK sous
 Linux), Vue 3, TypeScript strict, Vite, Pinia. Les règles d'architecture et les conventions

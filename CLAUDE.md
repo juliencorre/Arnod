@@ -8,8 +8,9 @@ fonctionnalité part de cette base et respecte les règles ci-dessous.
 Travail en cours : premier usage (arborescence, requêtes, environnements, vérifications, run),
 selon `docs/plan-premier-usage.md` (cœur Rust et interface livrés ; restent les tests e2e, la mesure de
 l'installeur et les écarts listés en fin de plan). Livré : projets et
-workspaces, selon `docs/plan-projets-workspaces.md` (maquettes dans `docs/maquettes/`) ; voir la
-section « Projets et workspaces ». Un nouveau lot commence par un plan rédigé à partir de
+workspaces, selon `docs/plan-projets-workspaces.md` (maquettes dans `docs/maquettes/`), puis
+workspaces en onglets selon `docs/plan-workspaces-onglets.md` ; voir la section « Projets et
+workspaces ». Un nouveau lot commence par un plan rédigé à partir de
 `docs/modele-plan.md`.
 
 ## Architecture
@@ -55,10 +56,10 @@ src/                    Frontend Vue
   styles.css            Thème clair/sombre (variables CSS), police système
   lib/ipc.ts            Wrapper typé autour d'invoke (seul point d'accès IPC)
   lib/format.ts         Formatage d'affichage
-  stores/               catalog (instantané), navigation (vue, titre), toasts (notifications),
+  stores/               catalog (instantané), navigation (onglet, vue, titre), toasts (notifications),
                         workbench (projet ouvert : arborescence, requête, réponse, environnements, run)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification
-  components/layout/    Coquille : barre latérale et zone principale
+  components/layout/    Coquille : onglets des workspaces, barre latérale, zone principale
   components/projects/  Vues des projets (premier lancement...)
   components/workspaces/ Vues des workspaces
   components/workbench/ Zone de travail d'un projet : arborescence, éditeur, réponse, environnements, run
@@ -159,18 +160,25 @@ Linux : installer d'abord les dépendances système
 ## Projets et workspaces
 
 Référence : `docs/plan-projets-workspaces.md` (cas d'usage P1 à P12 et W1 à W11, règles R1 à
-R11, tâches T1 à T27). Cocher une tâche dans le plan quand elle est livrée.
+R11), révisé par `docs/plan-workspaces-onglets.md` (cas O1 à O12, règles R3, R4, R7, R8, R11 et
+R12). Cocher une tâche dans le plan quand elle est livrée.
 
-- Les règles R1 à R11 vivent dans `src-tauri/src/catalog/`, module pur sans dépendance à Tauri
-  ni au disque, testé règle par règle (`catalog/tests.rs`). L'interface affiche l'état et ne
-  fait que des filtres et comptages d'affichage.
+- « Tous les projets » est le référentiel, affiché dans l'onglet épinglé ; ce n'est pas un
+  workspace. Il n'y a plus de workspace par défaut : un projet est dans zéro, un ou plusieurs
+  workspaces. Les onglets suivent l'ordre de création ; `lastWorkspaceId` vaut `null` pour
+  « Tous les projets ».
+- Les règles vivent dans `src-tauri/src/catalog/`, module pur sans dépendance à Tauri ni au
+  disque, testé règle par règle (`catalog/tests.rs`). L'interface affiche l'état et ne fait que
+  des filtres et comptages d'affichage.
 - Une commande qui modifie le catalogue passe par `AppState::mutate` (ou `mutate_undoable`) :
   copie, règle, écriture sur disque, remplacement. Elle renvoie l'instantané complet
   (`CatalogSnapshot`) ; le store remplace son état. Les actions annulables renvoient aussi un
   jeton pour `undo`. Les types de réponse sont dans `catalog/snapshot.rs`.
-- État de l'application : `arnod.json` dans `app_local_data_dir()`, écrit de façon atomique
-  (fichier temporaire puis renommage). Un fichier illisible ou écrit par une version plus
-  récente n'est jamais écrasé.
+- État de l'application : `arnod.json` (format 2) dans `app_local_data_dir()`, écrit de façon
+  atomique (fichier temporaire puis renommage). Un format 1 est migré à la lecture (R12). Un
+  fichier illisible ou écrit par une version plus récente n'est jamais écrasé.
+- Glisser-déposer HTML : `dragDropEnabled: false` sur la fenêtre (sinon WebView2 l'intercepte
+  sous Windows). Toute action glissée a son équivalent au clavier (« Ajouter à… »).
 - Un projet est un dossier contenant un manifeste `arnod.yml`. Arnod n'initialise pas Git.
 - Noms de projet et de workspace uniques, sans tenir compte de la casse. « Changer » choisit
   l'emplacement parent : le projet est créé dans `<emplacement>/<nom>`.

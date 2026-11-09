@@ -113,6 +113,31 @@ pub struct RunView {
     pub items: Vec<RunItem>,
 }
 
+/// Résumé du dernier run d'un projet, pour « Tous les projets » (O12).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectLastRun {
+    pub project_id: Uuid,
+    pub started_at: u64,
+    pub passed: usize,
+    pub total: usize,
+}
+
+impl ProjectLastRun {
+    pub fn of(project_id: Uuid, run: &RunView) -> Self {
+        Self {
+            project_id,
+            started_at: run.started_at,
+            passed: run
+                .items
+                .iter()
+                .filter(|i| i.status == ItemStatus::Passed)
+                .count(),
+            total: run.items.len(),
+        }
+    }
+}
+
 struct RunHandle {
     view: Mutex<RunView>,
     cancel: Notify,

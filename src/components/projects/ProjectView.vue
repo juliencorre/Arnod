@@ -3,30 +3,32 @@
 import { computed, useId } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import { ALL_PROJECTS } from "@/composables/useProjectActions";
 import WorkbenchView from "@/components/workbench/WorkbenchView.vue";
 import { useCatalogStore } from "@/stores/catalog";
 import { useNavigationStore } from "@/stores/navigation";
 
-const props = defineProps<{ projectId: string; workspaceId: string }>();
+const props = defineProps<{ projectId: string; workspaceId: string | null }>();
 
 const catalog = useCatalogStore();
 const navigation = useNavigationStore();
 const titleId = useId();
 
 const project = computed(() => catalog.projectById(props.projectId));
-const workspace = computed(() => catalog.workspaceById(props.workspaceId));
+const workspace = computed(() =>
+  props.workspaceId === null ? null : catalog.workspaceById(props.workspaceId),
+);
 const initial = computed(() => project.value?.name.charAt(0).toUpperCase() ?? "");
 </script>
 
 <template>
   <section v-if="project" class="project-view" :aria-labelledby="titleId">
     <BaseButton
-      v-if="workspace"
       variant="link"
       class="project-view__back"
-      @click="navigation.showWorkspace(workspace.id)"
+      @click="navigation.showTab(workspace?.id ?? null)"
     >
-      ← {{ workspace.name }}
+      ← {{ workspace?.name ?? ALL_PROJECTS }}
     </BaseButton>
     <header class="project-view__header">
       <span class="project-view__initial" aria-hidden="true">{{ initial }}</span>

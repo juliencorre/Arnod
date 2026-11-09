@@ -4,133 +4,151 @@ import { computed, ref, watch } from "vue";
 import { ipc } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
 
-/** Onglets de l'écran de gestion (2d, 2e). */
-export type ManageTab = "workspaces" | "registry";
-
 /** Vue affichée dans la zone principale. */
 export type View =
-  | { kind: "firstRun" }
+  /** Onglet épinglé « Tous les projets » (2e), ou premier lancement s'il n'y a aucun projet (1a). */
+  | { kind: "all"; highlightProjectId: string | null }
   | { kind: "workspace"; workspaceId: string }
-  | { kind: "project"; projectId: string; workspaceId: string }
+  /** Projet ouvert depuis un workspace, ou depuis « Tous les projets » (`workspaceId` à `null`). */
+  | { kind: "project"; projectId: string; workspaceId: string | null }
   | {
       kind: "manage";
-      tab: ManageTab;
-      /** Workspace détaillé dans l'onglet « Workspaces » (2d). */
-      workspaceId: string;
-      /** Projet mis en évidence dans le référentiel (P8). */
-      highlightProjectId: string | null;
+      /** Workspace détaillé dans « Gérer les workspaces » (2d). */
+      workspaceId: string | null;
+      /** Onglet à retrouver en quittant la gestion. */
+      returnTo: string | null;
     };
 
-/** Sujet du titre de fenêtre pour les onglets de gestion. */
-const MANAGE_TITLES: Record<ManageTab, string> = {
-  workspaces: "Workspaces",
-  registry: "Référentiel des projets",
-};
-
 /**
- * Navigation entre les vues, sans routeur. Tient aussi le titre de la fenêtre
- * (« Arnod — <workspace ou projet> ») à jour.
+ * Navigation entre les vues, sans routeur. Tient l'onglet actif (un workspace, ou
+ * « Tous les projets » avec `null`) et le titre de la fenêtre
+ * (« Arnod — <onglet ou projet> »).
  */
 export const useNavigationStore = defineStore("navigation", () => {
   const catalog = useCatalogStore();
-  const view = ref<View>({ kind: "firstRun" });
+  const view = ref<View>({ kind: "all", highlightProjectId: null });
 
-  /** Workspace affiché ou contenant le projet ouvert, pour la barre latérale. */
+  /** Onglet actif : workspace affiché ou contenant le projet ouvert ; `null` pour « Tous les projets ». */
   const currentWorkspaceId = computed<string | null>(() => {
     const current = view.value;
-    if (current.kind !== "firstRun") return current.workspaceId;
-    return catalog.snapshot?.lastWorkspaceId ?? null;
+    switch (current.kind) {
+      case "all":
+        return null;
+      case "workspace":
+      case "project":
+        return current.workspaceId;
+      case "manage":
+        return current.returnTo;
+    }
   });
 
-  /** Sujet du titre de la fenêtre ; `null` pour « Arnod » seul. */
+  /** Sujet du titre de la fenêtre. */
   const titleSubject = computed<string | null>(() => {
     const current = view.value;
     switch (current.kind) {
-      case "firstRun":
-        return null;
+      case "all":
+        // Avant le chargement et au premier lancement : « Arnod » seul.
+        return catalog.snapshot === null || catalog.isFirstRun ? null : "Tous les projets";
       case "workspace":
         return catalog.workspaceById(current.workspaceId)?.name ?? null;
       case "project":
         return catalog.projectById(current.projectId)?.name ?? null;
       case "manage":
-        return MANAGE_TITLES[current.tab];
+        return "Workspaces";
     }
   });
 
-  /**
-   * Première vue après le chargement : premier lancement s'il n'y a aucun projet,
-   * sinon le dernier workspace ouvert (W2, R7).
-   */
+  /** Première vue après le chargement : le dernier onglet ouvert (R7). */
   function start(): void {
-    const last = catalog.snapshot?.lastWorkspaceId;
+    const last = catalog.snapshot?.lastWorkspaceId ?? null;
     view.value =
-      catalog.isFirstRun || last === undefined
-        ? { kind: "firstRun" }
-        : { kind: "workspace", workspaceId: last };
+      last !== null && catalog.workspaceById(last) !== null
+        ? { kind: "workspace", workspaceId: last }
+        : { kind: "all", highlightProjectId: null };
   }
 
-  /** Ouvre un workspace et le mémorise pour le prochain démarrage. */
+  /** Ouvre l'onglet d'un workspace et le mémorise pour le prochain démarrage. */
   async function showWorkspace(workspaceId: string): Promise<void> {
     await catalog.openWorkspace(workspaceId);
     view.value = { kind: "workspace", workspaceId };
   }
 
-  /** Affiche un projet, dans le workspace courant (P5). */
-  function showProject(projectId: string, workspaceId: string): void {
+  /** Ouvre l'onglet « Tous les projets », en mettant éventuellement un projet en évidence. */
+  async function showAll(highlightProjectId: string | null = null): Promise<void> {
+    await catalog.openWorkspace(null);
+    view.value = { kind: "all", highlightProjectId };
+  }
+
+  /** Ouvre l'onglet `workspaceId`, ou « Tous les projets » avec `null`. */
+  function showTab(workspaceId: string | null): Promise<void> {
+    return workspaceId === null ? showAll() : showWorkspace(workspaceId);
+  }
+
+  /** Affiche un projet, dans l'onglet courant (P5). */
+  function showProject(projectId: string, workspaceId: string | null): void {
     view.value = { kind: "project", projectId, workspaceId };
   }
 
-  /** Affiche l'écran de gestion sur l'onglet voulu (2d, 2e). */
-  function showManage(
-    tab: ManageTab,
-    options: { workspaceId?: string; highlightProjectId?: string } = {},
-  ): void {
-    const workspaceId =
-      options.workspaceId ?? currentWorkspaceId.value ?? catalog.snapshot?.defaultWorkspaceId ?? "";
+  /** Affiche « Gérer les workspaces » (2d), sur `workspaceId` ou le premier. */
+  function showManage(workspaceId?: string): void {
     view.value = {
       kind: "manage",
-      tab,
-      workspaceId,
-      highlightProjectId: options.highlightProjectId ?? null,
+      workspaceId: workspaceId ?? currentWorkspaceId.value ?? catalog.workspaces[0]?.id ?? null,
+      returnTo: currentWorkspaceId.value,
     };
   }
 
-  /** Change d'onglet dans l'écran de gestion, sans mise en évidence. */
-  function selectTab(tab: ManageTab): void {
-    if (view.value.kind === "manage") view.value = { ...view.value, tab, highlightProjectId: null };
-  }
-
-  /** Choisit le workspace détaillé dans l'écran de gestion (2d). */
+  /** Choisit le workspace détaillé dans la gestion (2d). */
   function selectManagedWorkspace(workspaceId: string): void {
     if (view.value.kind === "manage") view.value = { ...view.value, workspaceId };
   }
 
-  /** Quitte l'écran de gestion pour le dernier workspace ouvert. */
-  function closeManage(): void {
-    const last = catalog.snapshot?.lastWorkspaceId;
-    if (last !== undefined) view.value = { kind: "workspace", workspaceId: last };
+  /** Quitte la gestion pour l'onglet d'où l'on venait. */
+  async function closeManage(): Promise<void> {
+    const current = view.value;
+    if (current.kind !== "manage") return;
+    const back = current.returnTo !== null && catalog.workspaceById(current.returnTo) !== null;
+    await showTab(back ? current.returnTo : null);
   }
 
-  // Si le workspace affiché disparaît (suppression, R8), revenir au workspace
-  // que le cœur a choisi comme dernier ouvert ; dans l'écran de gestion, au
-  // workspace par défaut.
+  // Le catalogue change : un projet oublié ramène à son onglet, un workspace
+  // supprimé ramène sur « Tous les projets » (R8), comme le cœur.
   watch(
     () => catalog.snapshot,
     (snapshot) => {
       const current = view.value;
-      if (snapshot === null || current.kind === "firstRun") return;
+      if (snapshot === null) return;
       if (current.kind === "project") {
-        // Projet oublié (P11) : retour à son workspace.
         if (catalog.projectById(current.projectId) === null) {
-          view.value = { kind: "workspace", workspaceId: current.workspaceId };
+          view.value =
+            current.workspaceId !== null && catalog.workspaceById(current.workspaceId) !== null
+              ? { kind: "workspace", workspaceId: current.workspaceId }
+              : { kind: "all", highlightProjectId: null };
+        } else if (
+          current.workspaceId !== null &&
+          catalog.workspaceById(current.workspaceId) === null
+        ) {
+          view.value = { ...current, workspaceId: null };
         }
         return;
       }
-      if (catalog.workspaceById(current.workspaceId) !== null) return;
-      view.value =
-        current.kind === "workspace"
-          ? { kind: "workspace", workspaceId: snapshot.lastWorkspaceId }
-          : { ...current, workspaceId: snapshot.defaultWorkspaceId };
+      if (current.kind === "workspace" && catalog.workspaceById(current.workspaceId) === null) {
+        view.value = { kind: "all", highlightProjectId: null };
+        return;
+      }
+      if (current.kind === "manage") {
+        const detailed =
+          current.workspaceId !== null && catalog.workspaceById(current.workspaceId) !== null
+            ? current.workspaceId
+            : (catalog.workspaces[0]?.id ?? null);
+        const returnTo =
+          current.returnTo !== null && catalog.workspaceById(current.returnTo) !== null
+            ? current.returnTo
+            : null;
+        if (detailed !== current.workspaceId || returnTo !== current.returnTo) {
+          view.value = { ...current, workspaceId: detailed, returnTo };
+        }
+      }
     },
   );
 
@@ -149,9 +167,10 @@ export const useNavigationStore = defineStore("navigation", () => {
     titleSubject,
     start,
     showWorkspace,
+    showAll,
+    showTab,
     showProject,
     showManage,
-    selectTab,
     selectManagedWorkspace,
     closeManage,
   };

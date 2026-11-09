@@ -1,3 +1,5 @@
+import type { WorkspaceColor } from "@/types/ipc";
+
 const timeFormatter = new Intl.DateTimeFormat("fr-FR", {
   hour: "2-digit",
   minute: "2-digit",
@@ -25,4 +27,28 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} o`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1).replace(".", ",")} Ko`;
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} Mo`;
+}
+
+/** Libellés français des couleurs de workspace (W8, O5). */
+export const COLOR_LABELS: Record<WorkspaceColor, string> = {
+  gray: "Gris",
+  orange: "Orange",
+  blue: "Bleu",
+  green: "Vert",
+  purple: "Violet",
+  red: "Rouge",
+  yellow: "Jaune",
+  teal: "Turquoise",
+};
+
+const dayTimeFormatter = new Intl.DateTimeFormat("fr-FR", {
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** Date courte d'un run : « 9 nov., 14:05 ». */
+export function formatDayTime(timestampMs: number): string {
+  return dayTimeFormatter.format(new Date(timestampMs));
 }

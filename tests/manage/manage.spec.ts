@@ -46,11 +46,21 @@ function richSnapshot() {
   return snapshot;
 }
 
-/** Ouvre l'écran de gestion par le sélecteur de workspaces. */
-async function openManage(app: AppWrapper, entry: string): Promise<void> {
-  await app.get('aside button[aria-haspopup="dialog"]').trigger("click");
+/** Ouvre « Gérer les workspaces » par le menu contextuel de l'onglet actif. */
+async function openManage(app: AppWrapper): Promise<void> {
+  await app.get('[role="tab"][aria-selected="true"]').trigger("contextmenu");
   await flushPromises();
-  await button(app.get("aside"), entry).trigger("click");
+  const item = app
+    .findAll('.tabs__context [role="menuitem"]')
+    .find((li) => li.text() === "Gérer les workspaces…");
+  await item?.trigger("click");
+  await flushPromises();
+}
+
+/** Ouvre l'onglet épinglé « Tous les projets ». */
+async function openAll(app: AppWrapper): Promise<void> {
+  const tab = app.findAll('[role="tab"]').find((t) => t.text() === "Tous les projets");
+  await tab?.trigger("click");
   await flushPromises();
 }
 
@@ -58,26 +68,28 @@ function lastArgs(core: FakeCore, cmd: string) {
   return core.calls.filter((c) => c.cmd === cmd).at(-1)?.args;
 }
 
-describe("gérer les workspaces (2d, W7 à W11)", () => {
-  it("s'ouvre depuis le sélecteur sur le workspace courant, sans barre latérale", async () => {
+describe("gérer les workspaces (2d, O11)", () => {
+  it("s'ouvre depuis l'onglet sur le workspace courant, sans barre latérale", async () => {
     installFakeCore(richSnapshot());
     wrapper = await mountApp();
 
-    await openManage(wrapper, "Gérer les workspaces…");
+    await openManage(wrapper);
 
     expect(wrapper.find("aside").exists()).toBe(false);
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Workspaces");
-    const list = wrapper.get("nav");
+    expect(wrapper.get("main h1").text()).toBe("Workspaces");
+    // L'onglet d'où l'on vient reste actif.
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Boutique");
+    const list = wrapper.get("main nav");
     expect(list.get("h2").text()).toBe("3 workspaces");
     expect(list.get('[aria-current="true"]').text()).toContain("Boutique");
     expect(wrapper.get<HTMLInputElement>("main form input").element.value).toBe("Boutique");
     expect(useNavigationStore().titleSubject).toBe("Workspaces");
   });
 
-  it("renomme, change la couleur et transfère le rôle par défaut", async () => {
+  it("renomme et change la couleur ; plus de rôle « par défaut »", async () => {
     const core = installFakeCore(richSnapshot());
     wrapper = await mountApp();
-    await openManage(wrapper, "Gérer les workspaces…");
+    await openManage(wrapper);
 
     const name = wrapper.get("main form input");
     await name.setValue("mes projets");
@@ -103,36 +115,33 @@ describe("gérer les workspaces (2d, W7 à W11)", () => {
     await press("Enter");
     expect(lastArgs(core, "workspace_set_color")).toEqual({ workspaceId: BOUTIQUE, color: "teal" });
 
-    const toggle = wrapper.get('[role="switch"]');
-    expect(toggle.attributes("aria-checked")).toBe("false");
-    expect(wrapper.get("main").text()).toContain("(actuellement : Mes projets)");
-    await toggle.trigger("click");
-    await flushPromises();
-    expect(lastArgs(core, "workspace_set_default")).toEqual({ workspaceId: BOUTIQUE });
-    expect(toggle.attributes("aria-checked")).toBe("true");
-    expect(toggle.attributes("disabled")).toBeDefined();
-    expect(wrapper.get("main").text()).toContain("(actuellement : Boutique v2)");
+    expect(wrapper.find('[role="switch"]').exists()).toBe(false);
+    expect(wrapper.get("main").text()).not.toContain("par défaut");
   });
 
-  it("le workspace par défaut ne peut pas être supprimé", async () => {
-    installFakeCore(richSnapshot());
+  it("tout workspace peut être supprimé, le dernier compris", async () => {
+    const core = installFakeCore(richSnapshot());
     wrapper = await mountApp();
-    await openManage(wrapper, "Gérer les workspaces…");
+    await openManage(wrapper);
 
-    await button(wrapper.get("nav"), "Mes projetspar défaut2 projets").trigger("click");
+    for (const name of ["Mes projets", "Boutique", "Recette sprint 42"]) {
+      await button(
+        wrapper.get("main nav"),
+        `${name}${name === "Recette sprint 42" ? "0 projet" : "2 projets"}`,
+      ).trigger("click");
+      await button(wrapper.get("main"), "Supprimer ce workspace").trigger("click");
+      await flushPromises();
+    }
 
-    expect(
-      button(wrapper.get("main"), "Supprimer ce workspace").attributes("disabled"),
-    ).toBeDefined();
-    expect(wrapper.get("main").text()).toContain(
-      "Le workspace par défaut ne peut pas être supprimé",
-    );
+    expect(core.snapshot().workspaces).toEqual([]);
+    expect(core.snapshot().projects).toHaveLength(3);
+    expect(wrapper.get("main").text()).toContain("Aucun workspace.");
   });
 
   it("supprime sans confirmation, puis « Annuler » le rétablit (R5, R6)", async () => {
     const core = installFakeCore(richSnapshot());
     wrapper = await mountApp();
-    await openManage(wrapper, "Gérer les workspaces…");
+    await openManage(wrapper);
 
     await button(wrapper.get("main"), "Supprimer ce workspace").trigger("click");
     await flushPromises();
@@ -140,22 +149,22 @@ describe("gérer les workspaces (2d, W7 à W11)", () => {
     expect(lastArgs(core, "workspace_delete")).toEqual({ workspaceId: BOUTIQUE });
     const toast = wrapper.get(".toast");
     expect(toast.text()).toContain(
-      "Workspace « Boutique » supprimé · 2 projets conservés dans le référentiel.",
+      "Workspace « Boutique » supprimé · 2 projets conservés dans « Tous les projets ».",
     );
-    expect(wrapper.get("nav h2").text()).toBe("2 workspaces");
-    expect(wrapper.get("nav [aria-current='true']").text()).toContain("Mes projets");
+    expect(wrapper.get("main nav h2").text()).toBe("2 workspaces");
+    expect(wrapper.get("main nav [aria-current='true']").text()).toContain("Mes projets");
     expect(core.snapshot().projects).toHaveLength(3);
 
     await button(toast, "Annuler").trigger("click");
     await flushPromises();
-    expect(wrapper.get("nav h2").text()).toBe("3 workspaces");
-    expect(wrapper.get("nav [aria-current='true']").text()).toContain("Boutique");
+    expect(wrapper.get("main nav h2").text()).toBe("3 workspaces");
+    expect(wrapper.get("main nav [aria-current='true']").text()).toContain("Boutique");
   });
 
   it("retire un projet du workspace détaillé, avec « Annuler »", async () => {
     const core = installFakeCore(richSnapshot());
     wrapper = await mountApp();
-    await openManage(wrapper, "Gérer les workspaces…");
+    await openManage(wrapper);
 
     await wrapper.get('button[aria-label="Retirer auth-sso de Boutique"]').trigger("click");
     await flushPromises();
@@ -170,23 +179,23 @@ describe("gérer les workspaces (2d, W7 à W11)", () => {
   it("crée un workspace et le sélectionne sans quitter l'écran", async () => {
     installFakeCore(richSnapshot());
     wrapper = await mountApp();
-    await openManage(wrapper, "Gérer les workspaces…");
+    await openManage(wrapper);
 
-    await button(wrapper.get("nav"), "+ Nouveau workspace").trigger("click");
+    await button(wrapper.get("main nav"), "+ Nouveau workspace").trigger("click");
     await flushPromises();
-    const dialog = wrapper.get("dialog[open]");
-    await dialog.get("input").setValue("Migration paiements");
-    await dialog.get("form").trigger("submit");
+    const popover = wrapper.get('[role="dialog"]');
+    await popover.get("input").setValue("Migration paiements");
+    await popover.get("form").trigger("submit");
     await flushPromises();
 
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Workspaces");
-    expect(wrapper.get("nav [aria-current='true']").text()).toContain("Migration paiements");
+    expect(wrapper.get("main h1").text()).toBe("Workspaces");
+    expect(wrapper.get("main nav [aria-current='true']").text()).toContain("Migration paiements");
   });
 
   it("« Retour au workspace » rouvre le dernier workspace", async () => {
     installFakeCore(richSnapshot());
     wrapper = await mountApp();
-    await openManage(wrapper, "Gérer les workspaces…");
+    await openManage(wrapper);
 
     await button(wrapper.get("main"), "Retour au workspace").trigger("click");
     await flushPromises();
@@ -196,7 +205,7 @@ describe("gérer les workspaces (2d, W7 à W11)", () => {
   });
 });
 
-describe("référentiel des projets (2e, P6, P8, P9, P10)", () => {
+describe("Tous les projets (2e, O1, O12, P6, P8, P10)", () => {
   it("liste chaque projet une fois avec ses workspaces en pastilles", async () => {
     const snapshot = richSnapshot();
     const missing = snapshot.projects[1];
@@ -204,12 +213,10 @@ describe("référentiel des projets (2e, P6, P8, P9, P10)", () => {
     installFakeCore(snapshot).missing.add(AUTH_SSO);
     wrapper = await mountApp();
 
-    await openManage(wrapper, "Référentiel des projets3 projets");
+    await openAll(wrapper);
 
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe(
-      "Référentiel des projets",
-    );
-    expect(wrapper.get("main h1").text()).toBe("3 projets");
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Tous les projets");
+    expect(wrapper.get("main h1").text()).toBe("Tous les projets · 3");
     const rows = wrapper.findAll("tbody tr");
     expect(rows.map((row) => row.get("th").text())).toEqual([
       "boutique-tests",
@@ -223,13 +230,14 @@ describe("référentiel des projets (2e, P6, P8, P9, P10)", () => {
     expect(rows[1]?.text()).toContain("Dossier introuvable");
     expect(rows[2]?.text()).toContain("Aucun workspace");
     expect(rows[0]?.findAll("td")[2]?.text()).toBe("—");
+    expect(rows.every((row) => row.attributes("draggable") === "true")).toBe(true);
     expect(wrapper.get("main").text()).toContain("Un projet sans workspace reste ici");
   });
 
   it("filtre par nom ou dossier", async () => {
     installFakeCore(richSnapshot());
     wrapper = await mountApp();
-    await openManage(wrapper, "Référentiel des projets3 projets");
+    await openAll(wrapper);
 
     await wrapper.get('main input[type="search"]').setValue("AUTH");
 
@@ -239,7 +247,7 @@ describe("référentiel des projets (2e, P6, P8, P9, P10)", () => {
   it("« Ajouter à… » ajoute le projet à un workspace", async () => {
     const core = installFakeCore(richSnapshot());
     wrapper = await mountApp();
-    await openManage(wrapper, "Référentiel des projets3 projets");
+    await openAll(wrapper);
 
     const trigger = wrapper.get('button[aria-label="Ajouter notifications à un workspace"]');
     (trigger.element as HTMLElement).focus();
@@ -266,31 +274,31 @@ describe("référentiel des projets (2e, P6, P8, P9, P10)", () => {
     ).toEqual(["Recette sprint 42"]);
   });
 
-  it("« Oublier » retire le projet du référentiel et de ses workspaces, avec « Annuler » (P11)", async () => {
+  it("« Oublier » retire le projet de partout, avec « Annuler » (P11)", async () => {
     const core = installFakeCore(richSnapshot());
     wrapper = await mountApp();
-    await openManage(wrapper, "Référentiel des projets3 projets");
+    await openAll(wrapper);
 
     await wrapper.get('button[aria-label="Oublier boutique-tests"]').trigger("click");
     await flushPromises();
 
     expect(lastArgs(core, "project_forget")).toEqual({ projectId: BOUTIQUE_TESTS });
-    expect(wrapper.get("main h1").text()).toBe("2 projets");
+    expect(wrapper.get("main h1").text()).toBe("Tous les projets · 2");
     expect(core.snapshot().workspaces.some((w) => w.projectIds.includes(BOUTIQUE_TESTS))).toBe(
       false,
     );
     const toast = wrapper.get(".toast");
     expect(toast.text()).toContain(
-      "« boutique-tests » oublié : retiré du référentiel et de ses workspaces. Ses fichiers restent sur le disque.",
+      "« boutique-tests » oublié : retiré de « Tous les projets » et de ses workspaces. Ses fichiers restent sur le disque.",
     );
 
     await button(toast, "Annuler").trigger("click");
     await flushPromises();
-    expect(wrapper.get("main h1").text()).toBe("3 projets");
+    expect(wrapper.get("main h1").text()).toBe("Tous les projets · 3");
     expect(wrapper.findAll("tbody th").map((th) => th.text())[0]).toBe("boutique-tests");
   });
 
-  it("« Afficher dans le référentiel » met le projet en évidence (P8)", async () => {
+  it("« Afficher dans « Tous les projets » » met le projet en évidence (P8)", async () => {
     installFakeCore(richSnapshot());
     wrapper = await mountApp();
     const trigger = wrapper.get('button[aria-label="Actions du projet boutique-tests"]');
@@ -300,37 +308,44 @@ describe("référentiel des projets (2e, P6, P8, P9, P10)", () => {
 
     const reveal = wrapper
       .findAll('[role="menuitem"]')
-      .find((item) => item.text() === "Afficher dans le référentiel");
+      .find((item) => item.text() === "Afficher dans « Tous les projets »");
     await reveal?.trigger("click");
     await flushPromises();
 
     const row = wrapper.get(`tr[data-project-id="${BOUTIQUE_TESTS}"]`);
-    expect(row.classes()).toContain("registry__row--highlight");
+    expect(row.classes()).toContain("all__row--highlight");
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Tous les projets");
     expect(document.activeElement).toBe(row.element);
   });
 
-  it("« Nouveau projet » ouvre la fenêtre sur le dernier workspace ouvert", async () => {
+  it("« Nouveau projet » ouvre la fenêtre sans workspace", async () => {
     installFakeCore(richSnapshot());
     wrapper = await mountApp();
-    await openManage(wrapper, "Référentiel des projets3 projets");
+    await openAll(wrapper);
 
     await button(wrapper.get("main"), "Nouveau projet").trigger("click");
     await flushPromises();
 
-    expect(wrapper.get<HTMLSelectElement>("dialog[open] select").element.value).toBe(BOUTIQUE);
+    const dialog = wrapper.get("dialog[open]");
+    expect(dialog.text()).toContain("Il sera visible dans « Tous les projets ».");
+    expect(dialog.findAll(".storage__chip").map((c) => c.text().replace(/\s+/g, " "))).toEqual([
+      "Tous les projets par défaut",
+    ]);
   });
 
-  it("les onglets se parcourent aux flèches", async () => {
-    installFakeCore(richSnapshot());
+  it("affiche la dernière exécution de chaque projet (O12)", async () => {
+    const core = installFakeCore(richSnapshot());
+    core.workbench.projectLastRuns = [
+      { projectId: BOUTIQUE_TESTS, startedAt: Date.UTC(2026, 10, 9, 13, 5), passed: 8, total: 10 },
+      { projectId: AUTH_SSO, startedAt: Date.UTC(2026, 10, 9, 13, 5), passed: 3, total: 3 },
+    ];
     wrapper = await mountApp();
-    await openManage(wrapper, "Gérer les workspaces…");
-    const tab = wrapper.get('[role="tab"][aria-selected="true"]');
-    (tab.element as HTMLElement).focus();
+    await openAll(wrapper);
 
-    await press("ArrowRight");
-
-    expect(document.activeElement?.textContent.trim()).toBe("Référentiel des projets");
-    expect(wrapper.get("main h1").text()).toBe("3 projets");
-    expect(useNavigationStore().view).toMatchObject({ kind: "manage", tab: "registry" });
+    const runs = wrapper.findAll("tbody .all__run").map((cell) => cell.text());
+    expect(runs[0]).toMatch(/^8\/10 · /);
+    expect(wrapper.findAll("tbody .all__run")[0]?.find(".all__run--ko").exists()).toBe(true);
+    expect(runs[1]).toMatch(/^3\/3 · /);
+    expect(runs[2]).toBe("—");
   });
 });

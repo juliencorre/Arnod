@@ -23,6 +23,7 @@ import type {
   TreeView,
   ProjectCreated,
   ProjectCreateInput,
+  ProjectLastRun,
   ProjectView,
   Undoable,
   WorkspaceColor,
@@ -37,7 +38,6 @@ const COMMAND_ERROR_KINDS: Record<CommandErrorKind, true> = {
   alreadyRegistered: true,
   notAProject: true,
   notFound: true,
-  defaultWorkspace: true,
   undoExpired: true,
   io: true,
   corruptState: true,
@@ -127,11 +127,11 @@ export const ipc = {
   projectCreate: (input: ProjectCreateInput): Promise<ProjectCreated> =>
     call<ProjectCreated>("project_create", { ...input }),
 
-  /** Inscrit un dossier projet existant (avec `arnod.yml`) au référentiel (P12). */
-  projectAddExisting: (path: string, workspaceId: string): Promise<ProjectCreated> =>
+  /** Inscrit un dossier projet existant (avec `arnod.yml`) dans « Tous les projets » (P12). */
+  projectAddExisting: (path: string, workspaceId: string | null): Promise<ProjectCreated> =>
     call<ProjectCreated>("project_add_existing", { path, workspaceId }),
 
-  /** Oublie un projet (référentiel et workspaces), fichiers conservés ; annulable (P11). */
+  /** Oublie un projet (« Tous les projets » et workspaces), fichiers conservés ; annulable (P11). */
   projectForget: (projectId: string): Promise<Undoable> =>
     call<Undoable>("project_forget", { projectId }),
 
@@ -139,8 +139,8 @@ export const ipc = {
   projectOpen: (projectId: string): Promise<ProjectView> =>
     call<ProjectView>("project_open", { projectId }),
 
-  /** Ouvre un workspace et le mémorise pour le prochain démarrage (W2). */
-  workspaceOpen: (workspaceId: string): Promise<CatalogSnapshot> =>
+  /** Ouvre l'onglet d'un workspace, ou « Tous les projets » avec `null`, et le mémorise (R7). */
+  workspaceOpen: (workspaceId: string | null): Promise<CatalogSnapshot> =>
     call<CatalogSnapshot>("workspace_open", { workspaceId }),
 
   /** Crée un workspace vide (W5). */
@@ -156,10 +156,7 @@ export const ipc = {
     call<CatalogSnapshot>("workspace_set_color", { workspaceId, color }),
 
   /** Transfère le rôle de workspace par défaut (W9). */
-  workspaceSetDefault: (workspaceId: string): Promise<CatalogSnapshot> =>
-    call<CatalogSnapshot>("workspace_set_default", { workspaceId }),
-
-  /** Ajoute des projets du référentiel à un workspace (W6, P6). */
+  /** Ajoute des projets à un workspace (W6, P6, O7). */
   workspaceAddProjects: (workspaceId: string, projectIds: string[]): Promise<CatalogSnapshot> =>
     call<CatalogSnapshot>("workspace_add_projects", { workspaceId, projectIds }),
 
@@ -276,4 +273,7 @@ export const ipc = {
 
   runLast: (project: string): Promise<RunView | null> =>
     call<RunView | null>("run_last", { project }),
+
+  /** Dernier run de chaque projet qui en a un (O12). */
+  projectLastRuns: (): Promise<ProjectLastRun[]> => call<ProjectLastRun[]>("project_last_runs"),
 };

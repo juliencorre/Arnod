@@ -25,14 +25,12 @@ pub enum CommandErrorKind {
     NameTaken,
     /// Le dossier cible existe déjà et n'est pas vide.
     FolderNotEmpty,
-    /// Le projet est déjà inscrit au référentiel.
+    /// Le projet est déjà dans « Tous les projets ».
     AlreadyRegistered,
     /// Le dossier ne contient pas de manifeste `arnod.yml`.
     NotAProject,
     /// Projet ou workspace introuvable.
     NotFound,
-    /// Action interdite sur le workspace par défaut.
-    DefaultWorkspace,
     /// Le jeton d'annulation n'est plus valable.
     UndoExpired,
     /// Erreur d'entrée-sortie : disque, droits, chemin.
@@ -102,14 +100,13 @@ mod tests {
     use crate::ts_contract::{serialized_name, union_members};
 
     /// Toutes les natures, à compléter à chaque ajout de variante.
-    const ALL_KINDS: [CommandErrorKind; 18] = [
+    const ALL_KINDS: [CommandErrorKind; 17] = [
         CommandErrorKind::InvalidName,
         CommandErrorKind::NameTaken,
         CommandErrorKind::FolderNotEmpty,
         CommandErrorKind::AlreadyRegistered,
         CommandErrorKind::NotAProject,
         CommandErrorKind::NotFound,
-        CommandErrorKind::DefaultWorkspace,
         CommandErrorKind::UndoExpired,
         CommandErrorKind::Io,
         CommandErrorKind::CorruptState,

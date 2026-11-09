@@ -60,7 +60,6 @@ pub fn run() {
             commands::workspaces::workspace_create,
             commands::workspaces::workspace_rename,
             commands::workspaces::workspace_set_color,
-            commands::workspaces::workspace_set_default,
             commands::workspaces::workspace_add_projects,
             commands::workspaces::workspace_remove_project,
             commands::workspaces::workspace_delete,
@@ -89,6 +88,7 @@ pub fn run() {
             commands::runs::run_cancel,
             commands::runs::run_retry_failures,
             commands::runs::run_last,
+            commands::runs::project_last_runs,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod");

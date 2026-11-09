@@ -25,7 +25,6 @@ export type CommandName =
   | "workspace_create"
   | "workspace_rename"
   | "workspace_set_color"
-  | "workspace_set_default"
   | "workspace_add_projects"
   | "workspace_remove_project"
   | "workspace_delete"
@@ -53,7 +52,8 @@ export type CommandName =
   | "run_status"
   | "run_cancel"
   | "run_retry_failures"
-  | "run_last";
+  | "run_last"
+  | "project_last_runs";
 
 /**
  * Nature d'une erreur de commande.
@@ -66,10 +66,9 @@ export type CommandErrorKind =
   | "invalidName" // Nom vide, trop long ou inutilisable comme nom de dossier.
   | "nameTaken" // Nom déjà utilisé, sans tenir compte de la casse.
   | "folderNotEmpty" // Le dossier cible existe déjà et n'est pas vide.
-  | "alreadyRegistered" // Le projet est déjà inscrit au référentiel.
+  | "alreadyRegistered" // Le projet est déjà dans Tous les projets.
   | "notAProject" // Le dossier ne contient pas de manifeste arnod.yml.
   | "notFound" // Projet ou workspace introuvable.
-  | "defaultWorkspace" // Action interdite sur le workspace par défaut.
   | "undoExpired" // Le jeton d'annulation n'est plus valable.
   | "io" // Erreur d'entrée-sortie : disque, droits, chemin.
   | "corruptState" // Le fichier d'état de l'application est illisible.
@@ -108,7 +107,7 @@ export interface HelloResponse {
 }
 
 /*
- * Catalogue : projets du référentiel et workspaces.
+ * Catalogue : « Tous les projets » et workspaces.
  * Équivalents Rust dans `src-tauri/src/catalog/model.rs` et `src-tauri/src/catalog/snapshot.rs`.
  * Les identifiants sont des UUID sérialisés en chaînes.
  */
@@ -124,7 +123,7 @@ export type WorkspaceColor =
 /** Présence du dossier d'un projet sur disque (P10). */
 export type ProjectStatus = "ok" | "missing";
 
-/** Projet du référentiel. Équivalent Rust : `ProjectView`. */
+/** Projet de « Tous les projets ». Équivalent Rust : `ProjectView`. */
 export interface ProjectView {
   id: string;
   name: string;
@@ -132,7 +131,7 @@ export interface ProjectView {
   path: string;
   /** `missing` si le dossier a été déplacé ou supprimé hors d'Arnod. */
   status: ProjectStatus;
-  /** Workspaces qui contiennent le projet : défaut d'abord, puis par nom. */
+  /** Workspaces qui contiennent le projet, dans l'ordre des onglets ; vide si aucun. */
   workspaceIds: string[];
 }
 
@@ -141,20 +140,18 @@ export interface WorkspaceView {
   id: string;
   name: string;
   color: WorkspaceColor;
-  isDefault: boolean;
   /** Projets du workspace, dans l'ordre où ils ont été ajoutés. */
   projectIds: string[];
 }
 
 /** État complet du catalogue, renvoyé par chaque modification. Équivalent Rust : `CatalogSnapshot`. */
 export interface CatalogSnapshot {
-  /** Référentiel, dans l'ordre de création. */
+  /** « Tous les projets », dans l'ordre de création. */
   projects: ProjectView[];
-  /** Workspace par défaut d'abord, puis les autres par nom. */
+  /** Workspaces dans l'ordre des onglets : l'ordre de création (R11). */
   workspaces: WorkspaceView[];
-  defaultWorkspaceId: string;
-  /** Dernier workspace ouvert, à rouvrir au démarrage. */
-  lastWorkspaceId: string;
+  /** Dernier onglet ouvert, à rouvrir au démarrage ; `null` pour « Tous les projets » (R7). */
+  lastWorkspaceId: string | null;
 }
 
 /** Réponse de `catalog_load`. Équivalent Rust : `CatalogLoad`. */
@@ -188,8 +185,19 @@ export interface ProjectCreateInput {
   name: string;
   /** Emplacement parent ; `null` pour `~/arnod`. */
   location: string | null;
-  /** Workspace choisi ; le projet va aussi dans le workspace par défaut. */
-  workspaceId: string;
+  /** Workspace choisi, facultatif : le projet est toujours dans « Tous les projets » (R4). */
+  workspaceId: string | null;
+}
+
+/** Dernier run d'un projet, pour « Tous les projets » (O12). Équivalent Rust : `ProjectLastRun`. */
+export interface ProjectLastRun {
+  projectId: string;
+  /** Début du run, en millisecondes depuis l'epoch Unix. */
+  startedAt: number;
+  /** Requêtes réussies. */
+  passed: number;
+  /** Requêtes exécutées. */
+  total: number;
 }
 
 // ---------------------------------------------------------------------------

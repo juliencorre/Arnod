@@ -47,15 +47,15 @@ pub struct WorkspaceCreated {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogSnapshot {
-    /// Référentiel, dans l'ordre de création (R11).
+    /// « Tous les projets », dans l'ordre de création.
     pub projects: Vec<ProjectView>,
-    /// Workspace par défaut d'abord, puis les autres par nom (R11).
+    /// Workspaces dans l'ordre des onglets, l'ordre de création (R11).
     pub workspaces: Vec<WorkspaceView>,
-    pub default_workspace_id: Uuid,
-    pub last_workspace_id: Uuid,
+    /// Dernier onglet ouvert ; `null` pour « Tous les projets » (R7).
+    pub last_workspace_id: Option<Uuid>,
 }
 
-/// Projet du référentiel vu par l'interface.
+/// Projet de « Tous les projets » vu par l'interface.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectView {
@@ -64,7 +64,7 @@ pub struct ProjectView {
     pub path: String,
     /// État du dossier au moment de l'instantané (P10).
     pub status: ProjectStatus,
-    /// Workspaces qui contiennent le projet, dans l'ordre R11.
+    /// Workspaces qui contiennent le projet, dans l'ordre des onglets (R11).
     pub workspace_ids: Vec<Uuid>,
 }
 
@@ -85,7 +85,6 @@ pub struct WorkspaceView {
     pub id: Uuid,
     pub name: String,
     pub color: WorkspaceColor,
-    pub is_default: bool,
     /// Projets du workspace, dans l'ordre où ils ont été ajoutés.
     pub project_ids: Vec<Uuid>,
 }

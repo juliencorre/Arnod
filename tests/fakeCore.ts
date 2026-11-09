@@ -1,6 +1,6 @@
 /**
  * Faux cœur Rust pour les tests de composants : répond aux commandes IPC en
- * mémoire, en appliquant une version simplifiée des règles R1 à R11 (le vrai
+ * mémoire, en appliquant une version simplifiée des règles R1 à R12 (le vrai
  * comportement est testé côté Rust). Les appels sont notés dans `calls`.
  */
 import { mockIPC } from "@tauri-apps/api/mocks";
@@ -65,16 +65,8 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     state.projects.find((p) => p.id === id) ??
     fail("notFound", "Ce projet n'existe plus dans le référentiel.");
 
-  /** Recalcule les champs dérivés et l'ordre R11, comme l'instantané Rust. */
+  /** Recalcule les champs dérivés, comme l'instantané Rust (onglets dans l'ordre de création, R11). */
   function normalize(): CatalogSnapshot {
-    state.workspaces.sort((a, b) =>
-      a.id === state.defaultWorkspaceId
-        ? -1
-        : b.id === state.defaultWorkspaceId
-          ? 1
-          : a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
-    );
-    for (const w of state.workspaces) w.isDefault = w.id === state.defaultWorkspaceId;
     for (const p of state.projects) {
       p.workspaceIds = state.workspaces.filter((w) => w.projectIds.includes(p.id)).map((w) => w.id);
       p.status = core.missing.has(p.id) ? "missing" : "ok";
@@ -123,8 +115,8 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           fail("invalidName", "Le caractère « / » n'est pas autorisé dans un nom de projet.");
         const taken = state.projects.find((p) => same(p.name, name));
         if (taken)
-          fail("nameTaken", `Un projet « ${taken.name} » existe déjà dans le référentiel.`);
-        const target = workspace(args.workspaceId);
+          fail("nameTaken", `Un projet « ${taken.name} » existe déjà dans « Tous les projets ».`);
+        const target = args.workspaceId == null ? null : workspace(args.workspaceId);
         const location = (args.location as string | null) ?? DEFAULT_LOCATION;
         const id = `p-${name}`;
         state.projects.push({
@@ -134,9 +126,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           status: "ok",
           workspaceIds: [],
         });
-        for (const w of [workspace(state.defaultWorkspaceId), target]) {
-          if (!w.projectIds.includes(id)) w.projectIds.push(id);
-        }
+        target?.projectIds.push(id);
         return { snapshot: normalize(), projectId: id };
       }
       case "project_add_existing": {
@@ -150,13 +140,11 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
         const name = path.split("/").at(-1) ?? path;
         const taken = state.projects.find((p) => same(p.name, name));
         if (taken)
-          fail("nameTaken", `Un projet « ${taken.name} » existe déjà dans le référentiel.`);
-        const target = workspace(args.workspaceId);
+          fail("nameTaken", `Un projet « ${taken.name} » existe déjà dans « Tous les projets ».`);
+        const target = args.workspaceId == null ? null : workspace(args.workspaceId);
         const id = `p-${name}`;
         state.projects.push({ id, name, path, status: "ok", workspaceIds: [] });
-        for (const w of [workspace(state.defaultWorkspaceId), target]) {
-          if (!w.projectIds.includes(id)) w.projectIds.push(id);
-        }
+        target?.projectIds.push(id);
         return { snapshot: normalize(), projectId: id };
       }
       case "project_forget": {
@@ -179,15 +167,15 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
         return { ...found };
       }
       case "workspace_open":
-        workspace(args.workspaceId);
-        state.lastWorkspaceId = String(args.workspaceId);
+        if (args.workspaceId != null) workspace(args.workspaceId);
+        state.lastWorkspaceId = (args.workspaceId as string | null) ?? null;
         return normalize();
       case "workspace_create": {
         const name = checkWorkspaceName(String(args.name));
         const used = new Set(state.workspaces.map((w) => w.color));
         const color = COLORS.find((c) => !used.has(c)) ?? "orange";
         const id = `ws-${name.toLowerCase().replaceAll(" ", "-")}`;
-        state.workspaces.push({ id, name, color, isDefault: false, projectIds: [] });
+        state.workspaces.push({ id, name, color, projectIds: [] });
         return { snapshot: normalize(), workspaceId: id };
       }
       case "workspace_rename": {
@@ -197,9 +185,6 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
       }
       case "workspace_set_color":
         workspace(args.workspaceId).color = args.color as WorkspaceColor;
-        return normalize();
-      case "workspace_set_default":
-        state.defaultWorkspaceId = workspace(args.workspaceId).id;
         return normalize();
       case "workspace_add_projects": {
         const target = workspace(args.workspaceId);
@@ -218,14 +203,10 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
         return undoable(before);
       }
       case "workspace_delete": {
-        if (args.workspaceId === state.defaultWorkspaceId) {
-          fail("defaultWorkspace", "Le workspace par défaut ne peut pas être supprimé.");
-        }
         const before = structuredClone(state);
         workspace(args.workspaceId);
         state.workspaces = state.workspaces.filter((w) => w.id !== args.workspaceId);
-        if (state.lastWorkspaceId === args.workspaceId)
-          state.lastWorkspaceId = state.defaultWorkspaceId;
+        if (state.lastWorkspaceId === args.workspaceId) state.lastWorkspaceId = null;
         return undoable(before);
       }
       case "undo": {

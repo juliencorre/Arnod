@@ -3,7 +3,7 @@ export interface MenuItem {
   /** Identifiant renvoyé par l'événement `select`. */
   id: string;
   label: string;
-  /** Sous-titre (« Le projet reste dans le référentiel. »). */
+  /** Sous-titre (« Le projet reste dans « Tous les projets ». »). */
   hint?: string;
   /** Raccourci affiché à droite (« Ctrl+N »). */
   shortcut?: string;

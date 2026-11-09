@@ -11,13 +11,12 @@ export const AUTH_SSO = "p-auth-sso";
 export function workspace(
   id: string,
   name: string,
-  options: { color?: WorkspaceColor; isDefault?: boolean; projectIds?: string[] } = {},
+  options: { color?: WorkspaceColor; projectIds?: string[] } = {},
 ): WorkspaceView {
   return {
     id,
     name,
     color: options.color ?? "orange",
-    isDefault: options.isDefault ?? false,
     projectIds: options.projectIds ?? [],
   };
 }
@@ -36,17 +35,15 @@ export function project(
   };
 }
 
-/** Premier lancement : « Mes projets » seul, aucun projet (1a). */
+/** Premier lancement : aucun projet, aucun workspace, « Tous les projets » ouvert (1a). */
 export function firstRunSnapshot(): CatalogSnapshot {
-  return {
-    projects: [],
-    workspaces: [workspace(MES_PROJETS, "Mes projets", { color: "gray", isDefault: true })],
-    defaultWorkspaceId: MES_PROJETS,
-    lastWorkspaceId: MES_PROJETS,
-  };
+  return { projects: [], workspaces: [], lastWorkspaceId: null };
 }
 
-/** Ouverture habituelle : « Boutique » ouvert avec deux projets (2a). */
+/**
+ * Ouverture habituelle (2a) : onglets « Mes projets » (gris) puis « Boutique »,
+ * qui contiennent tous deux les deux projets ; « Boutique » est ouvert.
+ */
 export function boutiqueSnapshot(): CatalogSnapshot {
   return {
     projects: [
@@ -56,12 +53,10 @@ export function boutiqueSnapshot(): CatalogSnapshot {
     workspaces: [
       workspace(MES_PROJETS, "Mes projets", {
         color: "gray",
-        isDefault: true,
         projectIds: [BOUTIQUE_TESTS, AUTH_SSO],
       }),
       workspace(BOUTIQUE, "Boutique", { projectIds: [BOUTIQUE_TESTS, AUTH_SSO] }),
     ],
-    defaultWorkspaceId: MES_PROJETS,
     lastWorkspaceId: BOUTIQUE,
   };
 }

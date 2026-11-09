@@ -46,7 +46,7 @@ pub enum WorkspaceColor {
 
 impl WorkspaceColor {
     /// Ordre d'attribution automatique aux nouveaux workspaces (W5). Le gris est
-    /// réservé en priorité au workspace par défaut et vient donc en dernier.
+    /// vient en dernier : c'était la couleur de l'ancien workspace par défaut.
     pub const ASSIGNMENT_ORDER: [Self; 8] = [
         Self::Orange,
         Self::Blue,
@@ -65,13 +65,21 @@ impl WorkspaceColor {
 pub struct CatalogFile {
     /// Version du format, pour les migrations.
     pub version: u32,
-    /// Référentiel, dans l'ordre de création (R11).
+    /// « Tous les projets », dans l'ordre de création.
     pub projects: Vec<Project>,
-    /// Workspaces, dans l'ordre de création.
+    /// Workspaces, dans l'ordre des onglets : l'ordre de création (R11).
     pub workspaces: Vec<Workspace>,
-    /// Workspace par défaut : porté par un seul champ, il est unique par construction (R3).
+    /// Dernier onglet ouvert ; `null` pour « Tous les projets » (R7).
+    pub last_workspace_id: Option<Uuid>,
+}
+
+/// Format version 1, avec un workspace par défaut, lu seulement pour être migré (R12).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogFileV1 {
+    pub projects: Vec<Project>,
+    pub workspaces: Vec<Workspace>,
     pub default_workspace_id: Uuid,
-    /// Dernier workspace ouvert (R7).
     pub last_workspace_id: Uuid,
 }
 
@@ -112,7 +120,7 @@ mod tests {
     fn format_disque_en_camel_case() {
         let id = Uuid::nil();
         let file = CatalogFile {
-            version: 1,
+            version: 2,
             projects: vec![Project {
                 id,
                 name: "boutique-tests".to_owned(),
@@ -120,26 +128,24 @@ mod tests {
             }],
             workspaces: vec![Workspace {
                 id,
-                name: "Mes projets".to_owned(),
-                color: WorkspaceColor::Gray,
+                name: "E-commerce".to_owned(),
+                color: WorkspaceColor::Orange,
                 project_ids: vec![id],
             }],
-            default_workspace_id: id,
-            last_workspace_id: id,
+            last_workspace_id: None,
         };
         let nil = "00000000-0000-0000-0000-000000000000";
         assert_eq!(
             serde_json::to_value(&file).unwrap(),
             serde_json::json!({
-                "version": 1,
+                "version": 2,
                 "projects": [
                     { "id": nil, "name": "boutique-tests", "path": "/home/julien/arnod/boutique-tests" }
                 ],
                 "workspaces": [
-                    { "id": nil, "name": "Mes projets", "color": "gray", "projectIds": [nil] }
+                    { "id": nil, "name": "E-commerce", "color": "orange", "projectIds": [nil] }
                 ],
-                "defaultWorkspaceId": nil,
-                "lastWorkspaceId": nil
+                "lastWorkspaceId": null
             })
         );
     }

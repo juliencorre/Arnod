@@ -24,9 +24,10 @@ const workspace = computed(() => catalog.workspaceById(props.workspaceId));
 const projects = computed(() => catalog.projectsOf(props.workspaceId));
 const summary = computed(() => {
   const count = projects.value.length;
-  if (count === 0) return "Aucun projet pour l'instant : ajoutez-en depuis le référentiel.";
-  if (count === 1) return "1 projet du référentiel, regroupé ici pour travailler ensemble.";
-  return `${count} projets du référentiel, regroupés ici pour travailler ensemble.`;
+  if (count === 0)
+    return "Aucun projet pour l'instant : ajoutez-en un, ou glissez-en depuis « Tous les projets ».";
+  if (count === 1) return "1 projet, regroupé ici pour travailler ensemble.";
+  return `${count} projets, regroupés ici pour travailler ensemble.`;
 });
 
 const renaming = ref(false);
@@ -108,7 +109,7 @@ function cancelRename(): void {
       />
       <button type="button" class="add-card" @click="dialogs.openAddProjects(workspace.id)">
         <span class="add-card__title">+ Ajouter un projet</span>
-        <span class="add-card__text">nouveau, existant ou du référentiel</span>
+        <span class="add-card__text">nouveau ou existant</span>
       </button>
     </div>
   </section>

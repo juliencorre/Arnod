@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::error::CommandError;
 use crate::state::AppState;
-use crate::workbench::{RunView, Workbench};
+use crate::workbench::{ProjectCtx, ProjectLastRun, RunView, Workbench};
 
 #[tauri::command]
 pub fn run_start(
@@ -42,6 +42,24 @@ pub fn run_retry_failures(
 ) -> Result<RunView, CommandError> {
     let ctx = state.project_ctx(project)?;
     bench.retry_failures(&ctx, run, confirmed)
+}
+
+/// Dernier run de chaque projet qui en a un, pour « Tous les projets » (O12).
+#[tauri::command]
+pub fn project_last_runs(state: State<'_, AppState>) -> Result<Vec<ProjectLastRun>, CommandError> {
+    let snapshot = state.snapshot()?;
+    Ok(snapshot
+        .projects
+        .iter()
+        .filter_map(|project| {
+            let ctx = ProjectCtx {
+                id: project.id,
+                root: project.path.clone().into(),
+                data_dir: state.data_dir().to_path_buf(),
+            };
+            Workbench::last_run(&ctx).map(|run| ProjectLastRun::of(project.id, &run))
+        })
+        .collect())
 }
 
 #[tauri::command]

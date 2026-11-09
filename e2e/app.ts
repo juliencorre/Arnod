@@ -64,8 +64,8 @@ export function removeSandbox(sandbox: Sandbox): void {
 export function readState(sandbox: Sandbox): {
   projects: { id: string; name: string; path: string }[];
   workspaces: { id: string; name: string; projectIds: string[] }[];
-  defaultWorkspaceId: string;
-  lastWorkspaceId: string;
+  /** Dernier onglet ouvert ; `null` pour « Tous les projets ». */
+  lastWorkspaceId: string | null;
 } {
   return JSON.parse(readFileSync(path.join(sandbox.dataDir, "arnod.json"), "utf8")) as ReturnType<
     typeof readState

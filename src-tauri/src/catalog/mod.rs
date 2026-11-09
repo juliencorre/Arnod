@@ -1,4 +1,8 @@
-//! Catalogue : référentiel des projets et workspaces (règles R1 à R11 du plan).
+//! Catalogue : « Tous les projets » (le référentiel) et workspaces.
+//!
+//! Règles R1, R2, R5, R6, R9 et R10 de `docs/plan-projets-workspaces.md`, R3, R4,
+//! R7, R8, R11 et R12 révisées par `docs/plan-workspaces-onglets.md` : il n'y a
+//! plus de workspace par défaut et un projet peut n'être dans aucun workspace.
 //!
 //! Module pur : ni Tauri, ni disque. Chaque méthode applique une règle et
 //! renvoie une [`CommandError`] prête à afficher si elle est enfreinte.
@@ -15,40 +19,57 @@ use std::path::{Path, PathBuf};
 
 use uuid::Uuid;
 
-use self::model::{CatalogFile, Project, Workspace, WorkspaceColor};
+use self::model::{CatalogFile, CatalogFileV1, Project, Workspace, WorkspaceColor};
 use self::snapshot::{CatalogSnapshot, ProjectStatus, ProjectView, WorkspaceView};
 use self::undo::UndoAction;
 use crate::error::{CommandError, CommandErrorKind};
 
-/// Nom du workspace créé au premier lancement (W1).
-pub const DEFAULT_WORKSPACE_NAME: &str = "Mes projets";
-
 /// Version courante du format `arnod.json`.
-pub const FILE_VERSION: u32 = 1;
+pub const FILE_VERSION: u32 = 2;
 
-/// Référentiel des projets et workspaces.
+/// « Tous les projets » et workspaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Catalog {
     projects: Vec<Project>,
     workspaces: Vec<Workspace>,
-    default_workspace_id: Uuid,
-    last_workspace_id: Uuid,
+    /// Dernier onglet ouvert : un workspace, ou `None` pour « Tous les projets » (R7).
+    last_workspace_id: Option<Uuid>,
 }
 
 impl Catalog {
-    /// Catalogue du premier lancement : « Mes projets », gris, par défaut et ouvert (W1).
+    /// Catalogue du premier lancement : aucun projet, aucun workspace, onglet
+    /// « Tous les projets » ouvert (R3, R7).
     pub fn first_launch() -> Self {
-        let id = Uuid::new_v4();
         Self {
             projects: Vec::new(),
-            workspaces: vec![Workspace {
-                id,
-                name: DEFAULT_WORKSPACE_NAME.to_owned(),
-                color: WorkspaceColor::Gray,
-                project_ids: Vec::new(),
-            }],
-            default_workspace_id: id,
-            last_workspace_id: id,
+            workspaces: Vec::new(),
+            last_workspace_id: None,
+        }
+    }
+
+    /// Migre un fichier version 1 (R12) : l'ancien workspace par défaut est
+    /// retiré s'il contient tous les projets, car il doublait « Tous les
+    /// projets » ; sinon il reste un workspace ordinaire.
+    pub fn migrate_v1(file: CatalogFileV1) -> CatalogFile {
+        let mut workspaces = file.workspaces;
+        let redundant = workspaces
+            .iter()
+            .position(|workspace| workspace.id == file.default_workspace_id)
+            .filter(|index| {
+                file.projects
+                    .iter()
+                    .all(|project| workspaces[*index].project_ids.contains(&project.id))
+            });
+        if let Some(index) = redundant {
+            workspaces.remove(index);
+        }
+        let last_workspace_id = Some(file.last_workspace_id)
+            .filter(|id| workspaces.iter().any(|workspace| workspace.id == *id));
+        CatalogFile {
+            version: FILE_VERSION,
+            projects: file.projects,
+            workspaces,
+            last_workspace_id,
         }
     }
 
@@ -56,8 +77,8 @@ impl Catalog {
     ///
     /// Les incohérences sans perte sont réparées : références à des projets
     /// inconnus ou en double, dernier workspace disparu (R7). Un fichier qui ne
-    /// décrit pas un catalogue valide (identifiants en double, workspace par
-    /// défaut absent) est refusé, avec la raison.
+    /// décrit pas un catalogue valide (identifiants en double) est refusé, avec
+    /// la raison.
     pub fn from_file(file: CatalogFile) -> Result<Self, String> {
         let mut project_ids = HashSet::new();
         for project in &file.projects {
@@ -71,10 +92,6 @@ impl Catalog {
                 return Err(format!("workspace {} en double", workspace.id));
             }
         }
-        if !workspace_ids.contains(&file.default_workspace_id) {
-            return Err("workspace par défaut absent".to_owned());
-        }
-
         let mut workspaces = file.workspaces;
         for workspace in &mut workspaces {
             let mut seen = HashSet::new();
@@ -82,16 +99,13 @@ impl Catalog {
                 .project_ids
                 .retain(|id| project_ids.contains(id) && seen.insert(*id));
         }
-        let last_workspace_id = if workspace_ids.contains(&file.last_workspace_id) {
-            file.last_workspace_id
-        } else {
-            file.default_workspace_id
-        };
+        let last_workspace_id = file
+            .last_workspace_id
+            .filter(|id| workspace_ids.contains(id));
 
         Ok(Self {
             projects: file.projects,
             workspaces,
-            default_workspace_id: file.default_workspace_id,
             last_workspace_id,
         })
     }
@@ -102,16 +116,12 @@ impl Catalog {
             version: FILE_VERSION,
             projects: self.projects.clone(),
             workspaces: self.workspaces.clone(),
-            default_workspace_id: self.default_workspace_id,
             last_workspace_id: self.last_workspace_id,
         }
     }
 
-    pub fn default_workspace_id(&self) -> Uuid {
-        self.default_workspace_id
-    }
-
-    pub fn last_workspace_id(&self) -> Uuid {
+    /// Dernier onglet ouvert ; `None` pour « Tous les projets ».
+    pub fn last_workspace_id(&self) -> Option<Uuid> {
         self.last_workspace_id
     }
 
@@ -138,17 +148,19 @@ impl Catalog {
             .ok_or_else(workspace_not_found)
     }
 
-    /// Vérifie, sans rien modifier, qu'un projet peut être inscrit dans
-    /// `workspace_id` avec ce nom et ce dossier (R1, R9, R10). Renvoie le nom
-    /// normalisé. À appeler avant de créer le dossier sur disque.
+    /// Vérifie, sans rien modifier, qu'un projet peut être inscrit, dans
+    /// `workspace_id` s'il est donné, avec ce nom et ce dossier (R1, R9, R10).
+    /// Renvoie le nom normalisé. À appeler avant de créer le dossier sur disque.
     pub fn check_new_project(
         &self,
         raw_name: &str,
         path: &Path,
-        workspace_id: Uuid,
+        workspace_id: Option<Uuid>,
     ) -> Result<String, CommandError> {
         let name = names::project_name(raw_name)?;
-        self.workspace(workspace_id)?;
+        if let Some(workspace_id) = workspace_id {
+            self.workspace(workspace_id)?;
+        }
         if let Some(existing) = self
             .projects
             .iter()
@@ -157,7 +169,7 @@ impl Catalog {
             return Err(CommandError::new(
                 CommandErrorKind::NameTaken,
                 format!(
-                    "Un projet « {} » existe déjà dans le référentiel.",
+                    "Un projet « {} » existe déjà dans « Tous les projets ».",
                     existing.name
                 ),
             ));
@@ -175,35 +187,33 @@ impl Catalog {
         Ok(name)
     }
 
-    /// Inscrit un projet au référentiel et l'ajoute au workspace par défaut ainsi
-    /// qu'à `workspace_id` s'il est différent (R1, R4).
+    /// Inscrit un projet dans « Tous les projets » et, si `workspace_id` est
+    /// donné, dans ce seul workspace (R1, R4).
     pub fn register_project(
         &mut self,
         id: Uuid,
         raw_name: &str,
         path: PathBuf,
-        workspace_id: Uuid,
+        workspace_id: Option<Uuid>,
     ) -> Result<(), CommandError> {
         // L'identifiant d'abord : réinscrire le même projet (P12) doit dire
         // « déjà inscrit », pas « nom déjà pris ».
         if self.projects.iter().any(|project| project.id == id) {
             return Err(CommandError::new(
                 CommandErrorKind::AlreadyRegistered,
-                "Ce projet est déjà inscrit au référentiel.",
+                "Ce projet est déjà dans « Tous les projets ».",
             ));
         }
         let name = self.check_new_project(raw_name, &path, workspace_id)?;
         self.projects.push(Project { id, name, path });
-        for target in [self.default_workspace_id, workspace_id] {
-            let workspace = self.workspace_mut(target)?;
-            if !workspace.project_ids.contains(&id) {
-                workspace.project_ids.push(id);
-            }
+        if let Some(workspace_id) = workspace_id {
+            self.workspace_mut(workspace_id)?.project_ids.push(id);
         }
         Ok(())
     }
 
-    /// Crée un workspace vide, avec la première couleur libre de la palette (W5).
+    /// Crée un workspace vide, à la fin des onglets, avec la première couleur
+    /// libre de la palette (W5, R11).
     pub fn create_workspace(&mut self, raw_name: &str) -> Result<Uuid, CommandError> {
         let name = names::workspace_name(raw_name)?;
         self.ensure_workspace_name_free(&name, None)?;
@@ -236,16 +246,12 @@ impl Catalog {
         Ok(())
     }
 
-    /// Transfère le rôle de workspace par défaut (W9, R3).
-    pub fn set_default_workspace(&mut self, id: Uuid) -> Result<(), CommandError> {
-        self.workspace(id)?;
-        self.default_workspace_id = id;
-        Ok(())
-    }
-
-    /// Mémorise le workspace ouvert, rouvert au prochain démarrage (W2, R7).
-    pub fn open_workspace(&mut self, id: Uuid) -> Result<(), CommandError> {
-        self.workspace(id)?;
+    /// Mémorise l'onglet ouvert, rouvert au prochain démarrage : un workspace,
+    /// ou « Tous les projets » avec `None` (O2, R7).
+    pub fn open_workspace(&mut self, id: Option<Uuid>) -> Result<(), CommandError> {
+        if let Some(id) = id {
+            self.workspace(id)?;
+        }
         self.last_workspace_id = id;
         Ok(())
     }
@@ -322,25 +328,19 @@ impl Catalog {
         })
     }
 
-    /// Supprime un workspace ; ses projets restent au référentiel et dans leurs
-    /// autres workspaces (W11, R3, R5). S'il était ouvert, le workspace par
-    /// défaut devient le workspace ouvert (R8).
+    /// Supprime un workspace ; ses projets restent dans « Tous les projets » et
+    /// dans leurs autres workspaces (O6, R3, R5). S'il était ouvert, « Tous les
+    /// projets » devient l'onglet ouvert (R8).
     pub fn delete_workspace(&mut self, id: Uuid) -> Result<UndoAction, CommandError> {
-        if id == self.default_workspace_id {
-            return Err(CommandError::new(
-                CommandErrorKind::DefaultWorkspace,
-                "Le workspace par défaut ne peut pas être supprimé : définissez d'abord un autre workspace par défaut.",
-            ));
-        }
         let index = self
             .workspaces
             .iter()
             .position(|workspace| workspace.id == id)
             .ok_or_else(workspace_not_found)?;
         let workspace = self.workspaces.remove(index);
-        let was_last = self.last_workspace_id == id;
+        let was_last = self.last_workspace_id == Some(id);
         if was_last {
-            self.last_workspace_id = self.default_workspace_id;
+            self.last_workspace_id = None;
         }
         Ok(UndoAction::RestoreWorkspace {
             workspace,
@@ -378,7 +378,7 @@ impl Catalog {
                 let index = index.min(self.workspaces.len());
                 self.workspaces.insert(index, workspace);
                 if was_last {
-                    self.last_workspace_id = id;
+                    self.last_workspace_id = Some(id);
                 }
             }
             UndoAction::RestoreProject {
@@ -454,7 +454,7 @@ impl Catalog {
     /// Instantané pour l'interface. `folder_exists` indique si le dossier d'un
     /// projet existe (P10) ; il est injecté pour garder ce module sans disque.
     pub fn snapshot(&self, folder_exists: impl Fn(&Path) -> bool) -> CatalogSnapshot {
-        let workspaces = self.sorted_workspaces();
+        let workspaces = &self.workspaces;
         let projects = self
             .projects
             .iter()
@@ -475,33 +475,19 @@ impl Catalog {
             })
             .collect();
         let workspaces = workspaces
-            .into_iter()
+            .iter()
             .map(|workspace| WorkspaceView {
                 id: workspace.id,
                 name: workspace.name.clone(),
                 color: workspace.color,
-                is_default: workspace.id == self.default_workspace_id,
                 project_ids: workspace.project_ids.clone(),
             })
             .collect();
         CatalogSnapshot {
             projects,
             workspaces,
-            default_workspace_id: self.default_workspace_id,
             last_workspace_id: self.last_workspace_id,
         }
-    }
-
-    /// Workspace par défaut d'abord, puis les autres par nom (R11).
-    fn sorted_workspaces(&self) -> Vec<&Workspace> {
-        let mut sorted: Vec<&Workspace> = self.workspaces.iter().collect();
-        sorted.sort_by_cached_key(|workspace| {
-            (
-                workspace.id != self.default_workspace_id,
-                names::sort_key(&workspace.name),
-            )
-        });
-        sorted
     }
 
     fn ensure_workspace_name_free(
@@ -553,7 +539,7 @@ fn same_path_ignoring_case(a: &Path, b: &Path) -> bool {
 fn project_not_found() -> CommandError {
     CommandError::new(
         CommandErrorKind::NotFound,
-        "Ce projet n'existe plus dans le référentiel.",
+        "Ce projet n'est plus dans « Tous les projets ».",
     )
 }
 

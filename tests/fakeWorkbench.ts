@@ -8,6 +8,7 @@ import type {
   EnvironmentDoc,
   EnvironmentView,
   EnvironmentsView,
+  ProjectLastRun,
   RequestDoc,
   RunView,
   SendOutcome,
@@ -73,6 +74,8 @@ export interface FakeWorkbench {
   lastRun: RunView | null;
   /** Résultat des requêtes d'un run, par chemin (réussie par défaut). */
   runStatus: Map<string, "passed" | "failed" | "error">;
+  /** Réponse de `project_last_runs`. */
+  projectLastRuns: ProjectLastRun[];
 }
 
 export function createFakeWorkbench(): FakeWorkbench {
@@ -93,6 +96,7 @@ export function createFakeWorkbench(): FakeWorkbench {
     nextSend: okOutcome(),
     lastRun: null,
     runStatus: new Map(),
+    projectLastRuns: [],
   };
 }
 
@@ -285,6 +289,8 @@ export function handleWorkbench(
     }
     case "run_last":
       return wb.lastRun;
+    case "project_last_runs":
+      return wb.projectLastRuns;
     default:
       return undefined;
   }

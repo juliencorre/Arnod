@@ -1,73 +1,35 @@
 <script setup lang="ts">
 /**
- * Écran de gestion (2d, 2e, W10) : onglets « Workspaces » et « Référentiel des
- * projets ». Flèches gauche et droite entre les onglets.
+ * « Gérer les workspaces » (2d, O11), ouvert depuis le menu d'un onglet :
+ * liste des workspaces et détail du workspace choisi. « Retour » ramène à
+ * l'onglet d'où l'on venait.
  */
-import { nextTick, useTemplateRef } from "vue";
+import { computed, useId } from "vue";
 
-import RegistryTab from "@/components/manage/RegistryTab.vue";
 import WorkspacesTab from "@/components/manage/WorkspacesTab.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
-import { type ManageTab, useNavigationStore } from "@/stores/navigation";
+import { ALL_PROJECTS } from "@/composables/useProjectActions";
+import { useNavigationStore } from "@/stores/navigation";
 
-const props = defineProps<{
-  tab: ManageTab;
-  workspaceId: string;
-  highlightProjectId: string | null;
-}>();
+defineProps<{ workspaceId: string | null }>();
 
 const navigation = useNavigationStore();
-const tablist = useTemplateRef<HTMLElement>("tablist");
-
-const TABS: { id: ManageTab; label: string }[] = [
-  { id: "workspaces", label: "Workspaces" },
-  { id: "registry", label: "Référentiel des projets" },
-];
-
-async function onTabKeydown(event: KeyboardEvent): Promise<void> {
-  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-  event.preventDefault();
-  const index = TABS.findIndex((tab) => tab.id === props.tab);
-  const next = TABS[(index + (event.key === "ArrowRight" ? 1 : -1) + TABS.length) % TABS.length];
-  if (!next) return;
-  navigation.selectTab(next.id);
-  await nextTick();
-  tablist.value?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
-}
+const titleId = useId();
+const backLabel = computed(() =>
+  navigation.currentWorkspaceId === null ? `Retour à « ${ALL_PROJECTS} »` : "Retour au workspace",
+);
 </script>
 
 <template>
-  <div class="manage">
+  <section class="manage" :aria-labelledby="titleId">
     <div class="manage__bar">
-      <div ref="tablist" class="manage__tabs" role="tablist" aria-label="Gestion">
-        <button
-          v-for="item in TABS"
-          :id="`manage-tab-${item.id}`"
-          :key="item.id"
-          type="button"
-          role="tab"
-          class="manage__tab"
-          :aria-selected="item.id === tab"
-          :aria-controls="`manage-panel-${item.id}`"
-          :tabindex="item.id === tab ? 0 : -1"
-          @click="navigation.selectTab(item.id)"
-          @keydown="onTabKeydown"
-        >
-          {{ item.label }}
-        </button>
-      </div>
-      <BaseButton variant="link" @click="navigation.closeManage()">Retour au workspace</BaseButton>
+      <h1 :id="titleId" class="manage__title">Workspaces</h1>
+      <BaseButton variant="link" @click="navigation.closeManage()">{{ backLabel }}</BaseButton>
     </div>
-    <section
-      :id="`manage-panel-${tab}`"
-      class="manage__panel"
-      role="tabpanel"
-      :aria-labelledby="`manage-tab-${tab}`"
-    >
-      <WorkspacesTab v-if="tab === 'workspaces'" :workspace-id="workspaceId" />
-      <RegistryTab v-else :highlight-project-id="highlightProjectId" />
-    </section>
-  </div>
+    <div class="manage__panel">
+      <WorkspacesTab :workspace-id="workspaceId" />
+    </div>
+  </section>
 </template>
 
 <style scoped>
@@ -86,30 +48,12 @@ async function onTabKeydown(event: KeyboardEvent): Promise<void> {
   border-bottom: 1px solid var(--color-border);
 }
 
-.manage__tabs {
-  display: flex;
-  gap: 1.5rem;
-}
-
-.manage__tab {
+.manage__title {
+  margin: 0;
   padding: 0.625rem 0.25rem;
-  border: none;
-  border-bottom: 2px solid transparent;
-  font: inherit;
-  color: var(--color-muted);
-  background: none;
-  cursor: pointer;
-}
-
-.manage__tab[aria-selected="true"] {
-  border-bottom-color: var(--color-accent);
+  border-bottom: 2px solid var(--color-accent);
+  font-size: 1rem;
   font-weight: 650;
-  color: var(--color-text);
-}
-
-.manage__tab:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: -2px;
 }
 
 .manage__panel {
