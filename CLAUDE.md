@@ -6,7 +6,8 @@ frontend Vue 3 + TypeScript + Vite + Pinia, cœur natif Rust. Toute nouvelle
 fonctionnalité part de cette base et respecte les règles ci-dessous.
 
 Travail en cours : premier usage (arborescence, requêtes, environnements, vérifications, run),
-selon `docs/plan-premier-usage.md` (plan rédigé, tâches T1 à T30 à cocher). Livré : projets et
+selon `docs/plan-premier-usage.md` (cœur Rust et interface livrés ; restent les tests e2e, la mesure de
+l'installeur et les écarts listés en fin de plan). Livré : projets et
 workspaces, selon `docs/plan-projets-workspaces.md` (maquettes dans `docs/maquettes/`) ; voir la
 section « Projets et workspaces ». Un nouveau lot commence par un plan rédigé à partir de
 `docs/modele-plan.md`.
@@ -54,11 +55,13 @@ src/                    Frontend Vue
   styles.css            Thème clair/sombre (variables CSS), police système
   lib/ipc.ts            Wrapper typé autour d'invoke (seul point d'accès IPC)
   lib/format.ts         Formatage d'affichage
-  stores/               catalog (instantané), navigation (vue, titre), toasts (notifications)
+  stores/               catalog (instantané), navigation (vue, titre), toasts (notifications),
+                        workbench (projet ouvert : arborescence, requête, réponse, environnements, run)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification
   components/layout/    Coquille : barre latérale et zone principale
   components/projects/  Vues des projets (premier lancement...)
   components/workspaces/ Vues des workspaces
+  components/workbench/ Zone de travail d'un projet : arborescence, éditeur, réponse, environnements, run
   types/ipc.ts          Types IPC documentés à la main
 tests/                  Tests Vitest (happy-dom, mockIPC, faux cœur fakeCore.ts), dont contrastes
 e2e/                    Tests e2e sur l'application réelle (tauri-driver, WebdriverIO)
@@ -69,6 +72,13 @@ src-tauri/              Cœur Rust
   src/error.rs          CommandError, erreur commune des commandes
   src/catalog/          Règles des projets et workspaces (pur : ni Tauri, ni disque)
   src/storage.rs        Lecture / écriture atomique d'arnod.json
+  src/request/          Requête : modèle YAML, fichier, résolution des variables, vérifications
+  src/tree/             Arborescence d'un projet sur disque (dossiers, requêtes, corbeille)
+  src/environment.rs    Environnements d'un projet (fichiers, chaîne, protection)
+  src/local.rs          Données locales d'un projet (hors dépôt : local.json)
+  src/secrets.rs        Coffre des secrets (trait SecretStore, keyring du système)
+  src/http.rs           Envoi HTTP (reqwest), délai, annulation, troncature à 5 Mo
+  src/workbench.rs      Établi : envoi, variables, environnements actifs, runs
   src/manifest.rs       Dossier d'un projet et manifeste arnod.yml
   src/state.rs          AppState : catalogue + stockage + annulation (app.manage)
   src/menu.rs           Menu natif (Fichier > Quitter)
@@ -137,14 +147,14 @@ Linux : installer d'abord les dépendances système
 - CSP stricte dans `tauri.conf.json` : pas de ressource distante, pas de `unsafe-eval`.
 - Pas de nouveau plugin Tauri ni de nouvelle permission sans besoin explicite. Seul ajout
   validé : `tauri-plugin-dialog`, appelé uniquement depuis Rust (ni paquet npm, ni
-  permission WebView).
+  permission WebView). `reqwest`, `keyring`, `trash` et `tokio` sont des crates Rust, sans permission WebView.
 - Thème clair/sombre suivant le système via les variables de `src/styles.css` (palette des
   maquettes, accent orange) : utiliser `var(--color-*)`, jamais de couleur codée en dur dans
   les composants. Tout nouveau jeton est défini pour les deux thèmes, en `#rrggbb` ;
   `tests/theme.spec.ts` vérifie les contrastes.
 - Police système uniquement : la CSP interdit les polices distantes des maquettes.
-- Hors périmètre actuel : requêtes HTTP/SOAP, mocks, scripts, CLI, signature de code,
-  updater. La persistance se limite à l'état des projets et workspaces.
+- Hors périmètre actuel : SOAP, mocks, scripts, CLI, signature de code, updater. Les requêtes HTTP
+  sont livrées (premier usage) ; les secrets vont dans le coffre du système, jamais dans le projet.
 
 ## Projets et workspaces
 

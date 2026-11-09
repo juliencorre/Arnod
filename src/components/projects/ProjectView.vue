@@ -1,11 +1,9 @@
 <script setup lang="ts">
-/**
- * Vue d'un projet (1b). Le contenu (requêtes, assertions, runs) arrive avec le
- * lot « requêtes » : pour l'instant, l'en-tête et un état vide.
- */
+/** Vue d'un projet (1b) : en-tête et zone de travail (arborescence, requête, réponse, run). */
 import { computed, useId } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import WorkbenchView from "@/components/workbench/WorkbenchView.vue";
 import { useCatalogStore } from "@/stores/catalog";
 import { useNavigationStore } from "@/stores/navigation";
 
@@ -37,12 +35,7 @@ const initial = computed(() => project.value?.name.charAt(0).toUpperCase() ?? ""
         <code class="project-view__path">{{ project.path }}</code>
       </div>
     </header>
-    <div class="project-view__empty">
-      <p class="project-view__empty-title">Aucune requête pour l'instant.</p>
-      <p class="project-view__empty-text">
-        L'écriture et l'envoi de requêtes arrivent dans une prochaine version d'Arnod.
-      </p>
-    </div>
+    <WorkbenchView :project-id="project.id" />
   </section>
 </template>
 
@@ -84,23 +77,6 @@ const initial = computed(() => project.value?.name.charAt(0).toUpperCase() ?? ""
 
 .project-view__path {
   font: 0.8125rem var(--font-mono);
-  color: var(--color-muted);
-}
-
-.project-view__empty {
-  padding: 2.5rem;
-  border: 1px dashed var(--color-border-strong);
-  border-radius: 10px;
-  text-align: center;
-}
-
-.project-view__empty-title {
-  margin: 0 0 0.25rem;
-  font-weight: 600;
-}
-
-.project-view__empty-text {
-  margin: 0;
   color: var(--color-muted);
 }
 </style>

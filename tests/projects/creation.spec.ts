@@ -48,7 +48,7 @@ describe("premier lancement (1a, P1, P3, P4)", () => {
       workspaceId: MES_PROJETS,
     });
     expect(wrapper.get("main h1").text()).toBe("boutique-tests");
-    expect(wrapper.get("main").text()).toContain("Aucune requête pour l'instant.");
+    expect(wrapper.get("main").text()).toContain("Aucune requête.");
     expect(wrapper.get(".toast").text()).toContain(
       "✓ « boutique-tests » créé dans le workspace Mes projets (par défaut).",
     );

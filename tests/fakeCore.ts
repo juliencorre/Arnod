@@ -7,6 +7,8 @@ import { mockIPC } from "@tauri-apps/api/mocks";
 
 import type { CatalogSnapshot, CommandError, WorkspaceColor } from "@/types/ipc";
 
+import { createFakeWorkbench, handleWorkbench, type FakeWorkbench } from "./fakeWorkbench";
+
 export const HOME = "/home/julien";
 export const DEFAULT_LOCATION = `${HOME}/arnod`;
 
@@ -20,6 +22,8 @@ export interface FakeCore {
   commands: () => string[];
   /** Fait échouer le prochain appel de `cmd` avec `error`. */
   failNext: (cmd: string, error: CommandError) => void;
+  /** État du faux cœur du premier usage (arborescence, requêtes, environnements, runs). */
+  workbench: FakeWorkbench;
 }
 
 const COLORS: WorkspaceColor[] = [
@@ -51,6 +55,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     failNext: (cmd, error) => {
       failures.set(cmd, error);
     },
+    workbench: createFakeWorkbench(),
   };
 
   const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -230,8 +235,11 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
         state = before;
         return normalize();
       }
-      default:
-        throw new Error(`commande inattendue : ${cmd}`);
+      default: {
+        const handled = handleWorkbench(core.workbench, cmd, args);
+        if (handled === undefined) throw new Error(`commande inattendue : ${cmd}`);
+        return handled;
+      }
     }
   });
   return core;

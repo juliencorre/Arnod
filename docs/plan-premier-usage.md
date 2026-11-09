@@ -409,47 +409,47 @@ commit ; chaque tâche est relue avant commit ; une tâche est cochée dès qu'e
 
 - [ ] **T1** Mettre à jour `CLAUDE.md` (§ 7), remplacer les captures 1c à 1f par celles de la
       maquette actuelle, reporter les décisions du § 11.
-- [ ] **T2** Jetons de couleur du § 6.5 (clair et sombre) et test de contraste.
-- [ ] **T3** Nouvelles natures de `CommandErrorKind` (Rust, TypeScript, `COMMAND_ERROR_KINDS`) et test de concordance.
+- [x] **T2** Jetons de couleur du § 6.5 (clair et sombre) et test de contraste.
+- [x] **T3** Nouvelles natures de `CommandErrorKind` (Rust, TypeScript, `COMMAND_ERROR_KINDS`) et test de concordance.
 - [ ] **T4** `arnod.json` version 2 : `lastEnvironment`, état replié ; migration et refus d'une version plus récente, tests.
 
 **Lot B - Arborescence et requêtes (cœur Rust)**
 
-- [ ] **T5** `request/model.rs` et `request/file.rs` : YAML d'une requête, ordre stable, clés inconnues conservées, version ; tests de lecture, d'écriture et de forme.
-- [ ] **T6** `tree/` : lecture du disque (R1), noms dérivés (R3), opérations R2, R4, R5 sur un faux système de fichiers puis sur dossier temporaire.
-- [ ] **T7** `commands/tree.rs` et `commands/requests.rs` (lecture, enregistrement), enregistrement dans `generate_handler!`, tests de la forme JSON et des erreurs.
-- [ ] **T8** Suppression par la corbeille (`trash`) et annulation (jeton, R5).
+- [x] **T5** `request/model.rs` et `request/file.rs` : YAML d'une requête, ordre stable, clés inconnues conservées, version ; tests de lecture, d'écriture et de forme.
+- [x] **T6** `tree/` : lecture du disque (R1), noms dérivés (R3), opérations R2, R4, R5 sur un faux système de fichiers puis sur dossier temporaire.
+- [x] **T7** `commands/tree.rs` et `commands/requests.rs` (lecture, enregistrement), enregistrement dans `generate_handler!`, tests de la forme JSON et des erreurs.
+- [x] **T8** Suppression par la corbeille (`trash`) et annulation (jeton, R5).
 
 **Lot C - Environnements et envoi (cœur Rust)**
 
-- [ ] **T9** `environment/` : fichiers, chaîne, protection, `lastEnvironment` ; tests R7 et R8.
-- [ ] **T10** `environment/secrets.rs` : trait `SecretStore`, implémentation `keyring`, faux pour les tests ; masquage R9.
-- [ ] **T11** `request/resolve.rs` : variables et portée (R6), URL avec paramètres, authentification, corps ; tests.
-- [ ] **T12** `http.rs` : envoi, délai, annulation, chronologie, troncature (R12) ; tests avec `wiremock` ; événements `request_event`.
-- [ ] **T13** `request/assertions.rs` : opérateurs, évaluation (R11), vérifications proposées (R10) ; tests, dont les cas limites (JSON invalide, tableau, `null`).
-- [ ] **T14** Commandes `request_send`, `request_cancel`, `request_propose_assertions`, `environment_*`, `environment_select` ; confirmation R8 ; tests.
+- [x] **T9** `environment/` : fichiers, chaîne, protection, `lastEnvironment` ; tests R7 et R8.
+- [x] **T10** `environment/secrets.rs` : trait `SecretStore`, implémentation `keyring`, faux pour les tests ; masquage R9.
+- [x] **T11** `request/resolve.rs` : variables et portée (R6), URL avec paramètres, authentification, corps ; tests.
+- [x] **T12** `http.rs` : envoi, délai, annulation, chronologie, troncature (R12) ; tests avec `wiremock` ; événements `request_event`.
+- [x] **T13** `request/assertions.rs` : opérateurs, évaluation (R11), vérifications proposées (R10) ; tests, dont les cas limites (JSON invalide, tableau, `null`).
+- [x] **T14** Commandes `request_send`, `request_cancel`, `request_propose_assertions`, `environment_*`, `environment_select` ; confirmation R8 ; tests.
 - [ ] **T15** Mesure de l'installeur après les nouvelles dépendances.
 
 **Lot D - Run (cœur Rust)**
 
-- [ ] **T16** `run.rs` : ordre, concurrence, annulation, agrégats, lenteur (R13, R16) ; tests avec `wiremock`.
-- [ ] **T17** `run_store.rs` et relance des échecs (R14, R15) ; tests sur dossier temporaire.
-- [ ] **T18** Commandes `run_*` et événements `run_event` ; ajout de `lastRun` à `ProjectView`.
+- [x] **T16** `run.rs` : ordre, concurrence, annulation, agrégats, lenteur (R13, R16) ; tests avec `wiremock`.
+- [x] **T17** `run_store.rs` et relance des échecs (R14, R15) ; tests sur dossier temporaire.
+- [ ] **T18** Commandes `run_*` et événements `run_event` ; ajout de `lastRun` à `ProjectView`. _(partiel : commandes `run_*` livrées, interrogation périodique au lieu d'événements, pas de `lastRun` dans `ProjectView`)_
 
 **Lot E - Frontend : socle**
 
-- [ ] **T19** `src/types/ipc.ts`, `src/lib/ipc.ts` (dont écoute des événements), tests `mockIPC` de chaque commande.
-- [ ] **T20** Stores `tree`, `editor`, `environments`, `runs` et tests ; faux cœur étendu.
+- [x] **T19** `src/types/ipc.ts`, `src/lib/ipc.ts` (dont écoute des événements), tests `mockIPC` de chaque commande.
+- [x] **T20** Stores `tree`, `editor`, `environments`, `runs` et tests ; faux cœur étendu.
 
 **Lot F - Frontend : écrans**
 
-- [ ] **T21** Arborescence : `ProjectTree`, `TreeRow`, `FolderView`, menu, création sur place, renommage, filtre, clavier (A1 à A5, A7, A8, A10).
-- [ ] **T22** Déplacement par glisser-déposer et « Déplacer vers… » (A6) ; duplication (A9).
-- [ ] **T23** Éditeur : barre d'adresse, paramètres, en-têtes, corps, authentification, enregistrement automatique (B1 à B5, B7).
-- [ ] **T24** Envoi et panneau de réponse : statut, corps, en-têtes, chronologie, annulation, erreurs (X1 à X3, X5).
-- [ ] **T25** Onglet Tests : vérifications proposées, ajout, résultat, échec détaillé, ignorer, retirer (V1 à V5).
-- [ ] **T26** Environnements : pastille de la barre latérale et d'« Envoyer », menu, page de gestion, secrets, confirmation, variable manquante (N1 à N6, B6).
-- [ ] **T27** Écran Run : résumé, échecs, résultat par dossier, relance, run vide, dernier run dans le référentiel (L1 à L7).
+- [x] **T21** Arborescence : `ProjectTree`, `TreeRow`, `FolderView`, menu, création sur place, renommage, filtre, clavier (A1 à A5, A7, A8, A10).
+- [ ] **T22** Déplacement par glisser-déposer et « Déplacer vers… » (A6) ; duplication (A9). _(non livré : pas de glisser-déposer ; « Déplacer vers » et duplication livrés)_
+- [x] **T23** Éditeur : barre d'adresse, paramètres, en-têtes, corps, authentification, enregistrement automatique (B1 à B5, B7).
+- [x] **T24** Envoi et panneau de réponse : statut, corps, en-têtes, chronologie, annulation, erreurs (X1 à X3, X5).
+- [ ] **T25** Onglet Tests : vérifications proposées, ajout, résultat, échec détaillé, ignorer, retirer (V1 à V5). _(partiel : ajout, résultat et proposition ; pas de « ignorer »)_
+- [x] **T26** Environnements : pastille de la barre latérale et d'« Envoyer », menu, page de gestion, secrets, confirmation, variable manquante (N1 à N6, B6).
+- [ ] **T27** Écran Run : résumé, échecs, résultat par dossier, relance, run vide, dernier run dans le référentiel (L1 à L7). _(partiel : résumé, échecs et relance ; pas de résultat par dossier ni de dernier run dans le référentiel)_
 - [ ] **T28** Copie `curl` et enregistrement du corps (X3, X4) - Could.
 
 **Lot G - Qualité**
@@ -508,3 +508,21 @@ Questions tranchées le 2026-11-08, sans validation préalable : à relire avant
 | Q10 | Onglets (plusieurs requêtes ouvertes) ?    | Hors de ce lot : une requête ouverte à la fois ; les onglets, zones et fenêtres forment le lot suivant.                                                                                      |
 | Q11 | Mot « workers » de la capture 1f ?         | Remplacé par « requêtes en même temps ».                                                                                                                                                     |
 | Q12 | Ligne de commande ?                        | Pas dans ce lot. Le cœur Rust du run (`run.rs`) ne dépend pas de Tauri : la commande `arnod` le réutilisera.                                                                                 |
+
+## Écarts constatés à l'implémentation
+
+- **Données locales** : `projects/<id>/local.json` (dernier environnement, dossiers repliés, valeurs locales
+  non secrètes) à la place d'un `arnod.json` en version 2 (T4 abandonné) : `arnod.json` reste inchangé.
+- **Événements** : `request_event` et `run_event` ne sont pas implémentés ; l'interface interroge `run_status`
+  toutes les 300 ms. Un envoi se suit par sa promesse, `request_cancel` l'interrompt.
+- **Établi** : `workbench.rs` (envoi, environnements, runs) remplace `run.rs` et `run_store.rs` ; le dernier
+  run est écrit dans `projects/<id>/last-run.json`, secrets masqués.
+- **Suppression** : corbeille du système sans annulation par jeton (le système la restaure) ; notification
+  d'information seulement.
+- **Enregistrement** : explicite (bouton « Enregistrer »), automatique au changement de requête et avant
+  un envoi ou un run ; pas d'enregistrement différé pendant la frappe.
+- **Réussite d'une requête** : avec au moins une vérification, seules les vérifications comptent (R11). La
+  vérification par défaut ne porte que sur la durée : un statut 500 passe tant que l'on n'a pas ajouté de
+  vérification de statut ; l'interface propose celles-ci après le premier envoi.
+- **À faire** : tests e2e (T29), mesure de l'installeur Windows (T15), glisser-déposer (T22), copie `curl` (T28),
+  captures du README (T30).

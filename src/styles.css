@@ -26,7 +26,9 @@
   --color-subtle: #8b857b; /* Indications et textes désactivés, 3:1 minimum */
   --color-link: #9a5a0c; /* Liens et actions textuelles (« + Ajouter un projet ») */
   --color-success: #2f7a4b;
+  --color-success-soft: #e7f4ec; /* Fond d'une vérification ou d'une ligne réussie */
   --color-danger: #b42318;
+  --color-danger-soft: #fdeceb; /* Fond d'une vérification ou d'une ligne en échec */
 
   /* Accent : bouton principal */
   --color-accent: #e8962e;
@@ -91,7 +93,9 @@
     --color-subtle: #8a8378;
     --color-link: #f0b46a;
     --color-success: #6cc28b;
+    --color-success-soft: #1f3327;
     --color-danger: #ff8a80;
+    --color-danger-soft: #3d2321;
 
     --color-accent: #eda24c;
     --color-accent-hover: #f3b46a;

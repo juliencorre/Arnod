@@ -180,7 +180,7 @@ export const ipc = {
   treeLoad: (project: string): Promise<TreeView> => call<TreeView>("tree_load", { project }),
 
   treeSetCollapsed: (project: string, collapsed: string[]): Promise<void> =>
-    call<void>("tree_set_collapsed", { project, collapsed }),
+    call<null>("tree_set_collapsed", { project, collapsed }).then(() => undefined),
 
   treeCreateFolder: (project: string, parent: string, name: string): Promise<string> =>
     call<string>("tree_create_folder", { project, parent, name }),
@@ -199,7 +199,7 @@ export const ipc = {
     call<string>("tree_duplicate", { project, path }),
 
   treeDelete: (project: string, path: string, permanent: boolean): Promise<void> =>
-    call<void>("tree_delete", { project, path, permanent }),
+    call<null>("tree_delete", { project, path, permanent }).then(() => undefined),
 
   // --- Requêtes ------------------------------------------------------------
 
@@ -207,7 +207,7 @@ export const ipc = {
     call<RequestDoc>("request_read", { project, path }),
 
   requestSave: (project: string, path: string, request: RequestDoc): Promise<void> =>
-    call<void>("request_save", { project, path, request }),
+    call<null>("request_save", { project, path, request }).then(() => undefined),
 
   /** Envoie la requête de l'éditeur ; `execId` permet de l'annuler. */
   requestSend: (
@@ -219,7 +219,8 @@ export const ipc = {
   ): Promise<SendOutcome> =>
     call<SendOutcome>("request_send", { project, execId, environment, request, confirmed }),
 
-  requestCancel: (execId: string): Promise<void> => call<void>("request_cancel", { execId }),
+  requestCancel: (execId: string): Promise<void> =>
+    call<null>("request_cancel", { execId }).then(() => undefined),
 
   requestProposeAssertions: (response: ProposeInput): Promise<Assertion[]> =>
     call<Assertion[]>("request_propose_assertions", { response }),
@@ -267,7 +268,8 @@ export const ipc = {
 
   runStatus: (run: string): Promise<RunView> => call<RunView>("run_status", { run }),
 
-  runCancel: (run: string): Promise<void> => call<void>("run_cancel", { run }),
+  runCancel: (run: string): Promise<void> =>
+    call<null>("run_cancel", { run }).then(() => undefined),
 
   runRetryFailures: (project: string, run: string, confirmed: boolean): Promise<RunView> =>
     call<RunView>("run_retry_failures", { project, run, confirmed }),
