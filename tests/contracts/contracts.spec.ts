@@ -3,6 +3,7 @@ import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { EVENTS } from "@/lib/ipc";
+import { AUTOSAVE_MS } from "@/stores/workbench";
 
 import type { FakeCore } from "../fakeCore";
 import { PETSTORE_OPERATIONS, PETSTORE_SOURCE } from "../fakeContracts";
@@ -176,7 +177,7 @@ describe("onglet du contrat (C5, C6, C10)", () => {
     await app?.get('[aria-label="Ouvrir la requête de GET /pets"]').trigger("click");
     await flushPromises();
     const chip = app?.get(".editor__contract");
-    expect(chip?.text()).toBe("Contrat : Petstore · GET /pets");
+    expect(chip?.text()).toBe("Petstore · GET /pets");
 
     // La conformité est déduite du lien : aucune vérification écrite pour elle (R8).
     await click(app as AppWrapper, ".editor__tab", "Vérifications");
@@ -202,11 +203,12 @@ describe("onglet du contrat (C5, C6, C10)", () => {
     await app?.get('[aria-label="Ouvrir la requête de GET /pets"]').trigger("click");
     await flushPromises();
 
-    await click(app as AppWrapper, ".editor__link button", "Délier");
+    await click(app as AppWrapper, ".editor__crumbs button", "Délier");
     expect(app?.find(".editor__contract").exists()).toBe(false);
-    expect(app?.get(".editor__state").text()).toContain("Modifiée");
+    expect(app?.get(".editor__saved").text()).toContain("Modifications en attente");
 
-    await click(app as AppWrapper, ".editor__line button", "Enregistrer");
+    await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_MS + 50));
+    await flushPromises();
     const saved = core.calls.filter((c) => c.cmd === "request_save").at(-1)?.args as {
       request: Record<string, unknown>;
     };

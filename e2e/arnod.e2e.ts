@@ -727,7 +727,10 @@ describe("Contrats de services", () => {
     );
     // Requête OpenCollection, liée par une étiquette ; la conformité n'est pas écrite (R8).
     expect(request).toContain("type: http");
-    expect(request).toContain("{{baseUrl}}/pets/1");
+    // Endpoint : paramètre de chemin dans l'adresse, réponses attendues du contrat (R8).
+    expect(request).toContain("{{baseUrl}}/pets/:petId");
+    expect(request).toContain("type: path");
+    expect(request).toContain("name: Un animal");
     expect(request).toContain("contract:contracts/animalerie.yaml#GET /pets/{petId}");
     expect(request).toContain("operator: eq");
     expect(request).not.toContain("matchesContract");
@@ -795,5 +798,60 @@ describe("Contrats de services", () => {
       { timeout: 15_000, timeoutMsg: "conformité non vérifiée à l'envoi" },
     );
     await screenshot(browser, "11-requete-liee");
+  });
+
+  it("configure l'endpoint : réglages et réponses attendues (EP7 à EP9)", async () => {
+    // Onglet de la requête liée, dans sa zone (d'autres zones peuvent en afficher d'autres).
+    const inTab = (step: "expected" | "fromLast" | "back" | "settings" | "ten" | "state") =>
+      browser.execute((action) => {
+        const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find((t) =>
+          t.querySelector(".editor__contract")?.textContent.includes("GET /pets/{petId}"),
+        );
+        if (!tab) throw new Error("onglet de la requête liée introuvable");
+        const buttons = Array.from(tab.querySelectorAll<HTMLButtonElement>("button"));
+        const find = (text: string) => buttons.find((b) => b.textContent.trim().startsWith(text));
+        if (action === "expected") find("Réponses attendues")?.click();
+        if (action === "fromLast") find("Depuis la dernière réponse reçue")?.click();
+        if (action === "back") find("← Réponses attendues")?.click();
+        if (action === "settings") find("Réglages")?.click();
+        if (action === "ten") {
+          tab
+            .querySelector<HTMLButtonElement>(
+              '[aria-labelledby="setting-timeoutMs"] button:nth-child(3)',
+            )
+            ?.click();
+        }
+        return {
+          rows: Array.from(tab.querySelectorAll(".expected__name")).map((n) => n.textContent),
+          saved: tab.querySelector(".editor__saved")?.textContent.trim() ?? "",
+          fromLast: find("Depuis la dernière réponse reçue")?.disabled ?? true,
+        };
+      }, step);
+    await browser.waitUntil(async () => (await inTab("expected")).rows.length === 1, {
+      timeout: 10_000,
+      timeoutMsg: "réponse attendue du contrat absente",
+    });
+    expect((await inTab("state")).rows).toEqual(["Un animal"]);
+    expect((await inTab("state")).fromLast).toBe(false);
+    await inTab("fromLast");
+    await browser.waitUntil(async () => (await inTab("back")).rows.length === 2, {
+      timeout: 10_000,
+      timeoutMsg: "réponse reçue non reprise",
+    });
+    await inTab("settings");
+    await inTab("ten");
+    await browser.waitUntil(async () => (await inTab("state")).saved === "✓ Enregistré", {
+      timeout: 10_000,
+      timeoutMsg: "endpoint non enregistré",
+    });
+    const file = readFileSync(
+      path.join(project(), "Animalerie", "animaux", "trouver-un-animal.yml"),
+      "utf8",
+    );
+    expect(file).toContain("timeout: 10000");
+    expect(file).toContain("examples:");
+    expect(file).toMatch(/name: "?Reçue le \d\d\/\d\d à \d\d:\d\d/);
+    expect(file).toContain("status: 200");
+    await screenshot(browser, "12-endpoint");
   });
 });

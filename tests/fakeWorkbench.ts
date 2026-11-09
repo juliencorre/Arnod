@@ -4,6 +4,7 @@
  */
 import type {
   Assertion,
+  Example,
   CommandError,
   EnvironmentDoc,
   EnvironmentView,
@@ -18,6 +19,8 @@ import type {
 export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): RequestDoc {
   return {
     name,
+    description: "",
+    tags: [],
     method: "GET",
     url: "{{baseUrl}}/",
     params: [],
@@ -32,8 +35,9 @@ export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): R
       location: "header",
       other: "",
     },
-    body: { kind: "none", content: "", form: [], other: "" },
-    timeoutMs: 30000,
+    body: { kind: "none", variants: [], selected: 0, other: "" },
+    settings: { timeoutMs: null, followRedirects: null, maxRedirects: null, encodeUrl: null },
+    docs: "",
     assertions: [
       {
         id: "duree",
@@ -44,7 +48,13 @@ export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): R
         enabled: true,
       },
     ],
+    examples: [],
     preserved: [],
+    inherited: {
+      auth: null,
+      headers: [],
+      settings: { timeoutMs: 30000, followRedirects: true, maxRedirects: 5, encodeUrl: true },
+    },
     ...overrides,
   };
 }
@@ -254,6 +264,23 @@ export function handleWorkbench(
       return structuredClone(wb.nextSend);
     case "request_cancel":
       return null;
+    case "request_example_from_response": {
+      const response = args.response as {
+        status: number;
+        statusText: string;
+        headers: [string, string][];
+        body: string;
+      };
+      return {
+        name: String(args.name),
+        description: "",
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers.map(([name, value]) => ({ name, value })),
+        bodyKind: response.body === "" ? "none" : "json",
+        body: response.body,
+      } satisfies Example;
+    }
     case "request_propose_assertions":
       return [
         {

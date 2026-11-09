@@ -83,8 +83,13 @@ pub async fn send(prepared: &Prepared, cancel: &Notify) -> Result<HttpResponse, 
 }
 
 async fn run(prepared: &Prepared) -> Result<HttpResponse, CommandError> {
+    // Redirections suivies au plus (R3) ; 0 : aucune.
+    let policy = match prepared.max_redirects {
+        0 => Policy::none(),
+        max => Policy::limited(max as usize),
+    };
     let client = reqwest::Client::builder()
-        .redirect(Policy::limited(10))
+        .redirect(policy)
         .build()
         .map_err(|e| {
             error(
@@ -94,9 +99,10 @@ async fn run(prepared: &Prepared) -> Result<HttpResponse, CommandError> {
         })?;
     let method = reqwest::Method::from_bytes(prepared.method.as_str().as_bytes())
         .map_err(|_| error(CommandErrorKind::InvalidRequest, "Méthode invalide."))?;
-    let mut builder = client
-        .request(method, &prepared.url)
-        .timeout(Duration::from_millis(prepared.timeout_ms));
+    let mut builder = client.request(method, &prepared.url);
+    if let Some(ms) = prepared.timeout_ms {
+        builder = builder.timeout(Duration::from_millis(ms));
+    }
     for (name, value) in &prepared.headers {
         builder = builder.header(name, value);
     }
@@ -165,7 +171,8 @@ mod tests {
             url,
             headers: vec![("x-test".into(), "oui".into())],
             body: None,
-            timeout_ms: 2000,
+            timeout_ms: Some(2000),
+            max_redirects: 5,
         }
     }
 
@@ -212,9 +219,40 @@ mod tests {
             .mount(&server)
             .await;
         let mut p = prepared(format!("{}/lent", server.uri()));
-        p.timeout_ms = 100;
+        p.timeout_ms = Some(100);
         let error = send(&p, &Notify::new()).await.unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::Timeout);
+    }
+
+    #[tokio::test]
+    async fn r3_redirections_suivies_ou_non() {
+        let server = MockServer::start().await;
+        Mock::given(path("/ancien"))
+            .respond_with(ResponseTemplate::new(302).insert_header("location", "/nouveau"))
+            .mount(&server)
+            .await;
+        Mock::given(path("/nouveau"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+        let mut p = prepared(format!("{}/ancien", server.uri()));
+        let followed = send(&p, &Notify::new()).await.unwrap();
+        assert_eq!(followed.status, 200);
+        p.max_redirects = 0;
+        let kept = send(&p, &Notify::new()).await.unwrap();
+        assert_eq!(kept.status, 302);
+    }
+
+    #[tokio::test]
+    async fn r5_sans_delai() {
+        let server = MockServer::start().await;
+        Mock::given(path("/lent"))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_millis(300)))
+            .mount(&server)
+            .await;
+        let mut p = prepared(format!("{}/lent", server.uri()));
+        p.timeout_ms = None;
+        assert_eq!(send(&p, &Notify::new()).await.unwrap().status, 200);
     }
 
     #[tokio::test]
@@ -222,7 +260,7 @@ mod tests {
         let mut request = prepared("http://127.0.0.1:1/".into());
         // Sous Windows, un refus de connexion n'est constaté qu'après plusieurs essais
         // (environ 2 s) : le délai du test doit les laisser aboutir.
-        request.timeout_ms = 15_000;
+        request.timeout_ms = Some(15_000);
         let error = send(&request, &Notify::new()).await.unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::Network);
         assert!(error.message.contains("127.0.0.1"));
@@ -242,7 +280,7 @@ mod tests {
             c.notify_one();
         });
         let mut p = prepared(format!("{}/lent", server.uri()));
-        p.timeout_ms = 10_000;
+        p.timeout_ms = Some(10_000);
         let error = send(&p, &cancel).await.unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::Cancelled);
     }

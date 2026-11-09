@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { reactive, ref } from "vue";
+import { reactive, ref, watch } from "vue";
 
 import { events, ipc, IpcError } from "@/lib/ipc";
 import { contentKey, useWindowsStore } from "@/stores/windows";
@@ -17,6 +17,12 @@ import type {
 /** Intervalle de lecture de l'avancement d'un run. */
 export const RUN_POLL_MS = 300;
 
+/** Attente après la dernière modification avant l'enregistrement automatique (EP1). */
+export const AUTOSAVE_MS = 600;
+
+/** État d'enregistrement d'une requête ouverte (EP1). */
+export type SaveState = "saved" | "pending" | "saving" | "error";
+
 /** Requête ouverte : brouillon, version enregistrée, dernière réponse. */
 export interface Editor {
   projectId: string;
@@ -25,6 +31,8 @@ export interface Editor {
   /** Brouillon tel qu'enregistré, en JSON, pour savoir s'il a changé. */
   saved: string;
   outcome: SendOutcome | null;
+  /** Heure de réception de la dernière réponse (EP9). */
+  receivedAt: Date | null;
   sending: boolean;
   sendError: string | null;
   /** Lecture impossible (fichier supprimé, illisible). */
@@ -32,6 +40,9 @@ export interface Editor {
   /** Modifiée dans une autre fenêtre alors qu'elle l'était aussi ici (F11). */
   changedElsewhere: boolean;
   execId: string | null;
+  saveState: SaveState;
+  /** Raison d'un enregistrement impossible (B7). */
+  saveError: string | null;
 }
 
 /** Action en attente de la confirmation d'un environnement protégé (R8). */
@@ -145,11 +156,14 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       draft: null,
       saved: "",
       outcome: null,
+      receivedAt: null,
       sending: false,
       sendError: null,
       loadError: null,
       changedElsewhere: false,
       execId: null,
+      saveState: "saved",
+      saveError: null,
     };
     editors[key] = editor;
     await Promise.all([loadProject(projectId).catch(() => undefined), reload(key)]);
@@ -176,14 +190,75 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return !!editor?.draft && JSON.stringify(editor.draft) !== editor.saved;
   }
 
-  /** Enregistre une requête modifiée. */
-  async function save(key: string): Promise<void> {
+  const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const saving = new Map<string, Promise<void>>();
+
+  function clearSaveTimer(key: string): void {
+    const timer = saveTimers.get(key);
+    if (timer !== undefined) clearTimeout(timer);
+    saveTimers.delete(key);
+  }
+
+  /** Enregistrement automatique, 600 ms après la dernière modification (EP1). */
+  function scheduleSave(key: string): void {
     const editor = editors[key];
-    if (!editor?.draft || !isDirty(key)) return;
-    await ipc.requestSave(editor.projectId, editor.path, editor.draft);
-    editor.saved = JSON.stringify(editor.draft);
-    editor.changedElsewhere = false;
-    if (trees.value[editor.projectId]) await refreshTree(editor.projectId);
+    if (!editor) return;
+    clearSaveTimer(key);
+    editor.saveState = "pending";
+    saveTimers.set(
+      key,
+      setTimeout(() => {
+        saveTimers.delete(key);
+        void save(key).catch(() => undefined);
+      }, AUTOSAVE_MS),
+    );
+  }
+
+  // Toute modification d'un brouillon déclenche son enregistrement automatique.
+  watch(
+    () => Object.keys(editors).map((key) => `${key}\u0000${JSON.stringify(editors[key]?.draft)}`),
+    () => {
+      for (const key of Object.keys(editors)) {
+        if (isDirty(key)) scheduleSave(key);
+      }
+    },
+  );
+
+  /**
+   * Enregistre une requête modifiée. Le contenu envoyé est figé avant l'écriture : une frappe
+   * pendant l'enregistrement en relance un autre. Un échec est signalé (B7) puis relancé.
+   */
+  async function save(key: string): Promise<void> {
+    const running = saving.get(key);
+    if (running) await running.catch(() => undefined);
+    const editor = editors[key];
+    if (!editor?.draft || !isDirty(key)) {
+      if (editor && editor.saveState !== "error") editor.saveState = "saved";
+      return;
+    }
+    clearSaveTimer(key);
+    const snapshot = JSON.stringify(editor.draft);
+    editor.saveState = "saving";
+    const write = (async () => {
+      try {
+        await ipc.requestSave(editor.projectId, editor.path, JSON.parse(snapshot) as RequestDoc);
+        editor.saved = snapshot;
+        editor.changedElsewhere = false;
+        editor.saveError = null;
+        editor.saveState = isDirty(key) ? "pending" : "saved";
+      } catch (caught) {
+        editor.saveState = "error";
+        editor.saveError = caught instanceof Error ? caught.message : String(caught);
+        throw caught;
+      }
+      if (trees.value[editor.projectId]) await refreshTree(editor.projectId);
+    })();
+    saving.set(key, write);
+    try {
+      await write;
+    } finally {
+      if (saving.get(key) === write) saving.delete(key);
+    }
   }
 
   /** Enregistre toutes les requêtes modifiées de la fenêtre (avant fermeture, Z6). */
@@ -195,7 +270,9 @@ export const useWorkbenchStore = defineStore("workbench", () => {
 
   /** Oublie une requête qui n'est plus ouverte dans aucun onglet de la fenêtre. */
   function release(key: string): void {
-    if (!isDirty(key)) Reflect.deleteProperty(editors, key);
+    if (isDirty(key)) return;
+    clearSaveTimer(key);
+    Reflect.deleteProperty(editors, key);
   }
 
   /** Envoie la requête (E1) ; un environnement protégé demande confirmation (R8). */
@@ -212,9 +289,11 @@ export const useWorkbenchStore = defineStore("workbench", () => {
         editor.projectId,
         editor.execId,
         environment,
+        editor.path,
         editor.draft,
         confirmed,
       );
+      editor.receivedAt = new Date();
     } catch (caught) {
       if (caught instanceof IpcError && caught.kind === "protectedEnvironment") {
         pending.value = { kind: "send", key };
@@ -258,6 +337,29 @@ export const useWorkbenchStore = defineStore("workbench", () => {
           ids.has(a.id) ? { ...a, id: `${a.id}-${crypto.randomUUID().slice(0, 8)}` } : a,
         ),
     ];
+  }
+
+  /**
+   * Ajoute la dernière réponse reçue aux réponses attendues (EP9, R7) ; renvoie son index.
+   * Le nom donne la date de réception.
+   */
+  async function addExampleFromResponse(key: string): Promise<number | null> {
+    const editor = editors[key];
+    const response = editor?.outcome?.response;
+    if (!editor?.draft || !response) return null;
+    const at = editor.receivedAt ?? new Date();
+    const name = `Reçue le ${at.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })} à ${at.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+    const example = await ipc.requestExampleFromResponse(
+      {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        body: response.body,
+      },
+      name,
+    );
+    editor.draft.examples.push(example);
+    return editor.draft.examples.length - 1;
   }
 
   // --- Arborescence ----------------------------------------------------------
@@ -535,6 +637,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     send,
     cancelSend,
     proposeAssertions,
+    addExampleFromResponse,
     openRequest,
     createRequest,
     createFolder,

@@ -255,14 +255,17 @@ fn r3_le_contenu_non_gere_est_conserve() {
     fs::write(&path, BRUNO).unwrap();
     let mut request = file::read(&path).unwrap();
     assert_eq!(request.method, Method::Post);
-    assert_eq!(request.timeout_ms, 5000);
+    assert_eq!(request.settings.timeout_ms, Some(5000));
     assert!(
         request.preserved.contains(&"scripts".to_owned()),
         "{:?}",
         request.preserved
     );
-    assert!(request.preserved.contains(&"documentation".to_owned()));
-    assert!(request.preserved.contains(&"exemples".to_owned()));
+    // Documentation et réponses attendues sont gérées (R9 de la configuration d'un endpoint).
+    assert_eq!(request.preserved, ["scripts"]);
+    assert_eq!(request.docs, "# Commande\nCrée une commande.");
+    assert_eq!(request.examples[0].status, Some(201));
+    assert_eq!(request.params[1].description, "Trace côté serveur");
     assert_eq!(request.params[0].kind, ParamKind::Path);
     assert_eq!(request.params[1].kind, ParamKind::Query);
     assert!(!request.assertions[2].enabled);
@@ -566,7 +569,7 @@ fn r6_un_projet_du_format_precedent_est_converti() {
     assert_valid(Part::HttpRequest, &path);
     let request = file::read(&path).unwrap();
     assert_eq!(request.name, "Lire");
-    assert_eq!(request.timeout_ms, 5000);
+    assert_eq!(request.settings.timeout_ms, Some(5000));
     assert!(!request.params[0].enabled);
     assert_eq!(request.assertions.len(), 2);
     assert_eq!(request.assertions[1].target, "headers.content-type");
@@ -691,6 +694,13 @@ fn unions_typescript_concordantes() {
         union_members("ParamKind"),
         names([ParamKind::Query, ParamKind::Path])
     );
+    {
+        use crate::request::model::ExampleBodyKind as K;
+        assert_eq!(
+            union_members("ExampleBodyKind"),
+            names([K::None, K::Json, K::Text, K::Xml, K::Html, K::Binary])
+        );
+    }
     assert_eq!(
         union_members("AuthKind"),
         names([
@@ -713,4 +723,245 @@ fn unions_typescript_concordantes() {
             BodyKind::Other,
         ])
     );
+}
+
+// Configuration d'un endpoint (docs/plan-configuration-endpoint.md).
+
+#[test]
+fn ep_description_etiquettes_docs_et_descriptions_ecrites() {
+    use crate::request::model::{ContractLink, Pair, Request};
+    let dir = project();
+    let path = dir.path().join("lire.yml");
+    let mut request = Request::new("Lire");
+    request.description = "Lit une commande.".to_owned();
+    request.tags = vec!["commandes".to_owned(), "critique".to_owned()];
+    request.docs = "## Lire\n\nLe client doit exister.".to_owned();
+    request.url = "{{baseUrl}}/orders/{id}".to_owned();
+    request.params = vec![Pair {
+        description: "Envoie l'e-mail".to_owned(),
+        ..Pair::new("notify", "true")
+    }];
+    request.headers = vec![Pair {
+        description: "Évite les doublons".to_owned(),
+        ..Pair::new("Idempotency-Key", "{{cle}}")
+    }];
+    request.contract = Some(ContractLink {
+        file: "contracts/boutique.yaml".to_owned(),
+        operation: "GET /orders/{id}".to_owned(),
+    });
+    file::write(&path, &request).unwrap();
+    assert_valid(Part::HttpRequest, &path);
+    let value = read(&path);
+    assert_eq!(
+        value.pointer("/info/description"),
+        Some(&json!("Lit une commande."))
+    );
+    assert_eq!(
+        value.pointer("/info/tags"),
+        Some(&json!([
+            "commandes",
+            "critique",
+            "contract:contracts/boutique.yaml#GET /orders/{id}"
+        ]))
+    );
+    assert_eq!(
+        value.pointer("/docs"),
+        Some(&json!("## Lire\n\nLe client doit exister."))
+    );
+    assert_eq!(
+        value.pointer("/http/headers/0/description"),
+        Some(&json!("Évite les doublons"))
+    );
+    // R1 : le paramètre de chemin « id » est ajouté, avant ceux de requête.
+    assert_eq!(
+        value.pointer("/http/params"),
+        Some(&json!([
+            { "name": "id", "value": "", "type": "path" },
+            { "name": "notify", "value": "true", "description": "Envoie l'e-mail", "type": "query" }
+        ]))
+    );
+    let back = file::read(&path).unwrap();
+    assert_eq!(back.tags, ["commandes", "critique"]);
+    assert_eq!(back.description, "Lit une commande.");
+    assert!(back.contract.is_some());
+}
+
+#[test]
+fn ep_r2_variantes_de_corps() {
+    use crate::request::model::{Body, BodyKind, BodyVariant, Request};
+    let dir = project();
+    let path = dir.path().join("creer.yml");
+    let mut request = Request::new("Créer");
+    request.method = Method::Post;
+    request.body = Body {
+        kind: BodyKind::Json,
+        variants: vec![
+            BodyVariant {
+                title: "Complète".to_owned(),
+                content: "{\"coupon\": \"BIENVENUE\"}".to_owned(),
+                ..BodyVariant::default()
+            },
+            BodyVariant {
+                title: "Sans coupon".to_owned(),
+                content: "{}".to_owned(),
+                ..BodyVariant::default()
+            },
+        ],
+        selected: 1,
+        ..Body::default()
+    };
+    file::write(&path, &request).unwrap();
+    assert_valid(Part::HttpRequest, &path);
+    let value = read(&path);
+    assert_eq!(
+        value.pointer("/http/body"),
+        Some(&json!([
+            { "title": "Complète", "body": { "type": "json", "data": "{\"coupon\": \"BIENVENUE\"}" } },
+            { "title": "Sans coupon", "selected": true, "body": { "type": "json", "data": "{}" } }
+        ]))
+    );
+    let back = file::read(&path).unwrap();
+    assert_eq!(back.body.selected, 1);
+    assert_eq!(back.body.content(), "{}");
+
+    // Seule la variante sélectionnée part.
+    let mut variables = Variables::default();
+    variables
+        .values
+        .insert("baseUrl".into(), "https://api.test".into());
+    let prepared = prepare(&back, &variables).unwrap();
+    assert_eq!(prepared.body.as_deref(), Some("{}"));
+
+    // Une seule variante sans nom : corps simple.
+    let mut simple = back.clone();
+    simple.body = Body::raw(BodyKind::Text, "bonjour");
+    file::write(&path, &simple).unwrap();
+    assert_eq!(
+        read(&path).pointer("/http/body"),
+        Some(&json!({ "type": "text", "data": "bonjour" }))
+    );
+}
+
+#[test]
+fn ep_r2_variantes_de_types_differents_conservees() {
+    let dir = project();
+    let path = dir.path().join("mixte.yml");
+    let text = "info:\n  name: Mixte\n  type: http\nhttp:\n  method: POST\n  url: https://h/x\n  body:\n    - title: A\n      body:\n        type: json\n        data: \"{}\"\n    - title: B\n      body:\n        type: text\n        data: b\n";
+    fs::write(&path, text).unwrap();
+    let mut request = file::read(&path).unwrap();
+    assert_eq!(request.body.kind, crate::request::model::BodyKind::Other);
+    request.url = "https://h/y".to_owned();
+    file::write(&path, &request).unwrap();
+    assert_eq!(
+        read(&path).pointer("/http/body/1/body/type"),
+        Some(&json!("text"))
+    );
+}
+
+#[test]
+fn ep_r3_reglages_propres_ou_herites() {
+    use crate::request::model::{Request, Settings};
+    let dir = project();
+    let path = dir.path().join("r.yml");
+    let mut request = Request::new("R");
+    request.settings = Settings {
+        timeout_ms: Some(5000),
+        follow_redirects: Some(false),
+        max_redirects: Some(3),
+        encode_url: None,
+    };
+    file::write(&path, &request).unwrap();
+    assert_valid(Part::HttpRequest, &path);
+    assert_eq!(
+        read(&path).get("settings"),
+        Some(&json!({ "timeout": 5000, "followRedirects": false, "maxRedirects": 3 }))
+    );
+    // « inherit » se lit comme hérité.
+    fs::write(
+        &path,
+        "info:\n  name: R\n  type: http\nhttp:\n  method: GET\n  url: https://h\nsettings:\n  timeout: inherit\n  encodeUrl: false\n",
+    )
+    .unwrap();
+    let back = file::read(&path).unwrap();
+    assert_eq!(back.settings.timeout_ms, None);
+    assert_eq!(back.settings.encode_url, Some(false));
+
+    // R5 : adresse non encodée, les paramètres partent tels quels.
+    let mut sent = back.clone();
+    sent.params = vec![crate::request::model::Pair::new("q", "a b")];
+    let prepared = prepare(&sent, &Variables::default()).unwrap();
+    assert_eq!(prepared.url, "https://h?q=a b");
+}
+
+#[test]
+fn ep_r6_reponses_attendues() {
+    use crate::request::model::{Example, ExampleBodyKind, ResponseHeader};
+    let dir = project();
+    let path = dir.path().join("commande.yml");
+    // Exemple existant avec une partie « request », conservée.
+    fs::write(
+        &path,
+        "info:\n  name: Commande\n  type: http\nhttp:\n  method: POST\n  url: https://h/orders\nexamples:\n  - name: Créée\n    request:\n      url: https://h/orders\n      method: POST\n    response:\n      status: 201\n",
+    )
+    .unwrap();
+    let mut request = file::read(&path).unwrap();
+    request.examples[0].description = "La commande est enregistrée.".to_owned();
+    request.examples[0].body_kind = ExampleBodyKind::Json;
+    request.examples[0].body = "{\n  \"id\": 1\n}".to_owned();
+    request.examples.push(Example {
+        name: "Erreur de validation".to_owned(),
+        status: Some(400),
+        status_text: "Bad Request".to_owned(),
+        headers: vec![ResponseHeader {
+            name: "Content-Type".to_owned(),
+            value: "application/json".to_owned(),
+        }],
+        ..Example::default()
+    });
+    file::write(&path, &request).unwrap();
+    assert_valid(Part::HttpRequest, &path);
+    let value = read(&path);
+    assert_eq!(
+        value.pointer("/examples/0/request/method"),
+        Some(&json!("POST"))
+    );
+    assert_eq!(
+        value.pointer("/examples/0/response"),
+        Some(&json!({ "status": 201, "body": { "type": "json", "data": "{\n  \"id\": 1\n}" } }))
+    );
+    assert_eq!(
+        value.pointer("/examples/1"),
+        Some(&json!({
+            "name": "Erreur de validation",
+            "response": {
+                "status": 400,
+                "statusText": "Bad Request",
+                "headers": [{ "name": "Content-Type", "value": "application/json" }]
+            }
+        }))
+    );
+    let back = file::read(&path).unwrap();
+    assert_eq!(back.examples, request.examples);
+
+    // Toutes supprimées : plus d'« examples ».
+    let mut none = back;
+    none.examples.clear();
+    file::write(&path, &none).unwrap();
+    assert!(read(&path).get("examples").is_none());
+}
+
+#[test]
+fn ep_r8_endpoint_d_un_contrat_valide_avec_ses_exemples() {
+    let dir = project();
+    let path = contract_file::add(dir.path(), CONTRACT).unwrap();
+    let report =
+        contract_file::generate(dir.path(), &path, &["GET /items/{id}".to_owned()], None).unwrap();
+    let full = dir.path().join(&report.created[0]);
+    assert_valid(Part::HttpRequest, &full);
+    let request = file::read(&full).unwrap();
+    assert_eq!(request.url, "{{baseUrl}}/items/:id");
+    assert_eq!(request.params[0].kind, ParamKind::Path);
+    assert_eq!(request.params[0].value, "7");
+    assert_eq!(request.examples[0].status, Some(200));
+    assert_eq!(request.examples[0].name, "ok");
 }

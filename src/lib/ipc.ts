@@ -30,6 +30,8 @@ import type {
   EnvironmentsView,
   HelloResponse,
   Assertion,
+  Example,
+  ExampleInput,
   ProposeInput,
   RequestDoc,
   RunView,
@@ -220,21 +222,36 @@ export const ipc = {
   requestSave: (project: string, path: string, request: RequestDoc): Promise<void> =>
     call<null>("request_save", { project, path, request }).then(() => undefined),
 
-  /** Envoie la requête de l'éditeur ; `execId` permet de l'annuler. */
+  /**
+   * Envoie la requête de l'éditeur ; `execId` permet de l'annuler, `path` la situe pour
+   * l'héritage de ses dossiers (R3, R4).
+   */
   requestSend: (
     project: string,
     execId: string,
     environment: string,
+    path: string | null,
     request: RequestDoc,
     confirmed: boolean,
   ): Promise<SendOutcome> =>
-    call<SendOutcome>("request_send", { project, execId, environment, request, confirmed }),
+    call<SendOutcome>("request_send", {
+      project,
+      execId,
+      environment,
+      path,
+      request,
+      confirmed,
+    }),
 
   requestCancel: (execId: string): Promise<void> =>
     call<null>("request_cancel", { execId }).then(() => undefined),
 
   requestProposeAssertions: (response: ProposeInput): Promise<Assertion[]> =>
     call<Assertion[]>("request_propose_assertions", { response }),
+
+  /** Réponse attendue reprise d'une réponse reçue (R7). */
+  requestExampleFromResponse: (response: ExampleInput, name: string): Promise<Example> =>
+    call<Example>("request_example_from_response", { response, name }),
 
   // --- Environnements ------------------------------------------------------
 

@@ -19,7 +19,9 @@ Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 > requêtes de ses opérations et vérifie la conformité des réponses
 > ([`docs/plan-contrats-services.md`](docs/plan-contrats-services.md)). Un projet est une
 > collection [OpenCollection](https://spec.opencollection.com) 1.0.0, format ouvert lu aussi par
-> Bruno ([`docs/plan-opencollection.md`](docs/plan-opencollection.md)).
+> Bruno ([`docs/plan-opencollection.md`](docs/plan-opencollection.md)). Chaque endpoint se
+> configure sur place, réponses attendues comprises
+> ([`docs/plan-configuration-endpoint.md`](docs/plan-configuration-endpoint.md)).
 
 | Thème clair                                      | Thème sombre                                           |
 | ------------------------------------------------ | ------------------------------------------------------ |
@@ -88,6 +90,21 @@ Cas C1 à C12 de [`docs/plan-contrats-services.md`](docs/plan-contrats-services.
 | C9       | Vue « Source » : texte modifiable, enregistré seulement s'il reste un contrat lisible (Ctrl+S), ou remplacé par un fichier.                                                          |
 | C10      | « Exécuter » lance le run des requêtes du contrat.                                                                                                                                   |
 | C11, C12 | Contrat mis à la corbeille ; requêtes dont l'opération a disparu signalées « hors contrat ».                                                                                         |
+
+### Configuration d'un endpoint
+
+Cas EP1 à EP10 de [`docs/plan-configuration-endpoint.md`](docs/plan-configuration-endpoint.md)
+(maquette « Contrats de service », options a et a2).
+
+| ID       | Comportement                                                                                                                                                     |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EP1      | Méthode, adresse, nom, description et étiquettes modifiés sur place ; enregistrement automatique (« ✓ Enregistré »).                                             |
+| EP2      | Paramètres de requête décrits ; paramètres de chemin tirés de l'adresse (`/orders/:id`).                                                                         |
+| EP3      | Corps JSON, XML, texte ou formulaire, en variantes nommées : la sélectionnée part à l'envoi.                                                                     |
+| EP4, EP5 | En-têtes décrits et en-têtes hérités ; authentification héritée du dossier ou de la collection, aucune, Basic, Bearer ou clé d'API, avec une note.               |
+| EP6, EP7 | Documentation en Markdown ; réglages (délai, redirections, encodage) hérités ou propres.                                                                         |
+| EP8, EP9 | Réponses attendues : ajouter, dupliquer, supprimer avec « Annuler », modifier (code, texte, nom, description, en-têtes, corps) ou reprendre la dernière réponse. |
+| EP10     | Un endpoint créé depuis un contrat reçoit ses paramètres de chemin et une réponse attendue par code documenté.                                                   |
 
 ### Format des fichiers : OpenCollection
 

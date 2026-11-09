@@ -1,19 +1,21 @@
 <script setup lang="ts">
-/** Éditeur de requête (B2 à B8) : méthode, adresse, paramètres, en-têtes, authentification, corps, vérifications. */
-import { computed, ref, useId } from "vue";
+/**
+ * Éditeur d'un endpoint (docs/plan-configuration-endpoint.md, EP1 à EP7) : tout se modifie sur
+ * place et s'enregistre seul. En-tête (contrat lié, méthode, adresse, nom, description,
+ * étiquettes), puis la requête par onglets, comme dans Bruno.
+ */
+import { computed, nextTick, ref, useId, useTemplateRef } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import AssertionsEditor from "@/components/workbench/AssertionsEditor.vue";
+import AuthEditor from "@/components/workbench/AuthEditor.vue";
+import BodyEditor from "@/components/workbench/BodyEditor.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
+import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
+import { pathParamNames } from "@/lib/url";
 import { useContractsStore } from "@/stores/contracts";
 import { useWorkbenchStore } from "@/stores/workbench";
-import type {
-  AssertionOperator,
-  AuthKind,
-  BodyKind,
-  HttpMethod,
-  RequestDoc,
-  Scalar,
-} from "@/types/ipc";
+import type { HttpMethod, Pair, RequestDoc } from "@/types/ipc";
 
 const props = defineProps<{ editorKey: string }>();
 
@@ -27,75 +29,28 @@ const folder = computed(() => {
 });
 
 const METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
-const AUTH_KINDS: { id: AuthKind; label: string }[] = [
-  { id: "none", label: "Aucune" },
-  { id: "inherit", label: "Héritée" },
-  { id: "basic", label: "Basic" },
-  { id: "bearer", label: "Bearer" },
-  { id: "apiKey", label: "Clé d'API" },
-];
-const BODY_KINDS: { id: BodyKind; label: string }[] = [
-  { id: "none", label: "Aucun" },
-  { id: "json", label: "JSON" },
-  { id: "text", label: "Texte" },
-  { id: "xml", label: "XML" },
-  { id: "form", label: "Formulaire" },
-];
-/** Opérateurs d'OpenCollection et de Bruno (R4), dans l'ordre du menu. */
-const OPERATORS: { id: AssertionOperator; label: string }[] = [
-  { id: "equals", label: "est égal à" },
-  { id: "notEquals", label: "est différent de" },
-  { id: "contains", label: "contient" },
-  { id: "notContains", label: "ne contient pas" },
-  { id: "startsWith", label: "commence par" },
-  { id: "endsWith", label: "se termine par" },
-  { id: "lessThan", label: "est inférieur à" },
-  { id: "lessOrEqual", label: "est inférieur ou égal à" },
-  { id: "greaterThan", label: "est supérieur à" },
-  { id: "greaterOrEqual", label: "est supérieur ou égal à" },
-  { id: "between", label: "est entre (min, max)" },
-  { id: "in", label: "est parmi (a, b, …)" },
-  { id: "notIn", label: "n'est pas parmi (a, b, …)" },
-  { id: "length", label: "a pour longueur" },
-  { id: "exists", label: "existe" },
-  { id: "isUndefined", label: "n'existe pas" },
-  { id: "isNull", label: "est null" },
-  { id: "isEmpty", label: "est vide" },
-  { id: "isNotEmpty", label: "n'est pas vide" },
-  { id: "isTruthy", label: "est vrai (truthy)" },
-  { id: "isFalsy", label: "est faux (falsy)" },
-  { id: "isNumber", label: "est un nombre" },
-  { id: "isText", label: "est un texte" },
-  { id: "isBoolean", label: "est un booléen" },
-  { id: "isArray", label: "est une liste" },
-  { id: "isJson", label: "est un objet JSON" },
-  { id: "matches", label: "correspond à l'expression (non évaluée)" },
-  { id: "notMatches", label: "ne correspond pas à l'expression (non évaluée)" },
-];
-const NO_VALUE: AssertionOperator[] = [
-  "exists",
-  "isUndefined",
-  "isNull",
-  "isEmpty",
-  "isNotEmpty",
-  "isTruthy",
-  "isFalsy",
-  "isNumber",
-  "isText",
-  "isBoolean",
-  "isArray",
-  "isJson",
-];
+const URL_PLACEHOLDER = "{{baseUrl}}/chemin";
+const ids = {
+  method: useId(),
+  url: useId(),
+  name: useId(),
+  desc: useId(),
+  tags: useId(),
+  docs: useId(),
+};
 
-/** Identifiant du résultat de conformité au contrat lié (`CONTRACT_CHECK`, R8). */
-const CONTRACT_CHECK = "contrat";
+// --- Contrat lié (C7) ------------------------------------------------------
 
-/** Contrat lié (C7) : son nom, s'il est connu, sinon son fichier. */
-const contractLabel = computed(() => {
+const contract = computed(() => {
   const link = request.value?.contract;
   if (!link || !editor.value) return null;
   const summary = contracts.lists[editor.value.projectId]?.find((c) => c.path === link.file);
-  return `${summary?.name ?? link.file} · ${link.operation}`;
+  return {
+    name: summary?.name ?? link.file,
+    version: summary?.version ?? "",
+    operation: link.operation,
+    file: link.file,
+  };
 });
 
 function openContract(): void {
@@ -103,98 +58,110 @@ function openContract(): void {
   if (link && editor.value) void contracts.show(editor.value.projectId, link.file);
 }
 
-/** Délier (R8) : la requête n'est plus vérifiée contre le contrat une fois enregistrée. */
+/** Délier (R8) : la requête n'est plus vérifiée contre le contrat. */
 function unlinkContract(): void {
   if (request.value) delete request.value.contract;
 }
 
-function setOperator(index: number, operator: AssertionOperator): void {
-  const assertion = request.value?.assertions[index];
-  if (!assertion) return;
-  assertion.operator = operator;
-  assertion.origin = "manual";
-  if (NO_VALUE.includes(operator)) assertion.value = null;
-}
+// --- Enregistrement automatique (EP1) -------------------------------------------
 
-/** Libellé d'une authentification ou d'un corps conservé sans être géré. */
-const otherAuth = computed(() =>
-  request.value?.auth.type === "other" ? request.value.auth.other : null,
-);
-const otherBody = computed(() =>
-  request.value?.body.kind === "other" ? request.value.body.other : null,
-);
-
-type Tab = "params" | "headers" | "auth" | "body" | "assertions";
-const tab = ref<Tab>("params");
-const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => [
-  { id: "params", label: "Paramètres", count: request.value?.params.length },
-  { id: "headers", label: "En-têtes", count: request.value?.headers.length },
-  { id: "auth", label: "Authentification" },
-  { id: "body", label: "Corps" },
-  { id: "assertions", label: "Vérifications", count: request.value?.assertions.length },
-]);
-
-const TOKEN_EXAMPLE = "{{token}}";
-const URL_PLACEHOLDER = "{{baseUrl}}/chemin";
-const urlId = useId();
-const methodId = useId();
-
-function scalarText(value: Scalar | null | undefined): string {
-  return value === null || value === undefined ? "" : String(value);
-}
-
-/** Convertit la saisie : nombre ou booléen si le texte en a la forme, sinon texte. */
-function parseScalar(text: string): Scalar {
-  if (text === "true") return true;
-  if (text === "false") return false;
-  const number = Number(text);
-  return text.trim() !== "" && Number.isFinite(number) ? number : text;
-}
-
-function setAssertionValue(index: number, text: string): void {
-  const assertion = request.value?.assertions[index];
-  if (assertion) {
-    assertion.value = parseScalar(text);
-    assertion.origin = "manual";
+const saveLabel = computed(() => {
+  switch (editor.value?.saveState) {
+    case "pending":
+      return "Modifications en attente…";
+    case "saving":
+      return "Enregistrement…";
+    case "error":
+      return "Non enregistré";
+    default:
+      return "✓ Enregistré";
   }
+});
+
+function retrySave(): void {
+  void workbench.save(props.editorKey).catch(() => undefined);
 }
 
-function addAssertion(): void {
-  request.value?.assertions.push({
-    id: `manuelle-${crypto.randomUUID().slice(0, 8)}`,
-    target: "status",
-    operator: "equals",
-    value: 200,
-    origin: "manual",
-    enabled: true,
-  });
+// --- Étiquettes (EP1) -------------------------------------------------------------
+
+const addingTag = ref(false);
+const newTag = ref("");
+const tagInput = useTemplateRef<HTMLInputElement>("tagInput");
+
+async function startTag(): Promise<void> {
+  addingTag.value = true;
+  newTag.value = "";
+  await nextTick();
+  tagInput.value?.focus();
 }
 
-function removeAssertion(index: number): void {
-  request.value?.assertions.splice(index, 1);
+function commitTag(): void {
+  const tag = newTag.value.trim();
+  const tags = request.value?.tags;
+  if (tags && tag !== "" && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) {
+    tags.push(tag);
+  }
+  addingTag.value = false;
+  newTag.value = "";
 }
 
-function resultFor(id: string): boolean | null {
-  const found = editor.value?.outcome?.assertions.find((a) => a.id === id);
-  return found ? found.passed : null;
+function removeTag(index: number): void {
+  request.value?.tags.splice(index, 1);
 }
+
+// --- Paramètres de chemin (EP2, R1) ---------------------------------------------
+
+const pathNames = computed(() => pathParamNames(request.value?.url ?? ""));
+
+function pathParam(name: string): Pair | undefined {
+  return request.value?.params.find((p) => p.kind === "path" && p.name === name);
+}
+
+function setPathParam(name: string, field: "value" | "description", text: string): void {
+  const params = request.value?.params;
+  if (!params) return;
+  let pair = pathParam(name);
+  if (!pair) {
+    pair = { name, value: "", enabled: true, kind: "path", description: "" };
+    params.unshift(pair);
+  }
+  pair[field] = text;
+}
+
+// --- Onglets ---------------------------------------------------------------------
+
+type Tab = "params" | "body" | "headers" | "auth" | "docs" | "settings" | "assertions";
+const tab = ref<Tab>("params");
+const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
+  const r = request.value;
+  const activeQuery = r?.params.filter((p) => p.kind === "query" && p.enabled).length ?? 0;
+  return [
+    { id: "params", label: "Paramètres", count: activeQuery + pathNames.value.length },
+    { id: "body", label: "Corps" },
+    { id: "headers", label: "En-têtes", count: r?.headers.filter((h) => h.enabled).length },
+    { id: "auth", label: "Auth" },
+    { id: "docs", label: "Docs" },
+    { id: "settings", label: "Réglages" },
+    { id: "assertions", label: "Vérifications", count: r?.assertions.length },
+  ];
+});
 </script>
 
 <template>
   <section v-if="request" class="editor" aria-label="Requête">
-    <div class="editor__title">
-      <h2 class="editor__name">{{ request.name }}</h2>
-      <span v-if="folder" class="editor__folder">{{ folder }}</span>
-      <span v-if="workbench.isDirty(editorKey)" class="editor__state">● Modifiée</span>
-      <span v-if="contractLabel" class="editor__link">
+    <div class="editor__top">
+      <p v-if="contract" class="editor__crumbs">
+        <span>Contrats de service</span>
+        <span aria-hidden="true">/</span>
         <button
           type="button"
           class="editor__contract"
-          :title="`Ouvrir le contrat (${request.contract?.file ?? ''})`"
+          :title="`Ouvrir le contrat (${contract.file})`"
           @click="openContract"
         >
-          Contrat : {{ contractLabel }}
+          {{ contract.name }} · {{ contract.operation }}
         </button>
+        <span v-if="contract.version" class="editor__version">Contrat v{{ contract.version }}</span>
         <button
           type="button"
           class="link"
@@ -203,23 +170,34 @@ function resultFor(id: string): boolean | null {
         >
           Délier
         </button>
-      </span>
+      </p>
+      <p v-else-if="folder" class="editor__crumbs editor__folder">{{ folder }}</p>
+      <p v-else class="editor__crumbs" />
+      <p
+        class="editor__saved"
+        :class="`editor__saved--${editor?.saveState ?? 'saved'}`"
+        role="status"
+        :title="editor?.saveError ?? undefined"
+      >
+        {{ saveLabel }}
+        <button v-if="editor?.saveState === 'error'" type="button" class="link" @click="retrySave">
+          Réessayer
+        </button>
+      </p>
     </div>
-    <p v-if="request.preserved.length > 0" class="editor__preserved" role="note">
-      Conservé dans le fichier sans être modifié par Arnod : {{ request.preserved.join(", ") }}.
-    </p>
     <p v-if="editor?.changedElsewhere" class="editor__elsewhere" role="status">
       Modifiée dans une autre fenêtre.
       <button type="button" class="link" @click="workbench.reload(editorKey)">Recharger</button>
     </p>
+
     <form class="editor__line" @submit.prevent="workbench.send(editorKey)">
-      <label :for="methodId" class="sr-only">Méthode</label>
-      <select :id="methodId" v-model="request.method" class="editor__method">
+      <label :for="ids.method" class="sr-only">Méthode</label>
+      <select :id="ids.method" v-model="request.method" class="editor__method">
         <option v-for="m in METHODS" :key="m" :value="m">{{ m }}</option>
       </select>
-      <label :for="urlId" class="sr-only">Adresse</label>
+      <label :for="ids.url" class="sr-only">Adresse</label>
       <input
-        :id="urlId"
+        :id="ids.url"
         v-model="request.url"
         class="editor__url"
         type="text"
@@ -233,10 +211,48 @@ function resultFor(id: string): boolean | null {
       <BaseButton v-else variant="primary" type="submit" :disabled="request.url.trim() === ''">
         Envoyer
       </BaseButton>
-      <BaseButton :disabled="!workbench.isDirty(editorKey)" @click="workbench.save(editorKey)">
-        Enregistrer
-      </BaseButton>
     </form>
+
+    <div class="editor__meta">
+      <div class="meta">
+        <label :for="ids.name">Nom</label>
+        <input :id="ids.name" v-model="request.name" class="meta__input" type="text" />
+      </div>
+      <div class="meta">
+        <label :for="ids.desc">Description</label>
+        <input :id="ids.desc" v-model="request.description" class="meta__input" type="text" />
+      </div>
+      <div class="meta">
+        <span :id="ids.tags">Étiquettes</span>
+        <ul class="tags" :aria-labelledby="ids.tags">
+          <li v-for="(tag, index) in request.tags" :key="tag" class="tag">
+            {{ tag }}
+            <button
+              type="button"
+              class="tag__remove"
+              :aria-label="`Retirer l'étiquette ${tag}`"
+              @click="removeTag(index)"
+            >
+              ×
+            </button>
+          </li>
+          <li>
+            <input
+              v-if="addingTag"
+              ref="tagInput"
+              v-model="newTag"
+              class="tag__input"
+              type="text"
+              aria-label="Nouvelle étiquette"
+              @keydown.enter.prevent="commitTag"
+              @keydown.escape.prevent="addingTag = false"
+              @blur="commitTag"
+            />
+            <button v-else type="button" class="tag__add" @click="startTag">+ Étiquette</button>
+          </li>
+        </ul>
+      </div>
+    </div>
 
     <div role="tablist" aria-label="Sections de la requête" class="editor__tabs">
       <button
@@ -256,165 +272,85 @@ function resultFor(id: string): boolean | null {
     </div>
 
     <div :id="`panel-${tab}`" role="tabpanel" :aria-labelledby="`tab-${tab}`" class="editor__panel">
-      <PairsEditor v-if="tab === 'params'" v-model="request.params" label="Paramètres" with-kind />
-      <PairsEditor v-else-if="tab === 'headers'" v-model="request.headers" label="En-têtes" />
-
-      <div v-else-if="tab === 'auth'" class="stack">
-        <label class="field">
-          <span>Type</span>
-          <select v-model="request.auth.type">
-            <option v-for="k in AUTH_KINDS" :key="k.id" :value="k.id">{{ k.label }}</option>
-            <option v-if="otherAuth !== null" value="other">Autre ({{ otherAuth }})</option>
-          </select>
-        </label>
-        <p v-if="request.auth.type === 'inherit'" class="hint">
-          Héritée du dossier ou de la collection : Arnod ne l'applique pas encore, la requête part
-          sans authentification.
-        </p>
-        <p v-else-if="request.auth.type === 'other'" class="hint">
-          Authentification « {{ otherAuth }} » conservée dans le fichier ; Arnod ne l'envoie pas.
-        </p>
-        <template v-if="request.auth.type === 'basic'">
-          <label class="field">
-            <span>Utilisateur</span>
-            <input v-model="request.auth.username" type="text" autocomplete="off" />
-          </label>
-          <label class="field">
-            <span>Mot de passe</span>
-            <input v-model="request.auth.password" type="text" autocomplete="off" />
-          </label>
-        </template>
-        <label v-else-if="request.auth.type === 'bearer'" class="field">
-          <span>Jeton</span>
-          <input v-model="request.auth.token" type="text" autocomplete="off" />
-        </label>
-        <template v-else-if="request.auth.type === 'apiKey'">
-          <label class="field">
-            <span>Nom</span>
-            <input v-model="request.auth.name" type="text" autocomplete="off" />
-          </label>
-          <label class="field">
-            <span>Valeur</span>
-            <input v-model="request.auth.value" type="text" autocomplete="off" />
-          </label>
-          <label class="field">
-            <span>Emplacement</span>
-            <select v-model="request.auth.location">
-              <option value="header">En-tête</option>
-              <option value="query">Paramètre d'adresse</option>
-            </select>
-          </label>
-        </template>
-        <p class="hint">
-          Utilisez des variables, par exemple <code>{{ TOKEN_EXAMPLE }}</code
-          >, plutôt que des valeurs en clair : les secrets restent sur votre poste.
-        </p>
-      </div>
-
-      <div v-else-if="tab === 'body'" class="stack">
-        <label class="field">
-          <span>Type</span>
-          <select v-model="request.body.kind">
-            <option v-for="k in BODY_KINDS" :key="k.id" :value="k.id">{{ k.label }}</option>
-            <option v-if="otherBody !== null" value="other">Autre ({{ otherBody }})</option>
-          </select>
-        </label>
-        <p v-if="request.body.kind === 'other'" class="hint">
-          Corps « {{ otherBody }} » conservé dans le fichier ; Arnod ne l'envoie pas.
-        </p>
-        <textarea
-          v-else-if="['json', 'text', 'xml'].includes(request.body.kind)"
-          v-model="request.body.content"
-          class="editor__body"
-          spellcheck="false"
-          aria-label="Contenu du corps"
-        />
+      <div v-if="tab === 'params'" class="stack">
+        <h3 class="section">Paramètres de requête</h3>
         <PairsEditor
-          v-else-if="request.body.kind === 'form'"
-          v-model="request.body.form"
-          label="Champs du formulaire"
+          v-model="request.params"
+          kind="query"
+          label="Paramètres de requête"
+          add-label="+ Paramètre"
+          value-title="Valeur d'exemple"
         />
-      </div>
-
-      <div v-else class="stack">
-        <p v-if="request.assertions.length === 0 && !request.contract" class="hint">
-          Sans vérification, la requête réussit si le statut est inférieur à 400.
+        <h3 class="section">Paramètres de chemin</h3>
+        <p v-if="pathNames.length === 0" class="hint">
+          Ils viennent du chemin : écrivez <code>/orders/:id</code> et « id » apparaît ici.
         </p>
-        <p
-          v-if="request.contract"
-          class="assertion assertion--contract"
-          :class="{
-            'assertion--ok': resultFor(CONTRACT_CHECK) === true,
-            'assertion--ko': resultFor(CONTRACT_CHECK) === false,
-          }"
-        >
-          La réponse est conforme au contrat (statut prévu, corps conforme au schéma) : vérifié à
-          chaque envoi tant que la requête est liée.
-        </p>
-        <ul class="assertions">
-          <li
-            v-for="(assertion, index) in request.assertions"
-            :key="assertion.id"
-            class="assertion"
-            :class="{
-              'assertion--ok': assertion.enabled && resultFor(assertion.id) === true,
-              'assertion--ko': assertion.enabled && resultFor(assertion.id) === false,
-              'assertion--off': !assertion.enabled,
-            }"
-          >
-            <input
-              v-model="assertion.enabled"
-              type="checkbox"
-              class="assertion__check"
-              :aria-label="`Activer la vérification ${index + 1}`"
-            />
-            <input
-              v-model="assertion.target"
-              type="text"
-              spellcheck="false"
-              :aria-label="`Cible de la vérification ${index + 1}`"
-            />
-            <select
-              :value="assertion.operator"
-              :aria-label="`Opérateur de la vérification ${index + 1}`"
-              @change="
-                setOperator(index, ($event.target as HTMLSelectElement).value as AssertionOperator)
-              "
-            >
-              <option v-for="o in OPERATORS" :key="o.id" :value="o.id">{{ o.label }}</option>
-            </select>
-            <input
-              v-if="!NO_VALUE.includes(assertion.operator)"
-              :value="scalarText(assertion.value)"
-              type="text"
-              :aria-label="`Valeur de la vérification ${index + 1}`"
-              @input="setAssertionValue(index, ($event.target as HTMLInputElement).value)"
-            />
-            <span v-else />
-            <span class="assertion__origin">{{
-              assertion.origin === "proposed"
-                ? "proposée"
-                : assertion.origin === "default"
-                  ? "par défaut"
-                  : ""
-            }}</span>
-            <button
-              type="button"
-              class="assertion__remove"
-              :aria-label="`Supprimer la vérification ${index + 1}`"
-              @click="removeAssertion(index)"
-            >
-              ×
-            </button>
-          </li>
-        </ul>
-        <div class="editor__row">
-          <button type="button" class="link" @click="addAssertion">
-            + Ajouter une vérification
-          </button>
+        <div v-for="name in pathNames" :key="name" class="path-param">
+          <span class="path-param__name"><span aria-hidden="true">{ }</span> {{ name }}</span>
+          <input
+            class="path-param__input"
+            type="text"
+            spellcheck="false"
+            :value="pathParam(name)?.value ?? ''"
+            :aria-label="`Valeur de ${name}`"
+            placeholder="Valeur d'exemple"
+            @input="setPathParam(name, 'value', ($event.target as HTMLInputElement).value)"
+          />
+          <input
+            class="path-param__input path-param__description"
+            type="text"
+            :value="pathParam(name)?.description ?? ''"
+            :aria-label="`Description de ${name}`"
+            placeholder="Description"
+            @input="setPathParam(name, 'description', ($event.target as HTMLInputElement).value)"
+          />
         </div>
       </div>
+
+      <BodyEditor v-else-if="tab === 'body'" v-model="request.body" />
+
+      <div v-else-if="tab === 'headers'" class="stack">
+        <PairsEditor v-model="request.headers" label="En-têtes" add-label="+ En-tête" />
+        <template v-if="request.inherited.headers.length > 0">
+          <h3 class="section">Hérités</h3>
+          <ul class="inherited">
+            <li v-for="h in request.inherited.headers" :key="h.name">
+              <code>{{ h.name }}: {{ h.value }}</code>
+              <span class="inherited__source">{{ h.source }}</span>
+            </li>
+          </ul>
+        </template>
+      </div>
+
+      <AuthEditor
+        v-else-if="tab === 'auth'"
+        v-model="request.auth"
+        :inherited="request.inherited"
+      />
+
+      <div v-else-if="tab === 'docs'" class="stack">
+        <label class="section" :for="ids.docs">Documentation, en Markdown</label>
+        <textarea :id="ids.docs" v-model="request.docs" class="editor__docs" />
+        <p class="hint">Enregistrée avec l'endpoint, dans son fichier OpenCollection.</p>
+      </div>
+
+      <SettingsEditor
+        v-else-if="tab === 'settings'"
+        v-model="request.settings"
+        :inherited="request.inherited.settings"
+      />
+
+      <AssertionsEditor
+        v-else
+        v-model="request.assertions"
+        :linked="request.contract !== undefined"
+        :results="editor?.outcome?.assertions ?? null"
+      />
     </div>
+
+    <p v-if="request.preserved.length > 0" class="editor__preserved" role="note">
+      Conservé dans le fichier sans être modifié par Arnod : {{ request.preserved.join(", ") }}.
+    </p>
   </section>
 </template>
 
@@ -426,56 +362,58 @@ function resultFor(id: string): boolean | null {
   min-width: 0;
 }
 
-.editor__title {
+.editor__top {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.625rem;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
-.editor__name {
+.editor__crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
   margin: 0;
-  font-size: 1.0625rem;
-  font-weight: 650;
-}
-
-.editor__folder {
-  font: 0.8125rem var(--font-mono);
+  font-size: 0.875rem;
   color: var(--color-muted);
 }
 
+.editor__folder {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
 .editor__contract {
-  padding: 0.0625rem 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
+  padding: 0;
+  border: 0;
   font: inherit;
-  font-size: 0.75rem;
   color: var(--color-link);
   background: none;
   cursor: pointer;
   overflow-wrap: anywhere;
 }
 
-.editor__contract:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
+.editor__version {
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font: 600 0.75rem var(--font-mono);
+  color: var(--color-text);
+  background: var(--color-chip);
 }
 
-.editor__link {
-  display: inline-flex;
-  align-items: baseline;
+.editor__saved {
+  display: flex;
   gap: 0.375rem;
-}
-
-.editor__preserved {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--color-muted);
 }
 
-.editor__state {
-  font-size: 0.75rem;
-  color: var(--color-link);
+.editor__saved--error {
+  color: var(--color-danger);
 }
 
 .editor__elsewhere {
@@ -486,7 +424,7 @@ function resultFor(id: string): boolean | null {
   background: var(--color-accent-soft);
 }
 
-/* Zone étroite (jusqu'à 280 px, Z4) : les boutons passent sous l'adresse. */
+/* Zone étroite (jusqu'à 280 px, Z4) : le bouton passe sous l'adresse. */
 .editor__line {
   display: flex;
   flex-wrap: wrap;
@@ -495,11 +433,10 @@ function resultFor(id: string): boolean | null {
 
 .editor__method,
 .editor__url,
-.field input,
-.field select,
-.assertion input[type="text"],
-.assertion select,
-.editor__body {
+.meta__input,
+.editor__docs,
+.path-param__input,
+.tag__input {
   padding: 0.5rem 0.625rem;
   border: 1px solid var(--color-border-strong);
   border-radius: 8px;
@@ -516,24 +453,75 @@ function resultFor(id: string): boolean | null {
   flex: 1 1 12rem;
   min-width: 0;
   font-family: var(--font-mono);
+  font-size: 0.9375rem;
+}
+
+.editor__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.meta__input {
+  min-width: 0;
   font-size: 0.875rem;
 }
 
-:is(
-  .editor__method,
-  .editor__url,
-  .field input,
-  .field select,
-  .assertion input,
-  .assertion select,
-  .editor__body,
-  .editor__tab,
-  .editor__link .link,
-  .link,
-  .assertion__remove
-):focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  background: var(--color-chip);
+}
+
+.tag__remove,
+.tag__add {
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tag__remove {
+  padding: 0 0.125rem;
+  color: var(--color-muted);
+}
+
+.tag__add {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.tag__input {
+  width: 9rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
 }
 
 .editor__tabs {
@@ -546,7 +534,7 @@ function resultFor(id: string): boolean | null {
 
 .editor__tab {
   flex: none;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.625rem;
   white-space: nowrap;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -577,18 +565,10 @@ function resultFor(id: string): boolean | null {
   gap: 0.5rem;
 }
 
-.field {
-  display: grid;
-  grid-template-columns: 9rem 1fr;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-}
-
-.editor__body {
-  min-height: 9rem;
-  font: 0.8125rem var(--font-mono);
-  resize: vertical;
+.section {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 
 .hint {
@@ -597,74 +577,83 @@ function resultFor(id: string): boolean | null {
   color: var(--color-muted);
 }
 
-.assertions {
+.path-param {
+  display: grid;
+  grid-template-columns: minmax(6rem, auto) minmax(0, 1fr);
+  gap: 0.25rem 0.5rem;
+  align-items: center;
+}
+
+.path-param__name {
+  font: 600 0.8125rem var(--font-mono);
+}
+
+.path-param__input {
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.path-param__description {
+  grid-column: 2;
+  font-family: inherit;
+  font-size: 0.75rem;
+}
+
+.inherited {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.25rem;
   margin: 0;
   padding: 0;
   list-style: none;
+  font-size: 0.8125rem;
 }
 
-.assertion {
-  display: grid;
-  grid-template-columns: auto 1.4fr 1.2fr 1fr auto auto;
-  gap: 0.375rem;
-  align-items: center;
-  padding: 0.25rem;
-  border-radius: 8px;
-}
-
-.assertion--ok {
-  background: var(--color-success-soft);
-}
-
-.assertion--ko {
-  background: var(--color-danger-soft);
-}
-
-.assertion--off input[type="text"],
-.assertion--off select {
+.inherited__source {
+  margin-left: 0.5rem;
   color: var(--color-muted);
 }
 
-.assertion--contract {
-  display: block;
+.editor__docs {
+  min-height: 12rem;
+  font: 0.8125rem var(--font-mono);
+  resize: vertical;
+}
+
+.editor__preserved {
   margin: 0;
-  padding: 0.5rem 0.625rem;
-  font-size: 0.8125rem;
-  border: 1px dashed var(--color-border-strong);
-}
-
-.assertion input[type="text"],
-.assertion select {
-  min-width: 0;
-  padding: 0.3125rem 0.5rem;
-  font-size: 0.8125rem;
-}
-
-.assertion__origin {
   font-size: 0.75rem;
   color: var(--color-muted);
 }
 
-.assertion__remove,
 .link {
+  padding: 0;
   border: 0;
   background: none;
   font: inherit;
-  cursor: pointer;
-}
-
-.assertion__remove {
-  font-size: 1.125rem;
-  color: var(--color-muted);
-}
-
-.link {
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--color-link);
+  cursor: pointer;
+}
+
+:is(
+  .editor__method,
+  .editor__url,
+  .meta__input,
+  .editor__docs,
+  .path-param__input,
+  .tag__input,
+  .tag__remove,
+  .tag__add,
+  .editor__tab,
+  .editor__contract,
+  .link
+):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .sr-only {

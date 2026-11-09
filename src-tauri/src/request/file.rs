@@ -114,11 +114,7 @@ mod tests {
             token: "{{token}}".to_owned(),
             ..Auth::default()
         };
-        request.body = Body {
-            kind: BodyKind::Json,
-            content: "{\n  \"qty\": 2\n}".to_owned(),
-            ..Body::default()
-        };
+        request.body = Body::raw(BodyKind::Json, "{\n  \"qty\": 2\n}");
         request.assertions.push(Assertion {
             id: "a1".to_owned(),
             target: "status".to_owned(),

@@ -13,8 +13,9 @@ workspaces en onglets selon `docs/plan-workspaces-onglets.md` ; voir la section 
 workspaces ». Livré ensuite : fenêtres et zones selon `docs/plan-fenetres-zones.md` ; voir la
 section « Fenêtres et zones ». Puis contrats de services selon `docs/plan-contrats-services.md`
 (section « Contrats de services ») et format OpenCollection strict selon
-`docs/plan-opencollection.md` (section « Format OpenCollection »). Un nouveau lot commence par un
-plan rédigé à partir de `docs/modele-plan.md`.
+`docs/plan-opencollection.md` (section « Format OpenCollection »), puis configuration d'un
+endpoint selon `docs/plan-configuration-endpoint.md` (section « Configuration d'un endpoint »). Un
+nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
 ## Architecture
 
@@ -61,6 +62,7 @@ src/                    Frontend Vue
   styles.css            Thème clair/sombre (variables CSS), police système
   lib/ipc.ts            Wrapper typé autour d'invoke et des événements (seul point d'accès IPC)
   lib/format.ts         Formatage d'affichage
+  lib/url.ts            Paramètres de chemin d'une adresse, pour l'affichage
   stores/               catalog (instantané), navigation (onglet, vue, titre), toasts (notifications),
                         windows (fenêtres, zones, onglets de contenu), workbench (par projet :
                         arborescence, environnements, run ; par onglet : brouillon, réponse),
@@ -84,7 +86,8 @@ src-tauri/              Cœur Rust
   src/error.rs          CommandError, erreur commune des commandes
   src/catalog/          Règles des projets et workspaces (pur : ni Tauri, ni disque)
   src/storage.rs        Lecture / écriture atomique d'arnod.json
-  src/request/          Requête : modèle YAML, fichier, résolution des variables, vérifications
+  src/request/          Requête : modèle, fichier, résolution des variables, vérifications,
+                        héritage des dossiers (inherit.rs), réponse attendue (example.rs)
   src/tree/             Arborescence d'un projet sur disque (dossiers, requêtes, corbeille)
   src/environment.rs    Environnements d'un projet (fichiers, chaîne, protection)
   src/local.rs          Données locales d'un projet (hors dépôt : local.json)
@@ -260,8 +263,28 @@ conservé dans `docs/opencollection/` et embarqué dans le cœur.
   requête (lien au contrat). Identifiants et origines des vérifications ne sont pas écrits.
 - `src-tauri/src/opencollection/` fait la correspondance avec le modèle de l'interface
   (`request/model.rs`, qui n'est plus écrit tel quel). Enregistrer fusionne les champs gérés dans
-  le fichier existant : scripts, exemples, docs, descriptions, autres authentifications et corps
-  sont conservés (signalés par `preserved`).
+  le fichier existant : scripts, variables et actions (signalés par `preserved`), la partie
+  `request` des exemples, les autres authentifications et corps sont conservés.
 - Un projet au format précédent (`arnod.yml`) est converti une fois à l'ouverture
   (`opencollection::migrate`). Une version de spécification de majeure supérieure à 1 ou une
   collection regroupée (`bundled`) sont refusées sans écriture.
+
+## Configuration d'un endpoint
+
+Référence : `docs/plan-configuration-endpoint.md` (cas EP1 à EP10, règles R1 à R9), maquettes
+`docs/maquettes/5a-endpoint.png` et `5b-endpoint-reponse-attendue.png`.
+
+- Un endpoint est une requête du projet. Tout se modifie sur place et s'enregistre seul : le store
+  `workbench` enregistre 600 ms après la dernière modification (`AUTOSAVE_MS`), l'éditeur affiche
+  « ✓ Enregistré », « Non enregistré · Réessayer » sur un échec. Plus de bouton « Enregistrer ».
+- Éditeur : `RequestEditor.vue` (en-tête, nom, description, étiquettes, paramètres, en-têtes, docs)
+  délègue à `BodyEditor`, `AuthEditor`, `SettingsEditor` et `AssertionsEditor` (`defineModel`).
+  Réponses attendues : `ExpectedResponses.vue`, onglet du panneau de résultat (`RequestTab.vue`).
+- Tout s'écrit dans le fichier OpenCollection : `info.description`, `info.tags` (l'étiquette
+  `contract:` n'est jamais montrée), descriptions des lignes, variantes de corps, `settings`
+  (absent = hérité), `docs`, `examples` (la partie `request` d'un exemple est conservée).
+- Héritage (`request/inherit.rs`) : `folder.yml` du dossier puis des parents, puis
+  `opencollection.yml` (`request.auth`, `request.headers`, `request.settings.http`), puis les
+  défauts. Calculé à la lecture (`RequestDoc.inherited`) et à l'envoi (`request_send` reçoit `path`).
+- Paramètres de chemin : segments `:nom` ou `{nom}` de l'adresse ; le cœur les aligne sur
+  l'adresse à l'enregistrement (`normalize_path_params`), `lib/url.ts` les liste pour l'affichage.
