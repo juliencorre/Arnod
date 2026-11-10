@@ -51,6 +51,29 @@
   --color-ws-yellow: #d4ad2a;
   --color-ws-teal: #2f9c95;
 
+  /* Familles des natures d'étape (catalogue des étapes) : fond, bord, texte */
+  --color-family-calls-bg: #ebf7ff;
+  --color-family-calls-border: #a7c8ea;
+  --color-family-calls-text: #194f81;
+  --color-family-data-bg: #e7faf9;
+  --color-family-data-border: #96d1d0;
+  --color-family-data-text: #005d5e;
+  --color-family-messages-bg: #f7f2ff;
+  --color-family-messages-border: #cabce6;
+  --color-family-messages-text: #563e7b;
+  --color-family-jobs-bg: #fef3e7;
+  --color-family-jobs-border: #debe9a;
+  --color-family-jobs-text: #6f4100;
+  --color-family-interface-bg: #fff0f9;
+  --color-family-interface-border: #e0b6d0;
+  --color-family-interface-text: #70355e;
+  --color-family-code-bg: #fff1ed;
+  --color-family-code-border: #e9b6ad;
+  --color-family-code-text: #7a342b;
+  --color-family-files-bg: #f6f7e7;
+  --color-family-files-border: #c6c89b;
+  --color-family-files-text: #515100;
+
   /* Effets (hors palette : transparences) */
   --shadow-popover: 0 8px 24px rgb(29 27 24 / 14%), 0 1px 3px rgb(29 27 24 / 10%);
   --shadow-dialog: 0 24px 64px rgb(29 27 24 / 22%);
@@ -114,6 +137,28 @@
     --color-ws-red: #e8766c;
     --color-ws-yellow: #e2c04a;
     --color-ws-teal: #4bbab2;
+
+    --color-family-calls-bg: #1e2f41;
+    --color-family-calls-border: #3e6084;
+    --color-family-calls-text: #a9d6ff;
+    --color-family-data-bg: #113434;
+    --color-family-data-border: #216a6a;
+    --color-family-data-text: #90e2e1;
+    --color-family-messages-bg: #31293f;
+    --color-family-messages-border: #64547f;
+    --color-family-messages-text: #d9c6fe;
+    --color-family-jobs-bg: #3b2a17;
+    --color-family-jobs-border: #77562f;
+    --color-family-jobs-text: #f3c898;
+    --color-family-interface-bg: #3b2634;
+    --color-family-interface-border: #784e6a;
+    --color-family-interface-text: #f6bde2;
+    --color-family-code-bg: #402622;
+    --color-family-code-border: #814e46;
+    --color-family-code-text: #ffbeb2;
+    --color-family-files-bg: #2f3017;
+    --color-family-files-border: #606130;
+    --color-family-files-text: #d4d699;
 
     --shadow-popover: 0 8px 24px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
     --shadow-dialog: 0 24px 64px rgb(0 0 0 / 55%);

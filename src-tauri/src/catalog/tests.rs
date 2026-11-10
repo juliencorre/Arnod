@@ -752,6 +752,7 @@ fn instantane_serialise_en_camel_case() {
             project_ids: vec![project],
         }],
         last_workspace_id: None,
+        inbox_project_id: None,
     })
     .unwrap();
 
@@ -771,7 +772,85 @@ fn instantane_serialise_en_camel_case() {
             "workspaces": [
                 { "id": id(2), "name": "Boutique", "color": "orange", "projectIds": [id(3)] }
             ],
-            "lastWorkspaceId": null
+            "lastWorkspaceId": null,
+            "inboxProjectId": null
         })
     );
+}
+
+// « Non classés » (docs/plan-accueil-non-classes.md, R4, R5)
+
+fn with_inbox() -> (Catalog, Uuid, Uuid, Uuid) {
+    let mut catalog = Catalog::first_launch();
+    let boutique = Uuid::from_u128(10);
+    let inbox = Uuid::from_u128(11);
+    catalog
+        .register_project(
+            boutique,
+            "boutique-tests",
+            PathBuf::from("/p/boutique"),
+            None,
+        )
+        .unwrap();
+    let workspace = catalog.create_workspace("E-commerce").unwrap();
+    catalog
+        .register_project(
+            inbox,
+            "Non classés",
+            PathBuf::from("/p/inbox"),
+            Some(workspace),
+        )
+        .unwrap();
+    catalog.set_inbox(inbox).unwrap();
+    (catalog, boutique, inbox, workspace)
+}
+
+#[test]
+fn r4_non_classes_retenu_et_relu() {
+    let (catalog, _, inbox, _) = with_inbox();
+    assert_eq!(catalog.inbox_project_id(), Some(inbox));
+    let file = catalog.to_file();
+    assert_eq!(file.inbox_project_id, Some(inbox));
+    let json = serde_json::to_value(&file).unwrap();
+    assert_eq!(json["inboxProjectId"], inbox.to_string());
+    let reread = Catalog::from_file(file).unwrap();
+    assert_eq!(reread.inbox_project_id(), Some(inbox));
+}
+
+#[test]
+fn r4_champ_absent_ou_projet_inconnu_ignore() {
+    let (catalog, _, _, _) = with_inbox();
+    let mut file = catalog.to_file();
+    file.inbox_project_id = Some(Uuid::from_u128(99));
+    assert_eq!(Catalog::from_file(file).unwrap().inbox_project_id(), None);
+    let json = serde_json::to_value(Catalog::first_launch().to_file()).unwrap();
+    assert!(json.get("inboxProjectId").is_none(), "{json}");
+}
+
+#[test]
+fn r5_non_classes_hors_des_workspaces() {
+    let (mut catalog, _, inbox, workspace) = with_inbox();
+    assert!(catalog.workspace(workspace).unwrap().project_ids.is_empty());
+    let error = catalog.add_projects(workspace, &[inbox]).unwrap_err();
+    assert_eq!(error.kind, CommandErrorKind::InvalidRequest);
+    assert!(catalog.workspace(workspace).unwrap().project_ids.is_empty());
+}
+
+#[test]
+fn r5_non_classes_en_tete_de_tous_les_projets() {
+    let (catalog, boutique, inbox, _) = with_inbox();
+    let snapshot = catalog.snapshot(|_| true);
+    let ids: Vec<Uuid> = snapshot.projects.iter().map(|p| p.id).collect();
+    assert_eq!(ids, vec![inbox, boutique]);
+    assert_eq!(snapshot.inbox_project_id, Some(inbox));
+}
+
+#[test]
+fn r5_non_classes_oublie_puis_restaure() {
+    let (mut catalog, _, inbox, _) = with_inbox();
+    let undo = catalog.forget_project(inbox).unwrap();
+    assert_eq!(catalog.inbox_project_id(), None);
+    assert_eq!(catalog.snapshot(|_| true).inbox_project_id, None);
+    catalog.undo(undo).unwrap();
+    assert_eq!(catalog.inbox_project_id(), Some(inbox));
 }

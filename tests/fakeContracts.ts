@@ -20,6 +20,8 @@ export type FakeOperation = Pick<OperationView, "key" | "method" | "path" | "sum
 export interface FakeContract {
   name: string;
   version: string;
+  /** Contrat déduit des essais de « Non classés ». */
+  deduced?: boolean;
   source: string;
   operations: FakeOperation[];
 }
@@ -104,6 +106,7 @@ function view(fc: FakeContracts, wb: FakeWorkbench, path: string): ContractView 
       name: wb.requests.get(requestPath)?.name ?? requestPath,
     }));
   return {
+    deduced: contract.deduced ?? false,
     path,
     name: contract.name,
     version: contract.version,
@@ -121,6 +124,7 @@ function view(fc: FakeContracts, wb: FakeWorkbench, path: string): ContractView 
 function summaries(fc: FakeContracts): ContractSummary[] {
   return [...fc.files]
     .map(([path, contract]) => ({
+      deduced: contract.deduced ?? false,
       path,
       name: contract.name,
       version: contract.version,

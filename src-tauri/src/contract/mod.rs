@@ -6,6 +6,7 @@
 //! disque) ; `file` range les contrats dans le dossier `contracts/` du projet.
 
 pub mod conformance;
+pub mod deduce;
 pub mod file;
 pub mod generate;
 pub mod parse;

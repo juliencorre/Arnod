@@ -469,3 +469,87 @@ fn f11_chaque_modification_enregistree_previent_l_ecouteur() {
     // L'écouteur voit le nouvel instantané, pas la modification refusée.
     assert_eq!(*seen.lock().unwrap(), [1]);
 }
+
+// « Non classés » (docs/plan-accueil-non-classes.md, R4, N5)
+
+#[test]
+fn r4_non_classes_cree_au_premier_essai() {
+    let fixture = Fixture::new();
+    let state = fixture.load();
+
+    let (ctx, snapshot) = state.ensure_inbox().unwrap();
+
+    let folder = fixture.default_location().join(INBOX_NAME);
+    assert_eq!(ctx.root, canonical(&folder));
+    assert!(folder.join(MANIFEST_FILE_NAME).is_file());
+    assert!(folder.join("environments").is_dir());
+    let snapshot = snapshot.expect("instantané d'un catalogue modifié");
+    assert_eq!(snapshot.inbox_project_id, Some(ctx.id));
+    assert_eq!(snapshot.projects[0].name, INBOX_NAME);
+
+    // Second appel : le même projet, sans modification.
+    let (again, unchanged) = state.ensure_inbox().unwrap();
+    assert_eq!(again.id, ctx.id);
+    assert!(unchanged.is_none());
+    // Relu au redémarrage.
+    let reloaded = fixture.load();
+    assert_eq!(reloaded.snapshot().unwrap().inbox_project_id, Some(ctx.id));
+}
+
+#[test]
+fn r4_dossier_projet_existant_reinscrit() {
+    let fixture = Fixture::new();
+    let first = fixture.load().ensure_inbox().unwrap().0;
+    // Arnod réinstallé : l'état est perdu, le dossier reste.
+    fs::remove_file(state_file(&fixture.data_dir())).unwrap();
+
+    let state = fixture.load();
+    let (ctx, _) = state.ensure_inbox().unwrap();
+
+    assert_eq!(ctx.id, first.id);
+    assert_eq!(state.snapshot().unwrap().projects.len(), 1);
+}
+
+#[test]
+fn r4_dossier_non_projet_refuse() {
+    let fixture = Fixture::new();
+    let folder = fixture.default_location().join(INBOX_NAME);
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("notes.txt"), "à moi").unwrap();
+    let state = fixture.load();
+
+    assert_eq!(kind(state.ensure_inbox()), CommandErrorKind::FolderNotEmpty);
+    assert!(state.snapshot().unwrap().projects.is_empty());
+}
+
+#[test]
+fn n5_dossier_efface_recree() {
+    let fixture = Fixture::new();
+    let state = fixture.load();
+    let (ctx, _) = state.ensure_inbox().unwrap();
+    fs::remove_dir_all(&ctx.root).unwrap();
+
+    let (again, snapshot) = state.ensure_inbox().unwrap();
+
+    assert_eq!(again.id, ctx.id);
+    assert!(again.root.join(MANIFEST_FILE_NAME).is_file());
+    assert_eq!(read_manifest(&again.root).unwrap().id, ctx.id);
+    let snapshot = snapshot.expect("le dossier revenu est signalé");
+    assert_eq!(snapshot.projects[0].status, ProjectStatus::Ok);
+}
+
+#[test]
+fn n5_non_classes_oublie_reinscrit() {
+    let fixture = Fixture::new();
+    let state = fixture.load();
+    let (ctx, _) = state.ensure_inbox().unwrap();
+    state
+        .mutate_undoable(|catalog| catalog.forget_project(ctx.id))
+        .unwrap();
+    assert!(state.snapshot().unwrap().inbox_project_id.is_none());
+
+    let (again, _) = state.ensure_inbox().unwrap();
+
+    assert_eq!(again.id, ctx.id);
+    assert_eq!(state.snapshot().unwrap().inbox_project_id, Some(ctx.id));
+}

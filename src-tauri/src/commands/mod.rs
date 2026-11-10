@@ -14,7 +14,9 @@ pub mod hello;
 pub mod projects;
 pub mod requests;
 pub mod runs;
+pub mod steps;
 pub mod tree;
+pub mod trial;
 pub mod window;
 pub mod workspaces;
 

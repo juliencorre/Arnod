@@ -1,0 +1,38 @@
+{
+  "format": 1,
+  "id": "rest",
+  "version": "1.0.0",
+  "name": "REST",
+  "title": "Une requête HTTP",
+  "description": "Appelle une API par HTTP : méthode, adresse, corps. Les vérifications portent sur le statut, les en-têtes, le corps et la durée.",
+  "family": "calls",
+  "publisher": "Arnod",
+  "engine": { "kind": "builtin", "id": "http", "abi": 1 },
+  "action": "Envoyer",
+  "subject": { "key": "url", "label": "Adresse", "placeholder": "https://…" },
+  "detect": [{ "kind": "url", "schemes": ["http", "https"], "methodField": "method" }],
+  "form": [
+    {
+      "key": "method",
+      "label": "Méthode",
+      "kind": "choice",
+      "default": "GET",
+      "options": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+    },
+    {
+      "key": "bodyType",
+      "label": "Type du corps",
+      "kind": "choice",
+      "default": "JSON",
+      "options": ["JSON", "XML", "Texte"],
+      "visibleWhen": { "key": "method", "in": ["POST", "PUT", "PATCH"] }
+    },
+    {
+      "key": "body",
+      "label": "Corps",
+      "kind": "multiline",
+      "placeholder": "{ … }",
+      "visibleWhen": { "key": "method", "in": ["POST", "PUT", "PATCH"] }
+    }
+  ]
+}

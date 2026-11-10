@@ -106,7 +106,9 @@ function onSourceKeydown(event: KeyboardEvent): void {
       <header class="contract__head">
         <div class="contract__title">
           <h2 class="contract__name">{{ view.name }}</h2>
-          <span v-if="view.version" class="contract__version">version {{ view.version }}</span>
+          <span v-if="view.version && !view.deduced" class="contract__version"
+            >version {{ view.version }}</span
+          >
           <span v-if="kindLabel" class="contract__kind">{{ kindLabel }}</span>
           <code class="contract__file">{{ view.path }}</code>
         </div>

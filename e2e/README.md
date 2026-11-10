@@ -30,12 +30,14 @@ ailleurs : `ARNOD_E2E_TAURI_DRIVER=/chemin/vers/tauri-driver`.
 - `app.ts` crée un bac à sable (dossier personnel `HOME` et données `XDG_DATA_HOME`
   temporaires), lance `tauri-driver` avec cet environnement, puis ouvre l'application par
   une session WebDriver classique (WebKitWebDriver ne gère pas WebDriver BiDi).
-- `arnod.e2e.ts` enchaîne les étapes d'un utilisateur : premier lancement, création de
-  projets, workspaces, ajout et retrait avec « Annuler », gestion, référentiel, redémarrage
+- `arnod.e2e.ts` enchaîne les étapes d'un utilisateur : premier lancement (accueil, formulaire
+  REST), création de projets, workspaces, ajout et retrait avec « Annuler », gestion, référentiel, redémarrage
   (W2), dossier supprimé hors d'Arnod (P10), dossier projet existant (P12), projet oublié puis
   rétabli (P11) ; puis zones et fenêtres : onglets, division, séparation au clavier, zone ouverte
   dans sa fenêtre puis rattachée, barre latérale détachée qui pilote la fenêtre principale,
-  restauration au redémarrage. Chaque étape vérifie aussi le disque (`opencollection.yml`, `arnod.json`,
+  restauration au redémarrage ; contrats de services contre un serveur HTTP local ; enfin catalogue
+  des étapes et essais REST gardés dans « Non classés » sous leur contrat déduit. Chaque étape
+  vérifie aussi le disque (`opencollection.yml`, `arnod.json`,
   `windows.json`).
 - Plusieurs fenêtres : `getWindowHandles()` les liste et `switchToWindow()` passe de l'une à
   l'autre ; un bouton qui n'apparaît qu'au survol est cliqué depuis la page (`clickHidden`).

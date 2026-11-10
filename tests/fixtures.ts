@@ -37,7 +37,7 @@ export function project(
 
 /** Premier lancement : aucun projet, aucun workspace, « Tous les projets » ouvert (1a). */
 export function firstRunSnapshot(): CatalogSnapshot {
-  return { projects: [], workspaces: [], lastWorkspaceId: null };
+  return { projects: [], workspaces: [], lastWorkspaceId: null, inboxProjectId: null };
 }
 
 /**
@@ -58,5 +58,6 @@ export function boutiqueSnapshot(): CatalogSnapshot {
       workspace(BOUTIQUE, "Boutique", { projectIds: [BOUTIQUE_TESTS, AUTH_SSO] }),
     ],
     lastWorkspaceId: BOUTIQUE,
+    inboxProjectId: null,
   };
 }

@@ -81,7 +81,10 @@ export type CommandName =
   | "contract_save"
   | "contract_delete"
   | "contract_generate"
-  | "contract_run";
+  | "contract_run"
+  | "steps_catalog"
+  | "steps_detect"
+  | "trial_send";
 
 /**
  * Nature d'une erreur de commande.
@@ -180,6 +183,8 @@ export interface CatalogSnapshot {
   workspaces: WorkspaceView[];
   /** Dernier onglet ouvert, à rouvrir au démarrage ; `null` pour « Tous les projets » (R7). */
   lastWorkspaceId: string | null;
+  /** Projet « Non classés », en tête de `projects` ; `null` s'il n'existe pas. */
+  inboxProjectId: string | null;
 }
 
 /** Réponse de `catalog_load`. Équivalent Rust : `CatalogLoad`. */
@@ -685,6 +690,8 @@ export type SpecKind = "openApi3" | "swagger2";
 
 /** Contrat de la barre latérale (`ContractSummary`). */
 export interface ContractSummary {
+  /** Contrat déduit des échanges réels (`x-arnod-deduced`) : version non affichée. */
+  deduced: boolean;
   /** Chemin relatif au projet : `contracts/petstore.yaml`. */
   path: string;
   name: string;
@@ -719,6 +726,8 @@ export interface OrphanView {
 
 /** Contrat affiché dans son onglet (`ContractView`). */
 export interface ContractView {
+  /** Contrat déduit des échanges réels (`x-arnod-deduced`). */
+  deduced: boolean;
   path: string;
   name: string;
   version: string;
@@ -756,4 +765,109 @@ export interface GenerateReport {
   created: string[];
   skipped: SkippedOperation[];
   baseUrl: BaseUrlSet | null;
+}
+
+/*
+ * Catalogue des étapes et essais (docs/plan-accueil-non-classes.md).
+ * Équivalents Rust dans `src-tauri/src/steps/` et `src-tauri/src/commands/trial.rs`.
+ */
+
+/**
+ * Famille d'une nature d'étape, qui donne sa couleur.
+ *
+ * Équivalent Rust : `Family` (`steps/definition.rs`) ; un test vérifie la concordance.
+ */
+export type StepFamily = "calls" | "data" | "messages" | "jobs" | "interface" | "code" | "files";
+
+/** Nature d'un champ de formulaire. Équivalent Rust : `FieldKind`. */
+export type StepFieldKind = "choice" | "text" | "multiline";
+
+/** Moteur d'une nature (`Engine`). */
+export type StepEngine =
+  | { kind: "builtin"; id: string; abi: number }
+  | { kind: "wasm"; module: string; sha256: string; abi: number };
+
+/** Champ principal, saisi dans l'entrée de l'accueil (`Subject`). */
+export interface StepSubject {
+  key: string;
+  label: string;
+  placeholder: string;
+}
+
+/** Condition d'affichage d'un champ (`VisibleWhen`). */
+export interface StepVisibleWhen {
+  key: string;
+  in: string[];
+}
+
+/** Champ déclaratif du formulaire d'une nature (`Field`). */
+export interface StepField {
+  key: string;
+  label: string;
+  kind: StepFieldKind;
+  default: string | null;
+  placeholder: string | null;
+  hint: string | null;
+  options: string[];
+  visibleWhen: StepVisibleWhen | null;
+}
+
+/** Règle de reconnaissance (`Rule`), affichée dans la fiche d'une nature. */
+export type StepRule =
+  | { kind: "url"; schemes: string[]; methodField: string | null }
+  | { kind: "keywords"; words: string[] }
+  | { kind: "prefix"; text: string }
+  | { kind: "suffix"; text: string };
+
+/** Nature d'étape disponible (`StepNature`). */
+export interface StepNature {
+  format: number;
+  id: string;
+  version: string;
+  name: string;
+  title: string;
+  description: string;
+  family: StepFamily;
+  publisher: string;
+  engine: StepEngine;
+  /** Verbe du bouton : « Envoyer », « Exécuter »… */
+  action: string;
+  subject: StepSubject;
+  detect: StepRule[];
+  form: StepField[];
+  /** Livrée avec Arnod. */
+  origin: "builtin";
+}
+
+/** Source des définitions (`CatalogSource`). */
+export interface StepCatalogSource {
+  name: string;
+  /** Date des définitions, `AAAA-MM-JJ`. */
+  updated: string;
+  /** Synchronisation en place ; `false` : définitions intégrées seulement. */
+  synced: boolean;
+}
+
+/** Réponse de `steps_catalog`. */
+export interface StepCatalog {
+  source: StepCatalogSource;
+  natures: StepNature[];
+}
+
+/** Réponse de `steps_detect` : nature reconnue, champ principal et valeurs lues. */
+export interface Detection {
+  nature: string;
+  subject: string;
+  values: Record<string, string>;
+}
+
+/** Réponse de `trial_send` : l'essai enregistré dans « Non classés ». */
+export interface TrialResult {
+  snapshot: CatalogSnapshot;
+  projectId: string;
+  /** Requête « Essai N », relative au projet. */
+  path: string;
+  /** Contrat déduit (`contracts/…`). */
+  contract: string;
+  outcome: SendOutcome;
 }

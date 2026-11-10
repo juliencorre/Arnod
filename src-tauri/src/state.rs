@@ -14,7 +14,7 @@ use crate::catalog::snapshot::{
     CatalogLoad, CatalogSnapshot, ProjectCreated, ProjectStatus, ProjectView, Undoable,
 };
 use crate::catalog::undo::{UndoAction, UndoStack};
-use crate::catalog::{Catalog, names};
+use crate::catalog::{Catalog, INBOX_NAME, names};
 use crate::environment;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::manifest::{self, Manifest};
@@ -278,6 +278,87 @@ impl AppState {
             ));
         }
         Ok(project)
+    }
+
+    /// Projet « Non classés » qui reçoit les essais (R4, N5) : celui du
+    /// catalogue, recréé si son dossier a disparu ; sinon le dossier
+    /// `<emplacement par défaut>/Non classés`, réinscrit s'il contient déjà un
+    /// projet, créé sinon. Renvoie son contexte et l'instantané s'il a changé.
+    pub fn ensure_inbox(&self) -> Result<(ProjectCtx, Option<CatalogSnapshot>), CommandError> {
+        let mut inner = self.lock()?;
+        if let Some(id) = inner.catalog.inbox_project_id() {
+            let project = inner.catalog.project(id)?.clone();
+            let snapshot = if project.path.is_dir() {
+                None
+            } else {
+                let created = manifest::create_project_folder(
+                    &project.path,
+                    &Manifest::new(id, &project.name),
+                )?;
+                if let Err(error) = environment::init(created.path()) {
+                    created.rollback();
+                    return Err(error);
+                }
+                // Le dossier est revenu : l'instantané le dit aux fenêtres.
+                let next = inner.catalog.clone();
+                Some(self.commit(&mut inner, next)?)
+            };
+            drop(inner);
+            return Ok((self.project_ctx(id)?, snapshot));
+        }
+
+        let folder = self.default_location.join(INBOX_NAME);
+        let mut next = inner.catalog.clone();
+        let mut created = None;
+        let id = match manifest::read_manifest(&folder) {
+            Ok(existing) => {
+                if existing.version > manifest::MANIFEST_VERSION {
+                    return Err(CommandError::new(
+                        CommandErrorKind::NewerVersion,
+                        format!(
+                            "Le projet « {} » a été créé par une version plus récente d'Arnod (format {}).",
+                            existing.name, existing.version
+                        ),
+                    ));
+                }
+                if next.project(existing.id).is_err() {
+                    next.register_project(existing.id, &existing.name, canonical(&folder), None)?;
+                }
+                existing.id
+            }
+            Err(_) => {
+                let name = next.check_new_project(INBOX_NAME, &canonical(&folder), None)?;
+                let id = Uuid::new_v4();
+                let folder_created =
+                    manifest::create_project_folder(&folder, &Manifest::new(id, &name))?;
+                if let Err(error) = environment::init(folder_created.path()) {
+                    folder_created.rollback();
+                    return Err(error);
+                }
+                if let Err(error) =
+                    next.register_project(id, &name, canonical(folder_created.path()), None)
+                {
+                    folder_created.rollback();
+                    return Err(error);
+                }
+                created = Some(folder_created);
+                id
+            }
+        };
+        let committed = next
+            .set_inbox(id)
+            .and_then(|()| self.commit(&mut inner, next));
+        let snapshot = match committed {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                if let Some(created) = created {
+                    created.rollback();
+                }
+                return Err(error);
+            }
+        };
+        drop(inner);
+        Ok((self.project_ctx(id)?, Some(snapshot)))
     }
 
     /// Dossier de données de l'application (`arnod.json`, données locales des projets).

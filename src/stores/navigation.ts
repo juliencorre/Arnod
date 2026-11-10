@@ -12,6 +12,8 @@ export type View =
   | { kind: "workspace"; workspaceId: string }
   /** Projet ouvert depuis un workspace, ou depuis « Tous les projets » (`workspaceId` à `null`). */
   | { kind: "project"; projectId: string; workspaceId: string | null }
+  /** « Catalogue des étapes » (docs/plan-accueil-non-classes.md, K1), plein écran. */
+  | { kind: "steps"; returnTo: View }
   | {
       kind: "manage";
       /** Workspace détaillé dans « Gérer les workspaces » (2d). */
@@ -41,8 +43,23 @@ export const useNavigationStore = defineStore("navigation", () => {
         return current.workspaceId;
       case "manage":
         return current.returnTo;
+      case "steps":
+        return current.returnTo.kind === "steps" ? null : workspaceOf(current.returnTo);
     }
   });
+
+  /** Onglet d'une vue autre que le catalogue. */
+  function workspaceOf(view: View): string | null {
+    switch (view.kind) {
+      case "workspace":
+      case "project":
+        return view.workspaceId;
+      case "manage":
+        return view.returnTo;
+      default:
+        return null;
+    }
+  }
 
   /** Sujet du titre de la fenêtre. */
   const titleSubject = computed<string | null>(() => {
@@ -57,6 +74,8 @@ export const useNavigationStore = defineStore("navigation", () => {
         return catalog.projectById(current.projectId)?.name ?? null;
       case "manage":
         return "Workspaces";
+      case "steps":
+        return "Catalogue des étapes";
     }
   });
 
@@ -105,6 +124,18 @@ export const useNavigationStore = defineStore("navigation", () => {
       workspaceId: workspaceId ?? currentWorkspaceId.value ?? catalog.workspaces[0]?.id ?? null,
       returnTo: currentWorkspaceId.value,
     };
+  }
+
+  /** Affiche le catalogue des étapes (K1) ; « Retour » ramène à la vue d'où l'on vient. */
+  function showSteps(): void {
+    if (view.value.kind === "steps") return;
+    view.value = { kind: "steps", returnTo: view.value };
+  }
+
+  /** Quitte le catalogue des étapes. */
+  function closeSteps(): void {
+    const current = view.value;
+    if (current.kind === "steps") view.value = current.returnTo;
   }
 
   /** Choisit le workspace détaillé dans la gestion (2d). */
@@ -198,6 +229,8 @@ export const useNavigationStore = defineStore("navigation", () => {
     showTab,
     showProject,
     showManage,
+    showSteps,
+    closeSteps,
     selectManagedWorkspace,
     closeManage,
   };

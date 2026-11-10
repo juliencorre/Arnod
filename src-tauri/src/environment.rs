@@ -218,13 +218,16 @@ fn write_file(path: &Path, value: &Value) -> Result<(), CommandError> {
     yaml::write(path, value)
 }
 
+/// Environnement créé avec chaque projet (N1).
+pub const LOCAL: &str = "Local";
+
 /// Crée `environments/` avec « Local » et la variable `baseUrl` vide (N1).
 pub fn init(root: &Path) -> Result<(), CommandError> {
     fs::create_dir_all(dir(root))
         .map_err(|error| CommandError::io("Création du dossier impossible", &dir(root), &error))?;
     if list(root).is_empty() {
         let local = Environment {
-            name: "Local".to_owned(),
+            name: LOCAL.to_owned(),
             color: default_color(),
             protected: false,
             variables: vec![Variable {
@@ -233,10 +236,8 @@ pub fn init(root: &Path) -> Result<(), CommandError> {
             }],
             locals: Vec::new(),
         };
-        write_file(&file_for(root, "Local"), &into_value(&local, None))?;
-        collection::update_meta(root, |meta| {
-            meta.environment_order = vec!["Local".to_owned()]
-        })?;
+        write_file(&file_for(root, LOCAL), &into_value(&local, None))?;
+        collection::update_meta(root, |meta| meta.environment_order = vec![LOCAL.to_owned()])?;
     }
     Ok(())
 }

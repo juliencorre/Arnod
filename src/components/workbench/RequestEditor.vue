@@ -47,7 +47,8 @@ const contract = computed(() => {
   const summary = contracts.lists[editor.value.projectId]?.find((c) => c.path === link.file);
   return {
     name: summary?.name ?? link.file,
-    version: summary?.version ?? "",
+    // Un contrat déduit des essais n'a pas de version à montrer (0.0.0).
+    version: summary && !summary.deduced ? summary.version : "",
     operation: link.operation,
     file: link.file,
   };

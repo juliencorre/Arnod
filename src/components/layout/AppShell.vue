@@ -13,6 +13,7 @@ import WorkspaceTabs from "@/components/layout/WorkspaceTabs.vue";
 import ManageScreen from "@/components/manage/ManageScreen.vue";
 import AllProjects from "@/components/projects/AllProjects.vue";
 import ProjectView from "@/components/projects/ProjectView.vue";
+import StepsCatalog from "@/components/steps/StepsCatalog.vue";
 import WorkspaceHome from "@/components/workspaces/WorkspaceHome.vue";
 import SplitHandle from "@/components/zones/SplitHandle.vue";
 import { useCatalogStore } from "@/stores/catalog";
@@ -30,11 +31,16 @@ const workspaceView = computed(() =>
 );
 const projectView = computed(() => (navigation.view.kind === "project" ? navigation.view : null));
 const manageView = computed(() => (navigation.view.kind === "manage" ? navigation.view : null));
-/** Pas de barre latérale sur le tableau « Tous les projets », dans la gestion, ni détachée. */
+const stepsView = computed(() => navigation.view.kind === "steps");
+/**
+ * Pas de barre latérale sur le tableau « Tous les projets », dans la gestion, dans
+ * le catalogue des étapes, ni détachée.
+ */
 const withSidebar = computed(
   () =>
     !windows.main?.sidebarDetached &&
     !manageView.value &&
+    !stepsView.value &&
     !(allView.value !== null && !catalog.isFirstRun),
 );
 
@@ -120,6 +126,7 @@ const detachHover = ref(false);
           :workspace-id="projectView.workspaceId"
         />
         <ManageScreen v-else-if="manageView" :workspace-id="manageView.workspaceId" />
+        <StepsCatalog v-else-if="stepsView" />
       </main>
     </div>
     <SharedDialogs />

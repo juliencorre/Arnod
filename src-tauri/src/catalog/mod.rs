@@ -27,6 +27,9 @@ use crate::error::{CommandError, CommandErrorKind};
 /// Version courante du format `arnod.json`.
 pub const FILE_VERSION: u32 = 2;
 
+/// Nom et dossier du projet qui reçoit les essais (`docs/plan-accueil-non-classes.md`, R4).
+pub const INBOX_NAME: &str = "Non classés";
+
 /// « Tous les projets » et workspaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Catalog {
@@ -34,6 +37,9 @@ pub struct Catalog {
     workspaces: Vec<Workspace>,
     /// Dernier onglet ouvert : un workspace, ou `None` pour « Tous les projets » (R7).
     last_workspace_id: Option<Uuid>,
+    /// Projet « Non classés » qui reçoit les essais
+    /// (`docs/plan-accueil-non-classes.md`, R4, R5).
+    inbox_project_id: Option<Uuid>,
 }
 
 impl Catalog {
@@ -44,6 +50,7 @@ impl Catalog {
             projects: Vec::new(),
             workspaces: Vec::new(),
             last_workspace_id: None,
+            inbox_project_id: None,
         }
     }
 
@@ -70,6 +77,7 @@ impl Catalog {
             projects: file.projects,
             workspaces,
             last_workspace_id,
+            inbox_project_id: None,
         }
     }
 
@@ -102,11 +110,19 @@ impl Catalog {
         let last_workspace_id = file
             .last_workspace_id
             .filter(|id| workspace_ids.contains(id));
+        let inbox_project_id = file.inbox_project_id.filter(|id| project_ids.contains(id));
+        // « Non classés » n'entre dans aucun workspace (R5).
+        if let Some(inbox) = inbox_project_id {
+            for workspace in &mut workspaces {
+                workspace.project_ids.retain(|id| *id != inbox);
+            }
+        }
 
         Ok(Self {
             projects: file.projects,
             workspaces,
             last_workspace_id,
+            inbox_project_id,
         })
     }
 
@@ -117,7 +133,24 @@ impl Catalog {
             projects: self.projects.clone(),
             workspaces: self.workspaces.clone(),
             last_workspace_id: self.last_workspace_id,
+            inbox_project_id: self.inbox_project_id(),
         }
+    }
+
+    /// Projet « Non classés », s'il est dans « Tous les projets » (R4).
+    pub fn inbox_project_id(&self) -> Option<Uuid> {
+        self.inbox_project_id
+            .filter(|id| self.projects.iter().any(|project| project.id == *id))
+    }
+
+    /// Désigne le projet « Non classés » ; il quitte les workspaces (R4, R5).
+    pub fn set_inbox(&mut self, project_id: Uuid) -> Result<(), CommandError> {
+        self.project(project_id)?;
+        for workspace in &mut self.workspaces {
+            workspace.project_ids.retain(|id| *id != project_id);
+        }
+        self.inbox_project_id = Some(project_id);
+        Ok(())
     }
 
     /// Dernier onglet ouvert ; `None` pour « Tous les projets ».
@@ -265,6 +298,12 @@ impl Catalog {
     ) -> Result<(), CommandError> {
         for id in project_ids {
             self.project(*id)?;
+            if self.inbox_project_id() == Some(*id) {
+                return Err(CommandError::new(
+                    CommandErrorKind::InvalidRequest,
+                    "« Non classés » reste hors des workspaces : rangez plutôt ses essais dans un projet.",
+                ));
+            }
         }
         let workspace = self.workspace_mut(workspace_id)?;
         for id in project_ids {
@@ -455,9 +494,18 @@ impl Catalog {
     /// projet existe (P10) ; il est injecté pour garder ce module sans disque.
     pub fn snapshot(&self, folder_exists: impl Fn(&Path) -> bool) -> CatalogSnapshot {
         let workspaces = &self.workspaces;
-        let projects = self
+        let inbox = self.inbox_project_id();
+        // « Non classés » en tête de « Tous les projets » (R5).
+        let ordered = self
             .projects
             .iter()
+            .filter(|project| Some(project.id) == inbox)
+            .chain(
+                self.projects
+                    .iter()
+                    .filter(|project| Some(project.id) != inbox),
+            );
+        let projects = ordered
             .map(|project| ProjectView {
                 id: project.id,
                 name: project.name.clone(),
@@ -487,6 +535,7 @@ impl Catalog {
             projects,
             workspaces,
             last_workspace_id: self.last_workspace_id,
+            inbox_project_id: inbox,
         }
     }
 

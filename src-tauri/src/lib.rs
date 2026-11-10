@@ -21,8 +21,10 @@ pub mod request;
 pub mod results;
 pub mod secrets;
 pub mod state;
+pub mod steps;
 pub mod storage;
 pub mod tree;
+pub mod trial;
 #[cfg(test)]
 mod ts_contract;
 pub mod windows;
@@ -133,6 +135,9 @@ pub fn run() {
             commands::runs::run_retry_failures,
             commands::runs::run_last,
             commands::runs::project_last_runs,
+            commands::steps::steps_catalog,
+            commands::steps::steps_detect,
+            commands::trial::trial_send,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

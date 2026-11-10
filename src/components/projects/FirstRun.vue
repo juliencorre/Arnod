@@ -1,48 +1,71 @@
 <script setup lang="ts">
 /**
- * Premier lancement (1a) : aucun projet encore. On nomme le premier ; le dossier
- * a déjà une valeur et le rangement dans un workspace est facultatif (O8). Ou
- * l'on importe un projet Arnod existant (P12).
+ * Premier lancement (docs/plan-accueil-non-classes.md, A1 à A4) : aucun projet
+ * encore. « Essayer une étape » d'abord, puis créer un projet (le dossier a déjà
+ * une valeur, le workspace est facultatif : O8) ou importer un projet Arnod
+ * existant (P12). Une nature choisie prend la place : créer et importer se
+ * réduisent à une ligne. L'entrée reste à la même hauteur dans les deux états.
  */
-import { useId } from "vue";
+import { ref, useId } from "vue";
 
+import TryStep from "@/components/home/TryStep.vue";
 import ProjectForm from "@/components/projects/ProjectForm.vue";
+import BaseButton from "@/components/ui/BaseButton.vue";
 import { useProjectActions } from "@/composables/useProjectActions";
+import { useDialogStore } from "@/stores/dialogs";
 
 const { announceCreated, addExistingProject } = useProjectActions();
+const dialogs = useDialogStore();
 const titleId = useId();
 const importTitleId = useId();
+/** Une nature est choisie : son formulaire est ouvert. */
+const focused = ref(false);
 </script>
 
 <template>
   <section class="first-run" :aria-labelledby="titleId">
     <div class="first-run__intro">
-      <h1 :id="titleId" class="first-run__title">Créez votre premier projet</h1>
+      <h1 :id="titleId" class="first-run__title">Bienvenue dans Arnod</h1>
       <p class="first-run__lead">
-        Donnez-lui un nom : vous écrirez votre première requête juste après.
+        Testez tout ce que votre application touche : API, services, bases de données, messages,
+        traitements et écrans, enchaînés dans un même test.
       </p>
     </div>
-    <div class="first-run__card">
-      <ProjectForm mode="firstRun" :initial-workspace-id="null" @created="announceCreated" />
-    </div>
-    <p class="first-run__or" aria-hidden="true"><span>ou</span></p>
-    <button
-      type="button"
-      class="first-run__import"
-      :aria-labelledby="importTitleId"
-      @click="addExistingProject(null)"
-    >
-      <span class="first-run__import-icon" aria-hidden="true">⇩</span>
-      <span>
-        <span :id="importTitleId" class="first-run__import-title">Importer…</span>
-        <span class="first-run__import-text">
-          Un projet Arnod existant, par exemple après un clone Git : choisissez son dossier.
+    <div class="first-run__column">
+      <TryStep @open="focused = $event" />
+      <template v-if="!focused">
+        <p class="first-run__or" aria-hidden="true"><span>ou</span></p>
+        <div class="first-run__cards">
+          <div class="first-run__card">
+            <h2 class="first-run__card-title">Créer un projet</h2>
+            <ProjectForm mode="firstRun" :initial-workspace-id="null" @created="announceCreated" />
+          </div>
+          <button
+            type="button"
+            class="first-run__import"
+            :aria-labelledby="importTitleId"
+            @click="addExistingProject(null)"
+          >
+            <span class="first-run__import-icon" aria-hidden="true">⇩</span>
+            <span :id="importTitleId" class="first-run__import-title">Importer…</span>
+            <span class="first-run__import-text">
+              Un projet Arnod existant, par exemple après un clone Git : choisissez son dossier.
+            </span>
+          </button>
+        </div>
+        <p class="first-run__note">
+          Un projet = un dossier sur votre poste, prêt à être partagé avec l'équipe.
+        </p>
+      </template>
+      <div v-else class="first-run__compact">
+        <span>Pas encore de projet ?</span>
+        <BaseButton @click="dialogs.openNewProject(null)">Créer un projet…</BaseButton>
+        <BaseButton @click="addExistingProject(null)">⇩ Importer…</BaseButton>
+        <span class="first-run__compact-note">
+          Un projet = un dossier sur votre poste, partagé avec l'équipe.
         </span>
-      </span>
-    </button>
-    <p class="first-run__note">
-      Un projet = un dossier sur votre poste, prêt à être partagé avec l'équipe.
-    </p>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -52,10 +75,9 @@ const importTitleId = useId();
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 1.5rem;
   min-height: 100%;
-  padding: 2.5rem;
+  padding: clamp(2rem, 9vh, 5rem) 2.5rem 2.5rem;
 }
 
 .first-run__intro {
@@ -75,25 +97,51 @@ const importTitleId = useId();
 
 .first-run__lead {
   margin: 0;
-  max-width: 32rem;
+  max-width: 44rem;
   font-size: 0.9375rem;
   color: var(--color-muted);
 }
 
+.first-run__column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: min(55rem, 100%);
+}
+
+.first-run__cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+@media (width < 48rem) {
+  .first-run__cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .first-run__card {
   box-sizing: border-box;
-  width: min(32.5rem, 100%);
-  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-surface);
+}
+
+.first-run__card-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
 }
 
 .first-run__or {
   display: flex;
   align-items: center;
   gap: 1rem;
-  width: min(32.5rem, 100%);
   margin: 0;
   font-size: 0.8125rem;
   color: var(--color-muted);
@@ -110,20 +158,22 @@ const importTitleId = useId();
 .first-run__import {
   box-sizing: border-box;
   display: flex;
-  gap: 0.875rem;
-  width: min(32.5rem, 100%);
-  padding: 1rem 1.25rem;
-  border: 1px dashed var(--color-border-strong);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 1.25rem;
+  border: 1.5px dashed var(--color-border-strong);
   border-radius: 12px;
   font: inherit;
-  text-align: left;
+  text-align: center;
   color: var(--color-text);
-  background: none;
+  background: var(--color-surface);
   cursor: pointer;
 }
 
 .first-run__import:hover {
-  background: var(--color-surface);
+  background: var(--color-sidebar);
 }
 
 .first-run__import:focus-visible {
@@ -133,22 +183,21 @@ const importTitleId = useId();
 
 .first-run__import-icon {
   display: grid;
-  flex: none;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 8px;
+  font-weight: 700;
   color: var(--color-link);
   background: var(--color-accent-soft);
 }
 
 .first-run__import-title {
-  display: block;
   font-weight: 600;
 }
 
 .first-run__import-text {
-  display: block;
+  max-width: 18rem;
   font-size: 0.8125rem;
   color: var(--color-muted);
 }
@@ -156,6 +205,23 @@ const importTitleId = useId();
 .first-run__note {
   margin: 0;
   font-size: 0.8125rem;
+  text-align: center;
   color: var(--color-muted);
+}
+
+.first-run__compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.first-run__compact-note {
+  margin-left: auto;
+  font-size: 0.75rem;
 }
 </style>

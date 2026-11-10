@@ -8,12 +8,14 @@
  */
 import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from "vue";
 
+import TryStep from "@/components/home/TryStep.vue";
 import FirstRun from "@/components/projects/FirstRun.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import ColorDot from "@/components/ui/ColorDot.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import SearchInput from "@/components/ui/SearchInput.vue";
+import TrayIcon from "@/components/ui/TrayIcon.vue";
 import { ALL_PROJECTS, useProjectActions } from "@/composables/useProjectActions";
 import { startProjectDrag } from "@/lib/dnd";
 import { formatDayTime } from "@/lib/format";
@@ -97,6 +99,10 @@ onMounted(async () => {
       </div>
     </header>
 
+    <div class="all__try">
+      <TryStep note="L'essai est gardé dans « Non classés »." />
+    </div>
+
     <div class="all__table-wrap">
       <table ref="table" class="all__table" :aria-labelledby="titleId">
         <thead>
@@ -113,13 +119,21 @@ onMounted(async () => {
             v-for="project in rows"
             :key="project.id"
             :data-project-id="project.id"
-            :class="{ 'all__row--highlight': project.id === highlightProjectId }"
+            :class="{
+              'all__row--highlight': project.id === highlightProjectId,
+              'all__row--inbox': catalog.isInbox(project.id),
+            }"
             class="all__row"
             tabindex="-1"
-            draggable="true"
+            :draggable="!catalog.isInbox(project.id)"
             @dragstart="startProjectDrag($event, project.id)"
           >
-            <th scope="row" class="all__name">{{ project.name }}</th>
+            <th scope="row" class="all__name">
+              <span v-if="catalog.isInbox(project.id)" class="all__inbox">
+                <TrayIcon />{{ project.name }}
+              </span>
+              <template v-else>{{ project.name }}</template>
+            </th>
             <td>
               <code class="all__path">{{ project.path }}</code>
               <span v-if="project.status === 'missing'" class="all__missing">
@@ -132,7 +146,10 @@ onMounted(async () => {
                   <ColorDot :color="catalog.workspaceById(id)?.color ?? 'gray'" size="sm" />
                   {{ catalog.workspaceById(id)?.name }}
                 </li>
-                <li v-if="project.workspaceIds.length === 0" class="all__muted">Aucun workspace</li>
+                <li v-if="catalog.isInbox(project.id)" class="all__muted">Hors workspaces</li>
+                <li v-else-if="project.workspaceIds.length === 0" class="all__muted">
+                  Aucun workspace
+                </li>
               </ul>
             </td>
             <td class="all__run">
@@ -154,6 +171,7 @@ onMounted(async () => {
             </td>
             <td class="all__action">
               <BaseMenu
+                v-if="!catalog.isInbox(project.id)"
                 align="end"
                 :items="addItems(project)"
                 :label="`Ajouter ${project.name} à un workspace`"
@@ -195,6 +213,24 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.all__try {
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.all__inbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text);
+}
+
+.all__row--inbox > * {
+  background: var(--color-accent-soft);
+}
+
 .all {
   box-sizing: border-box;
   display: flex;

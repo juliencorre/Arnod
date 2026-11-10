@@ -40,6 +40,9 @@ import type {
   RunChange,
   RunView,
   SendOutcome,
+  StepCatalog,
+  Detection,
+  TrialResult,
   TreeView,
   ProjectCreated,
   ProjectCreateInput,
@@ -321,6 +324,20 @@ export const ipc = {
     environment: string,
     confirmed: boolean,
   ): Promise<RunView> => call<RunView>("contract_run", { project, path, environment, confirmed }),
+
+  // --- Catalogue des étapes et essais (docs/plan-accueil-non-classes.md)
+
+  stepsCatalog: (): Promise<StepCatalog> => call<StepCatalog>("steps_catalog"),
+
+  stepsDetect: (input: string): Promise<Detection | null> =>
+    call<Detection | null>("steps_detect", { input }),
+
+  trialSend: (
+    execId: string,
+    nature: string,
+    subject: string,
+    values: Record<string, string>,
+  ): Promise<TrialResult> => call<TrialResult>("trial_send", { execId, nature, subject, values }),
   runStart: (
     project: string,
     folder: string,

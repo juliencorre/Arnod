@@ -9,7 +9,9 @@
  * tests Rust et Vitest. Les dernières étapes divisent la fenêtre en zones et
  * ouvrent des fenêtres interconnectées (docs/plan-fenetres-zones.md), puis
  * ajoutent un contrat de service et exécutent ses requêtes contre un serveur
- * HTTP local (docs/plan-contrats-services.md).
+ * HTTP local (docs/plan-contrats-services.md). Les dernières essaient une étape
+ * REST depuis « Tous les projets » : l'essai est gardé dans « Non classés », sous
+ * le contrat déduit de son serveur (docs/plan-accueil-non-classes.md).
  */
 import type { ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
@@ -186,24 +188,47 @@ function workspaceNamed(name: string) {
 }
 
 describe("Arnod, de bout en bout", () => {
-  it("premier lancement : seul l'onglet « Tous les projets », aucun workspace (1a, R3)", async () => {
-    expect(await heading(browser)).toBe("Créez votre premier projet");
+  it("premier lancement : seul l'onglet « Tous les projets », aucun workspace (1a, R3, A1)", async () => {
+    expect(await heading(browser)).toBe("Bienvenue dans Arnod");
     expect(await tabNames()).toEqual(["Tous les projets"]);
     expect(await browser.$("aside").getText()).toBe("Aucun projet pour l'instant.");
-    expect(await browser.$("main").getText()).toContain(
-      "Un projet est toujours dans « Tous les projets ». Un workspace est facultatif.",
+    const main = await browser.$("main").getText();
+    expect(main).toContain("Essayer une étape");
+    expect(main).toContain("Créer un projet");
+    expect(main).toContain(
+      "Un projet = un dossier sur votre poste, prêt à être partagé avec l'équipe.",
     );
 
     const state = readState(sandbox);
     expect(state.workspaces).toEqual([]);
     expect(state.projects).toEqual([]);
     expect(state.lastWorkspaceId).toBeNull();
+    expect(state.inboxProjectId).toBeUndefined();
     await screenshot(browser, "01-premier-lancement");
+  });
+
+  it("choisir REST ouvre son formulaire, créer et importer se réduisent à une ligne (A3, A4)", async () => {
+    await browser.$('main button[title^="REST"]').click();
+    const form = browser.$('main [role="group"][aria-label="Formulaire de la nature REST"]');
+    await form.waitForDisplayed();
+    expect(await browser.$("main .first-run__compact").isDisplayed()).toBe(true);
+    expect(await browser.$("main .first-run__cards").isExisting()).toBe(false);
+    expect(await browser.$("main .try__form").$("button=Envoyer").isDisplayed()).toBe(true);
+    // POST montre le type et le corps (champs conditionnels de la définition).
+    await form.$("button=POST").click();
+    await form.$("textarea").waitForDisplayed();
+    await screenshot(browser, "01b-accueil-rest");
+
+    // Échap ferme le formulaire : les cartes reviennent.
+    await browser.$("main .try__input").click();
+    await browser.keys("Escape");
+    await browser.$("main .first-run__cards").waitForDisplayed();
+    expect(await form.isExisting()).toBe(false);
   });
 
   it("crée le premier projet sur disque, sans workspace, et l'ouvre (P1, P4, P5)", async () => {
     // Les fenêtres fermées restent dans le DOM, hors de `main` : leurs champs ne comptent pas.
-    await browser.$("main form input").setValue("boutique-tests");
+    await browser.$("main .first-run__card form input").setValue("boutique-tests");
     const folder = browser.$('main [data-testid="project-folder"]');
     const expected = path.join(sandbox.home, "arnod", "boutique-tests");
     await browser.waitUntil(async () => (await folder.getText()) === expected, {
@@ -927,5 +952,148 @@ describe("Contrats de services", () => {
       timeoutMsg: "le résultat n'est pas revenu dans l'onglet",
     });
     expect(readWindows(sandbox).windows.map((w) => w.kind)).toEqual(["main"]);
+  });
+});
+
+describe("Accueil, catalogue des étapes et Non classés", () => {
+  let server: Server;
+  let url = "";
+  let host = "";
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      const json = (status: number, body: unknown): void => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      if (request.method === "GET" && request.url === "/sante") {
+        json(200, { etat: "ok", version: "1.4.2" });
+      } else if (request.method === "POST" && request.url === "/commandes") {
+        json(201, { id: 42, statut: "créée" });
+      } else json(404, { message: "absent" });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = String((server.address() as AddressInfo).port);
+    url = `http://127.0.0.1:${port}`;
+    host = `127.0.0.1:${port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  const inbox = () => path.join(sandbox.home, "arnod", "Non classés");
+  const contractFile = () => path.join(inbox(), "contracts", `${host.replace(/[.:]/g, "-")}.yaml`);
+
+  async function showAllProjects(): Promise<void> {
+    // Les zones ont aussi leurs listes d'onglets : on vise celle des workspaces.
+    await clickText('[role="tablist"][aria-label="Workspaces"] [role="tab"]', "Tous les projets");
+    await browser.waitUntil(async () => (await heading(browser)).startsWith("Tous les projets"), {
+      timeoutMsg: "« Tous les projets » attendu",
+    });
+  }
+
+  /** Colle `text` d'un bloc dans l'entrée « Essayer une étape », comme un Ctrl+V. */
+  async function paste(text: string): Promise<void> {
+    await browser.execute((value) => {
+      const input = document.querySelector<HTMLInputElement>("main .try__input");
+      if (!input) throw new Error("entrée « Essayer une étape » introuvable");
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, text);
+  }
+
+  /** Envoie l'essai reconnu et attend son onglet. */
+  async function sendTrial(name: string): Promise<void> {
+    const submit = browser.$("main .try__form").$("button=Envoyer");
+    await submit.waitForDisplayed({ timeoutMsg: "nature REST non reconnue" });
+    await submit.click();
+    await browser.waitUntil(async () => (await zoneTabs()).flat().includes(name), {
+      timeout: 15_000,
+      timeoutMsg: `onglet « ${name} » attendu`,
+    });
+    await browser.waitUntil(async () => (await toastText(browser)).includes("Essai gardé"), {
+      timeoutMsg: "notification de l'essai attendue",
+    });
+  }
+
+  it("le catalogue des étapes liste REST, intégrée à Arnod (K1, K2)", async () => {
+    await showAllProjects();
+    await browser.$("main .try").$("button*=Parcourir le catalogue").click();
+    await waitForHeading(browser, "Catalogue des étapes");
+    const table = await browser.$("main .catalog__table").getText();
+    expect(table).toContain("REST");
+    expect(table).toContain("Intégrée");
+    expect(await browser.$("main").getText()).toContain("arnod-steps");
+    await screenshot(browser, "16-catalogue-etapes");
+
+    await browser.$("main").$("button=← Retour").click();
+    await browser.waitUntil(async () => (await heading(browser)).startsWith("Tous les projets"), {
+      timeoutMsg: "retour à « Tous les projets » attendu",
+    });
+  });
+
+  it("une adresse collée crée « Non classés », son contrat déduit et « Essai 1 » (A2, A5, N1)", async () => {
+    await paste(`${url}/sante`);
+    await sendTrial("Essai 1");
+
+    // « Non classés » : un vrai projet, premier de la liste, hors des workspaces.
+    const state = readState(sandbox);
+    const project = state.projects.find((p) => p.name === "Non classés");
+    expect(project).toBeDefined();
+    expect(state.inboxProjectId).toBe(project?.id);
+    expect(state.workspaces.some((w) => w.projectIds.includes(project?.id ?? ""))).toBe(false);
+    expect(existsSync(path.join(inbox(), "opencollection.yml"))).toBe(true);
+
+    // Contrat déduit du serveur et requête liée à son opération.
+    const contract = readFileSync(contractFile(), "utf8");
+    expect(contract).toContain("x-arnod-deduced: true");
+    expect(contract).toContain("/sante:");
+    const request = readFileSync(path.join(inbox(), host.replace(":", " "), "essai-1.yml"), "utf8");
+    expect(request).toContain("name: Essai 1");
+    expect(request).toContain("contract:contracts/");
+    expect(request).toContain("GET /sante");
+
+    // La réponse est déjà dans l'onglet, vérifications proposées comprises.
+    const status = await browser.execute(() => {
+      const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find((t) =>
+        t.querySelector(".editor__contract")?.textContent.includes("GET /sante"),
+      );
+      return tab?.querySelector(".response__status")?.textContent.trim() ?? "";
+    });
+    expect(status).toContain("200");
+    await screenshot(browser, "17-essai-non-classes");
+  });
+
+  it("une méthode en tête est reprise ; l'essai suivant enrichit le même contrat (A2, N2, N3)", async () => {
+    await showAllProjects();
+    await paste(`POST ${url}/commandes`);
+    const form = browser.$('main [role="group"][aria-label="Formulaire de la nature REST"]');
+    await form.waitForDisplayed();
+    // Options cochées : méthode, puis type du corps (visible pour un POST).
+    const checked = () => form.$$('[role="radio"][aria-checked="true"]').map((r) => r.getText());
+    await browser.waitUntil(async () => (await checked())[0] === "POST", {
+      timeoutMsg: "méthode POST non reprise de la saisie",
+    });
+    expect(await checked()).toEqual(["POST", "JSON"]);
+    expect(await browser.$("main .try__input").getValue()).toBe(`${url}/commandes`);
+    await form.$("textarea").setValue('{"article":"T-shirt"}');
+    await sendTrial("Essai 2");
+
+    const contract = readFileSync(contractFile(), "utf8");
+    expect(contract).toContain("/sante:");
+    expect(contract).toContain("/commandes:");
+    expect(contract).toMatch(/"?201"?:/);
+    expect(existsSync(path.join(inbox(), host.replace(":", " "), "essai-2.yml"))).toBe(true);
+    // « Non classés » reste premier dans « Tous les projets ».
+    await showAllProjects();
+    const rows = await browser.$$("main tr.all__row").map((row) => row.getText());
+    expect(rows[0]).toContain("Non classés");
+    expect(rows[0]).toContain("Hors workspaces");
+    await screenshot(browser, "18-tous-les-projets-non-classes");
   });
 });
