@@ -513,7 +513,9 @@ describe("Fenêtres et zones", () => {
 
     await browser.$("main").$("button=+ Nouvelle requête").click();
     await waitForZoneTabs([["Nouvelle requête"]]);
-    await browser.$("aside").$("button*=+ Requête").click();
+    // « + » de la ligne du projet, puis « Nouvelle requête » (barre latérale du projet, B3).
+    await browser.$('aside button[aria-label="Ajouter au projet boutique-tests"]').click();
+    await browser.$('[role="menuitem"]*=Nouvelle requête').click();
     const dialog = browser.$("dialog[open]");
     await dialog.waitForDisplayed();
     await dialog.$("input").setValue("lister");

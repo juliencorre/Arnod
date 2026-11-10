@@ -57,9 +57,8 @@ function operationRows(wrapper: AppWrapper): string[] {
 describe("ajouter un contrat (C1 à C4)", () => {
   it("colle un contrat : refusé avec la raison, puis ajouté et ouvert", async () => {
     const { core } = await setup();
-    expect(app?.get(".contracts__empty").text()).toBe(
-      "Aucun contrat : « + Contrat » en ajoute un.",
-    );
+    // Projet sans contrat : une ligne « Ajouter un contrat » à la place d'un texte d'aide (B4).
+    expect(app?.get(".contracts__ghost").text()).toBe("+ Ajouter un contrat");
 
     await addMenu(app as AppWrapper, "Coller un contrat…");
     const dialog = app?.get("dialog[open]");
@@ -288,7 +287,7 @@ describe("source et suppression (C9, C11)", () => {
 });
 
 describe("au clavier et entre fenêtres", () => {
-  it("le menu « + Contrat » s'ouvre et se parcourt au clavier", async () => {
+  it("le menu « + » des contrats s'ouvre et se parcourt au clavier", async () => {
     await setup();
     const trigger = app?.get('[aria-label="Ajouter un contrat à boutique-tests"]');
     await trigger?.trigger("keydown", { key: "ArrowDown" });

@@ -98,7 +98,7 @@ function failureText(results: AssertionResult[]): string {
     </ul>
   </section>
   <p v-else class="run-none">
-    Aucun run pour l'instant : « ▶ Tout exécuter » ou « Exécuter le dossier » dans la barre
+    Aucun run pour l'instant : ▶ sur la ligne du projet ou « Exécuter le dossier » dans la barre
     latérale.
   </p>
 </template>

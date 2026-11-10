@@ -222,8 +222,9 @@ function onMenuKeydown(event: KeyboardEvent): void {
  */
 defineExpose({ open, close });
 
-function role(item: MenuItem): "menuitem" | "menuitemcheckbox" {
-  return item.checked === undefined ? "menuitem" : "menuitemcheckbox";
+function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio" {
+  if (item.checked === undefined) return "menuitem";
+  return item.radio === true ? "menuitemradio" : "menuitemcheckbox";
 }
 </script>
 
@@ -260,10 +261,19 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" {
             <span v-if="item.checked !== undefined" class="menu__check" aria-hidden="true">
               {{ item.checked ? "✓" : "" }}
             </span>
+            <span
+              v-if="item.swatch"
+              class="menu__swatch"
+              :style="{ background: item.swatch }"
+              aria-hidden="true"
+            />
             <span class="menu__text">
-              <span class="menu__label">{{ item.label }}</span>
+              <span class="menu__label"
+                >{{ item.label }}<span v-if="item.tag" class="menu__tag">{{ item.tag }}</span></span
+              >
               <span v-if="item.hint" class="menu__hint">{{ item.hint }}</span>
             </span>
+            <span v-if="item.detail" class="menu__detail">{{ item.detail }}</span>
             <kbd v-if="item.shortcut" class="menu__shortcut">{{ item.shortcut }}</kbd>
             <span v-if="hasChildren(item)" class="menu__arrow" aria-hidden="true">▸</span>
             <ul
@@ -315,7 +325,9 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" {
   position: absolute;
   z-index: 20;
   top: calc(100% + 4px);
+  width: max-content;
   min-width: 15rem;
+  max-width: min(26rem, 90vw);
   padding: 0.375rem;
   border: 1px solid var(--color-border);
   border-radius: 10px;
@@ -410,9 +422,35 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" {
   color: var(--color-muted);
 }
 
-.menu__shortcut {
+.menu__shortcut,
+.menu__detail {
   font: 0.75rem var(--font-mono);
   color: var(--color-muted);
+}
+
+.menu__detail {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu__swatch {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+}
+
+/* L'espace avant la mention fait partie du nom accessible (« Recette protégé »). */
+.menu__tag::before {
+  content: " ";
+}
+
+.menu__tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-link);
 }
 
 .menu__arrow {

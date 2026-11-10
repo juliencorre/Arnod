@@ -26,9 +26,18 @@ describe("environnements du projet", () => {
         locals: [],
       });
     }));
-    const options = app.findAll(".envbar__select option").map((o) => o.text());
-    expect(options).toEqual(["Local", "Recette 🔒"]);
-    await app.get(".envbar__select").setValue("Recette");
+    // Pastille sous le nom du projet ; son menu s'ouvre et se parcourt au clavier (B2).
+    const chip = app.get('[aria-label="Environnement de boutique-tests : Local"]');
+    await chip.trigger("keydown", { key: "ArrowDown" });
+    await flushPromises();
+    const radios = app.findAll('[role="menuitemradio"]');
+    expect(radios.map((r) => r.text())).toEqual(["✓Local", "Recetteprotégé"]);
+    expect(radios[0]?.attributes("aria-checked")).toBe("true");
+    expect(document.activeElement).toBe(radios[0]?.element);
+    await radios[0]?.trigger("keydown", { key: "ArrowDown" });
+    await flushPromises();
+    expect(document.activeElement).toBe(radios[1]?.element);
+    await radios[1]?.trigger("keydown", { key: "Enter" });
     await flushPromises();
     expect(core.workbench.active).toBe("Recette");
     expect(core.calls.find((c) => c.cmd === "environment_select")?.args).toMatchObject({
@@ -39,9 +48,20 @@ describe("environnements du projet", () => {
   it("crée un environnement depuis la fenêtre de gestion", async () => {
     let core;
     ({ app, core } = await openProject());
-    await click(app, ".envbar button", "Gérer");
+    await click(app, '[aria-label="Environnement de boutique-tests : Local"]');
+    await click(app, '[role="menuitem"]', "Gérer les environnements…");
     expect(app.find("dialog[open]").exists()).toBe(true);
     await click(app, "dialog[open] button", "+ Nouvel environnement");
+    expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local", "Nouvel environnement"]);
+  });
+
+  it("« + Nouvel environnement » du menu ouvre la gestion sur un nouvel environnement", async () => {
+    let core;
+    ({ app, core } = await openProject());
+    await click(app, '[aria-label="Environnement de boutique-tests : Local"]');
+    await click(app, '[role="menuitem"]', "+ Nouvel environnement");
+    await flushPromises();
+    expect(app.find("dialog[open]").exists()).toBe(true);
     expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local", "Nouvel environnement"]);
   });
 
@@ -51,7 +71,8 @@ describe("environnements du projet", () => {
       const local = c.workbench.envs[0];
       if (local) local.locals = ["token"];
     }));
-    await click(app, ".envbar button", "Gérer");
+    await click(app, `[aria-label="Plus d'actions sur boutique-tests"]`);
+    await click(app, '[role="menuitem"]', "Gérer les environnements…");
     const input = app.get('dialog[open] input[aria-label="Valeur de token"]');
     expect((input.element as HTMLInputElement).type).toBe("password");
     await input.setValue("abc123");

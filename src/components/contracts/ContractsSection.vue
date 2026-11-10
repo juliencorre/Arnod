@@ -1,11 +1,14 @@
 <script setup lang="ts">
 /**
  * Contrats d'un projet, sous ses requêtes dans la barre latérale (C1 à C4, C11).
- * « + Contrat » propose d'importer un fichier, de coller un contrat, de le lire
- * à une adresse ou d'en créer un vide ; un contrat choisi s'ouvre en onglet.
+ * Le « + » de la section propose d'importer un fichier, de coller un contrat, de le
+ * lire à une adresse ou d'en créer un vide ; un contrat choisi s'ouvre en onglet.
+ * Les lignes suivent la grille de la barre latérale (plan de la barre latérale du
+ * projet, B5) ; `add` est exposé au menu « + » du projet.
  */
 import { computed, onMounted, ref } from "vue";
 
+import { CONTRACT_ADD_ITEMS } from "@/components/contracts/addItems";
 import ContractDialog from "@/components/contracts/ContractDialog.vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
@@ -29,12 +32,7 @@ const mode = ref<ContractDialogMode | null>(null);
 const error = ref<string | null>(null);
 const busy = ref(false);
 
-const ADD_ITEMS: MenuItem[] = [
-  { id: "file", label: "Importer un fichier…", hint: "OpenAPI 3 ou Swagger 2, JSON ou YAML" },
-  { id: "text", label: "Coller un contrat…" },
-  { id: "url", label: "Depuis une adresse…" },
-  { id: "template", label: "Nouveau contrat…", separatorBefore: true },
-];
+const ADD_ITEMS = CONTRACT_ADD_ITEMS;
 
 onMounted(() => {
   if (!(props.projectId in contracts.lists)) {
@@ -52,6 +50,8 @@ function isSelected(contract: ContractSummary): boolean {
     content.path === contract.path
   );
 }
+
+defineExpose({ add: onAdd });
 
 function onAdd(id: string): void {
   if (id === "file") {
@@ -99,15 +99,25 @@ async function onItem(id: string, contract: ContractSummary): Promise<void> {
   <section class="contracts" :aria-label="`Contrats de ${projectName}`">
     <div class="contracts__head">
       <h3 class="contracts__title">Contrats</h3>
-      <BaseMenu :items="ADD_ITEMS" label="Ajouter un contrat" @select="onAdd">
+      <span v-if="list.length > 0" class="contracts__count">{{ list.length }}</span>
+      <BaseMenu
+        class="contracts__add"
+        :items="ADD_ITEMS"
+        label="Ajouter un contrat"
+        align="end"
+        @select="onAdd"
+      >
         <template #trigger="{ attrs }">
           <button
             type="button"
             class="contracts__tool"
             v-bind="attrs"
             :aria-label="`Ajouter un contrat à ${projectName}`"
+            :title="`Ajouter un contrat à ${projectName}`"
           >
-            + Contrat
+            <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M6 2.5v7M2.5 6h7" />
+            </svg>
           </button>
         </template>
       </BaseMenu>
@@ -150,7 +160,14 @@ async function onItem(id: string, contract: ContractSummary): Promise<void> {
         </BaseMenu>
       </li>
     </ul>
-    <p v-else class="contracts__empty">Aucun contrat : « + Contrat » en ajoute un.</p>
+    <BaseMenu v-else :items="ADD_ITEMS" label="Ajouter un contrat" @select="onAdd">
+      <template #trigger="{ attrs }">
+        <button type="button" class="contracts__ghost" v-bind="attrs">
+          <span class="contracts__lead" aria-hidden="true">+</span>
+          Ajouter un contrat
+        </button>
+      </template>
+    </BaseMenu>
     <ContractDialog
       :mode="mode"
       :error="error"
@@ -165,39 +182,62 @@ async function onItem(id: string, contract: ContractSummary): Promise<void> {
 .contracts {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  margin-top: 0.5rem;
   min-width: 0;
 }
 
+/* En-tête de section, aligné sur la colonne de tête des lignes du projet. */
 .contracts__head {
   display: flex;
-  align-items: baseline;
-  gap: 0.625rem;
-  padding: 0 0.25rem;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.875rem;
+  margin-top: 0.375rem;
+  padding: 0 var(--tree-pad) 0 calc(var(--tree-pad) + var(--tree-indent));
 }
 
 .contracts__title {
   margin: 0;
   font-size: 0.6875rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-muted);
 }
 
+.contracts__count {
+  font: 500 0.6875rem var(--font-mono);
+  color: var(--color-muted);
+}
+
+.contracts__add {
+  margin-left: auto;
+}
+
 .contracts__tool {
-  padding: 0.125rem 0;
+  display: grid;
+  place-items: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  padding: 0;
   border: none;
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-link);
+  border-radius: 6px;
   background: none;
   cursor: pointer;
 }
 
+.contracts__tool path {
+  stroke: var(--color-text);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.contracts__tool:hover,
+.contracts__tool[aria-expanded="true"] {
+  background: var(--color-chip);
+}
+
 .contracts__tool:focus-visible,
+.contracts__ghost:focus-visible,
 .contract-row__main:focus-visible,
 .contract-row__more:focus-visible {
   outline: 2px solid var(--color-focus);
@@ -211,15 +251,40 @@ async function onItem(id: string, contract: ContractSummary): Promise<void> {
   list-style: none;
 }
 
-.contracts__empty {
-  margin: 0.25rem 0.25rem 0.5rem;
-  font-size: 0.8125rem;
-  color: var(--color-muted);
+/* Ligne d'ajout d'un projet sans contrat, sur la grille des lignes. */
+.contracts__ghost {
+  display: flex;
+  align-items: center;
+  gap: var(--tree-gap);
+  width: 100%;
+  min-height: 1.75rem;
+  padding: 0 var(--tree-pad) 0 calc(var(--tree-pad) + var(--tree-indent));
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: left;
+  color: var(--color-link);
+  background: none;
+  cursor: pointer;
+}
+
+.contracts__ghost:hover {
+  background: var(--color-accent-soft);
+}
+
+.contracts__lead {
+  box-sizing: border-box;
+  flex: none;
+  width: var(--tree-lead);
+  padding-left: 0.125rem;
 }
 
 .contract-row {
   display: flex;
   align-items: center;
+  padding-left: calc(var(--tree-pad) + var(--tree-indent));
   border-radius: 6px;
 }
 
@@ -232,9 +297,10 @@ async function onItem(id: string, contract: ContractSummary): Promise<void> {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--tree-gap);
   min-width: 0;
-  padding: 0.3125rem 0.25rem 0.3125rem 0.5rem;
+  min-height: 1.75rem;
+  padding: 0;
   border: 0;
   background: none;
   font: inherit;
@@ -245,7 +311,8 @@ async function onItem(id: string, contract: ContractSummary): Promise<void> {
 }
 
 .contract-row__badge {
-  min-width: 2.5rem;
+  flex: none;
+  width: var(--tree-lead);
   font: 700 0.6875rem var(--font-mono);
   color: var(--color-link);
 }

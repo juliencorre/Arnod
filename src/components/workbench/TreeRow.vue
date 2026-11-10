@@ -1,5 +1,10 @@
 <script setup lang="ts">
-/** Ligne de l'arborescence : dossier (repliable) ou requête, avec son menu d'actions. */
+/**
+ * Ligne de l'arborescence : dossier (repliable) ou requête, avec son menu d'actions. Toutes
+ * les lignes suivent la grille de la barre latérale (`--tree-*`, défini par `AppSidebar`) :
+ * une colonne de tête (chevron et dossier, ou méthode), puis le nom ; chaque profondeur
+ * décale de la largeur du chevron, si bien qu'un enfant s'aligne sur l'icône de son dossier.
+ */
 import { computed } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
@@ -85,11 +90,7 @@ function activate(): void {
 
 <template>
   <li role="presentation">
-    <div
-      class="row"
-      :class="{ 'row--selected': isSelected }"
-      :style="{ paddingLeft: `${0.5 + depth * 1}rem` }"
-    >
+    <div class="row" :class="{ 'row--selected': isSelected }" :style="{ '--depth': depth + 1 }">
       <button
         type="button"
         class="row__main"
@@ -100,12 +101,17 @@ function activate(): void {
         @click="activate"
       >
         <template v-if="node.kind === 'folder'">
-          <span class="row__chevron" aria-hidden="true">{{ isOpen ? "▾" : "▸" }}</span>
+          <span class="row__lead" aria-hidden="true">
+            <span class="row__chevron">{{ isOpen ? "▾" : "▸" }}</span>
+            <svg class="row__folder" width="14" height="14" viewBox="0 0 14 14">
+              <path d="M1.5 3.5h4l1.2 1.4h5.8v6.6h-11z" />
+            </svg>
+          </span>
           <span class="row__name">{{ node.name }}</span>
           <span class="row__count">{{ node.requestCount }}</span>
         </template>
         <template v-else>
-          <span class="row__method" :class="`row__method--${node.method.toLowerCase()}`">
+          <span class="row__lead row__method" :class="`row__method--${node.method.toLowerCase()}`">
             {{ node.method }}
           </span>
           <span class="row__name">{{ node.name }}</span>
@@ -144,6 +150,7 @@ function activate(): void {
 .row {
   display: flex;
   align-items: center;
+  padding-left: calc(var(--tree-pad) + var(--tree-indent) * var(--depth));
   border-radius: 6px;
 }
 
@@ -156,9 +163,10 @@ function activate(): void {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--tree-gap);
   min-width: 0;
-  padding: 0.3125rem 0.25rem;
+  min-height: 1.75rem;
+  padding: 0;
   border: 0;
   background: none;
   font: inherit;
@@ -175,9 +183,30 @@ function activate(): void {
   border-radius: 6px;
 }
 
+/* Colonne de tête : chevron et dossier, ou méthode. */
+.row__lead {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.375rem;
+  width: var(--tree-lead);
+}
+
 .row__chevron {
-  width: 0.75rem;
+  width: 0.875rem;
+  font-size: 0.75rem;
+  text-align: center;
   color: var(--color-muted);
+}
+
+.row__folder {
+  flex: none;
+}
+
+.row__folder path {
+  fill: var(--color-chip);
+  stroke: var(--color-subtle);
+  stroke-width: 1;
 }
 
 .row__name {
@@ -193,7 +222,6 @@ function activate(): void {
 }
 
 .row__method {
-  min-width: 2.5rem;
   font: 700 0.6875rem var(--font-mono);
   color: var(--color-muted);
 }

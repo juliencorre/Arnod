@@ -41,7 +41,9 @@ describe("arborescence du projet", () => {
   it("crée une requête depuis la fenêtre de nom", async () => {
     let core;
     ({ app, core } = await openProject());
-    await click(app, ".tree__head button", "+ Requête");
+    // « + » de la ligne du projet, puis « Nouvelle requête » (B3).
+    await click(app, '[aria-label="Ajouter au projet boutique-tests"]');
+    await click(app, '[role="menuitem"]', "Nouvelle requête");
     const input = app.get("dialog[open] input");
     await input.setValue("Supprimer");
     await app.get("dialog[open] form").trigger("submit");
@@ -55,7 +57,8 @@ describe("arborescence du projet", () => {
 
   it("affiche l'erreur du cœur quand le nom est déjà pris", async () => {
     ({ app } = await openProject());
-    await click(app, ".tree__head button", "+ Dossier");
+    await click(app, '[aria-label="Ajouter au projet boutique-tests"]');
+    await click(app, '[role="menuitem"]', "Nouveau dossier");
     await app.get("dialog[open] input").setValue("Clients");
     await app.get("dialog[open] form").trigger("submit");
     await flushPromises();
