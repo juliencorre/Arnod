@@ -266,7 +266,7 @@ async function submit(): Promise<void> {
       <p :id="ids.storageHint" class="field__hint">
         {{
           creatingWorkspace && !selectedWorkspace
-            ? `Il apparaîtra en onglet, après « ${ALL_PROJECTS} ».`
+            ? `Il apparaîtra dans le sélecteur, après « ${ALL_PROJECTS} ».`
             : `Un projet est toujours dans « ${ALL_PROJECTS} ». Un workspace est facultatif.`
         }}
       </p>

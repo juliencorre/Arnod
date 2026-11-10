@@ -9,6 +9,7 @@ import type { CatalogSnapshot, CommandError } from "@/types/ipc";
 import { STEP_CATALOG } from "./fakeSteps";
 import { createFakeWindows, handleWindows } from "./fakeWindows";
 import { boutiqueSnapshot, firstRunSnapshot } from "./fixtures";
+import { currentWorkspace, switcherNames } from "./switcher";
 
 let titles: (string | null)[];
 
@@ -48,14 +49,14 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("premier lancement : seul l'onglet « Tous les projets » et l'invitation à créer (1a, R3)", async () => {
+  it("premier lancement : le sélecteur sur « Tous les projets », sans workspace, et l'invitation à créer (1a, R3)", async () => {
     mockCore({ snapshot: firstRunSnapshot() });
 
     const wrapper = await mountApp();
 
     expect(wrapper.get("main h1").text()).toBe("Bienvenue dans Arnod");
-    expect(wrapper.findAll('[role="tab"]').map((t) => t.text())).toEqual(["Tous les projets"]);
-    expect(wrapper.get('[role="tab"]').attributes("aria-selected")).toBe("true");
+    expect(currentWorkspace(wrapper)).toBe("Tous les projets");
+    expect(await switcherNames(wrapper)).toEqual(["Tous les projets"]);
     expect(wrapper.get("aside").text()).toBe("Aucun projet pour l'instant.");
     expect(wrapper.get("main").text()).toContain("Importer…");
     expect(titles).toEqual([null]);
@@ -81,7 +82,7 @@ describe("App", () => {
     expect(wrapper.get("main").text()).toContain(
       "2 projets, regroupés ici pour travailler ensemble.",
     );
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Boutique");
+    expect(currentWorkspace(wrapper)).toBe("Boutique");
     expect(wrapper.get("aside").text()).toContain("boutique-tests");
     expect(titles.at(-1)).toBe("Boutique");
   });

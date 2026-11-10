@@ -19,7 +19,9 @@ barre latérale du projet selon `docs/plan-barre-laterale-projet.md` (section «
 projet »), puis résultat détachable selon `docs/plan-resultat-detachable.md` (section « Fenêtres et
 zones »), puis accueil, catalogue des étapes et Non classés selon `docs/plan-accueil-non-classes.md`
 et l'étude `docs/etude-catalogue-etapes.md` (section « Accueil, catalogue des étapes et Non
-classés »). Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
+classés »), puis sélecteur de workspace et icônes des sections selon
+`docs/plan-selecteur-workspace.md` (section « Projets et workspaces »). Un nouveau lot commence par
+un plan rédigé à partir de `docs/modele-plan.md`.
 
 ## Architecture
 
@@ -74,9 +76,10 @@ src/                    Frontend Vue
                         contracts (contrats par projet, contrats ouverts), steps (catalogue des
                         étapes, reconnaissance, essai)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions)
-  components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification
-  components/layout/    Coquille : onglets des workspaces, barre latérale (un SidebarProject par
-                        projet), zone principale
+  components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification,
+                        en-tête et icônes des sections (SectionHeading, SectionIcon)
+  components/layout/    Coquille : sélecteur de workspace (WorkspaceSwitcher), barre latérale (un
+                        SidebarProject par projet), zone principale
   components/zones/     Zones : arbre, onglets, séparations (SplitHandle), onglet de requête,
                         onglet de résultat (ResultTab, ResultSide)
   components/windows/   Fenêtres détachées : contenu, barre latérale
@@ -155,8 +158,9 @@ Linux : installer d'abord les dépendances système
 - TypeScript strict (`strict`, `noUncheckedIndexedAccess`), pas de `any`.
 - Interface : réutiliser les composants de `src/components/ui/` (`BaseButton`, `BaseDialog` sur
   `<dialog>` natif, `BaseMenu` accessible au clavier, `ToggleSwitch`, `SearchInput`,
-  `ColorDot`) ; navigation par le store `navigation` (pas de routeur) ; notifications par le
-  store `toasts`. Chaque composant interactif est testé au clavier.
+  `ColorDot`, `SectionHeading` et `SectionIcon` pour les sections de la barre latérale) ;
+  navigation par le store `navigation` (pas de routeur) ; notifications par le store `toasts`.
+  Chaque composant interactif est testé au clavier.
 - ESLint (`vueTsConfigs.strictTypeChecked`) et Prettier sans erreur. Imports de types
   avec `import type`. Alias `@/` pour `src/`.
 - Rust : `cargo fmt` et `cargo clippy -D warnings` sans avertissement. Pas de `unwrap()`
@@ -200,12 +204,21 @@ Linux : installer d'abord les dépendances système
 
 Référence : `docs/plan-projets-workspaces.md` (cas d'usage P1 à P12 et W1 à W11, règles R1 à
 R11), révisé par `docs/plan-workspaces-onglets.md` (cas O1 à O12, règles R3, R4, R7, R8, R11 et
-R12). Cocher une tâche dans le plan quand elle est livrée.
+R12) puis par `docs/plan-selecteur-workspace.md` (cas S1 à S8, I1, I2). Cocher une tâche dans le
+plan quand elle est livrée.
 
-- « Tous les projets » est le référentiel, affiché dans l'onglet épinglé ; ce n'est pas un
-  workspace. Il n'y a plus de workspace par défaut : un projet est dans zéro, un ou plusieurs
-  workspaces. Les onglets suivent l'ordre de création ; `lastWorkspaceId` vaut `null` pour
+- « Tous les projets » est le référentiel, proposé en tête du sélecteur de workspace ; ce n'est pas
+  un workspace. Il n'y a plus de workspace par défaut : un projet est dans zéro, un ou plusieurs
+  workspaces. Le sélecteur suit l'ordre de création ; `lastWorkspaceId` vaut `null` pour
   « Tous les projets ».
+- Sélecteur (`WorkspaceSwitcher.vue`) : en tête de la colonne de la barre latérale, à la hauteur de
+  `.zone__bar` ; sans barre latérale (tableau, gestion, catalogue, barre détachée), dans une rangée
+  en haut. Plus de rangée d'onglets de workspaces. Son menu (`role="menu"`, `menuitemradio`) porte
+  la création, les actions d'un workspace (« ⋯ », clic droit, Maj+F10 : renommer F2, couleur,
+  gérer, supprimer Suppr) et le dépôt d'un projet glissé ; Ctrl+0…9 et Ctrl+Maj+W partout (code de
+  la touche, pour l'AZERTY). Tests : aides `tests/switcher.ts`.
+- Sections d'un projet dans la barre latérale : `SectionHeading` (icône `SectionIcon`, nom, nombre,
+  « + »). Les icônes des sections à venir sont déjà dans `components/ui/sectionIcons.ts`.
 - Les règles vivent dans `src-tauri/src/catalog/`, module pur sans dépendance à Tauri ni au
   disque, testé règle par règle (`catalog/tests.rs`). L'interface affiche l'état et ne fait que
   des filtres et comptages d'affichage.

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * « Nouveau workspace » (2b, O3), ouvert près du « + » des onglets : le nouvel
- * onglet s'ajoute à la fin et démarre vide. Échap, « Annuler » ou un clic à
- * l'extérieur ferment sans rien créer ; le focus revient au « + ».
+ * « Nouveau workspace » (S3), ouvert sous le sélecteur de workspace : le workspace
+ * s'ajoute au sélecteur et démarre vide. Échap, « Annuler » ou un clic à l'extérieur
+ * ferment sans rien créer ; le focus revient au sélecteur.
  */
 import { computed, nextTick, onBeforeUnmount, ref, useId, useTemplateRef, watch } from "vue";
 
@@ -29,7 +29,7 @@ const input = useTemplateRef<HTMLInputElement>("input");
 const name = ref("");
 const error = ref<string | null>(null);
 const submitting = ref(false);
-const position = ref({ top: 0, right: 0 });
+const position = ref({ top: 0, left: 0 });
 const isOpen = computed(() => dialogs.newWorkspace !== null);
 
 function onOutside(event: PointerEvent): void {
@@ -47,9 +47,11 @@ watch(isOpen, async (open) => {
   name.value = "";
   error.value = null;
   const rect = props.anchor?.getBoundingClientRect();
+  // Aligné sur le bord gauche du sélecteur, sans sortir de la fenêtre.
+  const width = Math.min(328, window.innerWidth - 16);
   position.value = {
     top: (rect?.bottom ?? 0) + 6,
-    right: Math.max(8, window.innerWidth - (rect?.right ?? window.innerWidth)),
+    left: Math.max(8, Math.min(rect?.left ?? 8, window.innerWidth - width - 8)),
   };
   document.addEventListener("pointerdown", onOutside, true);
   await nextTick();
@@ -60,7 +62,7 @@ onBeforeUnmount(() => {
   document.removeEventListener("pointerdown", onOutside, true);
 });
 
-/** Ferme ; `restore` rend le focus au « + ». */
+/** Ferme ; `restore` rend le focus au sélecteur. */
 function close(restore = true): void {
   dialogs.newWorkspace = null;
   if (restore) props.anchor?.focus();
@@ -92,7 +94,7 @@ async function submit(): Promise<void> {
     class="popover"
     role="dialog"
     :aria-labelledby="titleId"
-    :style="{ top: `${position.top}px`, right: `${position.right}px` }"
+    :style="{ top: `${position.top}px`, left: `${position.left}px` }"
     @keydown.esc.prevent.stop="close()"
   >
     <h2 :id="titleId" class="popover__title">Nouveau workspace</h2>
@@ -112,8 +114,7 @@ async function submit(): Promise<void> {
       />
       <p v-if="error" :id="errorId" class="popover__error" role="alert">{{ error }}</p>
       <p :id="hintId" class="popover__hint">
-        Un nouvel onglet s'ajoute à la fin. Il démarre vide : glissez-y des projets depuis «
-        {{ ALL_PROJECTS }} ».
+        Il s'ajoute au sélecteur, vide : glissez-y des projets depuis « {{ ALL_PROJECTS }} ».
       </p>
       <div class="popover__actions">
         <BaseButton @click="close()">Annuler</BaseButton>

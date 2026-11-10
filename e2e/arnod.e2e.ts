@@ -66,50 +66,94 @@ async function restart(): Promise<void> {
   browser = await launchApp();
 }
 
-/** Libellés des onglets, « Tous les projets » compris (texte du DOM, défilement ignoré). */
-async function tabNames(): Promise<string[]> {
-  return browser.execute(() =>
-    Array.from(document.querySelectorAll('[role="tablist"] [role="tab"]')).map((tab) =>
-      tab.textContent.trim(),
-    ),
+/** Workspace affiché par le sélecteur (docs/plan-selecteur-workspace.md, S1). */
+async function currentWorkspace(): Promise<string> {
+  // Texte du DOM : `getText` de WebKitWebDriver rend vide un libellé tronqué par ellipse.
+  return browser.execute(
+    () => document.querySelector(".switcher__label")?.textContent.trim() ?? "",
   );
 }
 
-/** Onglet par son libellé (WebdriverIO : `balise=texte` sous un parent CSS). */
-function tab(name: string) {
-  return browser.$('[role="tablist"]').$(`button=${name}`);
+async function openSwitcher(): Promise<void> {
+  const menu = browser.$('.switcher__popover [role="menu"]');
+  if (await menu.isExisting()) return;
+  await browser.$(".switcher__trigger").click();
+  await menu.waitForDisplayed();
 }
 
-async function openTabMenu(name: string): Promise<void> {
+async function closeSwitcher(): Promise<void> {
+  if (!(await browser.$('.switcher__popover [role="menu"]').isExisting())) return;
+  await browser.keys("Escape");
+  await browser.$('.switcher__popover [role="menu"]').waitForExist({ reverse: true });
+}
+
+/** « Tous les projets » puis les workspaces, lus dans le menu du sélecteur. */
+async function workspaceNames(): Promise<string[]> {
+  await openSwitcher();
+  const names = await browser.execute(() =>
+    Array.from(
+      document.querySelectorAll('.switcher__popover [role="menuitemradio"] .switcher__name'),
+    ).map((name) => name.textContent.trim()),
+  );
+  await closeSwitcher();
+  return names;
+}
+
+/** Ligne d'un workspace (ou de « Tous les projets ») dans le menu ouvert. */
+async function clickSwitcherEntry(label: string, role = "menuitemradio"): Promise<void> {
+  await browser.execute(
+    (text, kind) => {
+      const entry = Array.from(
+        document.querySelectorAll<HTMLElement>(`.switcher__popover [role="${kind}"]`),
+      ).find((item) => item.querySelector(".switcher__name")?.textContent.trim() === text);
+      if (!entry) throw new Error(`« ${text} » absent du sélecteur`);
+      entry.click();
+    },
+    label,
+    role,
+  );
+}
+
+/** Ouvre un workspace, ou « Tous les projets », par le sélecteur. */
+async function chooseWorkspace(name: string): Promise<void> {
+  await openSwitcher();
+  await clickSwitcherEntry(name);
+  await browser.$('.switcher__popover [role="menu"]').waitForExist({ reverse: true });
+}
+
+/** Actions d'un workspace : menu du sélecteur, puis clic droit sur sa ligne (S4). */
+async function openWorkspaceActions(name: string): Promise<void> {
+  await openSwitcher();
   // Clic droit émis dans la WebView : un clic droit par actions WebDriver dérègle
   // ensuite la frappe des majuscules sous WebKitWebDriver. Le vrai clic droit est
   // couvert par Vitest ; ici, le menu s'ouvre sur le même événement `contextmenu`.
   await browser.execute((label) => {
-    const target = Array.from(document.querySelectorAll('[role="tablist"] [role="tab"]')).find(
-      (t) => t.textContent.trim() === label,
-    );
-    if (!target) throw new Error(`onglet « ${label} » introuvable`);
+    const target = Array.from(
+      document.querySelectorAll('.switcher__popover [role="menuitemradio"]'),
+    ).find((t) => t.querySelector(".switcher__name")?.textContent.trim() === label);
+    if (!target) throw new Error(`workspace « ${label} » introuvable`);
     const box = target.getBoundingClientRect();
     target.dispatchEvent(
       new MouseEvent("contextmenu", {
         bubbles: true,
         cancelable: true,
         button: 2,
-        clientX: box.left + box.width / 2,
+        clientX: box.right - 24,
         clientY: box.top + box.height / 2,
       }),
     );
   }, name);
-  await browser.$('.tabs__context [role="menu"]').waitForDisplayed();
+  await browser.$('.switcher__context [role="menu"]').waitForDisplayed();
 }
 
-async function chooseTabMenuItem(label: string): Promise<void> {
-  await browser.$(".tabs__context").$(`[role="menuitem"]*=${label}`).click();
+async function chooseWorkspaceAction(label: string): Promise<void> {
+  await browser.$(".switcher__context").$(`[role="menuitem"]*=${label}`).click();
 }
 
-/** Crée un workspace par le « + » des onglets. */
+/** Crée un workspace par « + Nouveau workspace » du sélecteur (S3). */
 async function createWorkspace(name: string): Promise<void> {
-  await browser.$('button[aria-label="Nouveau workspace"]').click();
+  await openSwitcher();
+  await clickSwitcherEntry("Nouveau workspace", "menuitem");
   const popover = browser.$('[role="dialog"][aria-labelledby]');
   await popover.waitForDisplayed();
   await popover.$("input").setValue(name);
@@ -190,7 +234,8 @@ function workspaceNamed(name: string) {
 describe("Arnod, de bout en bout", () => {
   it("premier lancement : seul l'onglet « Tous les projets », aucun workspace (1a, R3, A1)", async () => {
     expect(await heading(browser)).toBe("Bienvenue dans Arnod");
-    expect(await tabNames()).toEqual(["Tous les projets"]);
+    expect(await currentWorkspace()).toBe("Tous les projets");
+    expect(await workspaceNames()).toEqual(["Tous les projets"]);
     expect(await browser.$("aside").getText()).toBe("Aucun projet pour l'instant.");
     const main = await browser.$("main").getText();
     expect(main).toContain("Essayer une étape");
@@ -253,7 +298,7 @@ describe("Arnod, de bout en bout", () => {
 
   it("refuse un nom déjà pris, message du cœur sous le champ (R9)", async () => {
     // Depuis un projet, l'onglet de départ ramène à sa liste.
-    await tab("Tous les projets").click();
+    await chooseWorkspace("Tous les projets");
     await waitForHeading(browser, "Tous les projets · 1");
     await browser.$("main").$("button=Nouveau projet").click();
     const dialog = browser.$("dialog[open]");
@@ -271,21 +316,21 @@ describe("Arnod, de bout en bout", () => {
     await dialog.waitForDisplayed({ reverse: true });
   });
 
-  it("« + » crée un workspace : son onglet s'ajoute à la fin et s'ouvre (O3)", async () => {
+  it("« + Nouveau workspace » du sélecteur crée un workspace et l'ouvre (S3)", async () => {
     await createWorkspace("Boutique");
 
-    expect(await tabNames()).toEqual(["Tous les projets", "Boutique"]);
-    expect(await tab("Boutique").getAttribute("aria-selected")).toBe("true");
+    expect(await workspaceNames()).toEqual(["Tous les projets", "Boutique"]);
+    expect(await currentWorkspace()).toBe("Boutique");
     expect(await browser.$("main").getText()).toContain("Aucun projet pour l'instant");
     const state = readState(sandbox);
     expect(state.workspaces.map((w) => w.name)).toEqual(["Boutique"]);
     expect(state.lastWorkspaceId).toBe(workspaceNamed("Boutique")?.id);
   });
 
-  it("le menu contextuel d'un onglet s'affiche en entier, par-dessus la zone principale (O4)", async () => {
-    await openTabMenu("Boutique");
+  it("le sélecteur et les actions d'un workspace s'affichent en entier, par-dessus la zone principale (S2, S4)", async () => {
+    await openWorkspaceActions("Boutique");
     const layout = await browser.execute(() => {
-      const menu = document.querySelector('.tabs__context [role="menu"]');
+      const menu = document.querySelector('.switcher__context [role="menu"]');
       if (!menu) return null;
       const box = menu.getBoundingClientRect();
       // Près de chaque coin, c'est bien le menu qui est affiché : il n'est pas rogné.
@@ -298,10 +343,19 @@ describe("Arnod, de bout en bout", () => {
       return corners.every(([x, y]) => menu.contains(document.elementFromPoint(x, y)));
     });
     expect(layout).toBe(true);
-    await screenshot(browser, "02b-menu-onglet");
+    const popover = await browser.execute(() => {
+      const menu = document.querySelector(".switcher__popover");
+      if (!menu) return null;
+      const box = menu.getBoundingClientRect();
+      // Le bas du menu du sélecteur passe par-dessus la zone principale.
+      return menu.contains(document.elementFromPoint(box.left + 4, box.bottom - 4));
+    });
+    expect(popover).toBe(true);
+    await screenshot(browser, "02b-selecteur-workspace");
 
     await browser.keys("Escape");
-    await browser.$('.tabs__context [role="menu"]').waitForDisplayed({ reverse: true });
+    await browser.$('.switcher__context [role="menu"]').waitForExist({ reverse: true });
+    await closeSwitcher();
   });
 
   it("ajoute un projet existant au workspace (2c, W6)", async () => {
@@ -337,7 +391,7 @@ describe("Arnod, de bout en bout", () => {
       state.workspaces.map((w) => [w.name, id !== undefined && w.projectIds.includes(id)]),
     ).toEqual([["Boutique", true]]);
 
-    await tab("Boutique").click();
+    await chooseWorkspace("Boutique");
     await waitForHeading(browser, "Boutique");
     expect(await cardNames(browser)).toEqual(["boutique-tests", "paiements-v3"]);
     await screenshot(browser, "03-workspace-boutique");
@@ -357,45 +411,64 @@ describe("Arnod, de bout en bout", () => {
     await dismissToast();
   });
 
-  it("renomme un workspace dans son onglet (O4)", async () => {
-    await openTabMenu("Boutique");
-    await chooseTabMenuItem("Renommer");
-    const input = browser.$(".tab--editing input");
-    await input.waitForDisplayed();
-    // Le nom est sélectionné à l'ouverture : la frappe le remplace. (Pas de
-    // `setValue` : son effacement fait perdre le focus, ce qui valide l'édition.)
-    expect(await input.isFocused()).toBe(true);
-    await input.addValue("E-commerce");
-    expect(await input.getValue()).toBe("E-commerce");
+  it("renomme un workspace depuis le sélecteur (S4)", async () => {
+    await openWorkspaceActions("Boutique");
+    await chooseWorkspaceAction("Renommer");
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForDisplayed();
+    expect(await dialog.$("h2").getText()).toBe("Renommer le workspace");
+    const input = dialog.$("input");
+    expect(await input.getValue()).toBe("Boutique");
+    await input.setValue("E-commerce");
     await browser.keys("Enter");
 
     await waitForHeading(browser, "E-commerce");
-    expect(await tabNames()).toEqual(["Tous les projets", "E-commerce"]);
+    expect(await currentWorkspace()).toBe("E-commerce");
+    expect(await workspaceNames()).toEqual(["Tous les projets", "E-commerce"]);
     expect(workspaceNamed("E-commerce")?.projectIds).toHaveLength(2);
   });
 
-  it("glisser une ligne de « Tous les projets » sur un onglet ajoute le projet (O7)", async () => {
+  it("glisser une ligne de « Tous les projets » sur le sélecteur ajoute le projet (S6)", async () => {
     await createWorkspace("Recette");
-    await tab("Tous les projets").click();
+    await chooseWorkspace("Tous les projets");
     await waitForHeading(browser, "Tous les projets · 2");
 
     // Le glisser natif ne se pilote pas par WebDriver sous WebKit : on émet les
-    // événements HTML du glisser-déposer dans la vraie WebView.
+    // événements HTML du glisser-déposer dans la vraie WebView. Le sélecteur
+    // s'ouvre au survol, puis le projet se dépose sur un workspace.
     await browser.execute(() => {
       const row = Array.from(document.querySelectorAll("main tbody tr")).find(
         (tr) => tr.querySelector("th")?.textContent === "boutique-tests",
       );
-      const target = Array.from(document.querySelectorAll('[role="tab"]')).find(
-        (t) => t.textContent.trim() === "Recette",
-      );
-      if (!row || !target) throw new Error("ligne ou onglet introuvable");
+      const trigger = document.querySelector(".switcher__trigger");
+      if (!row || !trigger) throw new Error("ligne ou sélecteur introuvable");
       const dataTransfer = new DataTransfer();
+      (window as unknown as { __drag: { row: Element; dataTransfer: DataTransfer } }).__drag = {
+        row,
+        dataTransfer,
+      };
+      for (const [element, type] of [
+        [row, "dragstart"],
+        [trigger, "dragenter"],
+      ] as const) {
+        element.dispatchEvent(
+          new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer }),
+        );
+      }
+    });
+    await browser.$('.switcher__popover [role="menu"]').waitForDisplayed();
+    await browser.execute(() => {
+      const { row, dataTransfer } = (
+        window as unknown as { __drag: { row: Element; dataTransfer: DataTransfer } }
+      ).__drag;
+      const target = Array.from(
+        document.querySelectorAll('.switcher__popover [role="menuitemradio"]'),
+      ).find((t) => t.querySelector(".switcher__name")?.textContent.trim() === "Recette");
+      if (!target) throw new Error("workspace « Recette » absent du sélecteur");
       const fire = (element: Element, type: string) =>
         element.dispatchEvent(
           new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer }),
         );
-      fire(row, "dragstart");
-      fire(target, "dragenter");
       fire(target, "dragover");
       fire(target, "drop");
       fire(row, "dragend");
@@ -408,8 +481,8 @@ describe("Arnod, de bout en bout", () => {
   });
 
   it("gère les workspaces : suppression sans confirmation, puis annulée (2d, O6, O11)", async () => {
-    await openTabMenu("Recette");
-    await chooseTabMenuItem("Gérer les workspaces…");
+    await openWorkspaceActions("Recette");
+    await chooseWorkspaceAction("Gérer les workspaces…");
     await waitForHeading(browser, "Workspaces");
     expect(await browser.$("aside").isExisting()).toBe(false);
     expect(await browser.$("main").getText()).not.toContain("par défaut");
@@ -420,11 +493,11 @@ describe("Arnod, de bout en bout", () => {
       "Workspace « Recette » supprimé · 1 projet conservé dans « Tous les projets ».",
     );
     expect(readState(sandbox).workspaces.map((w) => w.name)).toEqual(["E-commerce"]);
-    expect(await tabNames()).toEqual(["Tous les projets", "E-commerce"]);
+    expect(await workspaceNames()).toEqual(["Tous les projets", "E-commerce"]);
 
     await browser.$(".toast").$("button=Annuler").click();
     await browser.waitUntil(() => readState(sandbox).workspaces.length === 2);
-    expect(await tabNames()).toEqual(["Tous les projets", "E-commerce", "Recette"]);
+    expect(await workspaceNames()).toEqual(["Tous les projets", "E-commerce", "Recette"]);
     await dismissToast();
     await browser.$("main").$("button*=Retour").click();
     await waitForHeading(browser, "Tous les projets · 2");
@@ -447,7 +520,7 @@ describe("Arnod, de bout en bout", () => {
     await waitForHeading(browser, "Tous les projets · 2");
     expect(readState(sandbox).lastWorkspaceId).toBeNull();
 
-    await tab("E-commerce").click();
+    await chooseWorkspace("E-commerce");
     await waitForHeading(browser, "E-commerce");
     await restart();
 
@@ -505,7 +578,7 @@ describe("Arnod, de bout en bout", () => {
   });
 
   it("oublie un projet sans toucher à ses fichiers, puis annule (P11, R6)", async () => {
-    await tab("Tous les projets").click();
+    await chooseWorkspace("Tous les projets");
     await waitForHeading(browser, "Tous les projets · 3");
 
     await browser.$('button[aria-label="Oublier catalogue-legacy"]').click();
@@ -531,7 +604,7 @@ describe("Fenêtres et zones", () => {
   let mainWindow: string;
 
   it("ouvre les requêtes en onglets et divise la zone (F1, F2, F4)", async () => {
-    await tab("E-commerce").click();
+    await chooseWorkspace("E-commerce");
     await waitForHeading(browser, "E-commerce");
     await browser.$("aside nav").$("button*=boutique-tests").click();
     await waitForHeading(browser, "boutique-tests");
@@ -991,7 +1064,7 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
 
   async function showAllProjects(): Promise<void> {
     // Les zones ont aussi leurs listes d'onglets : on vise celle des workspaces.
-    await clickText('[role="tablist"][aria-label="Workspaces"] [role="tab"]', "Tous les projets");
+    await chooseWorkspace("Tous les projets");
     await browser.waitUntil(async () => (await heading(browser)).startsWith("Tous les projets"), {
       timeoutMsg: "« Tous les projets » attendu",
     });

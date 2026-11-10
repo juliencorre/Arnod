@@ -3,11 +3,15 @@
  * Arborescence d'un projet (A1 à A8), sous son nom dans la barre latérale :
  * dossiers, requêtes et actions. Une requête choisie s'ouvre en onglet, dans
  * la fenêtre qui suit la sélection (Z5). Les créations partent du « + » de la
- * ligne du projet (`newRequest`, `newFolder`) ; un projet vide montre la ligne
- * « Nouvelle requête » (plan de la barre latérale du projet, B4).
+ * ligne du projet ou de l'en-tête « Requêtes » (`newRequest`, `newFolder`) ; un
+ * projet vide montre la ligne « Nouvelle requête » (plan de la barre latérale du
+ * projet, B4).
  */
 import { computed, ref } from "vue";
 
+import BaseMenu from "@/components/ui/BaseMenu.vue";
+import type { MenuItem } from "@/components/ui/menu";
+import SectionHeading from "@/components/ui/SectionHeading.vue";
 import NameDialog from "@/components/workbench/NameDialog.vue";
 import TreeRow from "@/components/workbench/TreeRow.vue";
 import { useCatalogStore } from "@/stores/catalog";
@@ -29,6 +33,23 @@ type NameAction =
 
 const nameAction = ref<NameAction | null>(null);
 const nameError = ref<string | null>(null);
+
+/** Nombre de requêtes du projet, pour l'en-tête de la section (I1). */
+const requestCount = computed(() => {
+  const count = (list: TreeNode[]): number =>
+    list.reduce((sum, node) => sum + (node.kind === "folder" ? count(node.children) : 1), 0);
+  return count(nodes.value);
+});
+
+const ADD_ITEMS: MenuItem[] = [
+  { id: "request", label: "Nouvelle requête", shortcut: "Ctrl+N" },
+  { id: "folder", label: "Nouveau dossier" },
+];
+
+function onAdd(id: string): void {
+  if (id === "request") newRequest();
+  else newFolder();
+}
 
 /** Tous les dossiers, pour « Déplacer vers ». */
 const folders = computed(() => {
@@ -139,6 +160,28 @@ async function submitName(name: string): Promise<void> {
 
 <template>
   <div class="tree">
+    <SectionHeading icon="requests" title="Requêtes" :count="requestCount">
+      <BaseMenu
+        :items="ADD_ITEMS"
+        :label="`Ajouter aux requêtes de ${projectName}`"
+        align="end"
+        @select="onAdd"
+      >
+        <template #trigger="{ attrs }">
+          <button
+            type="button"
+            class="tree__tool"
+            v-bind="attrs"
+            :aria-label="`Ajouter aux requêtes de ${projectName}`"
+            :title="`Ajouter aux requêtes de ${projectName}`"
+          >
+            <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M6 2.5v7M2.5 6h7" />
+            </svg>
+          </button>
+        </template>
+      </BaseMenu>
+    </SectionHeading>
     <ul
       v-if="nodes.length > 0"
       role="tree"
@@ -177,6 +220,34 @@ async function submitName(name: string): Promise<void> {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.tree__tool {
+  display: grid;
+  place-items: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.tree__tool path {
+  stroke: var(--color-text);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.tree__tool:hover,
+.tree__tool[aria-expanded="true"] {
+  background: var(--color-chip);
+}
+
+.tree__tool:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
 }
 
 .tree__list {

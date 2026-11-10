@@ -3,7 +3,7 @@ import { ref } from "vue";
 
 /**
  * Fenêtres et fenêtres surgissantes partagées, ouvertes depuis plusieurs endroits
- * (onglets, barre latérale, vue workspace, « Tous les projets », notifications)
+ * (sélecteur de workspace, barre latérale, vue workspace, « Tous les projets », notifications)
  * et rendues une seule fois. `null` : fermée.
  */
 export const useDialogStore = defineStore("dialogs", () => {
@@ -14,8 +14,8 @@ export const useDialogStore = defineStore("dialogs", () => {
   /** « Ajouter un projet à un workspace » (2c) : créer, importer ou reprendre. */
   const addProjects = ref<{ workspaceId: string } | null>(null);
   /**
-   * « Nouveau workspace » (2b), près du « + » des onglets ; `open` : ouvrir
-   * l'onglet créé (sinon il est détaillé dans la gestion).
+   * « Nouveau workspace » (S3), sous le sélecteur de workspace ; `open` : ouvrir
+   * le workspace créé (sinon il est détaillé dans la gestion).
    */
   const newWorkspace = ref<{ open: boolean } | null>(null);
 

@@ -14,6 +14,7 @@ import {
   workspace,
 } from "../fixtures";
 import { type AppWrapper, mountApp } from "../mountApp";
+import { chooseSwitcherAction, chooseWorkspace, currentWorkspace } from "../switcher";
 
 let wrapper: AppWrapper | undefined;
 
@@ -46,22 +47,14 @@ function richSnapshot() {
   return snapshot;
 }
 
-/** Ouvre « Gérer les workspaces » par le menu contextuel de l'onglet actif. */
+/** Ouvre « Gérer les workspaces » par le sélecteur de workspace. */
 async function openManage(app: AppWrapper): Promise<void> {
-  await app.get('[role="tab"][aria-selected="true"]').trigger("contextmenu");
-  await flushPromises();
-  const item = app
-    .findAll('.tabs__context [role="menuitem"]')
-    .find((li) => li.text() === "Gérer les workspaces…");
-  await item?.trigger("click");
-  await flushPromises();
+  await chooseSwitcherAction(app, "Gérer les workspaces…");
 }
 
-/** Ouvre l'onglet épinglé « Tous les projets ». */
+/** Ouvre « Tous les projets » par le sélecteur. */
 async function openAll(app: AppWrapper): Promise<void> {
-  const tab = app.findAll('[role="tab"]').find((t) => t.text() === "Tous les projets");
-  await tab?.trigger("click");
-  await flushPromises();
+  await chooseWorkspace(app, "Tous les projets");
 }
 
 function lastArgs(core: FakeCore, cmd: string) {
@@ -69,7 +62,7 @@ function lastArgs(core: FakeCore, cmd: string) {
 }
 
 describe("gérer les workspaces (2d, O11)", () => {
-  it("s'ouvre depuis l'onglet sur le workspace courant, sans barre latérale", async () => {
+  it("s'ouvre depuis le sélecteur sur le workspace courant, sans barre latérale", async () => {
     installFakeCore(richSnapshot());
     wrapper = await mountApp();
 
@@ -77,8 +70,8 @@ describe("gérer les workspaces (2d, O11)", () => {
 
     expect(wrapper.find("aside").exists()).toBe(false);
     expect(wrapper.get("main h1").text()).toBe("Workspaces");
-    // L'onglet d'où l'on vient reste actif.
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Boutique");
+    // Le workspace d'où l'on vient reste affiché.
+    expect(currentWorkspace(wrapper)).toBe("Boutique");
     const list = wrapper.get("main nav");
     expect(list.get("h2").text()).toBe("3 workspaces");
     expect(list.get('[aria-current="true"]').text()).toContain("Boutique");
@@ -215,7 +208,7 @@ describe("Tous les projets (2e, O1, O12, P6, P8, P10)", () => {
 
     await openAll(wrapper);
 
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Tous les projets");
+    expect(currentWorkspace(wrapper)).toBe("Tous les projets");
     expect(wrapper.get("main h1").text()).toBe("Tous les projets · 3");
     const rows = wrapper.findAll("tbody tr");
     expect(rows.map((row) => row.get("th").text())).toEqual([
@@ -314,7 +307,7 @@ describe("Tous les projets (2e, O1, O12, P6, P8, P10)", () => {
 
     const row = wrapper.get(`tr[data-project-id="${BOUTIQUE_TESTS}"]`);
     expect(row.classes()).toContain("all__row--highlight");
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Tous les projets");
+    expect(currentWorkspace(wrapper)).toBe("Tous les projets");
     expect(document.activeElement).toBe(row.element);
   });
 

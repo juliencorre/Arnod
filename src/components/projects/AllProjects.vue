@@ -82,8 +82,8 @@ onMounted(async () => {
           {{ ALL_PROJECTS }} <span class="all__count">· {{ catalog.projects.length }}</span>
         </h1>
         <p class="all__text">
-          Chaque projet connu d'Arnod, une seule fois. Glissez une ligne sur un onglet pour ajouter
-          le projet à ce workspace.
+          Chaque projet connu d'Arnod, une seule fois. Glissez une ligne sur le sélecteur de
+          workspace pour ajouter le projet à un workspace.
         </p>
       </div>
       <div class="all__tools">

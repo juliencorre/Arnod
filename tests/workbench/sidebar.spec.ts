@@ -119,3 +119,41 @@ describe("barre latérale du projet", () => {
     expect(app.get("dialog[open]").text()).toContain("Environnements");
   });
 });
+
+/** Icônes des sections d'un projet (docs/plan-selecteur-workspace.md, I1, I2). */
+describe("sections d'un projet", () => {
+  it("« Requêtes » et « Contrats de service » : icône décorative, nombre et « + » (I1, I2)", async () => {
+    ({ app } = await openProject());
+    const heads = app.findAll(".section-head");
+    expect(heads.map((h) => h.get("h3").text())).toEqual(["Requêtes", "Contrats de service"]);
+    expect(heads.map((h) => h.get("svg").attributes("data-icon"))).toEqual([
+      "requests",
+      "contracts",
+    ]);
+    expect(heads.map((h) => h.get("svg").attributes("aria-hidden"))).toEqual(["true", "true"]);
+    expect(heads[0]?.get(".section-head__count").text()).toBe("3");
+    // Aucun contrat : pas de nombre, la ligne d'ajout suffit.
+    expect(heads[1]?.find(".section-head__count").exists()).toBe(false);
+  });
+
+  it("le « + » de « Requêtes » crée une requête ou un dossier, au clavier", async () => {
+    let core;
+    ({ app, core } = await openProject());
+    const add = app.get('[aria-label="Ajouter aux requêtes de boutique-tests"]');
+    await add.trigger("keydown", { key: "ArrowDown" });
+    await flushPromises();
+    expect(menuTexts(app)).toEqual(["Nouvelle requêteCtrl+N", "Nouveau dossier"]);
+    await app.findAll('[role="menuitem"]')[0]?.trigger("keydown", { key: "ArrowDown" });
+    await flushPromises();
+    await app.findAll('[role="menuitem"]')[1]?.trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(app.get("dialog[open] h2").text()).toBe("Nouveau dossier");
+    await app.get("dialog[open] input").setValue("Paiements");
+    await app.get("dialog[open] form").trigger("submit");
+    await flushPromises();
+    expect(core.calls.find((c) => c.cmd === "tree_create_folder")?.args).toMatchObject({
+      parent: "",
+      name: "Paiements",
+    });
+  });
+});

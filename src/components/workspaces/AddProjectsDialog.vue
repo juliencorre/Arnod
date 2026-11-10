@@ -154,7 +154,7 @@ async function submit(): Promise<void> {
       <section v-if="candidates.length > 0" class="registry" :aria-labelledby="registryTitleId">
         <h3 :id="registryTitleId" class="registry__title">Ou reprendre un projet existant</h3>
         <p class="registry__text">
-          Ceux de l'onglet « Tous les projets ». Un projet peut être dans plusieurs workspaces.
+          Ceux de « Tous les projets ». Un projet peut être dans plusieurs workspaces.
         </p>
         <SearchInput
           v-if="searchable"

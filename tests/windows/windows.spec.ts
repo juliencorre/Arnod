@@ -11,6 +11,7 @@ import { newRequest } from "../fakeWorkbench";
 import { BOUTIQUE_TESTS, boutiqueSnapshot } from "../fixtures";
 import { type AppWrapper, mountApp } from "../mountApp";
 import { click, openProject } from "../workbench/helpers";
+import { switcherNames } from "../switcher";
 
 let app: AppWrapper | undefined;
 
@@ -127,7 +128,7 @@ describe("barre latérale détachée (F9, Z5)", () => {
     const core = setup("sidebar");
     app = await mountApp();
 
-    expect(app.findAll('[role="tab"]').map((t) => t.text())).toContain("Tous les projets");
+    expect(await switcherNames(app)).toContain("Tous les projets");
     expect(app.get(".sidebar-window__pilot").text()).toBe("Pilote 1 fenêtre de contenu");
 
     core.windows.windows.push(newWindow("content", [tab(lister)]));
