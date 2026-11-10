@@ -3,7 +3,7 @@ import { computed, ref, watch } from "vue";
 
 import { ipc } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
-import { useWindowsStore } from "@/stores/windows";
+import { contentProject, useWindowsStore } from "@/stores/windows";
 
 /** Vue affichée dans la zone principale. */
 export type View =
@@ -69,7 +69,8 @@ export const useNavigationStore = defineStore("navigation", () => {
         : { kind: "all", highlightProjectId: null };
     // Onglets restaurés dans la fenêtre principale (Z8) : la zone de travail.
     const content = windows.activeTab?.content;
-    const project = content ? catalog.projectById(content.projectId) : null;
+    const projectId = content ? contentProject(content) : null;
+    const project = projectId === null ? null : catalog.projectById(projectId);
     if (windows.kind === "main" && project && project.status !== "missing") {
       view.value = { kind: "project", projectId: project.id, workspaceId: last };
     }
@@ -167,10 +168,12 @@ export const useNavigationStore = defineStore("navigation", () => {
     (tab, previous) => {
       const content = windows.activeTab?.content;
       if (windows.kind !== "main" || tab === null || tab === previous || !content) return;
+      const projectId = contentProject(content);
+      if (projectId === null) return;
       const current = view.value;
-      if (current.kind === "project" && current.projectId === content.projectId) return;
-      if (catalog.projectById(content.projectId) === null) return;
-      showProject(content.projectId, currentWorkspaceId.value);
+      if (current.kind === "project" && current.projectId === projectId) return;
+      if (catalog.projectById(projectId) === null) return;
+      showProject(projectId, currentWorkspaceId.value);
     },
   );
 

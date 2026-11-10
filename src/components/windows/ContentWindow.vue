@@ -23,6 +23,7 @@ const contracts = useContractsStore();
 const crumbs = computed<string[]>(() => {
   const content = windows.activeTab?.content;
   if (!content) return [];
+  if (content.kind === "result") return ["Résultat"];
   const project = catalog.projectById(content.projectId)?.name ?? "projet";
   if (content.kind === "run") return [project, "Run"];
   if (content.kind === "contract") {
@@ -61,7 +62,15 @@ watch(
           }}</span>
         </template>
       </nav>
+      <span
+        v-if="windows.resultOnly"
+        class="content-window__follow content-window__follow--static"
+        title="Montre le résultat de la requête active, dans la dernière fenêtre utilisée."
+      >
+        ⇆ Suit la requête active
+      </span>
       <button
+        v-else
         type="button"
         class="content-window__follow"
         :aria-pressed="follow"
@@ -138,6 +147,13 @@ watch(
   border-color: var(--color-toast-bg);
   color: var(--color-toast-text);
   background: var(--color-toast-bg);
+}
+
+.content-window__follow--static {
+  border-color: var(--color-toast-bg);
+  color: var(--color-toast-text);
+  background: var(--color-toast-bg);
+  cursor: default;
 }
 
 .content-window__follow:focus-visible {

@@ -8,6 +8,7 @@ import type {
   EnvironmentsView,
   ProjectChange,
   RequestDoc,
+  RequestResult,
   RunView,
   SendOutcome,
   TreeNode,
@@ -180,8 +181,34 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       saveError: null,
     };
     editors[key] = editor;
-    await Promise.all([loadProject(projectId).catch(() => undefined), reload(key)]);
+    await Promise.all([
+      loadProject(projectId).catch(() => undefined),
+      reload(key),
+      loadResult(key),
+    ]);
     return editors[key] ?? editor;
+  }
+
+  /**
+   * Applique le dernier envoi d'une requête, fait dans une autre fenêtre (R5) :
+   * « Envoi en cours… », puis la réponse ou l'erreur.
+   */
+  function applyResult(result: RequestResult): void {
+    const editor = editors[requestKey(result.projectId, result.path)];
+    if (!editor) return;
+    editor.sending = result.sending;
+    editor.outcome = result.outcome;
+    editor.sendError = result.error;
+    editor.receivedAt = result.receivedAt === null ? null : new Date(result.receivedAt);
+  }
+
+  /** Reprend le dernier envoi gardé par le cœur, pour une requête ouverte ici (D2). */
+  async function loadResult(key: string): Promise<void> {
+    const opened = editors[key];
+    if (!opened) return;
+    const result = await ipc.requestResult(opened.projectId, opened.path).catch(() => null);
+    const editor = editors[key];
+    if (result && editor && !editor.sending && editor.outcome === null) applyResult(result);
   }
 
   async function reload(key: string): Promise<void> {
@@ -625,6 +652,14 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     await events.onProject((change) => {
       void onProjectChange(change);
     });
+    // Envoi fait dans une autre fenêtre : la réponse s'affiche ici aussi (R5).
+    await events.onResult((change) => {
+      if (change.origin !== windows.label) applyResult(change.result);
+    });
+    // Run démarré dans une autre fenêtre : son onglet le suit ici aussi (R7).
+    await events.onRun((change) => {
+      if (change.origin !== windows.label) follow(change.projectId, change.run);
+    });
   }
 
   return {
@@ -644,6 +679,8 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     toggleFolder,
     activeEnvironment,
     openEditor,
+    applyResult,
+    loadResult,
     reload,
     isDirty,
     save,

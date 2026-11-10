@@ -35,14 +35,19 @@ pub enum Content {
     /// Un contrat du projet, par son chemin relatif (`contracts/…`).
     #[serde(rename_all = "camelCase")]
     Contract { project_id: Uuid, path: String },
+    /// Le résultat de la requête active, dans sa propre fenêtre
+    /// (`docs/plan-resultat-detachable.md`).
+    Result,
 }
 
 impl Content {
-    pub fn project_id(&self) -> Uuid {
+    /// Projet du contenu ; aucun pour le résultat, qui suit la requête active.
+    pub fn project_id(&self) -> Option<Uuid> {
         match self {
             Self::Request { project_id, .. }
             | Self::Run { project_id }
-            | Self::Contract { project_id, .. } => *project_id,
+            | Self::Contract { project_id, .. } => Some(*project_id),
+            Self::Result => None,
         }
     }
 }
@@ -592,7 +597,7 @@ impl Layout {
                     project_id: id,
                     path: tab_path,
                 } => *id == project_id && within(tab_path, path).is_some(),
-                Content::Run { .. } => false,
+                Content::Run { .. } | Content::Result => false,
             })
             .map(|tab| tab.id)
             .collect();
@@ -606,7 +611,7 @@ impl Layout {
         let ids: Vec<Uuid> = self
             .tabs()
             .into_iter()
-            .filter(|tab| tab.content.project_id() == project_id)
+            .filter(|tab| tab.content.project_id() == Some(project_id))
             .map(|tab| tab.id)
             .collect();
         for id in ids {

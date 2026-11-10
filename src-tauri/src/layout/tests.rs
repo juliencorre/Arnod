@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use super::windows::{
-    Bounds, MAIN, MAX_SIDEBAR_WIDTH, WindowKind, WindowState, Windows, WindowsFile,
+    ActiveRequest, Bounds, MAIN, MAX_SIDEBAR_WIDTH, WindowKind, WindowState, Windows, WindowsFile,
 };
 use super::*;
 use crate::error::CommandErrorKind;
@@ -36,6 +36,7 @@ fn names(layout: &Layout) -> Vec<Vec<String>> {
                     Content::Request { path, .. } => path.trim_end_matches(".yml").to_owned(),
                     Content::Run { .. } => "run".to_owned(),
                     Content::Contract { path, .. } => format!("contrat:{path}"),
+                    Content::Result => "résultat".to_owned(),
                 })
                 .collect()
         })
@@ -283,6 +284,144 @@ fn format_json_d_une_disposition() {
             "activeZone": id(2)
         })
     );
+}
+
+// Résultat détachable : docs/plan-resultat-detachable.md (D1 à D6, R1 à R4)
+
+fn active(name: &str) -> Option<ActiveRequest> {
+    Some(ActiveRequest {
+        project_id: Uuid::from_u128(1),
+        path: format!("{name}.yml"),
+    })
+}
+
+#[test]
+fn d1_le_resultat_s_ouvre_dans_sa_fenetre_qui_ne_prend_pas_la_selection() {
+    let mut windows = Windows::default();
+    windows
+        .layout_mut(MAIN)
+        .unwrap()
+        .open(request("a"), None)
+        .unwrap();
+
+    let label = windows.detach_result(None);
+
+    assert_eq!(tab_names(&windows, &label), [["résultat"]]);
+    let window = windows.get(&label).unwrap();
+    assert_eq!(window.kind, WindowKind::Content);
+    assert!(!window.follow);
+    // R2 : la sélection de la barre latérale va dans la principale.
+    windows.focus(&label);
+    assert_eq!(windows.open_selection(request("b")).unwrap(), MAIN);
+    assert_eq!(tab_names(&windows, MAIN), [["a", "b"]]);
+}
+
+#[test]
+fn r1_un_seul_resultat_le_redemander_renvoie_sa_fenetre() {
+    let mut windows = Windows::default();
+    let first = windows.detach_result(None);
+
+    let again = windows.detach_result(None);
+
+    assert_eq!(first, again);
+    assert_eq!(windows.labels().len(), 2);
+    assert_eq!(
+        windows.result_window().map(|w| w.label.clone()),
+        Some(first)
+    );
+}
+
+#[test]
+fn d2_la_requete_active_suit_la_derniere_fenetre_utilisee() {
+    let mut windows = Windows::default();
+    assert_eq!(windows.active_request(), None);
+    let layout = windows.layout_mut(MAIN).unwrap();
+    layout.open(request("a"), None).unwrap();
+    let b = layout.open(request("b"), None).unwrap();
+    assert_eq!(windows.active_request(), active("b"));
+
+    let content = windows.detach_tab(MAIN, b, None).unwrap();
+    assert_eq!(windows.active_request(), active("b"));
+    windows.focus(MAIN);
+    assert_eq!(windows.active_request(), active("a"));
+
+    // Le focus de la fenêtre de résultat ne change pas la requête active.
+    let result = windows.detach_result(None);
+    windows.focus(&result);
+    assert_eq!(windows.active_request(), active("a"));
+    windows.focus(&content);
+    assert_eq!(windows.active_request(), active("b"));
+}
+
+#[test]
+fn d2_une_fenetre_sans_requete_active_est_passee() {
+    let mut windows = Windows::default();
+    let layout = windows.layout_mut(MAIN).unwrap();
+    layout.open(request("a"), None).unwrap();
+    layout
+        .open(
+            Content::Run {
+                project_id: Uuid::from_u128(1),
+            },
+            None,
+        )
+        .unwrap();
+
+    assert_eq!(windows.active_request(), None);
+
+    let run_tab = windows.get(MAIN).unwrap().layout.as_ref().unwrap().tabs()[1].id;
+    let label = windows.detach_tab(MAIN, run_tab, None).unwrap();
+    windows.focus(&label);
+    assert_eq!(windows.active_request(), active("a"));
+}
+
+#[test]
+fn d2_le_resultat_dans_une_zone_laisse_active_la_requete_de_l_autre_zone() {
+    let mut windows = Windows::default();
+    let layout = windows.layout_mut(MAIN).unwrap();
+    layout.open(request("a"), None).unwrap();
+    let result = layout.open(Content::Result, None).unwrap();
+    let zone = first_zone(layout);
+    layout.split(zone, result, Side::Right).unwrap();
+
+    assert_eq!(windows.active_request(), active("a"));
+}
+
+#[test]
+fn r4_rattacher_le_resultat_le_ferme_sans_rien_deplacer() {
+    let mut windows = Windows::default();
+    windows
+        .layout_mut(MAIN)
+        .unwrap()
+        .open(request("a"), None)
+        .unwrap();
+    let label = windows.detach_result(None);
+
+    windows.reattach(&label).unwrap();
+
+    assert_eq!(windows.labels(), [MAIN]);
+    assert_eq!(tab_names(&windows, MAIN), [["a"]]);
+    assert!(windows.result_window().is_none());
+}
+
+#[test]
+fn d6_la_fenetre_de_resultat_est_restauree_et_ignoree_par_les_projets_oublies() {
+    let mut windows = Windows::default();
+    windows
+        .layout_mut(MAIN)
+        .unwrap()
+        .open(request("a"), None)
+        .unwrap();
+    let label = windows.detach_result(None);
+    let json = serde_json::to_string(&windows.to_file()).unwrap();
+    assert!(json.contains(r#"{"kind":"result"}"#));
+
+    let mut restored = Windows::from_file(serde_json::from_str::<WindowsFile>(&json).unwrap());
+    assert_eq!(tab_names(&restored, &label), [["résultat"]]);
+
+    assert!(restored.retain_projects(&[]));
+    assert_eq!(restored.labels(), [MAIN.to_owned(), label.clone()]);
+    assert_eq!(tab_names(&restored, &label), [["résultat"]]);
 }
 
 // Fenêtres : F8 à F13, Z5 à Z8

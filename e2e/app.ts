@@ -88,6 +88,8 @@ export function readWindows(sandbox: Sandbox): {
     label: string;
     kind: "main" | "content" | "sidebar";
     layout: { root: SavedNode; activeZone: string } | null;
+    /** Fenêtre de contenu : suit la sélection de la barre latérale (F10). */
+    follow: boolean;
     sidebarDetached: boolean;
   }[];
 } {

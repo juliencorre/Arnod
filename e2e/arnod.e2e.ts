@@ -856,4 +856,76 @@ describe("Contrats de services", () => {
     expect(file).toContain("status: 200");
     await screenshot(browser, "12-endpoint");
   });
+
+  it("trois fenêtres : barre latérale, requête et résultat qui suit la requête active (D1 à D6)", async () => {
+    const mainWindow = await browser.getWindowHandle();
+    // Dans la requête liée : éditeur, envoi, ⧉ du résultat.
+    const linked = (action: "detach" | "send" | "state") =>
+      browser.execute((step) => {
+        const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find((t) =>
+          t.querySelector(".editor__contract")?.textContent.includes("GET /pets/{petId}"),
+        );
+        if (!tab) throw new Error("onglet de la requête liée introuvable");
+        if (step === "detach") {
+          tab
+            .querySelector<HTMLButtonElement>(
+              'button[aria-label="Ouvrir le résultat dans une fenêtre"]',
+            )
+            ?.click();
+        }
+        if (step === "send") {
+          Array.from(tab.querySelectorAll<HTMLButtonElement>("button"))
+            .find((b) => b.textContent.trim() === "Envoyer")
+            ?.click();
+        }
+        return { response: tab.querySelector(".request-tab__response") !== null };
+      }, action);
+
+    await linked("detach");
+    let handles = await waitForWindows(2);
+    const result = handles.find((h) => h !== mainWindow) ?? "";
+    expect(readWindows(sandbox).windows.map((w) => [w.kind, w.follow])).toEqual([
+      ["main", true],
+      ["content", false],
+    ]);
+    await browser.waitUntil(async () => !(await linked("state")).response, {
+      timeoutMsg: "le résultat reste dans l'onglet de la requête",
+    });
+
+    await clickHidden('button[aria-label="Détacher la barre latérale dans une fenêtre"]');
+    handles = await waitForWindows(3);
+    const sidebar = handles.find((h) => h !== mainWindow && h !== result) ?? "";
+
+    // Envoi depuis la fenêtre principale : la réponse arrive dans la fenêtre de résultat.
+    await browser.switchToWindow(mainWindow);
+    await linked("send");
+    await browser.switchToWindow(result);
+    const name = browser.$(".result-tab__name");
+    await name.waitForDisplayed({ timeout: 15_000 });
+    expect((await name.getText()).toLowerCase()).toContain("animal");
+    expect(await browser.$(".content-window__follow").getText()).toBe("⇆ Suit la requête active");
+    await browser.waitUntil(async () => (await browser.$(".response").getText()).includes("200"), {
+      timeout: 15_000,
+      timeoutMsg: "réponse absente de la fenêtre de résultat",
+    });
+    await screenshot(browser, "14-fenetre-resultat");
+    await browser.switchToWindow(sidebar);
+    await browser.$(".sidebar-window__pilot").waitForDisplayed({ timeout: 15_000 });
+    await screenshot(browser, "15-fenetre-barre");
+    await browser.switchToWindow(mainWindow);
+    await screenshot(browser, "13-fenetre-requete");
+
+    // Rattacher : le résultat revient dans l'onglet de la requête (R4).
+    await browser.switchToWindow(result);
+    await browser.$(".content-window__bar").$("button=Rattacher").click();
+    await waitForWindows(2);
+    await browser.switchToWindow(sidebar);
+    await browser.$(".sidebar-window__footer").$("button=Rattacher").click();
+    await waitForWindows(1);
+    await browser.switchToWindow(mainWindow);
+    await browser.waitUntil(async () => (await linked("state")).response, {
+      timeoutMsg: "le résultat n'est pas revenu dans l'onglet",
+    });
+    expect(readWindows(sandbox).windows.map((w) => w.kind)).toEqual(["main"]);
+  });
 });

@@ -3,6 +3,8 @@
 //! Chaque modification est diffusée aux autres fenêtres (F11) ; un renommage,
 //! un déplacement ou une suppression met aussi à jour les onglets ouverts.
 
+use std::sync::Mutex;
+
 use serde::Serialize;
 use tauri::{Manager, State, WebviewWindow};
 use uuid::Uuid;
@@ -10,6 +12,7 @@ use uuid::Uuid;
 use crate::error::CommandError;
 use crate::layout::windows::Windows;
 use crate::local;
+use crate::results::ResultBook;
 use crate::state::AppState;
 use crate::tree::{self, TreeNode};
 use crate::windows::{self, ProjectScope};
@@ -67,6 +70,10 @@ fn follow_path(window: &WebviewWindow, project: Uuid, from: &str, to: &str) {
         w.rename_path(project, from, to);
         Ok(())
     });
+    // Le dernier résultat suit aussi la requête renommée.
+    if let Ok(mut book) = window.app_handle().state::<Mutex<ResultBook>>().lock() {
+        book.rename(project, from, to);
+    }
 }
 
 #[tauri::command]

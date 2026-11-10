@@ -16,6 +16,7 @@ import ContractTab from "@/components/contracts/ContractTab.vue";
 import RunPanel from "@/components/workbench/RunPanel.vue";
 import ProjectWelcome from "@/components/zones/ProjectWelcome.vue";
 import RequestTab from "@/components/zones/RequestTab.vue";
+import ResultTab from "@/components/zones/ResultTab.vue";
 import { useTabActions } from "@/composables/useTabActions";
 import {
   type DropRegion,
@@ -53,6 +54,7 @@ const single = computed(() => windows.zones.length === 1);
 /** Libellé, méthode et état d'un onglet. */
 function info(tab: ContentTab): { name: string; badge: string; dirty: boolean } {
   const content = tab.content;
+  if (content.kind === "result") return { name: "Résultat", badge: "RES", dirty: false };
   if (content.kind === "run") {
     return {
       name: `Run · ${catalog.projectById(content.projectId)?.name ?? "projet"}`,
@@ -416,6 +418,7 @@ const welcome = computed(
           :project-id="activeTab.content.projectId"
           :path="activeTab.content.path"
         />
+        <ResultTab v-else-if="activeTab.content.kind === 'result'" :key="activeTab.id" />
         <div v-else class="zone__run">
           <RunPanel :project-id="activeTab.content.projectId" />
         </div>

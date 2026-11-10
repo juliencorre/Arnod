@@ -2,15 +2,17 @@
 
 use std::sync::Arc;
 
-use tauri::State;
+use tauri::{State, WebviewWindow};
 use uuid::Uuid;
 
 use crate::error::CommandError;
 use crate::state::AppState;
+use crate::windows;
 use crate::workbench::{ProjectCtx, ProjectLastRun, RunView, Workbench};
 
 #[tauri::command]
 pub fn run_start(
+    window: WebviewWindow,
     state: State<'_, AppState>,
     bench: State<'_, Arc<Workbench>>,
     project: Uuid,
@@ -19,7 +21,9 @@ pub fn run_start(
     confirmed: bool,
 ) -> Result<RunView, CommandError> {
     let ctx = state.project_ctx(project)?;
-    bench.start_run(&ctx, &folder, &environment, None, confirmed)
+    let run = bench.start_run(&ctx, &folder, &environment, None, confirmed)?;
+    windows::run_started(&window, project, &run);
+    Ok(run)
 }
 
 #[tauri::command]
@@ -34,6 +38,7 @@ pub fn run_cancel(bench: State<'_, Arc<Workbench>>, run: Uuid) -> Result<(), Com
 
 #[tauri::command]
 pub fn run_retry_failures(
+    window: WebviewWindow,
     state: State<'_, AppState>,
     bench: State<'_, Arc<Workbench>>,
     project: Uuid,
@@ -41,7 +46,9 @@ pub fn run_retry_failures(
     confirmed: bool,
 ) -> Result<RunView, CommandError> {
     let ctx = state.project_ctx(project)?;
-    bench.retry_failures(&ctx, run, confirmed)
+    let view = bench.retry_failures(&ctx, run, confirmed)?;
+    windows::run_started(&window, project, &view);
+    Ok(view)
 }
 
 /// Dernier run de chaque projet qui en a un, pour « Tous les projets » (O12).

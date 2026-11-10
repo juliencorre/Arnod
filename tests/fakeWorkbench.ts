@@ -11,6 +11,7 @@ import type {
   EnvironmentsView,
   ProjectLastRun,
   RequestDoc,
+  RequestResult,
   RunView,
   SendOutcome,
   TreeNode,
@@ -93,6 +94,8 @@ export interface FakeWorkbench {
   runStatus: Map<string, "passed" | "failed" | "error">;
   /** Réponse de `project_last_runs`. */
   projectLastRuns: ProjectLastRun[];
+  /** Derniers résultats gardés par le cœur, par chemin (`request_result`, R5). */
+  results: Map<string, RequestResult>;
 }
 
 export function createFakeWorkbench(): FakeWorkbench {
@@ -110,6 +113,7 @@ export function createFakeWorkbench(): FakeWorkbench {
     active: "Local",
     collapsed: [],
     nextSend: okOutcome(),
+    results: new Map(),
     lastRun: null,
     runStatus: new Map(),
     projectLastRuns: [],
@@ -264,6 +268,8 @@ export function handleWorkbench(
       return structuredClone(wb.nextSend);
     case "request_cancel":
       return null;
+    case "request_result":
+      return structuredClone(wb.results.get(String(args.path)) ?? null);
     case "request_example_from_response": {
       const response = args.response as {
         status: number;
