@@ -10,12 +10,13 @@ Application de bureau de test, destinée à remplacer SoapUI et Bruno : des éta
 (REST aujourd'hui ; SOAP, base de données, messages, traitements et écrans ensuite) dans un même
 test.
 
-> **Statut : accueil « Essayer une étape » (REST), projets et workspaces en onglets, fenêtres et
+> **Statut : accueil « Essayer une étape » (REST), projets et sélecteur de workspace, fenêtres et
 > zones, contrats de services, format OpenCollection.** Sur le squelette technique
 > ([`PRD-squelette.md`](PRD-squelette.md)), Arnod crée et gère des projets et des
 > workspaces selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md), révisé
-> par [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md) : les workspaces sont
-> des onglets, après l'onglet épinglé « Tous les projets ». Les requêtes s'ouvrent en onglets,
+> par [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md) puis
+> [`docs/plan-selecteur-workspace.md`](docs/plan-selecteur-workspace.md) : un sélecteur en tête
+> de la barre latérale propose « Tous les projets » puis les workspaces. Les requêtes s'ouvrent en onglets,
 > dans des zones redimensionnables et des fenêtres interconnectées
 > ([`docs/plan-fenetres-zones.md`](docs/plan-fenetres-zones.md)). Un contrat OpenAPI crée les
 > requêtes de ses opérations et vérifie la conformité des réponses
@@ -36,24 +37,30 @@ suit la préférence du système._
 
 ## Ce que fait Arnod aujourd'hui
 
-Cas d'usage détaillés dans [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md)
-et [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md), maquettes dans
+Cas d'usage détaillés dans [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md),
+[`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md) et
+[`docs/plan-selecteur-workspace.md`](docs/plan-selecteur-workspace.md), maquettes dans
 [`docs/maquettes/`](docs/maquettes/).
 
-| ID           | Comportement                                                                                                                                   |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1, O8       | Premier lancement : seul l'onglet « Tous les projets » ; Arnod propose d'essayer une étape ou de créer le premier projet (`~/arnod/<nom>`).    |
-| P2, O8       | Nouveau projet depuis un workspace : rangé dans ce seul workspace, toujours visible dans « Tous les projets ».                                 |
-| P5, P10      | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                                               |
-| P6, P7       | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                                              |
-| O1, O12, P11 | « Tous les projets » : chaque projet une fois, dernière exécution, « Oublier » avec « Annuler », import d'un projet ou d'une collection Bruno. |
-| O2, R7       | Workspaces en onglets ; Arnod rouvre le dernier onglet utilisé, conservé dans `arnod.json`.                                                    |
-| O3–O6        | « + » crée un onglet ; clic droit (ou Maj+F10) : renommer, couleur, gérer, supprimer avec « Annuler ».                                         |
-| O7           | Glisser une ligne de « Tous les projets » sur un onglet ajoute le projet à ce workspace.                                                       |
-| W6, O10      | « Ajouter un projet » à un workspace : créer, importer, ou reprendre des projets existants.                                                    |
-| O11          | Gestion des workspaces : nom, couleur, projets, suppression avec « Annuler ».                                                                  |
-| F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                                       |
-| N7           | Thème clair ou sombre selon le système, police système.                                                                                        |
+| Sélecteur de workspace et actions d'un workspace                      | Sections d'un projet, avec leurs icônes                               |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| ![Sélecteur de workspace, thème clair](docs/screenshot-selecteur.png) | ![Sections d'un projet, thème sombre](docs/screenshot-essai-dark.png) |
+
+| ID           | Comportement                                                                                                                                      |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1, O8       | Premier lancement : le sélecteur sur « Tous les projets » ; Arnod propose d'essayer une étape ou de créer le premier projet (`~/arnod/<nom>`).    |
+| P2, O8       | Nouveau projet depuis un workspace : rangé dans ce seul workspace, toujours visible dans « Tous les projets ».                                    |
+| P5, P10      | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                                                  |
+| P6, P7       | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                                                 |
+| O1, O12, P11 | « Tous les projets » : chaque projet une fois, dernière exécution, « Oublier » avec « Annuler », import d'un projet ou d'une collection Bruno.    |
+| S1, S2, R7   | Sélecteur en tête de la barre latérale : « Tous les projets » puis les workspaces (Ctrl+0…9) ; Arnod rouvre le dernier, gardé dans `arnod.json`.  |
+| S3, S4, S5   | « + Nouveau workspace » ; « ⋯ », clic droit ou Maj+F10 sur un workspace : renommer (F2), couleur, gérer (Ctrl+Maj+W), supprimer avec « Annuler ». |
+| S6           | Glisser une ligne de « Tous les projets » sur le sélecteur l'ouvre ; la déposer sur un workspace y ajoute le projet.                              |
+| I1, I2       | Dans un projet déplié, « Requêtes » et « Contrats de service » sont précédées d'une icône, avec leur nombre et « + ».                             |
+| W6, O10      | « Ajouter un projet » à un workspace : créer, importer, ou reprendre des projets existants.                                                       |
+| O11          | Gestion des workspaces : nom, couleur, projets, suppression avec « Annuler ».                                                                     |
+| F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                                          |
+| N7           | Thème clair ou sombre selon le système, police système.                                                                                           |
 
 ### Accueil, catalogue des étapes et Non classés
 

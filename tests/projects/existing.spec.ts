@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { installFakeCore } from "../fakeCore";
 import { BOUTIQUE, boutiqueSnapshot, firstRunSnapshot } from "../fixtures";
 import { type AppWrapper, mountApp } from "../mountApp";
+import { chooseWorkspace } from "../switcher";
 
 let wrapper: AppWrapper | undefined;
 
@@ -86,7 +87,7 @@ describe("importer un projet existant (P12)", () => {
     const core = installFakeCore(boutiqueSnapshot());
     core.pickedFolder = "/home/julien/dev/partenaires-v2";
     wrapper = await mountApp();
-    await clickButton(wrapper, '[role="tablist"]', "Tous les projets");
+    await chooseWorkspace(wrapper, "Tous les projets");
 
     await clickButton(wrapper, "main", "Importer…");
 

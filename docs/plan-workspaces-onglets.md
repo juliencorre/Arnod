@@ -9,6 +9,9 @@ R3, R4, R7, R8 et R11, et respecte les règles de [`CLAUDE.md`](../CLAUDE.md).
 
 Source : maquette Claude Design, pages « Workspaces » (2a à 2e) et « Premier usage » (1a, 1a bis).
 
+> **Révisé** par [`plan-selecteur-workspace.md`](plan-selecteur-workspace.md) : les onglets de
+> workspaces (O1 à O7) sont remplacés par un sélecteur en tête de la barre latérale (S1 à S6).
+
 ## 1. Objectif
 
 À la fin de ce plan, Arnod :

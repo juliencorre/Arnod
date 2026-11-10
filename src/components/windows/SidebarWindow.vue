@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Barre latérale détachée (F9) : onglets des workspaces et projets ; elle
+ * Barre latérale détachée (F9) : sélecteur de workspace et projets ; elle
  * pilote les fenêtres qui suivent la sélection (Z5). « Rattacher » la remet
  * dans la fenêtre principale.
  */
@@ -8,7 +8,7 @@ import { computed } from "vue";
 
 import AppSidebar from "@/components/layout/AppSidebar.vue";
 import SharedDialogs from "@/components/layout/SharedDialogs.vue";
-import WorkspaceTabs from "@/components/layout/WorkspaceTabs.vue";
+import WorkspaceSwitcher from "@/components/layout/WorkspaceSwitcher.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import { countLabel } from "@/lib/format";
 import { useWindowsStore } from "@/stores/windows";
@@ -21,7 +21,9 @@ const pilot = computed(
 
 <template>
   <div class="sidebar-window">
-    <WorkspaceTabs compact />
+    <div class="sidebar-window__switcher">
+      <WorkspaceSwitcher />
+    </div>
     <div class="sidebar-window__body">
       <AppSidebar />
     </div>
@@ -41,6 +43,15 @@ const pilot = computed(
   flex-direction: column;
   height: 100vh;
   background: var(--color-sidebar);
+}
+
+.sidebar-window__switcher {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 2.375rem;
+  padding: 0 0.5rem;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .sidebar-window__body {

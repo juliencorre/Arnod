@@ -52,7 +52,7 @@ async function submit(): Promise<void> {
     @close="close"
   >
     <p v-if="catalog.workspaces.length === 0" class="empty">
-      Aucun workspace pour l'instant : créez-en un avec « + » dans la barre des onglets.
+      Aucun workspace pour l'instant : créez-en un avec « + Nouveau workspace » du sélecteur.
     </p>
     <ul v-else-if="project" class="choices">
       <li v-for="workspace in catalog.workspaces" :key="workspace.id">

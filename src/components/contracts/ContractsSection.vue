@@ -11,6 +11,7 @@ import { computed, onMounted, ref } from "vue";
 import { CONTRACT_ADD_ITEMS } from "@/components/contracts/addItems";
 import ContractDialog from "@/components/contracts/ContractDialog.vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
+import SectionHeading from "@/components/ui/SectionHeading.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import { useCatalogStore } from "@/stores/catalog";
 import { type ContractDialogMode, useContractsStore } from "@/stores/contracts";
@@ -97,16 +98,8 @@ async function onItem(id: string, contract: ContractSummary): Promise<void> {
 
 <template>
   <section class="contracts" :aria-label="`Contrats de ${projectName}`">
-    <div class="contracts__head">
-      <h3 class="contracts__title">Contrats</h3>
-      <span v-if="list.length > 0" class="contracts__count">{{ list.length }}</span>
-      <BaseMenu
-        class="contracts__add"
-        :items="ADD_ITEMS"
-        label="Ajouter un contrat"
-        align="end"
-        @select="onAdd"
-      >
+    <SectionHeading icon="contracts" title="Contrats de service" :count="list.length">
+      <BaseMenu :items="ADD_ITEMS" label="Ajouter un contrat" align="end" @select="onAdd">
         <template #trigger="{ attrs }">
           <button
             type="button"
@@ -121,7 +114,7 @@ async function onItem(id: string, contract: ContractSummary): Promise<void> {
           </button>
         </template>
       </BaseMenu>
-    </div>
+    </SectionHeading>
     <ul v-if="list.length > 0" class="contracts__list">
       <li
         v-for="contract in list"
@@ -185,34 +178,6 @@ async function onItem(id: string, contract: ContractSummary): Promise<void> {
   display: flex;
   flex-direction: column;
   min-width: 0;
-}
-
-/* En-tête de section, aligné sur la colonne de tête des lignes du projet. */
-.contracts__head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 1.875rem;
-  margin-top: 0.375rem;
-  padding: 0 var(--tree-pad) 0 calc(var(--tree-pad) + var(--tree-indent));
-}
-
-.contracts__title {
-  margin: 0;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-.contracts__count {
-  font: 500 0.6875rem var(--font-mono);
-  color: var(--color-muted);
-}
-
-.contracts__add {
-  margin-left: auto;
 }
 
 .contracts__tool {

@@ -109,8 +109,8 @@ async function setColor(color: string): Promise<void> {
     </nav>
 
     <p v-if="!workspace" class="detail detail__empty">
-      Aucun workspace. Créez-en un avec « + Nouveau workspace » : il apparaîtra en onglet, après «
-      {{ ALL_PROJECTS }} ».
+      Aucun workspace. Créez-en un avec « + Nouveau workspace » : il apparaîtra dans le sélecteur,
+      après « {{ ALL_PROJECTS }} ».
     </p>
     <div v-else class="detail">
       <form class="detail__name" novalidate @submit.prevent="saveName">

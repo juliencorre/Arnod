@@ -14,6 +14,7 @@ import {
   workspace,
 } from "../fixtures";
 import { type AppWrapper, mountApp } from "../mountApp";
+import { chooseWorkspace, currentWorkspace, switcherNames } from "../switcher";
 
 let wrapper: AppWrapper | undefined;
 
@@ -76,7 +77,9 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
       .find((item) => item.text() === "Créer un workspace…")
       ?.trigger("click");
     await flushPromises();
-    expect(wrapper.text()).toContain("Il apparaîtra en onglet, après « Tous les projets ».");
+    expect(wrapper.text()).toContain(
+      "Il apparaîtra dans le sélecteur, après « Tous les projets ».",
+    );
 
     const input = wrapper.get(".storage__create input");
     expect(document.activeElement).toBe(input.element);
@@ -91,11 +94,8 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
       "Tous les projets par défaut",
       "E-commerce ×",
     ]);
-    // L'onglet est déjà là, après « Tous les projets ».
-    expect(wrapper.findAll('[role="tab"]').map((t) => t.text())).toEqual([
-      "Tous les projets",
-      "E-commerce",
-    ]);
+    // Le workspace est déjà dans le sélecteur, après « Tous les projets ».
+    expect(await switcherNames(wrapper)).toEqual(["Tous les projets", "E-commerce"]);
 
     await wrapper.get(".first-run__card form input").setValue("boutique-tests");
     await wrapper.get(".first-run__card form").trigger("submit");
@@ -105,7 +105,7 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
     expect(wrapper.get(".toast").text()).toContain(
       "✓ « boutique-tests » créé dans « E-commerce » · visible dans « Tous les projets ».",
     );
-    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("E-commerce");
+    expect(currentWorkspace(wrapper)).toBe("E-commerce");
   });
 
   it("« Changer » choisit l'emplacement parent du dossier", async () => {
@@ -275,7 +275,7 @@ describe("ajouter un projet à d'autres workspaces (P4, P6)", () => {
 });
 
 describe("vue projet (1b, P5)", () => {
-  it("revient à « Tous les projets » par l'onglet épinglé", async () => {
+  it("revient à « Tous les projets » par le sélecteur", async () => {
     const core = installFakeCore(firstRunSnapshot());
     wrapper = await mountApp();
     await wrapper.get(".first-run__card form input").setValue("boutique-tests");
@@ -283,8 +283,7 @@ describe("vue projet (1b, P5)", () => {
     await flushPromises();
     expect(wrapper.get("main h1").text()).toBe("boutique-tests");
 
-    await wrapper.findAll('[role="tab"]')[0]?.trigger("click");
-    await flushPromises();
+    await chooseWorkspace(wrapper, "Tous les projets");
 
     expect(core.calls.filter((c) => c.cmd === "workspace_open").at(-1)?.args).toEqual({
       workspaceId: null,

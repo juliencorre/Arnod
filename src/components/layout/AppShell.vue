@@ -1,15 +1,16 @@
 <script setup lang="ts">
 /**
- * Fenêtre principale : onglets des workspaces en haut (2b), puis barre latérale
- * (largeur réglable, détachable : F5, F9) et vue courante ; plus les fenêtres
- * partagées. « Tous les projets » et la gestion des workspaces occupent toute
- * la largeur (2d, 2e).
+ * Fenêtre principale : barre latérale (largeur réglable, détachable : F5, F9) coiffée
+ * du sélecteur de workspace, à la hauteur des onglets de contenu (S1, S8), puis vue
+ * courante ; plus les fenêtres partagées. « Tous les projets », la gestion des
+ * workspaces et le catalogue des étapes occupent toute la largeur (2d, 2e) : le
+ * sélecteur passe alors dans une rangée en haut.
  */
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from "vue";
 
 import AppSidebar from "@/components/layout/AppSidebar.vue";
 import SharedDialogs from "@/components/layout/SharedDialogs.vue";
-import WorkspaceTabs from "@/components/layout/WorkspaceTabs.vue";
+import WorkspaceSwitcher from "@/components/layout/WorkspaceSwitcher.vue";
 import ManageScreen from "@/components/manage/ManageScreen.vue";
 import AllProjects from "@/components/projects/AllProjects.vue";
 import ProjectView from "@/components/projects/ProjectView.vue";
@@ -85,10 +86,12 @@ const detachHover = ref(false);
 
 <template>
   <div class="shell">
-    <WorkspaceTabs />
     <div ref="body" class="shell__body" :class="{ 'shell__body--parting': detachHover }">
       <template v-if="withSidebar">
         <div class="shell__sidebar" :style="{ width: `${width}px` }">
+          <div class="shell__switcher">
+            <WorkspaceSwitcher />
+          </div>
           <AppSidebar />
         </div>
         <SplitHandle
@@ -117,17 +120,22 @@ const detachHover = ref(false);
           </button>
         </SplitHandle>
       </template>
-      <main class="shell__main">
-        <AllProjects v-if="allView" :highlight-project-id="allView.highlightProjectId" />
-        <WorkspaceHome v-else-if="workspaceView" :workspace-id="workspaceView.workspaceId" />
-        <ProjectView
-          v-else-if="projectView"
-          :project-id="projectView.projectId"
-          :workspace-id="projectView.workspaceId"
-        />
-        <ManageScreen v-else-if="manageView" :workspace-id="manageView.workspaceId" />
-        <StepsCatalog v-else-if="stepsView" />
-      </main>
+      <div class="shell__column">
+        <div v-if="!withSidebar" class="shell__switcher shell__switcher--top">
+          <WorkspaceSwitcher />
+        </div>
+        <main class="shell__main">
+          <AllProjects v-if="allView" :highlight-project-id="allView.highlightProjectId" />
+          <WorkspaceHome v-else-if="workspaceView" :workspace-id="workspaceView.workspaceId" />
+          <ProjectView
+            v-else-if="projectView"
+            :project-id="projectView.projectId"
+            :workspace-id="projectView.workspaceId"
+          />
+          <ManageScreen v-else-if="manageView" :workspace-id="manageView.workspaceId" />
+          <StepsCatalog v-else-if="stepsView" />
+        </main>
+      </div>
     </div>
     <SharedDialogs />
   </div>
@@ -147,7 +155,37 @@ const detachHover = ref(false);
 }
 
 .shell__sidebar {
+  display: flex;
   flex: none;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-sidebar);
+  transition:
+    margin 0.2s,
+    box-shadow 0.2s;
+}
+
+.shell__sidebar > :deep(.sidebar) {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+/* Rangée du sélecteur : à la hauteur de la rangée d'onglets d'une zone (.zone__bar). */
+.shell__switcher {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 2.375rem;
+  padding: 0 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-sidebar);
+}
+
+.shell__column {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
   transition:
     margin 0.2s,
@@ -159,11 +197,9 @@ const detachHover = ref(false);
   flex: 1;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
   background: var(--color-bg);
-  transition:
-    margin 0.2s,
-    box-shadow 0.2s;
 }
 
 .shell__main > :deep(*) {
@@ -176,7 +212,7 @@ const detachHover = ref(false);
   box-shadow: var(--shadow-popover);
 }
 
-.shell__body--parting .shell__main {
+.shell__body--parting .shell__column {
   margin-left: 5px;
   box-shadow: var(--shadow-popover);
 }

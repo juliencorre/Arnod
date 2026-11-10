@@ -22,7 +22,8 @@ const props = withDefaults(
   }>(),
   { heading: undefined, align: "start" },
 );
-const emit = defineEmits<{ select: [id: string] }>();
+/** `closed` : le menu s'est fermé, avec ou sans choix. */
+const emit = defineEmits<{ select: [id: string]; closed: [] }>();
 defineSlots<{ trigger(props: { open: boolean; attrs: MenuTriggerAttrs }): unknown }>();
 
 const root = useTemplateRef<HTMLElement>("root");
@@ -87,6 +88,7 @@ function close(restore = true): void {
   document.removeEventListener("pointerdown", onOutside, true);
   if (restore) returnFocus?.focus();
   returnFocus = null;
+  emit("closed");
 }
 
 onBeforeUnmount(() => {
