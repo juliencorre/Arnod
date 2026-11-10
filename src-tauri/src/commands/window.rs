@@ -7,11 +7,11 @@
 //! Rust, ces opérations ne demandent aucune permission WebView.
 
 use serde::Serialize;
-use tauri::{AppHandle, State, WebviewWindow};
+use tauri::{AppHandle, Manager, State, WebviewWindow};
 use uuid::Uuid;
 
 use crate::error::{CommandError, CommandErrorKind};
-use crate::layout::windows::{Bounds, Windows, WindowsFile};
+use crate::layout::windows::{ActiveRequest, Bounds, Windows, WindowsFile};
 use crate::layout::{Content, Placement, Preset, Side};
 use crate::windows::{self, WindowsState};
 
@@ -48,6 +48,8 @@ pub fn window_set_title(
 pub struct WindowContext {
     pub label: String,
     pub windows: WindowsFile,
+    /// Requête active, que suit la fenêtre de résultat (D2).
+    pub active_request: Option<ActiveRequest>,
 }
 
 /// Rôle et zones de la fenêtre appelante, au démarrage de son interface.
@@ -59,6 +61,7 @@ pub fn windows_load(
     Ok(WindowContext {
         label: window.label().to_owned(),
         windows: state.snapshot()?,
+        active_request: state.read(Windows::active_request)?,
     })
 }
 
@@ -222,6 +225,20 @@ pub fn window_detach_sidebar(
     bounds: Option<Bounds>,
 ) -> Result<WindowsFile, CommandError> {
     windows::apply(&app, |w| Ok(w.detach_sidebar(bounds))).map(|(_, file)| file)
+}
+
+/// Ouvre le résultat dans sa propre fenêtre (D1) ; déjà ouvert, sa fenêtre
+/// passe au premier plan (R1).
+#[tauri::command]
+pub fn window_detach_result(
+    app: AppHandle,
+    bounds: Option<Bounds>,
+) -> Result<WindowsFile, CommandError> {
+    let (label, file) = windows::apply(&app, |w| Ok(w.detach_result(bounds)))?;
+    if let Some(existing) = app.get_webview_window(&label) {
+        let _ = existing.set_focus();
+    }
+    Ok(file)
 }
 
 /// Rattache la fenêtre appelante à la fenêtre principale (F12, Z6).

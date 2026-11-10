@@ -239,6 +239,7 @@ pub fn contract_generate(
 /// Exécute les requêtes liées au contrat (C10, R12).
 #[tauri::command]
 pub fn contract_run(
+    window: WebviewWindow,
     state: State<'_, AppState>,
     bench: State<'_, Arc<Workbench>>,
     project: Uuid,
@@ -247,5 +248,7 @@ pub fn contract_run(
     confirmed: bool,
 ) -> Result<RunView, CommandError> {
     let ctx = state.project_ctx(project)?;
-    bench.start_contract_run(&ctx, &path, &environment, confirmed)
+    let run = bench.start_contract_run(&ctx, &path, &environment, confirmed)?;
+    windows::run_started(&window, project, &run);
+    Ok(run)
 }

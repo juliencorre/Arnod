@@ -72,6 +72,7 @@ et zones »).
 | F9, F10  | Barre latérale détachable (`Ctrl+Maj+D`) : elle pilote les fenêtres qui suivent la sélection ; une fenêtre peut être épinglée.         |
 | F11      | Catalogue, arborescences, requêtes enregistrées et environnements se mettent à jour dans toutes les fenêtres.                          |
 | F13, F14 | Zones, tailles et fenêtres détachées rouvertes au démarrage (`windows.json`) ; ⤢ agrandit une zone.                                    |
+| D1 à D7  | ⧉ dans le résultat d'une requête : le résultat a sa fenêtre et suit la requête active ; l'onglet de la requête garde l'éditeur seul.   |
 
 ### Contrats de services
 

@@ -403,6 +403,19 @@ impl Workbench {
     }
 
     /// Envoie la requête `request` (ou celle enregistrée) dans l'environnement `env` (E1).
+    /// Refuse d'avance un envoi qui demande confirmation (R8), sans rien envoyer :
+    /// les autres fenêtres ne voient pas d'envoi qui n'a pas lieu.
+    pub fn precheck(
+        &self,
+        ctx: &ProjectCtx,
+        env: &str,
+        request: &Request,
+        confirmed: bool,
+    ) -> Result<(), CommandError> {
+        let (_, environment) = self.variables(ctx, env)?;
+        Self::check_protected(&environment, &[request.method], confirmed)
+    }
+
     pub async fn send(
         &self,
         ctx: &ProjectCtx,

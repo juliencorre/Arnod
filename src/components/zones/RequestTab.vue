@@ -2,14 +2,14 @@
 /**
  * Onglet d'une requête : éditeur et résultat, côte à côte ou l'un sous
  * l'autre (F6). En automatique, le résultat passe dessous quand la zone fait
- * moins de 860 px de large.
+ * moins de 860 px de large. Quand le résultat a sa fenêtre, l'onglet ne montre
+ * que l'éditeur (docs/plan-resultat-detachable.md, R3).
  */
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue";
 
-import ExpectedResponses from "@/components/workbench/ExpectedResponses.vue";
 import RequestEditor from "@/components/workbench/RequestEditor.vue";
-import ResponsePanel from "@/components/workbench/ResponsePanel.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
+import ResultSide from "@/components/zones/ResultSide.vue";
 import { useTabActions } from "@/composables/useTabActions";
 import { useWindowsStore } from "@/stores/windows";
 import { requestKey, useWorkbenchStore } from "@/stores/workbench";
@@ -56,29 +56,6 @@ watch(
   { immediate: true },
 );
 
-/**
- * Côté résultat : la réponse reçue ou les réponses attendues (EP8). Un endpoint de contrat
- * s'ouvre sur ses réponses attendues ; un envoi montre la réponse.
- */
-const side = ref<"response" | "expected">("response");
-watch(
-  () => {
-    const current = editor.value;
-    return current?.draft?.contract !== undefined && current.outcome === null;
-  },
-  (linked) => {
-    if (linked) side.value = "expected";
-  },
-  { immediate: true },
-);
-watch(
-  () => editor.value?.outcome,
-  (outcome) => {
-    if (outcome) side.value = "response";
-  },
-);
-const expectedCount = computed(() => editor.value?.draft?.examples.length ?? 0);
-
 /** Clic sur la place active : retour à l'automatique ; sur l'autre : choix explicite. */
 function place(target: "right" | "below"): void {
   const effective = below.value ? "below" : "right";
@@ -88,7 +65,11 @@ function place(target: "right" | "below"): void {
 </script>
 
 <template>
-  <div ref="root" class="request-tab" :class="{ 'request-tab--below': below }">
+  <div
+    ref="root"
+    class="request-tab"
+    :class="{ 'request-tab--below': below, 'request-tab--alone': windows.resultDetached }"
+  >
     <div v-if="editor?.loadError" class="request-tab__missing" role="alert">
       <p>{{ editor.loadError }}</p>
       <BaseButton @click="tabs.close(tabId)">Fermer l'onglet</BaseButton>
@@ -98,52 +79,41 @@ function place(target: "right" | "below"): void {
       <div class="request-tab__editor">
         <RequestEditor :editor-key="key" />
       </div>
-      <div class="request-tab__response">
-        <div class="side">
-          <div role="tablist" aria-label="Résultat" class="side__tabs">
+      <div v-if="!windows.resultDetached" class="request-tab__response">
+        <ResultSide :editor-key="key">
+          <template #tools>
+            <div class="placement" role="group" aria-label="Place du résultat">
+              <button
+                type="button"
+                class="placement__option"
+                :aria-pressed="!below"
+                @click="place('right')"
+              >
+                À droite{{ !below && placement === "auto" ? " · auto" : "" }}
+              </button>
+              <button
+                type="button"
+                class="placement__option"
+                :aria-pressed="below"
+                @click="place('below')"
+              >
+                Dessous{{ below && placement === "auto" ? " · auto" : "" }}
+              </button>
+            </div>
             <button
               type="button"
-              role="tab"
-              class="side__tab"
-              :aria-selected="side === 'response'"
-              @click="side = 'response'"
+              class="detach"
+              aria-label="Ouvrir le résultat dans une fenêtre"
+              title="Le résultat dans sa fenêtre, qui suit la requête active"
+              @click="windows.detachResult()"
             >
-              Réponse
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                <rect x="1.5" y="4" width="8.5" height="8.5" rx="1.5" />
+                <path d="M5 2h6a1 1 0 0 1 1 1v6" />
+              </svg>
             </button>
-            <button
-              type="button"
-              role="tab"
-              class="side__tab"
-              :aria-selected="side === 'expected'"
-              @click="side = 'expected'"
-            >
-              Réponses attendues
-              <span v-if="expectedCount > 0" class="side__badge">{{ expectedCount }}</span>
-            </button>
-          </div>
-          <div class="placement" role="group" aria-label="Place du résultat">
-            <button
-              type="button"
-              class="placement__option"
-              :aria-pressed="!below"
-              @click="place('right')"
-            >
-              À droite{{ !below && placement === "auto" ? " · auto" : "" }}
-            </button>
-            <button
-              type="button"
-              class="placement__option"
-              :aria-pressed="below"
-              @click="place('below')"
-            >
-              Dessous{{ below && placement === "auto" ? " · auto" : "" }}
-            </button>
-          </div>
-        </div>
-        <div role="tabpanel" :aria-label="side === 'response' ? 'Réponse' : 'Réponses attendues'">
-          <ResponsePanel v-if="side === 'response'" :editor-key="key" />
-          <ExpectedResponses v-else :editor-key="key" />
-        </div>
+          </template>
+        </ResultSide>
       </div>
     </template>
   </div>
@@ -172,6 +142,40 @@ function place(target: "right" | "below"): void {
   min-width: 0;
 }
 
+/* Le résultat a sa fenêtre : l'éditeur prend toute la largeur (R3). */
+.request-tab--alone .request-tab__editor {
+  flex-basis: 100%;
+}
+
+.detach {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.625rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-muted);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.detach svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.detach:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
+.detach:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
 .request-tab--below .request-tab__response {
   padding-top: 1rem;
   border-top: 1px solid var(--color-border);
@@ -189,54 +193,8 @@ function place(target: "right" | "below"): void {
   color: var(--color-muted);
 }
 
-.side {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.side__tabs {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.side__tab {
-  padding: 0.5rem 0.625rem;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  font: inherit;
-  font-size: 0.875rem;
-  color: var(--color-muted);
-  background: none;
-  cursor: pointer;
-}
-
-.side__tab[aria-selected="true"] {
-  border-bottom-color: var(--color-accent);
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.side__tab:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: -2px;
-}
-
-.side__badge {
-  margin-left: 0.25rem;
-  padding: 0 0.375rem;
-  border-radius: 999px;
-  font-size: 0.6875rem;
-  background: var(--color-chip);
-}
-
 .placement {
   display: inline-flex;
-  margin-bottom: 0.375rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   overflow: hidden;

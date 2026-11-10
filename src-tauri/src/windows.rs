@@ -12,14 +12,17 @@ use std::sync::{Mutex, MutexGuard};
 
 use serde::Serialize;
 use tauri::{
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, Window, WindowEvent,
 };
 use uuid::Uuid;
 
 use crate::catalog::snapshot::CatalogSnapshot;
 use crate::error::{CommandError, CommandErrorKind};
-use crate::layout::windows::{Bounds, MAIN, WindowKind, WindowState, Windows, WindowsFile};
+use crate::layout::windows::{
+    ActiveRequest, Bounds, MAIN, WindowKind, WindowState, Windows, WindowsFile,
+};
+use crate::workbench::RunView;
 
 /// Fichier des fenêtres, dans les données locales (Z8).
 pub const WINDOWS_FILE: &str = "windows.json";
@@ -34,6 +37,22 @@ pub mod events {
     pub const PROJECT: &str = "arnod://projet";
     /// Demande de fermeture d'une fenêtre détachée : elle enregistre puis se rattache (Z6).
     pub const CLOSE: &str = "arnod://fermer";
+    /// Requête active, que montre la fenêtre de résultat (`ActiveRequest` ou `null`).
+    pub const ACTIVE_REQUEST: &str = "arnod://requete-active";
+    /// Début ou fin d'un envoi (`ResultChange`).
+    pub const RESULT: &str = "arnod://resultat";
+    /// Run démarré (`RunChange`) : toutes les fenêtres le suivent (R7).
+    pub const RUN: &str = "arnod://run";
+}
+
+/// Run démarré dans une fenêtre, diffusé aux autres (R7).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunChange {
+    pub project_id: Uuid,
+    pub run: RunView,
+    /// Fenêtre à l'origine du run, qui le suit déjà.
+    pub origin: String,
 }
 
 /// Partie d'un projet modifiée.
@@ -150,6 +169,7 @@ pub fn apply<R: Runtime, T>(
     change: impl FnOnce(&mut Windows) -> Result<T, CommandError>,
 ) -> Result<(T, WindowsFile), CommandError> {
     let state = app.state::<WindowsState>();
+    let active_before = state.read(Windows::active_request).ok().flatten();
     let (value, before, file) = state.update(change)?;
     for window in file.windows.iter().filter(|w| !before.contains(&w.label)) {
         spawn(app, window.clone());
@@ -163,7 +183,20 @@ pub fn apply<R: Runtime, T>(
         }
     }
     let _ = app.emit(events::WINDOWS, &file);
+    emit_active_if_changed(app, active_before);
     Ok((value, file))
+}
+
+/// Diffuse la requête active si elle a changé depuis `before` (D2).
+fn emit_active_if_changed<R: Runtime>(app: &AppHandle<R>, before: Option<ActiveRequest>) {
+    let after = app
+        .state::<WindowsState>()
+        .read(Windows::active_request)
+        .ok()
+        .flatten();
+    if after != before {
+        let _ = app.emit(events::ACTIVE_REQUEST, &after);
+    }
 }
 
 /// Crée la fenêtre du système d'une fenêtre détachée, hors du fil principal
@@ -174,8 +207,15 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>, window: WindowState) {
     }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
+        let result_only = window.layout.as_ref().is_some_and(|layout| {
+            layout
+                .tabs()
+                .iter()
+                .all(|tab| tab.content == crate::layout::Content::Result)
+        });
         let (title, width, height, min_width) = match window.kind {
             WindowKind::Sidebar => ("Arnod — Barre latérale", 320.0, 760.0, 240.0),
+            _ if result_only => ("Arnod — Résultat", 620.0, 720.0, 360.0),
             _ => ("Arnod", 980.0, 720.0, 480.0),
         };
         let mut builder =
@@ -229,7 +269,12 @@ pub fn on_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
     let state = app.state::<WindowsState>();
     let label = window.label().to_owned();
     match event {
-        WindowEvent::Focused(true) => state.quietly(|windows| windows.focus(&label)),
+        WindowEvent::Focused(true) => {
+            // Le focus change la requête active que suit la fenêtre de résultat (D2).
+            let before = state.read(Windows::active_request).ok().flatten();
+            state.quietly(|windows| windows.focus(&label));
+            emit_active_if_changed(app, before);
+        }
         WindowEvent::Moved(_) | WindowEvent::Resized(_) if label != MAIN => {
             if let Some(bounds) = bounds_of(window) {
                 state.quietly(|windows| windows.set_bounds(&label, bounds));
@@ -272,10 +317,11 @@ pub fn catalog_changed<R: Runtime>(app: &AppHandle<R>, snapshot: &CatalogSnapsho
         .read(|windows| {
             windows.to_file().windows.iter().any(|w| {
                 w.layout.as_ref().is_some_and(|layout| {
-                    layout
-                        .tabs()
-                        .iter()
-                        .any(|tab| !known.contains(&tab.content.project_id()))
+                    layout.tabs().iter().any(|tab| {
+                        tab.content
+                            .project_id()
+                            .is_some_and(|id| !known.contains(&id))
+                    })
                 })
             })
         })
@@ -283,6 +329,18 @@ pub fn catalog_changed<R: Runtime>(app: &AppHandle<R>, snapshot: &CatalogSnapsho
     if forgotten {
         let _ = apply(app, |windows| Ok(windows.retain_projects(&known)));
     }
+}
+
+/// Diffuse un run démarré : les autres fenêtres le suivent aussi (R7).
+pub fn run_started<R: Runtime>(window: &WebviewWindow<R>, project_id: Uuid, run: &RunView) {
+    let _ = window.app_handle().emit(
+        events::RUN,
+        RunChange {
+            project_id,
+            run: run.clone(),
+            origin: window.label().to_owned(),
+        },
+    );
 }
 
 /// Diffuse la modification d'un projet aux fenêtres (F11).

@@ -1,15 +1,17 @@
 //! Domaine « requêtes » : lecture, enregistrement, envoi et vérifications proposées.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Deserialize;
-use tauri::{Manager, State, WebviewWindow};
+use tauri::{Emitter, Manager, State, WebviewWindow};
 use uuid::Uuid;
 
 use crate::error::CommandError;
 use crate::request::assertions::{self, ResponseData};
 use crate::request::model::{Assertion, Example, Request};
 use crate::request::{example, file, inherit};
+use crate::results::{RequestResult, ResultBook, ResultChange};
 use crate::state::AppState;
 use crate::tree;
 use crate::windows::{self, ProjectScope};
@@ -54,12 +56,15 @@ pub fn request_save(
 }
 
 /// Envoie la requête telle qu'elle est dans l'éditeur, enregistrée ou non (E1).
-/// `path` situe la requête pour l'héritage de ses dossiers (R3, R4).
+/// `path` situe la requête pour l'héritage de ses dossiers (R3, R4). Le début
+/// et la fin de l'envoi sont gardés et diffusés à toutes les fenêtres (R5).
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn request_send(
+    window: WebviewWindow,
     state: State<'_, AppState>,
     bench: State<'_, Arc<Workbench>>,
+    results: State<'_, Mutex<ResultBook>>,
     project: Uuid,
     exec_id: Uuid,
     environment: String,
@@ -70,11 +75,58 @@ pub async fn request_send(
     let ctx = state.project_ctx(project)?;
     let mut request = request;
     request.inherited = path
-        .map(|path| inherit::resolve(&ctx.root, &path))
+        .as_deref()
+        .map(|path| inherit::resolve(&ctx.root, path))
         .unwrap_or_default();
-    bench
+    bench.precheck(&ctx, &environment, &request, confirmed)?;
+    if let Some(path) = path.as_deref() {
+        let started = results.lock().map(|mut book| book.start(project, path));
+        if let Ok(result) = started {
+            share(&window, result);
+        }
+    }
+    let sent = bench
         .send(&ctx, exec_id, &environment, request, confirmed)
-        .await
+        .await;
+    if let Some(path) = path.as_deref() {
+        let finished = results
+            .lock()
+            .map(|mut book| book.finish(project, path, &sent, now_ms()));
+        if let Ok(result) = finished {
+            share(&window, result);
+        }
+    }
+    sent
+}
+
+/// Diffuse le résultat d'un envoi à toutes les fenêtres (R5).
+fn share(window: &WebviewWindow, result: RequestResult) {
+    let _ = window.app_handle().emit(
+        windows::events::RESULT,
+        ResultChange {
+            result,
+            origin: window.label().to_owned(),
+        },
+    );
+}
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+}
+
+/// Dernier résultat d'une requête, pour une fenêtre qui s'ouvre (D2).
+#[tauri::command]
+pub fn request_result(
+    results: State<'_, Mutex<ResultBook>>,
+    project: Uuid,
+    path: String,
+) -> Option<RequestResult> {
+    results
+        .lock()
+        .ok()
+        .and_then(|book| book.get(project, &path).cloned())
 }
 
 #[tauri::command]

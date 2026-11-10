@@ -4,6 +4,7 @@ import { computed, ref } from "vue";
 import { events, ipc } from "@/lib/ipc";
 import { useToastStore } from "@/stores/toasts";
 import type {
+  ActiveRequest,
   ContentRef,
   ContentTab,
   LayoutNode,
@@ -40,8 +41,22 @@ export function splitAround(
   );
 }
 
+/** Projet d'un contenu ; aucun pour le résultat, qui suit la requête active. */
+export function contentProject(content: ContentRef): string | null {
+  return content.kind === "result" ? null : content.projectId;
+}
+
+function isResult(tab: ContentTab): boolean {
+  return tab.content.kind === "result";
+}
+
+function hasResult(zone: ZoneView): boolean {
+  return zone.tabs.some(isResult);
+}
+
 /** Même contenu (Z3). */
 export function sameContent(a: ContentRef, b: ContentRef): boolean {
+  if (a.kind === "result" || b.kind === "result") return a.kind === b.kind;
   if (a.kind === "run" || b.kind === "run") {
     return a.kind === b.kind && a.projectId === b.projectId;
   }
@@ -57,6 +72,8 @@ export function contentKey(content: ContentRef): string {
       return `${content.projectId}::run`;
     case "contract":
       return `${content.projectId}::contrat::${content.path}`;
+    case "result":
+      return "resultat";
   }
 }
 
@@ -70,6 +87,8 @@ export const useWindowsStore = defineStore("windows", () => {
   const toasts = useToastStore();
   const label = ref(MAIN_WINDOW);
   const snapshot = ref<WindowsSnapshot | null>(null);
+  /** Requête active, que suit la fenêtre de résultat (D2). */
+  const activeRequest = ref<ActiveRequest | null>(null);
   /** Zone agrandie dans cette fenêtre (⤢), ou `null`. */
   const maximizedZone = ref<string | null>(null);
   let subscribed = false;
@@ -94,6 +113,19 @@ export const useWindowsStore = defineStore("windows", () => {
       snapshot.value?.windows.filter((w) => w.kind === "main" || (w.kind === "content" && w.follow))
         .length ?? 0,
   );
+  /** Fenêtre qui porte l'onglet de résultat, s'il existe (R1). */
+  const resultWindow = computed(
+    () =>
+      snapshot.value?.windows.find(
+        (w) => w.layout && zonesOf(w.layout.root).some((z) => hasResult(z)),
+      ) ?? null,
+  );
+  /** Le résultat a son onglet : celui des requêtes ne montre que l'éditeur (R3). */
+  const resultDetached = computed(() => resultWindow.value !== null);
+  /** Cette fenêtre ne montre que le résultat : elle suit la requête active (R2). */
+  const resultOnly = computed(
+    () => zones.value.length > 0 && zones.value.every((z) => z.tabs.every(isResult)),
+  );
   /** Autres fenêtres à zones, pour « Déplacer vers » (F3). */
   const others = computed(
     () => snapshot.value?.windows.filter((w) => w.label !== label.value && w.layout) ?? [],
@@ -111,9 +143,13 @@ export const useWindowsStore = defineStore("windows", () => {
     const context = await ipc.windowsLoad();
     label.value = context.label;
     apply(context.windows);
+    activeRequest.value = context.activeRequest;
     if (!subscribed) {
       subscribed = true;
       await events.onWindows(apply);
+      await events.onActiveRequest((active) => {
+        activeRequest.value = active;
+      });
     }
   }
 
@@ -150,6 +186,10 @@ export const useWindowsStore = defineStore("windows", () => {
     label,
     snapshot,
     maximizedZone,
+    activeRequest,
+    resultWindow,
+    resultDetached,
+    resultOnly,
     me,
     kind,
     main,
@@ -183,6 +223,7 @@ export const useWindowsStore = defineStore("windows", () => {
     detachTab: (tab: string, bounds: WindowBounds | null = null) =>
       run(() => ipc.windowDetachTab(tab, bounds)),
     detachSidebar: () => run(() => ipc.windowDetachSidebar(null)),
+    detachResult: () => run(() => ipc.windowDetachResult(null)),
     reattach: () => run(() => ipc.windowReattach()),
     reattachAll: () => run(() => ipc.windowReattachAll()),
     toggleMaximize(zone: string): void {

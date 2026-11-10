@@ -16,7 +16,8 @@ section « Fenêtres et zones ». Puis contrats de services selon `docs/plan-con
 `docs/plan-opencollection.md` (section « Format OpenCollection »), puis configuration d'un
 endpoint selon `docs/plan-configuration-endpoint.md` (section « Configuration d'un endpoint ») et
 barre latérale du projet selon `docs/plan-barre-laterale-projet.md` (section « Barre latérale du
-projet »). Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
+projet »), puis résultat détachable selon `docs/plan-resultat-detachable.md` (section « Fenêtres et
+zones »). Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
 ## Architecture
 
@@ -72,7 +73,8 @@ src/                    Frontend Vue
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification
   components/layout/    Coquille : onglets des workspaces, barre latérale (un SidebarProject par
                         projet), zone principale
-  components/zones/     Zones : arbre, onglets, séparations (SplitHandle), onglet de requête
+  components/zones/     Zones : arbre, onglets, séparations (SplitHandle), onglet de requête,
+                        onglet de résultat (ResultTab, ResultSide)
   components/windows/   Fenêtres détachées : contenu, barre latérale
   components/contracts/ Contrats : section de la barre latérale, dialogue d'ajout, onglet
   components/projects/  Vues des projets (premier lancement...)
@@ -96,6 +98,7 @@ src-tauri/              Cœur Rust
   src/secrets.rs        Coffre des secrets (trait SecretStore, keyring du système)
   src/http.rs           Envoi HTTP (reqwest), délai, annulation, troncature à 5 Mo
   src/workbench.rs      Établi : envoi, variables, environnements actifs, runs
+  src/results.rs        Derniers résultats des envois, partagés entre fenêtres (pur)
   src/layout/           Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
   src/contract/         Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
                         file.rs range les contrats dans contracts/ du projet
@@ -231,6 +234,13 @@ Référence : `docs/plan-fenetres-zones.md` (cas F1 à F14, règles Z1 à Z8).
   enregistre ses requêtes puis appelle `window_reattach`. Fermer la principale quitte (Z7).
 - Toute séparation passe par `SplitHandle` (motif WAI-ARIA « window splitter », minimums en pixels) ;
   toute action glissée (onglet, zone) a son équivalent au clavier ou dans le menu de l'onglet.
+- Résultat détachable (`docs/plan-resultat-detachable.md`, D1 à D7, R1 à R7) : le contenu `result`
+  (un seul dans l'application) montre le résultat de la **requête active**, calculée par le cœur
+  (`Windows::active_request` : ordre du focus, zones) et diffusée par `arnod://requete-active`. Sa
+  fenêtre ne reçoit pas la sélection ; tant qu'il existe, l'onglet d'une requête ne montre que
+  l'éditeur ; le rattacher le ferme. Le cœur garde le dernier envoi de chaque requête
+  (`results.rs`, 50 au plus) et le diffuse par `arnod://resultat` ; un run démarré est diffusé par
+  `arnod://run`. Une fenêtre ignore l'écho de ses propres événements (`origin`).
 
 ## Contrats de services
 

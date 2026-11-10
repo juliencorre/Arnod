@@ -13,7 +13,7 @@ import SidebarProject from "@/components/layout/SidebarProject.vue";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
 import { useNavigationStore } from "@/stores/navigation";
-import { useWindowsStore } from "@/stores/windows";
+import { contentProject, useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 
 const catalog = useCatalogStore();
@@ -57,7 +57,7 @@ function register(projectId: string, block: unknown): void {
 function selectedProject(): string | null {
   const content = windows.activeTab?.content;
   const candidates = [
-    content?.projectId,
+    content ? contentProject(content) : null,
     openProjectId.value,
     projects.value.find((p) => workbench.isExpanded(p.id))?.id,
   ];

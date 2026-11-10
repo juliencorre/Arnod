@@ -10,7 +10,7 @@ import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import ZoneLayout from "@/components/zones/ZoneLayout.vue";
 import ZoneView from "@/components/zones/ZoneView.vue";
 import { useTabActions } from "@/composables/useTabActions";
-import { useWindowsStore } from "@/stores/windows";
+import { contentProject, useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 
 /** Projet présenté dans une fenêtre sans onglet (fenêtre principale). */
@@ -22,7 +22,16 @@ const workbench = useWorkbenchStore();
 
 // Les onglets ont besoin des données de leur projet (arborescence, run).
 watch(
-  () => [...new Set(windows.zones.flatMap((zone) => zone.tabs.map((t) => t.content.projectId)))],
+  () => [
+    ...new Set(
+      windows.zones.flatMap((zone) =>
+        zone.tabs.flatMap((t) => {
+          const project = contentProject(t.content);
+          return project === null ? [] : [project];
+        }),
+      ),
+    ),
+  ],
   (projects) => {
     for (const projectId of projects) {
       workbench.loadProject(projectId).catch(() => undefined);

@@ -107,6 +107,15 @@ impl WindowState {
     }
 }
 
+/// Requête active : celle dont la fenêtre de résultat montre le résultat
+/// (`docs/plan-resultat-detachable.md`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveRequest {
+    pub project_id: Uuid,
+    pub path: String,
+}
+
 /// Fichier `windows.json` et instantané envoyé aux fenêtres.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -377,6 +386,65 @@ impl Windows {
         self.add(WindowState::detached(WindowKind::Sidebar, None, bounds))
     }
 
+    /// Fenêtre qui porte l'onglet de résultat, s'il existe (R1).
+    pub fn result_window(&self) -> Option<&WindowState> {
+        self.windows.iter().find(|w| {
+            w.layout
+                .as_ref()
+                .is_some_and(|layout| layout.tabs().iter().any(|t| t.content == Content::Result))
+        })
+    }
+
+    /// Ouvre le résultat dans sa propre fenêtre (D1). Il n'y en a qu'un (R1) :
+    /// s'il existe déjà, sa fenêtre est renvoyée. La fenêtre ne reçoit pas la
+    /// sélection de la barre latérale (R2).
+    pub fn detach_result(&mut self, bounds: Option<Bounds>) -> String {
+        if let Some(existing) = self.result_window() {
+            return existing.label.clone();
+        }
+        let mut window = WindowState::detached(
+            WindowKind::Content,
+            Some(Layout::single(vec![Tab::new(Content::Result)])),
+            bounds,
+        );
+        window.follow = false;
+        self.add(window)
+    }
+
+    /// Requête active (D2) : dans la fenêtre utilisée le plus récemment qui en
+    /// montre une, l'onglet actif de la zone active, sinon d'une autre zone
+    /// (le résultat peut occuper la zone active).
+    pub fn active_request(&self) -> Option<ActiveRequest> {
+        let by_recency = self
+            .recent
+            .iter()
+            .filter_map(|label| self.windows.iter().find(|w| &w.label == label))
+            .chain(
+                self.windows
+                    .iter()
+                    .filter(|w| !self.recent.contains(&w.label)),
+            );
+        by_recency
+            .filter_map(|w| w.layout.as_ref())
+            .find_map(|layout| {
+                let zones = layout.zones();
+                let mut active_first = zones
+                    .iter()
+                    .filter(|z| z.id == layout.active_zone)
+                    .chain(zones.iter().filter(|z| z.id != layout.active_zone));
+                active_first.find_map(|zone| {
+                    let tab = zone.tabs.iter().find(|t| Some(t.id) == zone.active_tab)?;
+                    match &tab.content {
+                        Content::Request { project_id, path } => Some(ActiveRequest {
+                            project_id: *project_id,
+                            path: path.clone(),
+                        }),
+                        _ => None,
+                    }
+                })
+            })
+    }
+
     /// Rattache une fenêtre détachée (F12, Z6) : ses onglets reviennent dans la
     /// zone active de la fenêtre principale ; la barre latérale reprend sa place.
     pub fn reattach(&mut self, label: &str) -> Result<(), CommandError> {
@@ -394,9 +462,17 @@ impl Windows {
         match window.kind {
             WindowKind::Sidebar => main.sidebar_detached = false,
             WindowKind::Content => {
+                // Le résultat revient dans l'onglet de chaque requête (R4).
                 let tabs = window
                     .layout
-                    .map(|layout| layout.tabs().into_iter().cloned().collect())
+                    .map(|layout| {
+                        layout
+                            .tabs()
+                            .into_iter()
+                            .filter(|tab| tab.content != Content::Result)
+                            .cloned()
+                            .collect()
+                    })
                     .unwrap_or_default();
                 if let Some(layout) = main.layout.as_mut() {
                     layout.absorb(tabs)?;
@@ -435,7 +511,7 @@ impl Windows {
             .iter()
             .filter_map(|w| w.layout.as_ref())
             .flat_map(Layout::tabs)
-            .map(|tab| tab.content.project_id())
+            .filter_map(|tab| tab.content.project_id())
             .filter(|id| !known.contains(id))
             .collect();
         for project_id in &forgotten {

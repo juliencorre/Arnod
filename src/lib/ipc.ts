@@ -9,6 +9,7 @@ import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
+  ActiveRequest,
   CatalogLoad,
   CatalogSnapshot,
   CommandError,
@@ -34,6 +35,9 @@ import type {
   ExampleInput,
   ProposeInput,
   RequestDoc,
+  RequestResult,
+  ResultChange,
+  RunChange,
   RunView,
   SendOutcome,
   TreeView,
@@ -246,6 +250,10 @@ export const ipc = {
   requestCancel: (execId: string): Promise<void> =>
     call<null>("request_cancel", { execId }).then(() => undefined),
 
+  /** Dernier envoi de la requête gardé par le cœur, ou `null` (R5). */
+  requestResult: (project: string, path: string): Promise<RequestResult | null> =>
+    call<RequestResult | null>("request_result", { project, path }),
+
   requestProposeAssertions: (response: ProposeInput): Promise<Assertion[]> =>
     call<Assertion[]>("request_propose_assertions", { response }),
 
@@ -393,6 +401,10 @@ export const ipc = {
   windowDetachSidebar: (bounds: WindowBounds | null): Promise<WindowsSnapshot> =>
     call<WindowsSnapshot>("window_detach_sidebar", { bounds }),
 
+  /** Ouvre le résultat dans sa fenêtre, ou met la sienne au premier plan (D1, R1). */
+  windowDetachResult: (bounds: WindowBounds | null): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("window_detach_result", { bounds }),
+
   /** Rattache cette fenêtre à la fenêtre principale (F12). */
   windowReattach: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach"),
 
@@ -405,6 +417,9 @@ export const EVENTS = {
   catalog: "arnod://catalogue",
   project: "arnod://projet",
   close: "arnod://fermer",
+  activeRequest: "arnod://requete-active",
+  result: "arnod://resultat",
+  run: "arnod://run",
 } as const;
 
 /** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
@@ -424,6 +439,24 @@ export const events = {
   /** Modification d'un projet (arborescence, requête, environnements). */
   onProject: (handler: (change: ProjectChange) => void): Promise<UnlistenFn> =>
     listen<ProjectChange>(EVENTS.project, (event) => {
+      handler(event.payload);
+    }),
+
+  /** Requête active changée (onglet, fenêtre) : la fenêtre de résultat la suit (D2). */
+  onActiveRequest: (handler: (active: ActiveRequest | null) => void): Promise<UnlistenFn> =>
+    listen<ActiveRequest | null>(EVENTS.activeRequest, (event) => {
+      handler(event.payload);
+    }),
+
+  /** Début ou fin d'un envoi, dans n'importe quelle fenêtre (R5). */
+  onResult: (handler: (change: ResultChange) => void): Promise<UnlistenFn> =>
+    listen<ResultChange>(EVENTS.result, (event) => {
+      handler(event.payload);
+    }),
+
+  /** Run démarré dans n'importe quelle fenêtre (R7). */
+  onRun: (handler: (change: RunChange) => void): Promise<UnlistenFn> =>
+    listen<RunChange>(EVENTS.run, (event) => {
       handler(event.payload);
     }),
 

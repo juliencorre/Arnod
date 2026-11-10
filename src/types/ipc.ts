@@ -44,6 +44,7 @@ export type CommandName =
   | "window_detach_zone"
   | "window_detach_tab"
   | "window_detach_sidebar"
+  | "window_detach_result"
   | "window_reattach"
   | "window_reattach_all"
   | "tree_load"
@@ -58,6 +59,7 @@ export type CommandName =
   | "request_save"
   | "request_send"
   | "request_cancel"
+  | "request_result"
   | "request_propose_assertions"
   | "request_example_from_response"
   | "environments_load"
@@ -544,7 +546,9 @@ export interface ExampleInput {
 export type ContentRef =
   | { kind: "request"; projectId: string; path: string }
   | { kind: "run"; projectId: string }
-  | { kind: "contract"; projectId: string; path: string };
+  | { kind: "contract"; projectId: string; path: string }
+  /** Résultat de la requête active, dans sa fenêtre (docs/plan-resultat-detachable.md). */
+  | { kind: "result" };
 
 /** Onglet de contenu d'une zone (`Tab`). */
 export interface ContentTab {
@@ -627,6 +631,39 @@ export interface WindowsSnapshot {
 export interface WindowContext {
   label: string;
   windows: WindowsSnapshot;
+  /** Requête active, que suit la fenêtre de résultat (D2). */
+  activeRequest: ActiveRequest | null;
+}
+
+/** Requête active (`ActiveRequest`), diffusée par `arnod://requete-active`. */
+export interface ActiveRequest {
+  projectId: string;
+  path: string;
+}
+
+/** Dernier envoi d'une requête (`RequestResult`), gardé par le cœur (R5). */
+export interface RequestResult {
+  projectId: string;
+  path: string;
+  sending: boolean;
+  outcome: SendOutcome | null;
+  error: string | null;
+  /** Réception de la réponse, en millisecondes depuis l'époque Unix. */
+  receivedAt: number | null;
+}
+
+/** Envoi diffusé par `arnod://resultat` (`ResultChange`). */
+export interface ResultChange {
+  result: RequestResult;
+  /** Fenêtre à l'origine de l'envoi, qui l'a déjà appliqué. */
+  origin: string;
+}
+
+/** Run démarré diffusé par `arnod://run` (`RunChange`) : toutes les fenêtres le suivent (R7). */
+export interface RunChange {
+  projectId: string;
+  run: RunView;
+  origin: string;
 }
 
 /** Partie d'un projet modifiée (`ProjectScope`). */

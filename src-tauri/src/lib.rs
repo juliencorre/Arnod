@@ -18,6 +18,7 @@ pub mod manifest;
 mod menu;
 pub mod opencollection;
 pub mod request;
+pub mod results;
 pub mod secrets;
 pub mod state;
 pub mod storage;
@@ -27,10 +28,11 @@ mod ts_contract;
 pub mod windows;
 pub mod workbench;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tauri::Manager;
 
+use crate::results::ResultBook;
 use crate::secrets::SystemSecretStore;
 use crate::state::{AppState, DEFAULT_LOCATION_DIR};
 use crate::windows::WindowsState;
@@ -50,6 +52,7 @@ pub fn run() {
             app.manage(AppState::load(data_dir.clone(), default_location));
             app.manage(Arc::new(Workbench::new(Arc::new(SystemSecretStore))));
             app.manage(WindowsState::load(data_dir));
+            app.manage(Mutex::new(ResultBook::default()));
             // Chaque modification du catalogue est diffusée à toutes les fenêtres (F11).
             let handle = app.handle().clone();
             app.state::<AppState>().on_change(Box::new(move |snapshot| {
@@ -92,6 +95,7 @@ pub fn run() {
             commands::window::window_detach_zone,
             commands::window::window_detach_tab,
             commands::window::window_detach_sidebar,
+            commands::window::window_detach_result,
             commands::window::window_reattach,
             commands::window::window_reattach_all,
             commands::contracts::contract_list,
@@ -114,6 +118,7 @@ pub fn run() {
             commands::requests::request_save,
             commands::requests::request_send,
             commands::requests::request_cancel,
+            commands::requests::request_result,
             commands::requests::request_propose_assertions,
             commands::requests::request_example_from_response,
             commands::environments::environments_load,

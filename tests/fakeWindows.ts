@@ -4,6 +4,7 @@
  * testé côté Rust, `layout/tests.rs`).
  */
 import type {
+  ActiveRequest,
   CommandError,
   ContentRef,
   ContentTab,
@@ -79,6 +80,7 @@ export function tab(content: ContentRef): ContentTab {
 }
 
 function same(a: ContentRef, b: ContentRef): boolean {
+  if (a.kind === "result" || b.kind === "result") return a.kind === b.kind;
   if (a.kind === "request" && b.kind === "request") {
     return a.projectId === b.projectId && a.path === b.path;
   }
@@ -263,11 +265,40 @@ function reattach(fw: FakeWindows, label: string): void {
   const layout = host.layout;
   if (!layout) return;
   for (const z of zonesIn(window.layout?.root ?? newZone())) {
-    for (const t of z.tabs) insert(layout, layout.activeZone, t, null);
+    // Le résultat revient dans l'onglet de chaque requête (R4).
+    for (const t of z.tabs.filter((x) => x.content.kind !== "result")) {
+      insert(layout, layout.activeZone, t, null);
+    }
   }
 }
 
 /** Fenêtre qui reçoit la sélection de la barre latérale (Z5). */
+function tabsIn(window: WindowView): ContentTab[] {
+  return window.layout ? zonesIn(window.layout.root).flatMap((z) => z.tabs) : [];
+}
+
+/** Requête active (D2) : onglet actif d'une requête dans la fenêtre la plus récente. */
+export function activeRequest(fw: FakeWindows): ActiveRequest | null {
+  const ordered = [
+    ...fw.recent.flatMap((l) => fw.windows.filter((w) => w.label === l)),
+    ...fw.windows.filter((w) => !fw.recent.includes(w.label)),
+  ];
+  for (const w of ordered) {
+    if (!w.layout) continue;
+    const layout = w.layout;
+    const zones = zonesIn(layout.root).sort(
+      (a, b) => Number(b.id === layout.activeZone) - Number(a.id === layout.activeZone),
+    );
+    for (const z of zones) {
+      const active = z.tabs.find((t) => t.id === z.activeTab);
+      if (active?.content.kind === "request") {
+        return { projectId: active.content.projectId, path: active.content.path };
+      }
+    }
+  }
+  return null;
+}
+
 function selectionTarget(fw: FakeWindows): string {
   for (const label of fw.recent) {
     const w = fw.windows.find((x) => x.label === label);
@@ -285,6 +316,7 @@ export function closePath(fw: FakeWindows, projectId: string, path: string): voi
         const c = t.content;
         if (
           c.kind !== "run" &&
+          c.kind !== "result" &&
           c.projectId === projectId &&
           (c.path === path || c.path.startsWith(`${path}/`))
         ) {
@@ -314,7 +346,7 @@ export function handleWindows(
   const done = (): WindowsSnapshot => snapshotOf(fw);
   switch (cmd) {
     case "windows_load":
-      return { label: me, windows: snapshotOf(fw) };
+      return { label: me, windows: snapshotOf(fw), activeRequest: activeRequest(fw) };
     case "layout_open": {
       const layout = layoutOf(fw, me);
       insert(layout, opt("zone") ?? layout.activeZone, tab(args.content as ContentRef), null);
@@ -420,6 +452,13 @@ export function handleWindows(
       if (!fw.windows.some((w) => w.kind === "sidebar")) {
         main(fw).sidebarDetached = true;
         add(fw, newWindow("sidebar"));
+      }
+      return done();
+    case "window_detach_result":
+      if (!fw.windows.some((w) => w.layout && tabsIn(w).some((t) => t.content.kind === "result"))) {
+        const window = newWindow("content", [tab({ kind: "result" })]);
+        window.follow = false;
+        add(fw, window);
       }
       return done();
     case "window_reattach":
