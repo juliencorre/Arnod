@@ -7,7 +7,7 @@
   2. Installe en mode silencieux (/S) pour l'utilisateur courant.
   3. Vérifie le dossier d'installation, le raccourci du menu Démarrer et
      l'entrée de désinstallation dans HKCU (Paramètres Windows).
-  4. Lance Arnod, attend que la page affiche « Créez votre premier projet » (poste vierge :
+  4. Lance Arnod, attend que la page affiche « Bienvenue dans Arnod » (poste vierge :
      premier lancement, 1a), via UI Automation,
      enregistre une capture, puis ferme la fenêtre comme avec la croix (F4).
   5. Désinstalle en mode silencieux et vérifie la suppression.
@@ -131,12 +131,12 @@ $started = Get-Date
 $rendered = $false
 if (Initialize-UIAutomation) {
   try {
-    Wait-Until -TimeoutSeconds 60 -Message "« Créez votre premier projet » n'est pas apparu dans la fenêtre." -Condition {
+    Wait-Until -TimeoutSeconds 60 -Message "« Bienvenue dans Arnod » n'est pas apparu dans la fenêtre." -Condition {
       if ($app.HasExited) { throw "Arnod s'est arrêté (code $($app.ExitCode))." }
-      $null -ne (Find-UIElementByName -Handle $app.MainWindowHandle -Name 'Créez votre premier projet')
+      $null -ne (Find-UIElementByName -Handle $app.MainWindowHandle -Name 'Bienvenue dans Arnod')
     }
     $rendered = $true
-    Write-Host ("« Créez votre premier projet » affiché après {0:N1} s (1a)." -f ((Get-Date) - $started).TotalSeconds)
+    Write-Host ("« Bienvenue dans Arnod » affiché après {0:N1} s (1a)." -f ((Get-Date) - $started).TotalSeconds)
   } catch {
     $failures += $_.Exception.Message
   }

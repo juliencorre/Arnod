@@ -81,6 +81,12 @@ const PAIRS: { foreground: string[]; background: string[]; minimum: number }[] =
     background: ["--color-toast-bg"],
     minimum: 4.5,
   },
+  // Pastilles des natures d'étape : texte de la famille sur son fond.
+  ...["calls", "data", "messages", "jobs", "interface", "code", "files"].map((family) => ({
+    foreground: [`--color-family-${family}-text`],
+    background: [`--color-family-${family}-bg`, "--color-surface"],
+    minimum: 4.5,
+  })),
   {
     foreground: ["--color-subtle", "--color-focus"],
     background: ["--color-bg", "--color-surface", "--color-sidebar"],

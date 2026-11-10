@@ -40,11 +40,11 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
       "Tous les projets par défaut",
     ]);
 
-    await wrapper.get("form input").setValue("boutique-tests");
+    await wrapper.get(".first-run__card form input").setValue("boutique-tests");
     await flushPromises();
     expect(folderPreview(wrapper)).toBe(`${DEFAULT_LOCATION}/boutique-tests`);
 
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
 
     expect(core.calls.find((call) => call.cmd === "project_create")?.args).toEqual({
@@ -97,8 +97,8 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
       "E-commerce",
     ]);
 
-    await wrapper.get("form input").setValue("boutique-tests");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form input").setValue("boutique-tests");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
     const created = core.calls.find((c) => c.cmd === "project_create")?.args;
     expect(created?.workspaceId).toBe("ws-e-commerce");
@@ -112,13 +112,13 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
     const core = installFakeCore(firstRunSnapshot());
     core.pickedFolder = "/home/julien/dev";
     wrapper = await mountApp();
-    await wrapper.get("form input").setValue("auth-sso");
+    await wrapper.get(".first-run__card form input").setValue("auth-sso");
 
     await wrapper.get('button[aria-label="Changer l\'emplacement du dossier"]').trigger("click");
     await flushPromises();
 
     expect(folderPreview(wrapper)).toBe("/home/julien/dev/auth-sso");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
     expect(core.calls.find((call) => call.cmd === "project_create")?.args).toMatchObject({
       location: "/home/julien/dev",
@@ -138,10 +138,10 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
   it("affiche l'erreur du cœur sous le champ concerné", async () => {
     const core = installFakeCore(firstRunSnapshot());
     wrapper = await mountApp();
-    const input = wrapper.get("form input");
+    const input = wrapper.get(".first-run__card form input");
 
     await input.setValue("api/v2");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
     expect(input.attributes("aria-invalid")).toBe("true");
     const nameError = wrapper.get(`#${input.attributes("aria-describedby") ?? ""}`);
@@ -153,20 +153,22 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
     });
     await input.setValue("boutique");
     expect(input.attributes("aria-invalid")).toBe("false");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
     expect(wrapper.get('[role="group"] + [role="alert"]').text()).toBe(
       "Le dossier /home/julien/arnod/boutique existe déjà et n'est pas vide.",
     );
-    expect(wrapper.get("main h1").text()).toBe("Créez votre premier projet");
+    expect(wrapper.get("main h1").text()).toBe("Bienvenue dans Arnod");
   });
 
   it("n'envoie rien tant que le nom est vide", async () => {
     const core = installFakeCore(firstRunSnapshot());
     wrapper = await mountApp();
 
-    expect(wrapper.get('form button[type="submit"]').attributes("disabled")).toBeDefined();
-    await wrapper.get("form").trigger("submit");
+    expect(
+      wrapper.get('.first-run__card form button[type="submit"]').attributes("disabled"),
+    ).toBeDefined();
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
 
     expect(core.commands()).not.toContain("project_create");
@@ -276,8 +278,8 @@ describe("vue projet (1b, P5)", () => {
   it("revient à « Tous les projets » par l'onglet épinglé", async () => {
     const core = installFakeCore(firstRunSnapshot());
     wrapper = await mountApp();
-    await wrapper.get("form input").setValue("boutique-tests");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form input").setValue("boutique-tests");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
     expect(wrapper.get("main h1").text()).toBe("boutique-tests");
 

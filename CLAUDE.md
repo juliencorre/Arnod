@@ -17,7 +17,9 @@ section « Fenêtres et zones ». Puis contrats de services selon `docs/plan-con
 endpoint selon `docs/plan-configuration-endpoint.md` (section « Configuration d'un endpoint ») et
 barre latérale du projet selon `docs/plan-barre-laterale-projet.md` (section « Barre latérale du
 projet »), puis résultat détachable selon `docs/plan-resultat-detachable.md` (section « Fenêtres et
-zones »). Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
+zones »), puis accueil, catalogue des étapes et Non classés selon `docs/plan-accueil-non-classes.md`
+et l'étude `docs/etude-catalogue-etapes.md` (section « Accueil, catalogue des étapes et Non
+classés »). Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
 ## Architecture
 
@@ -65,10 +67,12 @@ src/                    Frontend Vue
   lib/ipc.ts            Wrapper typé autour d'invoke et des événements (seul point d'accès IPC)
   lib/format.ts         Formatage d'affichage
   lib/url.ts            Paramètres de chemin d'une adresse, pour l'affichage
+  lib/steps.ts          Libellés des natures d'étape (familles, moteurs, règles), pour l'affichage
   stores/               catalog (instantané), navigation (onglet, vue, titre), toasts (notifications),
                         windows (fenêtres, zones, onglets de contenu), workbench (par projet :
                         arborescence, environnements, run ; par onglet : brouillon, réponse),
-                        contracts (contrats par projet, contrats ouverts)
+                        contracts (contrats par projet, contrats ouverts), steps (catalogue des
+                        étapes, reconnaissance, essai)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification
   components/layout/    Coquille : onglets des workspaces, barre latérale (un SidebarProject par
@@ -78,6 +82,8 @@ src/                    Frontend Vue
   components/windows/   Fenêtres détachées : contenu, barre latérale
   components/contracts/ Contrats : section de la barre latérale, dialogue d'ajout, onglet
   components/projects/  Vues des projets (premier lancement...)
+  components/home/      « Essayer une étape » (TryStep) et formulaire déclaratif d'une nature
+  components/steps/     Catalogue des étapes, pastille de nature (couleur de sa famille)
   components/workspaces/ Vues des workspaces
   components/workbench/ Arborescence, éditeur, réponse, environnements, run
   types/ipc.ts          Types IPC documentés à la main
@@ -101,7 +107,11 @@ src-tauri/              Cœur Rust
   src/results.rs        Derniers résultats des envois, partagés entre fenêtres (pur)
   src/layout/           Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
   src/contract/         Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
-                        file.rs range les contrats dans contracts/ du projet
+                        file.rs range les contrats dans contracts/ du projet ; deduce.rs déduit
+                        un contrat des essais
+  src/steps/            Catalogue des étapes (pur) : définitions (REST intégrée dans steps/rest.json),
+                        validation, reconnaissance, valeurs du formulaire, requête HTTP d'un essai
+  src/trial.rs          Essai sans projet : contrat déduit et « Essai N » dans « Non classés »
   src/windows.rs        windows.json, fenêtres natives, focus, fermetures, événements arnod://
   src/opencollection/   Format OpenCollection 1.0.0 : schéma embarqué, YAML, requêtes, racine
                         (opencollection.yml, extensions.arnod), conversion de l'ancien format
@@ -317,3 +327,30 @@ du projet » (option a), captures `docs/maquettes/6*.png`.
   de texte d'aide vide : une ligne d'ajout (« + Nouvelle requête », « + Ajouter un contrat »).
 - Raccourcis : Ctrl+N (nouvelle requête) et Ctrl+Maj+E (environnements) sur le projet de l'onglet
   actif, sinon le projet ouvert, sinon le premier déplié.
+
+## Accueil, catalogue des étapes et Non classés
+
+Référence : `docs/plan-accueil-non-classes.md` (cas A1 à A5, K1, K2, N1 à N5, règles R1 à R12) et
+l'étude `docs/etude-catalogue-etapes.md` (catalogue synchronisé, non implémenté).
+
+- Une nature d'étape est une **définition** (données : famille, moteur, champ principal, règles de
+  reconnaissance, formulaire déclaratif) exécutée par un **moteur** du cœur. Seule REST existe
+  (`src-tauri/steps/rest.json`, moteur intégré `http`, version d'interface 1). Une définition est
+  validée (`steps::definition::validate`) : format, moteur connu, champs uniques, `visibleWhen`
+  vers un choix placé avant. Pour une nouvelle nature : une définition, un moteur, les familles et
+  natures de champ restent fermées (miroirs `StepFamily`, `StepFieldKind` testés).
+- La source du catalogue (`arnod-steps`, `synced: false`) prépare la synchronisation décrite dans
+  l'étude (index signé, cache local, épinglage par projet) : ne pas l'implémenter sans un plan.
+- Accueil (`FirstRun.vue`) et « Tous les projets » : une entrée « Essayer une étape » (`TryStep`) ; le
+  cœur reconnaît la nature (`steps_detect`, une méthode en tête passe dans le formulaire) ; la
+  nature choisie ouvre son formulaire sous l'entrée et réduit créer / importer à une ligne. Le
+  formulaire est généré depuis la définition (`NatureForm.vue`), jamais écrit à la main par nature.
+- « Non classés » est un vrai projet par poste (`inboxProjectId` dans `arnod.json`), créé au
+  premier essai dans `<emplacement par défaut>/Non classés`, premier de la liste, jamais dans un
+  workspace (refusé par le cœur), avec son icône de bac. `trial_send` envoie dans l'environnement
+  « Local », crée ou enrichit le contrat déduit de l'origine (`contracts/<hôte>.yaml`, OpenAPI 3.1
+  marqué `x-arnod-deduced`, version masquée dans l'interface) et range « Essai N » dans le dossier
+  du serveur, liée à son opération, vérifications proposées et exemple compris. Un contrat écrit
+  à la main n'est jamais modifié ; un contrat déduit illisible refuse l'essai.
+- Couleurs des familles : jetons `--color-family-*` (texte, fond, bord) des deux thèmes, contrastes
+  vérifiés dans `tests/theme.spec.ts`.

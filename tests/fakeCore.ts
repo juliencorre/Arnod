@@ -16,10 +16,19 @@ import {
   snapshotOf,
   type FakeWindows,
 } from "./fakeWindows";
-import { createFakeWorkbench, handleWorkbench, type FakeWorkbench } from "./fakeWorkbench";
+import { STEP_CATALOG, detect } from "./fakeSteps";
+import {
+  createFakeWorkbench,
+  handleWorkbench,
+  newRequest,
+  okOutcome,
+  type FakeWorkbench,
+} from "./fakeWorkbench";
 
 export const HOME = "/home/julien";
 export const DEFAULT_LOCATION = `${HOME}/arnod`;
+/** Identifiant du projet « Non classés » créé par le premier essai. */
+export const INBOX = "p-non-classes";
 
 export interface FakeCore {
   calls: { cmd: string; args: Record<string, unknown> }[];
@@ -230,6 +239,69 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           state.workspaces = state.workspaces.filter((w) => w.id !== args.workspaceId);
           if (state.lastWorkspaceId === args.workspaceId) state.lastWorkspaceId = null;
           return undoable(before);
+        }
+        case "steps_catalog":
+          return structuredClone(STEP_CATALOG);
+        case "steps_detect":
+          return detect(String(args.input));
+        case "trial_send": {
+          // Essai REST : « Non classés » créé au besoin, « Essai N » sous le contrat déduit.
+          const subject = String(args.subject);
+          const host = /^https?:\/\/([^/:?#]+)/i.exec(subject)?.[1];
+          if (host === undefined)
+            fail("invalidRequest", "L'adresse doit commencer par http(s)://.");
+          if (!state.projects.some((p) => p.id === INBOX)) {
+            state.projects.unshift({
+              id: INBOX,
+              name: "Non classés",
+              path: `${DEFAULT_LOCATION}/Non classés`,
+              status: "ok",
+              workspaceIds: [],
+            });
+          }
+          state.inboxProjectId = INBOX;
+          const count = [...core.workbench.requests.values()].filter((r) =>
+            r.name.startsWith("Essai "),
+          ).length;
+          const name = `Essai ${String(count + 1)}`;
+          const path = `${host}/essai-${String(count + 1)}.yml`;
+          const values = (args.values ?? {}) as Record<string, string>;
+          const method = (values.method ?? "GET") as "GET";
+          const route = /^https?:\/\/[^/?#]+(\/[^?#]*)?/i.exec(subject)?.[1] ?? "/";
+          const key = `${method} ${route}`;
+          const file = `contracts/${host.replaceAll(".", "-")}.yaml`;
+          const contract = core.contracts.files.get(file) ?? {
+            name: host,
+            version: "0.0.0",
+            deduced: true,
+            source: `openapi: 3.1.0\ninfo:\n  title: ${host}\n  version: 0.0.0\n`,
+            operations: [],
+          };
+          if (!contract.operations.some((o) => o.key === key)) {
+            contract.operations.push({ key, method, path: route, summary: null, tag: null });
+          }
+          core.contracts.files.set(file, contract);
+          core.workbench.folders.add(host);
+          core.workbench.requests.set(
+            path,
+            newRequest(name, { url: subject, method, contract: { file, operation: key } }),
+          );
+          const outcome = okOutcome();
+          core.workbench.results.set(path, {
+            projectId: INBOX,
+            path,
+            sending: false,
+            outcome,
+            error: null,
+            receivedAt: 1_700_000_000_000,
+          });
+          return {
+            snapshot: normalize(),
+            projectId: INBOX,
+            path,
+            contract: file,
+            outcome,
+          };
         }
         case "undo": {
           const before = undo.get(String(args.undoToken));

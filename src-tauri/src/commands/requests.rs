@@ -100,7 +100,7 @@ pub async fn request_send(
 }
 
 /// Diffuse le résultat d'un envoi à toutes les fenêtres (R5).
-fn share(window: &WebviewWindow, result: RequestResult) {
+pub(crate) fn share(window: &WebviewWindow, result: RequestResult) {
     let _ = window.app_handle().emit(
         windows::events::RESULT,
         ResultChange {
@@ -110,7 +110,7 @@ fn share(window: &WebviewWindow, result: RequestResult) {
     );
 }
 
-fn now_ms() -> u64 {
+pub(crate) fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))

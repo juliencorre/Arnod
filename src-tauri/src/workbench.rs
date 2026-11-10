@@ -444,8 +444,30 @@ impl Workbench {
         Ok(Self::outcome(&ctx.root, &request, response))
     }
 
+    /// Envoie un essai hors de tout projet, sans variables
+    /// (`docs/plan-accueil-non-classes.md`, R12 : rien n'est créé avant la réponse).
+    pub async fn send_detached(
+        &self,
+        exec_id: Uuid,
+        request: &Request,
+    ) -> Result<HttpResponse, CommandError> {
+        let variables = Variables {
+            environment: environment::LOCAL.to_owned(),
+            ..Variables::default()
+        };
+        let prepared = resolve::prepare(request, &variables)?;
+        let cancel = Arc::new(Notify::new());
+        self.executions
+            .lock()
+            .map_err(|_| busy())?
+            .insert(exec_id, cancel.clone());
+        let result = http::send(&prepared, &cancel).await;
+        self.executions.lock().map_err(|_| busy())?.remove(&exec_id);
+        result
+    }
+
     /// Évalue les vérifications ; celle de conformité lit le contrat lié (C8).
-    fn outcome(root: &Path, request: &Request, response: HttpResponse) -> SendOutcome {
+    pub fn outcome(root: &Path, request: &Request, response: HttpResponse) -> SendOutcome {
         let list = &request.assertions;
         let data = response.data();
         let mut results = assertions::evaluate_all(list, &data);

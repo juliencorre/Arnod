@@ -138,7 +138,9 @@ async function onItem(id: string, contract: ContractSummary): Promise<void> {
         >
           <span class="contract-row__badge" aria-hidden="true">API</span>
           <span class="contract-row__name">{{ contract.name }}</span>
-          <span v-if="contract.version" class="contract-row__version">{{ contract.version }}</span>
+          <span v-if="contract.version && !contract.deduced" class="contract-row__version">{{
+            contract.version
+          }}</span>
           <span v-if="contract.error" class="contract-row__invalid" aria-label="illisible">⚠</span>
         </button>
         <BaseMenu

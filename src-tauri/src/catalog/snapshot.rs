@@ -53,6 +53,8 @@ pub struct CatalogSnapshot {
     pub workspaces: Vec<WorkspaceView>,
     /// Dernier onglet ouvert ; `null` pour « Tous les projets » (R7).
     pub last_workspace_id: Option<Uuid>,
+    /// Projet « Non classés », en tête de `projects` (R4, R5).
+    pub inbox_project_id: Option<Uuid>,
 }
 
 /// Projet de « Tous les projets » vu par l'interface.

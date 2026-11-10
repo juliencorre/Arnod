@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::names::{same_name, sort_key};
-use crate::contract::conformance;
 use crate::contract::generate::{request_for, safe_name, supported};
 use crate::contract::parse::{Contract, SpecKind, load};
+use crate::contract::{conformance, deduce};
 use crate::environment;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::request::assertions::{AssertionResult, ResponseData};
@@ -28,6 +28,8 @@ const BASE_URL: &str = "baseUrl";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractSummary {
+    /// Contrat déduit des échanges réels (`x-arnod-deduced`) : version non affichée.
+    pub deduced: bool,
     /// Chemin relatif au projet : `contracts/petstore.yaml`.
     pub path: String,
     pub name: String,
@@ -68,6 +70,8 @@ pub struct OrphanView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractView {
+    /// Contrat déduit des échanges réels (`x-arnod-deduced`).
+    pub deduced: bool,
     pub path: String,
     pub name: String,
     pub version: String,
@@ -129,7 +133,7 @@ fn not_a_contract(reason: &str) -> CommandError {
     invalid(format!("Ce texte n'est pas un contrat lisible : {reason}"))
 }
 
-fn dir(root: &Path) -> PathBuf {
+pub(crate) fn dir(root: &Path) -> PathBuf {
     root.join(CONTRACTS_DIR)
 }
 
@@ -153,7 +157,7 @@ fn resolve_path(root: &Path, path: &str) -> Result<PathBuf, CommandError> {
     Ok(absolute)
 }
 
-fn relative(path: &Path) -> String {
+pub(crate) fn relative(path: &Path) -> String {
     format!(
         "{CONTRACTS_DIR}/{}",
         path.file_name()
@@ -192,6 +196,7 @@ pub fn list(root: &Path) -> Vec<ContractSummary> {
             let text = fs::read_to_string(&path).unwrap_or_default();
             match load(&text) {
                 Ok(contract) => ContractSummary {
+                    deduced: deduce::is_deduced(&contract.doc),
                     path: relative(&path),
                     name: contract.title,
                     version: contract.version,
@@ -199,6 +204,7 @@ pub fn list(root: &Path) -> Vec<ContractSummary> {
                     error: None,
                 },
                 Err(reason) => ContractSummary {
+                    deduced: false,
                     path: relative(&path),
                     name: stem(&path),
                     version: String::new(),
@@ -284,6 +290,7 @@ pub fn view(root: &Path, path: &str) -> Result<ContractView, CommandError> {
     Ok(match load(&source) {
         Ok(contract) => view_of(path, &contract, source, &links),
         Err(reason) => ContractView {
+            deduced: false,
             path: path.to_owned(),
             name: stem(&absolute),
             version: String::new(),
@@ -333,6 +340,7 @@ fn view_of(path: &str, contract: &Contract, source: String, links: &[Linked]) ->
         })
         .collect();
     ContractView {
+        deduced: deduce::is_deduced(&contract.doc),
         path: path.to_owned(),
         name: contract.title.clone(),
         version: contract.version.clone(),
@@ -385,7 +393,7 @@ fn is_json_text(text: &str) -> bool {
 }
 
 /// Nom de fichier libre dans `contracts/` pour `base.ext`.
-fn free_name(dir: &Path, base: &str, ext: &str) -> String {
+pub(crate) fn free_name(dir: &Path, base: &str, ext: &str) -> String {
     let taken = |candidate: &str| {
         fs::read_dir(dir).is_ok_and(|entries| {
             entries.flatten().any(|entry| {
@@ -422,7 +430,7 @@ pub fn add(root: &Path, text: &str) -> Result<String, CommandError> {
     Ok(relative(&file))
 }
 
-fn write_text(path: &Path, text: &str) -> Result<(), CommandError> {
+pub(crate) fn write_text(path: &Path, text: &str) -> Result<(), CommandError> {
     let tmp = path.with_extension("tmp");
     fs::write(&tmp, text).map_err(|error| CommandError::io("Écriture impossible", &tmp, &error))?;
     fs::rename(&tmp, path).map_err(|error| {
@@ -460,7 +468,7 @@ pub fn delete(root: &Path, path: &str, permanent: bool) -> Result<(), CommandErr
 }
 
 /// Dossier d'un nom à la racine, hors des dossiers réservés.
-fn folder_name(title: &str) -> String {
+pub(crate) fn folder_name(title: &str) -> String {
     let name = safe_name(title, "Contrat");
     if [CONTRACTS_DIR, ENVIRONMENTS_DIR]
         .iter()

@@ -14,6 +14,7 @@ import { computed, nextTick, useTemplateRef } from "vue";
 import { CONTRACT_ADD_ITEMS } from "@/components/contracts/addItems";
 import ContractsSection from "@/components/contracts/ContractsSection.vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
+import TrayIcon from "@/components/ui/TrayIcon.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import EnvironmentChip from "@/components/workbench/EnvironmentChip.vue";
 import TreePanel from "@/components/workbench/TreePanel.vue";
@@ -44,6 +45,8 @@ const id = computed(() => props.project.id);
 const name = computed(() => props.project.name);
 const expanded = computed(() => workbench.isExpanded(id.value));
 const missing = computed(() => props.project.status === "missing");
+/** « Non classés » : icône de bac, jamais glissé vers un workspace (N3, R5). */
+const inbox = computed(() => catalog.isInbox(id.value));
 
 /** Nombre de requêtes du projet, une fois son arborescence lue. */
 const requestCount = computed(() => {
@@ -174,11 +177,14 @@ defineExpose({
         type="button"
         class="project__main"
         :aria-current="current ? 'page' : undefined"
-        draggable="true"
+        :draggable="!inbox"
         @dragstart="startProjectDrag($event, id)"
         @click="choose"
       >
-        <span class="project__initial" aria-hidden="true">{{ name.charAt(0).toUpperCase() }}</span>
+        <span class="project__initial" aria-hidden="true">
+          <TrayIcon v-if="inbox" />
+          <template v-else>{{ name.charAt(0).toUpperCase() }}</template>
+        </span>
         <span class="project__name">{{ name }}</span>
         <span v-if="missing" class="project__missing" title="Dossier introuvable">
           <span aria-hidden="true">!</span>

@@ -71,6 +71,10 @@ pub struct CatalogFile {
     pub workspaces: Vec<Workspace>,
     /// Dernier onglet ouvert ; `null` pour « Tous les projets » (R7).
     pub last_workspace_id: Option<Uuid>,
+    /// Projet « Non classés » (`docs/plan-accueil-non-classes.md`, R4). Champ
+    /// facultatif du format 2 : absent, aucun ; une version précédente l'ignore.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inbox_project_id: Option<Uuid>,
 }
 
 /// Format version 1, avec un workspace par défaut, lu seulement pour être migré (R12).
@@ -133,6 +137,7 @@ mod tests {
                 project_ids: vec![id],
             }],
             last_workspace_id: None,
+            inbox_project_id: None,
         };
         let nil = "00000000-0000-0000-0000-000000000000";
         assert_eq!(

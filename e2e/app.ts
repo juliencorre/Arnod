@@ -66,6 +66,8 @@ export function readState(sandbox: Sandbox): {
   workspaces: { id: string; name: string; projectIds: string[] }[];
   /** Dernier onglet ouvert ; `null` pour « Tous les projets ». */
   lastWorkspaceId: string | null;
+  /** Projet « Non classés », absent avant le premier essai. */
+  inboxProjectId?: string;
 } {
   return JSON.parse(readFileSync(path.join(sandbox.dataDir, "arnod.json"), "utf8")) as ReturnType<
     typeof readState

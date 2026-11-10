@@ -6,10 +6,12 @@
 [![Fiabilité](https://sonarcloud.io/api/project_badges/measure?project=juliencorre_Arnod&metric=reliability_rating)](https://sonarcloud.io/summary/overall?id=juliencorre_Arnod)
 [![Maintenabilité](https://sonarcloud.io/api/project_badges/measure?project=juliencorre_Arnod&metric=sqale_rating)](https://sonarcloud.io/summary/overall?id=juliencorre_Arnod)
 
-Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
+Application de bureau de test, destinée à remplacer SoapUI et Bruno : des étapes de toutes natures
+(REST aujourd'hui ; SOAP, base de données, messages, traitements et écrans ensuite) dans un même
+test.
 
-> **Statut : projets et workspaces en onglets, fenêtres et zones, contrats de services, format
-> OpenCollection.** Sur le squelette technique
+> **Statut : accueil « Essayer une étape » (REST), projets et workspaces en onglets, fenêtres et
+> zones, contrats de services, format OpenCollection.** Sur le squelette technique
 > ([`PRD-squelette.md`](PRD-squelette.md)), Arnod crée et gère des projets et des
 > workspaces selon [`docs/plan-projets-workspaces.md`](docs/plan-projets-workspaces.md), révisé
 > par [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md) : les workspaces sont
@@ -21,7 +23,9 @@ Application de bureau de test d'API, destinée à remplacer SoapUI et Bruno.
 > collection [OpenCollection](https://spec.opencollection.com) 1.0.0, format ouvert lu aussi par
 > Bruno ([`docs/plan-opencollection.md`](docs/plan-opencollection.md)). Chaque endpoint se
 > configure sur place, réponses attendues comprises
-> ([`docs/plan-configuration-endpoint.md`](docs/plan-configuration-endpoint.md)).
+> ([`docs/plan-configuration-endpoint.md`](docs/plan-configuration-endpoint.md)). L'accueil essaie
+> une étape sans projet : l'essai est gardé dans « Non classés », sous le contrat déduit de son
+> serveur ([`docs/plan-accueil-non-classes.md`](docs/plan-accueil-non-classes.md)).
 
 | Thème clair                                      | Thème sombre                                           |
 | ------------------------------------------------ | ------------------------------------------------------ |
@@ -38,7 +42,7 @@ et [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md), maquett
 
 | ID           | Comportement                                                                                                                                   |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1, O8       | Premier lancement : seul l'onglet « Tous les projets » ; Arnod propose de créer le premier projet (`~/arnod/<nom>`), workspace facultatif.     |
+| P1, O8       | Premier lancement : seul l'onglet « Tous les projets » ; Arnod propose d'essayer une étape ou de créer le premier projet (`~/arnod/<nom>`).    |
 | P2, O8       | Nouveau projet depuis un workspace : rangé dans ce seul workspace, toujours visible dans « Tous les projets ».                                 |
 | P5, P10      | Ouverture d'un projet ; un dossier déplacé ou supprimé hors d'Arnod est signalé.                                                               |
 | P6, P7       | Ajout d'un projet à d'autres workspaces, retrait d'un workspace avec « Annuler ».                                                              |
@@ -50,6 +54,25 @@ et [`docs/plan-workspaces-onglets.md`](docs/plan-workspaces-onglets.md), maquett
 | O11          | Gestion des workspaces : nom, couleur, projets, suppression avec « Annuler ».                                                                  |
 | F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                                       |
 | N7           | Thème clair ou sombre selon le système, police système.                                                                                        |
+
+### Accueil, catalogue des étapes et Non classés
+
+Cas A1 à A5, K1, K2 et N1 à N5 de [`docs/plan-accueil-non-classes.md`](docs/plan-accueil-non-classes.md) ;
+étude du catalogue synchronisé dans [`docs/etude-catalogue-etapes.md`](docs/etude-catalogue-etapes.md).
+
+| Accueil, formulaire REST ouvert                            | Essai gardé dans « Non classés »                                        |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| ![Accueil, thème clair](docs/screenshot-accueil.png)       | ![Essai dans Non classés, thème clair](docs/screenshot-essai.png)       |
+| ![Accueil, thème sombre](docs/screenshot-accueil-dark.png) | ![Essai dans Non classés, thème sombre](docs/screenshot-essai-dark.png) |
+
+| ID     | Comportement                                                                                                                                                          |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1, A2 | « Essayer une étape » : une adresse collée est reconnue REST par le cœur, son formulaire s'ouvre sous l'entrée ; une méthode en tête (`POST https://…`) y passe.      |
+| A3, A4 | Une pastille de nature ouvre son formulaire, généré depuis sa définition ; créer et importer se réduisent à une ligne ; Échap revient au départ.                      |
+| A5, N1 | « Envoyer » crée au besoin le projet « Non classés » et y ouvre « Essai N » avec sa réponse, lié au contrat déduit du serveur (`contracts/<hôte>.yaml`, OpenAPI 3.1). |
+| N2, N4 | Les essais suivants, depuis « Tous les projets », enrichissent le même contrat ; un contrat écrit à la main n'est jamais modifié.                                     |
+| N3, N5 | « Non classés » : icône de bac, en tête de liste, hors workspaces ; recréé au besoin au prochain essai.                                                               |
+| K1, K2 | « Parcourir le catalogue… » : natures d'étape, famille, moteur, version et ce qu'Arnod reconnaît ; REST est intégrée à Arnod.                                         |
 
 ### Fenêtres et zones
 
@@ -262,7 +285,7 @@ Vitest, clippy, `cargo test`, le build puis un test de fumée :
 - **Windows** (`scripts/smoke-windows.ps1`) : manifeste de l'installeur en `asInvoker`
   (aucune élévation demandée), installation silencieuse dans `%LOCALAPPDATA%\Arnod`,
   raccourci du menu Démarrer, entrée de désinstallation dans `HKCU`, lancement, attente de
-  « Créez votre premier projet » dans la page (UI Automation), capture publiée en artefact,
+  « Bienvenue dans Arnod » dans la page (UI Automation), capture publiée en artefact,
   fermeture par la croix (code 0), désinstallation silencieuse.
 - **Linux** (`scripts/smoke-linux.sh`) : AppImage construit sur Ubuntu 22.04, lancé sous
   Xvfb, capture d'écran publiée en artefact, fermeture par `Ctrl+Q` (code 0).

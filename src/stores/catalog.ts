@@ -31,6 +31,13 @@ export const useCatalogStore = defineStore("catalog", () => {
   /** Aucun projet encore : l'application affiche le premier lancement (1a). */
   const isFirstRun = computed(() => snapshot.value !== null && projects.value.length === 0);
 
+  /** Projet « Non classés », qui reçoit les essais (docs/plan-accueil-non-classes.md, R4). */
+  const inboxProjectId = computed(() => snapshot.value?.inboxProjectId ?? null);
+
+  function isInbox(projectId: string): boolean {
+    return inboxProjectId.value === projectId;
+  }
+
   function workspaceById(id: string): WorkspaceView | null {
     return workspacesById.value.get(id) ?? null;
   }
@@ -155,6 +162,9 @@ export const useCatalogStore = defineStore("catalog", () => {
     projects,
     workspaces,
     isFirstRun,
+    inboxProjectId,
+    isInbox,
+    apply,
     workspaceById,
     projectById,
     projectsOf,

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import App from "@/App.vue";
 import type { CatalogSnapshot, CommandError } from "@/types/ipc";
 
+import { STEP_CATALOG } from "./fakeSteps";
 import { createFakeWindows, handleWindows } from "./fakeWindows";
 import { boutiqueSnapshot, firstRunSnapshot } from "./fixtures";
 
@@ -26,6 +27,7 @@ function mockCore(options: {
         return null;
       }
       if (cmd === "windows_load") return handleWindows(windows, cmd, {});
+      if (cmd === "steps_catalog") return STEP_CATALOG;
       if (cmd !== "catalog_load") throw new Error(`commande inattendue : ${cmd}`);
       if (options.failure) throw options.failure;
       return { snapshot: options.snapshot, warning: options.warning ?? null };
@@ -51,7 +53,7 @@ describe("App", () => {
 
     const wrapper = await mountApp();
 
-    expect(wrapper.get("main h1").text()).toBe("Créez votre premier projet");
+    expect(wrapper.get("main h1").text()).toBe("Bienvenue dans Arnod");
     expect(wrapper.findAll('[role="tab"]').map((t) => t.text())).toEqual(["Tous les projets"]);
     expect(wrapper.get('[role="tab"]').attributes("aria-selected")).toBe("true");
     expect(wrapper.get("aside").text()).toBe("Aucun projet pour l'instant.");
