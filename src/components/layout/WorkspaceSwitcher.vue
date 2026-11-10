@@ -442,7 +442,7 @@ onBeforeUnmount(() => {
           <kbd class="switcher__key">Ctrl+0</kbd>
         </li>
         <li v-if="catalog.workspaces.length > 0" role="separator" class="switcher__separator" />
-        <li v-if="catalog.workspaces.length > 0" role="none">
+        <li v-if="catalog.workspaces.length > 0" role="presentation">
           <p class="switcher__heading" aria-hidden="true">
             Workspaces · {{ catalog.workspaces.length }}
           </p>
