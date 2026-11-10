@@ -44,7 +44,7 @@ describe("run d'un dossier", () => {
     ({ app, core } = await openProject((c) => {
       c.workbench.runStatus.set("Clients/creer.yml", "failed");
     }));
-    await click(app, ".tree__head button", "Tout exécuter");
+    await click(app, '[aria-label^="Exécuter 3 requêtes sur Local"]');
     await click(app, ".run button", "Relancer les échecs");
     expect(core.commands()).toContain("run_retry_failures");
     expect(app.findAll(".run__item")).toHaveLength(1);
@@ -55,7 +55,7 @@ describe("run d'un dossier", () => {
     ({ app } = await openProject((c) => {
       c.workbench.runStatus.set("sante.yml", "error");
     }));
-    await click(app, ".tree__head button", "Tout exécuter");
+    await click(app, '[aria-label^="Exécuter 3 requêtes sur Local"]');
     expect(app.get(".run").text()).toContain("Variable « x » absente de l'environnement Local.");
   });
 });

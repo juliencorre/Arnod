@@ -2,7 +2,9 @@
 /**
  * Arborescence d'un projet (A1 à A8), sous son nom dans la barre latérale :
  * dossiers, requêtes et actions. Une requête choisie s'ouvre en onglet, dans
- * la fenêtre qui suit la sélection (Z5).
+ * la fenêtre qui suit la sélection (Z5). Les créations partent du « + » de la
+ * ligne du projet (`newRequest`, `newFolder`) ; un projet vide montre la ligne
+ * « Nouvelle requête » (plan de la barre latérale du projet, B4).
  */
 import { computed, ref } from "vue";
 
@@ -108,6 +110,17 @@ async function onAction(id: string, node: TreeNode, target?: string): Promise<vo
   }
 }
 
+/** Nouvelle requête ou nouveau dossier à la racine du projet (menu « + » du projet). */
+function newRequest(): void {
+  openName({ kind: "new-request", folder: "" });
+}
+
+function newFolder(): void {
+  openName({ kind: "new-folder", parent: "" });
+}
+
+defineExpose({ newRequest, newFolder });
+
 async function submitName(name: string): Promise<void> {
   const action = nameAction.value;
   if (action === null) return;
@@ -126,30 +139,6 @@ async function submitName(name: string): Promise<void> {
 
 <template>
   <div class="tree">
-    <div class="tree__head">
-      <button
-        type="button"
-        class="tree__tool"
-        @click="openName({ kind: 'new-request', folder: '' })"
-      >
-        + Requête
-      </button>
-      <button
-        type="button"
-        class="tree__tool"
-        @click="openName({ kind: 'new-folder', parent: '' })"
-      >
-        + Dossier
-      </button>
-      <button
-        type="button"
-        class="tree__tool"
-        :aria-label="`Tout exécuter dans ${projectName}`"
-        @click="guard(() => workbench.runFolder(projectId, ''))"
-      >
-        ▶ Tout exécuter
-      </button>
-    </div>
     <ul
       v-if="nodes.length > 0"
       role="tree"
@@ -166,7 +155,10 @@ async function submitName(name: string): Promise<void> {
         @action="onAction"
       />
     </ul>
-    <p v-else class="tree__empty">Aucune requête : « + Requête » crée la première.</p>
+    <button v-else type="button" class="tree__ghost" @click="newRequest">
+      <span class="tree__lead" aria-hidden="true">+</span>
+      Nouvelle requête
+    </button>
     <NameDialog
       :open="nameAction !== null"
       :title="dialog.title"
@@ -184,32 +176,7 @@ async function submitName(name: string): Promise<void> {
 .tree {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
   min-width: 0;
-}
-
-.tree__head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.125rem 0.625rem;
-  padding: 0 0.25rem;
-}
-
-.tree__tool {
-  padding: 0.125rem 0;
-  border: none;
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-link);
-  background: none;
-  cursor: pointer;
-}
-
-.tree__tool:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-  border-radius: 4px;
 }
 
 .tree__list {
@@ -218,9 +185,38 @@ async function submitName(name: string): Promise<void> {
   list-style: none;
 }
 
-.tree__empty {
-  margin: 0.25rem 0.25rem 0.5rem;
-  font-size: 0.8125rem;
-  color: var(--color-muted);
+/* Ligne d'ajout, sur la grille des lignes de l'arborescence. */
+.tree__ghost {
+  display: flex;
+  align-items: center;
+  gap: var(--tree-gap);
+  width: 100%;
+  min-height: 1.75rem;
+  padding: 0 var(--tree-pad) 0 calc(var(--tree-pad) + var(--tree-indent));
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: left;
+  color: var(--color-link);
+  background: none;
+  cursor: pointer;
+}
+
+.tree__ghost:hover {
+  background: var(--color-accent-soft);
+}
+
+.tree__ghost:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.tree__lead {
+  box-sizing: border-box;
+  flex: none;
+  width: var(--tree-lead);
+  padding-left: 0.125rem;
 }
 </style>

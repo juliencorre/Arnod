@@ -12,6 +12,14 @@ export interface MenuItem {
   disabled?: boolean;
   /** Défini pour une entrée à cocher (`menuitemcheckbox`). */
   checked?: boolean;
+  /** Avec `checked` : choix exclusif (`menuitemradio`), comme un environnement. */
+  radio?: boolean;
+  /** Couleur d'une pastille devant le libellé (`var(--color-…)`). */
+  swatch?: string;
+  /** Mention courte après le libellé (« protégé »). */
+  tag?: string;
+  /** Détail à droite, en police à chasse fixe (« localhost:8080 »). */
+  detail?: string;
   /** Trait de séparation avant l'entrée. */
   separatorBefore?: boolean;
   /** Sous-menu (un seul niveau). */

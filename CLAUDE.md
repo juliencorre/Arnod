@@ -14,8 +14,9 @@ workspaces ». Livré ensuite : fenêtres et zones selon `docs/plan-fenetres-zon
 section « Fenêtres et zones ». Puis contrats de services selon `docs/plan-contrats-services.md`
 (section « Contrats de services ») et format OpenCollection strict selon
 `docs/plan-opencollection.md` (section « Format OpenCollection »), puis configuration d'un
-endpoint selon `docs/plan-configuration-endpoint.md` (section « Configuration d'un endpoint »). Un
-nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
+endpoint selon `docs/plan-configuration-endpoint.md` (section « Configuration d'un endpoint ») et
+barre latérale du projet selon `docs/plan-barre-laterale-projet.md` (section « Barre latérale du
+projet »). Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
 ## Architecture
 
@@ -69,7 +70,8 @@ src/                    Frontend Vue
                         contracts (contrats par projet, contrats ouverts)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification
-  components/layout/    Coquille : onglets des workspaces, barre latérale, zone principale
+  components/layout/    Coquille : onglets des workspaces, barre latérale (un SidebarProject par
+                        projet), zone principale
   components/zones/     Zones : arbre, onglets, séparations (SplitHandle), onglet de requête
   components/windows/   Fenêtres détachées : contenu, barre latérale
   components/contracts/ Contrats : section de la barre latérale, dialogue d'ajout, onglet
@@ -288,3 +290,20 @@ Référence : `docs/plan-configuration-endpoint.md` (cas EP1 à EP10, règles R1
   défauts. Calculé à la lecture (`RequestDoc.inherited`) et à l'envoi (`request_send` reçoit `path`).
 - Paramètres de chemin : segments `:nom` ou `{nom}` de l'adresse ; le cœur les aligne sur
   l'adresse à l'enregistrement (`normalize_path_params`), `lib/url.ts` les liste pour l'affichage.
+
+## Barre latérale du projet
+
+Référence : `docs/plan-barre-laterale-projet.md` (cas B1 à B6), maquette « Arnod - Barre latérale
+du projet » (option a), captures `docs/maquettes/6*.png`.
+
+- Un projet = `SidebarProject.vue` : chevron, pastille, nom, puis ▶ (exécuter), + (ajouter) et ⋯
+  (autres), visibles au survol, au focus et sur le projet ouvert ; sous le nom, la pastille
+  d'environnement (`EnvironmentChip`) ; puis `TreePanel` et `ContractsSection`, dont les créations
+  passent par leurs méthodes exposées. Un projet replié montre sa pastille compacte à droite.
+- Toute ligne de la barre latérale suit la grille `--tree-pad`, `--tree-indent`, `--tree-lead`,
+  `--tree-gap` (définie par `AppSidebar`) : une colonne de tête de largeur fixe, le libellé
+  après ; une nouvelle ligne la reprend au lieu de marges propres.
+- Menus par `BaseMenu` (entrées `radio`, `swatch`, `tag`, `detail` pour les environnements) ; pas
+  de texte d'aide vide : une ligne d'ajout (« + Nouvelle requête », « + Ajouter un contrat »).
+- Raccourcis : Ctrl+N (nouvelle requête) et Ctrl+Maj+E (environnements) sur le projet de l'onglet
+  actif, sinon le projet ouvert, sinon le premier déplié.

@@ -113,6 +113,20 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     trees.value[projectId] = await ipc.treeLoad(projectId);
   }
 
+  /**
+   * Environnements d'un projet replié, pour sa pastille dans la barre latérale : lus une fois,
+   * sans déplier le projet ; une erreur (projet illisible) laisse la pastille absente.
+   */
+  async function peekEnvironments(projectId: string): Promise<void> {
+    if (projectId in environments.value) return;
+    try {
+      const view = await ipc.environmentsLoad(projectId);
+      if (!(projectId in environments.value)) environments.value[projectId] = view;
+    } catch {
+      // Le projet s'ouvrira avec son erreur quand on le dépliera.
+    }
+  }
+
   async function refreshEnvironments(projectId: string): Promise<void> {
     environments.value[projectId] = await ipc.environmentsLoad(projectId);
   }
@@ -623,6 +637,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     loadProject,
     refreshTree,
     refreshEnvironments,
+    peekEnvironments,
     isExpanded,
     expand,
     collapse,

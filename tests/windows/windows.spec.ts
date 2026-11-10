@@ -141,7 +141,7 @@ describe("barre latérale détachée (F9, Z5)", () => {
     app = await mountApp();
 
     // Sans vue projet ici, choisir le projet le déplie.
-    await click(app, "aside .sidebar__project", "boutique-tests");
+    await click(app, "aside .project__main", "boutique-tests");
     expect(app.find('[aria-label="Replier boutique-tests"]').exists()).toBe(true);
     await click(app, '[role="treeitem"]', "Santé");
 
@@ -249,8 +249,6 @@ describe("fenêtres interconnectées (F11)", () => {
     await core.emit(EVENTS.catalog, snapshot);
     await flushPromises();
 
-    expect(app.findAll("aside .sidebar__project").map((b) => b.text())).toContain(
-      "Bboutique-recette",
-    );
+    expect(app.findAll("aside .project__main").map((b) => b.text())).toContain("Bboutique-recette");
   });
 });

@@ -81,15 +81,26 @@ Cas C1 à C12 de [`docs/plan-contrats-services.md`](docs/plan-contrats-services.
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | ![Contrat et ses requêtes, thème clair](docs/screenshot-contrat.png) | ![Contrat et ses requêtes, thème sombre](docs/screenshot-contrat-dark.png) |
 
-| ID       | Comportement                                                                                                                                                                         |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C1 à C4  | « + Contrat » : importer un fichier, coller un contrat, le lire à une adresse ou en créer un vide ; OpenAPI 3.0, 3.1 ou Swagger 2.0, JSON ou YAML, rangé dans `contracts/`.          |
-| C5       | Onglet du contrat : version, format, serveurs, opérations groupées par tag, couverture « n opérations · m avec requête ».                                                            |
-| C6, C7   | « Créer les requêtes » : une requête prête à envoyer par opération cochée (exemples, authentification, vérifications), liée au contrat ; `baseUrl` vide prend le serveur du contrat. |
-| C8       | Toute requête liée est vérifiée « conforme au contrat » : statut prévu et corps conforme au schéma, avec le chemin du premier écart ; « Délier » retire le lien.                     |
-| C9       | Vue « Source » : texte modifiable, enregistré seulement s'il reste un contrat lisible (Ctrl+S), ou remplacé par un fichier.                                                          |
-| C10      | « Exécuter » lance le run des requêtes du contrat.                                                                                                                                   |
-| C11, C12 | Contrat mis à la corbeille ; requêtes dont l'opération a disparu signalées « hors contrat ».                                                                                         |
+| ID       | Comportement                                                                                                                                                                           |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1 à C4  | « + Ajouter un contrat » : importer un fichier, coller un contrat, le lire à une adresse ou en créer un vide ; OpenAPI 3.0, 3.1 ou Swagger 2.0, JSON ou YAML, rangé dans `contracts/`. |
+| C5       | Onglet du contrat : version, format, serveurs, opérations groupées par tag, couverture « n opérations · m avec requête ».                                                              |
+| C6, C7   | « Créer les requêtes » : une requête prête à envoyer par opération cochée (exemples, authentification, vérifications), liée au contrat ; `baseUrl` vide prend le serveur du contrat.   |
+| C8       | Toute requête liée est vérifiée « conforme au contrat » : statut prévu et corps conforme au schéma, avec le chemin du premier écart ; « Délier » retire le lien.                       |
+| C9       | Vue « Source » : texte modifiable, enregistré seulement s'il reste un contrat lisible (Ctrl+S), ou remplacé par un fichier.                                                            |
+| C10      | « Exécuter » lance le run des requêtes du contrat.                                                                                                                                     |
+| C11, C12 | Contrat mis à la corbeille ; requêtes dont l'opération a disparu signalées « hors contrat ».                                                                                           |
+
+### Barre latérale du projet
+
+Cas B1 à B6 de [`docs/plan-barre-laterale-projet.md`](docs/plan-barre-laterale-projet.md).
+
+| ID     | Comportement                                                                                                                           |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| B1, B5 | La ligne du projet porte ▶ (exécuter), + (ajouter) et ⋯ ; un projet replié montre son environnement à droite de son nom.               |
+| B2     | Une pastille sous le nom ouvre le menu des environnements : couleur, adresse, protégé, gestion et création.                            |
+| B3, B4 | « + » : nouvelle requête, dossier, contrat, environnement ; un projet vide propose « + Nouvelle requête » et « + Ajouter un contrat ». |
+| B6     | Ctrl+N crée une requête, Ctrl+Maj+E ouvre les environnements du projet sélectionné.                                                    |
 
 ### Configuration d'un endpoint
 

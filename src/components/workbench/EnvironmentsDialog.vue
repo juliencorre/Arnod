@@ -11,7 +11,10 @@ import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { EnvironmentDoc, EnvironmentView } from "@/types/ipc";
 
-const props = defineProps<{ open: boolean; projectId: string }>();
+const props = withDefaults(
+  defineProps<{ open: boolean; projectId: string; startNew?: boolean }>(),
+  { startNew: false },
+);
 const emit = defineEmits<{ close: [] }>();
 
 const workbench = useWorkbenchStore();
@@ -61,7 +64,10 @@ function load(env: EnvironmentView | undefined): void {
 watch(
   () => props.open,
   (open) => {
-    if (open) load(list.value.find((e) => e.name === view.value?.active) ?? list.value[0]);
+    if (!open) return;
+    load(list.value.find((e) => e.name === view.value?.active) ?? list.value[0]);
+    // « + Nouvel environnement » du menu de la pastille : la gestion s'ouvre sur un nouveau.
+    if (props.startNew) void create();
   },
   { immediate: true },
 );
