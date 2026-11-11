@@ -67,10 +67,22 @@ fn is_request_file(path: &Path) -> bool {
 /// par nom sans tenir compte de la casse ; éléments cachés, racine de la
 /// collection et réglages de dossier (`folder.yml`) ignorés (R7 du format).
 pub fn read(root: &Path) -> Result<Vec<TreeNode>, CommandError> {
-    read_dir(root, root, true)
+    read_dir(root, root, true, &mut vec![canonical(root)])
 }
 
-fn read_dir(root: &Path, dir: &Path, top: bool) -> Result<Vec<TreeNode>, CommandError> {
+/// Chemin réel d'un dossier, liens suivis ; tel quel s'il ne se résout pas.
+fn canonical(path: &Path) -> PathBuf {
+    dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// `ancestors` : chemins réels du dossier lu et de ses parents, pour ne pas
+/// suivre un lien qui y ramène (boucle sans fin).
+fn read_dir(
+    root: &Path,
+    dir: &Path,
+    top: bool,
+    ancestors: &mut Vec<PathBuf>,
+) -> Result<Vec<TreeNode>, CommandError> {
     let entries = fs::read_dir(dir)
         .map_err(|error| CommandError::io("Lecture du dossier impossible", dir, &error))?;
     let mut folders = Vec::new();
@@ -86,7 +98,20 @@ fn read_dir(root: &Path, dir: &Path, top: bool) -> Result<Vec<TreeNode>, Command
             if top && (name == ENVIRONMENTS_DIR || name == CONTRACTS_DIR) {
                 continue;
             }
-            let children = read_dir(root, &path, false)?;
+            // Seul un lien demande une résolution ; un dossier ordinaire prolonge son parent.
+            let real = match ancestors.last() {
+                Some(parent) if !entry.file_type().is_ok_and(|kind| kind.is_symlink()) => {
+                    parent.join(entry.file_name())
+                }
+                _ => canonical(&path),
+            };
+            if ancestors.contains(&real) {
+                continue;
+            }
+            ancestors.push(real);
+            let children = read_dir(root, &path, false, ancestors);
+            ancestors.pop();
+            let children = children?;
             let request_count = children.iter().map(TreeNode::count).sum();
             folders.push(TreeNode::Folder {
                 name,
@@ -180,6 +205,9 @@ pub fn slug(name: &str) -> String {
     let out = out.trim_end_matches('-').to_owned();
     if out.is_empty() {
         "requete".to_owned()
+    } else if names::is_reserved(&out) {
+        // « con.yml » ou « nul.yml » ne s'ouvrent pas sous Windows (R10).
+        format!("_{out}")
     } else {
         out
     }

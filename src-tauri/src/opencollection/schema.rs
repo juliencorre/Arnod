@@ -37,7 +37,8 @@ fn schema() -> &'static Value {
 pub fn errors(part: Part, value: &Value) -> Vec<String> {
     let doc = schema();
     let target = match part {
-        Part::Root => doc.clone(),
+        // Le schéma lui-même, sans le copier à chaque validation.
+        Part::Root => return validate_at(doc, doc, value, "fichier"),
         Part::HttpRequest => json!({ "$ref": "#/$defs/HttpRequest" }),
         Part::Folder => json!({ "$ref": "#/$defs/Folder" }),
         Part::Environment => json!({ "$ref": "#/$defs/Environment" }),

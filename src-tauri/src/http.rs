@@ -1,7 +1,10 @@
 //! Envoi d'une requête HTTP et mesure de la réponse (E1 à E6).
 
+use std::error::Error as StdError;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
+use reqwest::header::{HeaderName, HeaderValue};
 use reqwest::redirect::Policy;
 use serde::Serialize;
 use tokio::sync::Notify;
@@ -41,8 +44,55 @@ impl HttpResponse {
     }
 }
 
+/// Annulation d'un envoi ou d'un run (E5). Elle est mémorisée : un envoi qui
+/// commence après elle est annulé aussi, alors qu'un simple `Notify` ne
+/// réveille que les envois déjà en attente.
+#[derive(Debug, Default)]
+pub struct Cancel {
+    cancelled: AtomicBool,
+    notify: Notify,
+}
+
+impl Cancel {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Annule les envois en cours et ceux à venir.
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+        self.notify.notify_waiters();
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::SeqCst)
+    }
+
+    /// Rend la main dès que l'annulation est demandée, même avant l'appel.
+    pub async fn cancelled(&self) {
+        let notified = self.notify.notified();
+        tokio::pin!(notified);
+        // Inscrit avant de relire le drapeau : une annulation entre les deux n'est pas perdue.
+        notified.as_mut().enable();
+        if self.is_cancelled() {
+            return;
+        }
+        notified.await;
+    }
+}
+
 fn error(kind: CommandErrorKind, message: impl Into<String>) -> CommandError {
     CommandError::new(kind, message)
+}
+
+/// Cause première d'une erreur : le dernier maillon de sa chaîne de sources
+/// (connexion refusée, nom introuvable, certificat refusé…).
+fn root_cause(error: &(dyn StdError + 'static)) -> String {
+    let mut cause = error;
+    while let Some(source) = cause.source() {
+        cause = source;
+    }
+    cause.to_string()
 }
 
 fn network(error: &reqwest::Error, url: &str) -> CommandError {
@@ -57,9 +107,13 @@ fn network(error: &reqwest::Error, url: &str) -> CommandError {
         );
     }
     if error.is_connect() {
+        // La cause distingue un serveur arrêté d'un nom introuvable ou d'un certificat refusé.
         return self::error(
             CommandErrorKind::Network,
-            format!("Impossible de joindre {host}. Vérifiez l'adresse et la connexion."),
+            format!(
+                "Impossible de joindre {host} ({}). Vérifiez l'adresse et la connexion.",
+                root_cause(error)
+            ),
         );
     }
     if error.is_builder() {
@@ -68,17 +122,62 @@ fn network(error: &reqwest::Error, url: &str) -> CommandError {
             "L'adresse de la requête est invalide.",
         );
     }
+    if error.is_redirect() {
+        return self::error(
+            CommandErrorKind::Network,
+            "Trop de redirections : augmentez la limite dans les réglages de la requête.",
+        );
+    }
     self::error(
         CommandErrorKind::Network,
-        format!("La requête a échoué : {error}."),
+        format!("La requête a échoué : {}.", root_cause(error)),
     )
 }
 
-/// Envoie la requête ; `cancel` l'interrompt (E5).
-pub async fn send(prepared: &Prepared, cancel: &Notify) -> Result<HttpResponse, CommandError> {
+/// En-têtes vérifiés avant l'envoi : un nom ou une valeur refusés par HTTP
+/// sont nommés, au lieu d'une « adresse invalide ».
+fn checked_headers(
+    headers: &[(String, String)],
+) -> Result<Vec<(HeaderName, HeaderValue)>, CommandError> {
+    headers
+        .iter()
+        .map(|(name, value)| {
+            let header = HeaderName::from_bytes(name.as_bytes()).map_err(|_| {
+                error(
+                    CommandErrorKind::InvalidRequest,
+                    format!(
+                        "L'en-tête « {name} » a un nom invalide : ni espace, ni accent, ni « : »."
+                    ),
+                )
+            })?;
+            let value = HeaderValue::from_str(value).map_err(|_| {
+                error(
+                    CommandErrorKind::InvalidRequest,
+                    format!(
+                        "La valeur de l'en-tête « {name} » est invalide : ni retour à la ligne, ni caractère de contrôle."
+                    ),
+                )
+            })?;
+            Ok((header, value))
+        })
+        .collect()
+}
+
+/// Retire la fin d'un caractère UTF-8 coupé par la troncature.
+fn trim_cut_character(bytes: &mut Vec<u8>) {
+    if let Err(error) = std::str::from_utf8(bytes)
+        && error.error_len().is_none()
+    {
+        bytes.truncate(error.valid_up_to());
+    }
+}
+
+/// Envoie la requête ; `cancel` l'interrompt (E5), même demandé avant l'envoi.
+pub async fn send(prepared: &Prepared, cancel: &Cancel) -> Result<HttpResponse, CommandError> {
     tokio::select! {
+        biased;
+        () = cancel.cancelled() => Err(error(CommandErrorKind::Cancelled, "Envoi annulé.")),
         result = run(prepared) => result,
-        () = cancel.notified() => Err(error(CommandErrorKind::Cancelled, "Envoi annulé.")),
     }
 }
 
@@ -99,11 +198,12 @@ async fn run(prepared: &Prepared) -> Result<HttpResponse, CommandError> {
         })?;
     let method = reqwest::Method::from_bytes(prepared.method.as_str().as_bytes())
         .map_err(|_| error(CommandErrorKind::InvalidRequest, "Méthode invalide."))?;
+    let headers = checked_headers(&prepared.headers)?;
     let mut builder = client.request(method, &prepared.url);
     if let Some(ms) = prepared.timeout_ms {
         builder = builder.timeout(Duration::from_millis(ms));
     }
-    for (name, value) in &prepared.headers {
+    for (name, value) in headers {
         builder = builder.header(name, value);
     }
     if let Some(body) = &prepared.body {
@@ -142,6 +242,9 @@ async fn run(prepared: &Prepared) -> Result<HttpResponse, CommandError> {
         if size > MAX_BODY_BYTES {
             truncated = true;
         }
+    }
+    if truncated {
+        trim_cut_character(&mut bytes);
     }
     let total = started.elapsed();
     let millis = |d: Duration| u64::try_from(d.as_millis()).unwrap_or(u64::MAX);
@@ -185,7 +288,7 @@ mod tests {
             .respond_with(ResponseTemplate::new(201).set_body_string("{\"ok\":true}"))
             .mount(&server)
             .await;
-        let response = send(&prepared(format!("{}/a", server.uri())), &Notify::new())
+        let response = send(&prepared(format!("{}/a", server.uri())), &Cancel::new())
             .await
             .unwrap();
         assert_eq!(response.status, 201);
@@ -203,7 +306,7 @@ mod tests {
             )
             .mount(&server)
             .await;
-        let response = send(&prepared(format!("{}/gros", server.uri())), &Notify::new())
+        let response = send(&prepared(format!("{}/gros", server.uri())), &Cancel::new())
             .await
             .unwrap();
         assert!(response.truncated);
@@ -220,7 +323,7 @@ mod tests {
             .await;
         let mut p = prepared(format!("{}/lent", server.uri()));
         p.timeout_ms = Some(100);
-        let error = send(&p, &Notify::new()).await.unwrap_err();
+        let error = send(&p, &Cancel::new()).await.unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::Timeout);
     }
 
@@ -236,10 +339,10 @@ mod tests {
             .mount(&server)
             .await;
         let mut p = prepared(format!("{}/ancien", server.uri()));
-        let followed = send(&p, &Notify::new()).await.unwrap();
+        let followed = send(&p, &Cancel::new()).await.unwrap();
         assert_eq!(followed.status, 200);
         p.max_redirects = 0;
-        let kept = send(&p, &Notify::new()).await.unwrap();
+        let kept = send(&p, &Cancel::new()).await.unwrap();
         assert_eq!(kept.status, 302);
     }
 
@@ -252,7 +355,7 @@ mod tests {
             .await;
         let mut p = prepared(format!("{}/lent", server.uri()));
         p.timeout_ms = None;
-        assert_eq!(send(&p, &Notify::new()).await.unwrap().status, 200);
+        assert_eq!(send(&p, &Cancel::new()).await.unwrap().status, 200);
     }
 
     #[tokio::test]
@@ -261,7 +364,7 @@ mod tests {
         // Sous Windows, un refus de connexion n'est constaté qu'après plusieurs essais
         // (environ 2 s) : le délai du test doit les laisser aboutir.
         request.timeout_ms = Some(15_000);
-        let error = send(&request, &Notify::new()).await.unwrap_err();
+        let error = send(&request, &Cancel::new()).await.unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::Network);
         assert!(error.message.contains("127.0.0.1"));
     }
@@ -273,15 +376,125 @@ mod tests {
             .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
             .mount(&server)
             .await;
-        let cancel = std::sync::Arc::new(Notify::new());
+        let cancel = std::sync::Arc::new(Cancel::new());
         let c = cancel.clone();
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_millis(100)).await;
-            c.notify_one();
+            c.cancel();
         });
         let mut p = prepared(format!("{}/lent", server.uri()));
         p.timeout_ms = Some(10_000);
         let error = send(&p, &cancel).await.unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::Cancelled);
+    }
+
+    #[tokio::test]
+    async fn annulation_demandee_avant_l_envoi_rien_ne_part() {
+        let server = MockServer::start().await;
+        Mock::given(path("/a"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(0)
+            .mount(&server)
+            .await;
+        let cancel = Cancel::new();
+        cancel.cancel();
+        let error = send(&prepared(format!("{}/a", server.uri())), &cancel)
+            .await
+            .unwrap_err();
+        assert_eq!(error.kind, CommandErrorKind::Cancelled);
+        // `expect(0)` : le serveur n'a rien reçu.
+        server.verify().await;
+    }
+
+    #[tokio::test]
+    async fn en_tete_invalide_nomme_dans_le_message() {
+        let mut p = prepared("http://127.0.0.1:1/".into());
+        p.headers = vec![("Content Type".into(), "application/json".into())];
+        let error = send(&p, &Cancel::new()).await.unwrap_err();
+        assert_eq!(error.kind, CommandErrorKind::InvalidRequest);
+        assert!(
+            error.message.contains("« Content Type »"),
+            "{}",
+            error.message
+        );
+
+        p.headers = vec![("X-Trace".into(), "a\nb".into())];
+        let error = send(&p, &Cancel::new()).await.unwrap_err();
+        assert_eq!(error.kind, CommandErrorKind::InvalidRequest);
+        assert!(
+            error.message.contains("valeur de l'en-tête « X-Trace »"),
+            "{}",
+            error.message
+        );
+    }
+
+    #[tokio::test]
+    async fn troncature_sans_caractere_coupe() {
+        let server = MockServer::start().await;
+        // Un octet puis des « é » (deux octets) : la limite tombe au milieu d'un caractère.
+        let body = format!("a{}", "é".repeat(MAX_BODY_BYTES / 2 + 8));
+        Mock::given(path("/accents"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(body))
+            .mount(&server)
+            .await;
+        let response = send(
+            &prepared(format!("{}/accents", server.uri())),
+            &Cancel::new(),
+        )
+        .await
+        .unwrap();
+        assert!(response.truncated);
+        assert!(response.body.len() <= MAX_BODY_BYTES);
+        assert!(response.body.ends_with('é'), "fin : caractère entier");
+        assert!(!response.body.contains('\u{fffd}'));
+    }
+
+    #[tokio::test]
+    async fn echec_de_connexion_donne_sa_cause() {
+        // Serveur qui ne parle pas TLS : la poignée de main https échoue.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            use std::io::Write;
+            for mut socket in listener.incoming().flatten() {
+                let _ = socket.write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n");
+            }
+        });
+        let tls = send(
+            &prepared(format!("https://127.0.0.1:{port}/")),
+            &Cancel::new(),
+        )
+        .await
+        .unwrap_err();
+        let mut closed = prepared("http://127.0.0.1:1/".into());
+        closed.timeout_ms = Some(15_000);
+        let refused = send(&closed, &Cancel::new()).await.unwrap_err();
+        assert_eq!(tls.kind, CommandErrorKind::Network);
+        assert_eq!(refused.kind, CommandErrorKind::Network);
+        // Les deux pannes ne se confondent plus : chacune donne sa cause.
+        assert_ne!(tls.message, refused.message);
+        assert!(
+            refused.message.contains("127.0.0.1 ("),
+            "{}",
+            refused.message
+        );
+    }
+
+    #[test]
+    fn cause_premiere_d_une_chaine_d_erreurs() {
+        #[derive(Debug)]
+        struct Outer(std::io::Error);
+        impl std::fmt::Display for Outer {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("erreur d'envoi")
+            }
+        }
+        impl StdError for Outer {
+            fn source(&self) -> Option<&(dyn StdError + 'static)> {
+                Some(&self.0)
+            }
+        }
+        let error = Outer(std::io::Error::other("certificat refusé"));
+        assert_eq!(root_cause(&error), "certificat refusé");
     }
 }

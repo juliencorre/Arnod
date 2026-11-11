@@ -244,6 +244,98 @@ async fn annuler_un_run_arrete_les_requetes_en_cours() {
     assert_eq!(view.items[0].status, ItemStatus::Cancelled);
 }
 
+/// Une annulation qui tombe entre le démarrage d'une requête et son envoi
+/// (lecture du fichier, héritage) l'annule aussi : aucune ne part après elle.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn annuler_un_run_n_envoie_plus_aucune_requete() {
+    let server = MockServer::start().await;
+    Mock::given(path("/lent"))
+        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_millis(400)))
+        .mount(&server)
+        .await;
+    let f = fixture();
+    set_base_url(&f, &server.uri());
+    tree::create_folder(&f.ctx.root, "", "D").unwrap();
+    for n in 0..24 {
+        add_request(
+            &f,
+            "D",
+            &format!("Lent {n}"),
+            "{{baseUrl}}/lent",
+            Method::Get,
+        );
+    }
+    // Annulations à des instants variés du démarrage : de 0 à 6 ms.
+    for attempt in 0..30u64 {
+        let started = f
+            .bench
+            .start_run(&f.ctx, "D", "Local", None, false)
+            .unwrap();
+        tokio::time::sleep(Duration::from_micros(attempt * 200)).await;
+        f.bench.cancel_run(started.id).unwrap();
+        let view = wait(&f.bench, started.id).await;
+        let sent: Vec<&str> = view
+            .items
+            .iter()
+            .filter(|i| i.status != ItemStatus::Cancelled)
+            .map(|i| i.name.as_str())
+            .collect();
+        assert!(
+            sent.is_empty(),
+            "essai {attempt} : envoyées malgré l'annulation : {sent:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn les_runs_termines_anciens_sont_oublies() {
+    let f = fixture();
+    tree::create_folder(&f.ctx.root, "", "Vide").unwrap();
+    let mut ids = Vec::new();
+    for _ in 0..MAX_FINISHED_RUNS + 15 {
+        let view = f
+            .bench
+            .start_run(&f.ctx, "Vide", "Local", None, false)
+            .unwrap();
+        ids.push(view.id);
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    assert_eq!(f.bench.runs.lock().unwrap().len(), MAX_FINISHED_RUNS);
+    // Les plus récents restent lisibles, le plus ancien est oublié.
+    assert!(f.bench.run_status(*ids.last().unwrap()).is_ok());
+    assert_eq!(
+        f.bench.run_status(ids[0]).unwrap_err().kind,
+        CommandErrorKind::NotFound
+    );
+}
+
+#[tokio::test]
+async fn le_dernier_run_se_relance_apres_un_redemarrage() {
+    let f = fixture();
+    tree::create_folder(&f.ctx.root, "", "D").unwrap();
+    // Variable inconnue : la requête finit en erreur, donc à relancer.
+    add_request(&f, "D", "Mauvais", "{{absente}}/ko", Method::Get);
+    let started = f
+        .bench
+        .start_run(&f.ctx, "D", "Local", None, false)
+        .unwrap();
+    wait(&f.bench, started.id).await;
+
+    // Nouvel établi, comme après un redémarrage : le run n'est plus en mémoire.
+    let restarted = Arc::new(Workbench::new(f.store.clone()));
+    let retry = restarted.retry_failures(&f.ctx, started.id, false).unwrap();
+    assert_eq!(retry.items.len(), 1);
+    wait(&restarted, retry.id).await;
+    // Un identifiant inconnu reste refusé.
+    assert_eq!(
+        restarted
+            .retry_failures(&f.ctx, Uuid::new_v4(), false)
+            .unwrap_err()
+            .kind,
+        CommandErrorKind::NotFound
+    );
+}
+
 #[tokio::test]
 async fn dossier_vide_donne_un_run_termine() {
     let f = fixture();
