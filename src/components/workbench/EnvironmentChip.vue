@@ -88,14 +88,15 @@ defineExpose({ manage });
     :align="compact ? 'end' : 'start'"
     @select="onSelect"
   >
-    <template #trigger="{ attrs }">
+    <template #trigger="{ open, attrs }">
+      <!-- Pas d'infobulle menu ouvert : elle recouvrirait l'en-tête du menu. -->
       <button
         v-bind="attrs"
         type="button"
         class="chip"
         :class="{ 'chip--compact': compact }"
         :aria-label="`Environnement de ${projectName} : ${active.name}`"
-        :title="`Environnement du projet : ${active.name}`"
+        :title="open ? undefined : `Environnement du projet : ${active.name}`"
       >
         <span class="chip__swatch" :style="{ background: swatch(active) }" aria-hidden="true" />
         <span class="chip__name">{{ active.name }}</span>

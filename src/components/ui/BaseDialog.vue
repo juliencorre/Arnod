@@ -2,11 +2,17 @@
 /**
  * Fenêtre modale sur l'élément `<dialog>` natif : focus piégé, fermeture par
  * Échap ou clic sur le fond. Le parent garde la main sur `open` : Échap et le
- * clic sur le fond émettent `close` sans fermer d'eux-mêmes.
+ * clic sur le fond émettent `close` sans fermer d'eux-mêmes. `wide` : une fenêtre
+ * plus large, pour un contenu en deux colonnes (liste et formulaire).
  */
 import { onMounted, useId, useTemplateRef, watch } from "vue";
 
-const props = defineProps<{ open: boolean; title: string; description?: string }>();
+const props = defineProps<{
+  open: boolean;
+  title: string;
+  description?: string;
+  wide?: boolean;
+}>();
 const emit = defineEmits<{ close: [] }>();
 
 const dialog = useTemplateRef<HTMLDialogElement>("dialog");
@@ -35,6 +41,7 @@ function onClick(event: MouseEvent): void {
   <dialog
     ref="dialog"
     class="dialog"
+    :class="{ 'dialog--wide': wide }"
     :aria-labelledby="titleId"
     :aria-describedby="description ? descriptionId : undefined"
     @cancel.prevent="emit('close')"
@@ -65,6 +72,10 @@ function onClick(event: MouseEvent): void {
   color: var(--color-text);
   background: var(--color-surface);
   box-shadow: var(--shadow-dialog);
+}
+
+.dialog--wide {
+  width: min(46rem, calc(100vw - 2rem));
 }
 
 .dialog::backdrop {

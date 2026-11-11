@@ -7,10 +7,21 @@
  * Clavier : flèches, Début, Fin, Entrée ou Espace, flèche droite et gauche pour
  * le sous-menu, Échap pour fermer ; le focus revient au déclencheur. `open()` et
  * `close()` sont exposés pour un menu contextuel.
+ *
+ * Le menu et son sous-menu sont en position fixe, placés depuis le déclencheur et
+ * gardés dans la fenêtre : une colonne qui défile (barre latérale, zone) ne les
+ * rogne pas. Ils suivent le déclencheur quand la page défile ou change de taille.
  */
-import { computed, nextTick, onBeforeUnmount, ref, useId, useTemplateRef } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, useId, useTemplateRef, watch } from "vue";
 
-import type { MenuItem, MenuTriggerAttrs } from "./menu";
+import {
+  placeBelow,
+  placeBeside,
+  type MenuItem,
+  type MenuTriggerAttrs,
+  type Point,
+  type Size,
+} from "./menu";
 
 const props = withDefaults(
   defineProps<{
@@ -27,6 +38,7 @@ const emit = defineEmits<{ select: [id: string]; closed: [] }>();
 defineSlots<{ trigger(props: { open: boolean; attrs: MenuTriggerAttrs }): unknown }>();
 
 const root = useTemplateRef<HTMLElement>("root");
+const popover = useTemplateRef<HTMLElement>("popover");
 const menuId = useId();
 const isOpen = ref(false);
 /** Entrée active du menu principal (-1 : aucune). */
@@ -36,6 +48,9 @@ const subOpen = ref<number | null>(null);
 /** Entrée active du sous-menu (-1 : focus dans le menu principal). */
 const subActive = ref(-1);
 let returnFocus: HTMLElement | null = null;
+/** Position fixe du menu et du sous-menu ouverts (`null` : pas encore mesurée). */
+const menuAt = ref<Point | null>(null);
+const subAt = ref<Point | null>(null);
 
 const subItems = computed<MenuItem[]>(() =>
   subOpen.value === null ? [] : (props.items[subOpen.value]?.children ?? []),
@@ -63,6 +78,55 @@ async function focusActive(): Promise<void> {
   root.value?.querySelector<HTMLElement>(selector)?.focus();
 }
 
+function viewport(): Size {
+  const { clientWidth, clientHeight } = document.documentElement;
+  return { width: clientWidth, height: clientHeight };
+}
+
+function sizeOf(element: HTMLElement): Size {
+  return { width: element.offsetWidth, height: element.offsetHeight };
+}
+
+/** Place le menu sous le déclencheur et le sous-menu à côté de son entrée, dans la fenêtre. */
+function place(): void {
+  const anchor = root.value;
+  const menu = popover.value;
+  if (!anchor || !menu) return;
+  menuAt.value = placeBelow(anchor.getBoundingClientRect(), sizeOf(menu), viewport(), props.align);
+  const sub = menu.querySelector<HTMLElement>(".menu__list--sub");
+  const item = sub?.parentElement;
+  subAt.value =
+    sub && item
+      ? placeBeside(
+          item.getBoundingClientRect(),
+          sizeOf(sub),
+          viewport(),
+          props.align === "end" ? "start" : "end",
+        )
+      : null;
+}
+
+/** Coordonnées CSS d'un menu placé ; sans elles, il garde sa place naturelle pour être mesuré. */
+function at(point: Point | null): Record<string, string> | undefined {
+  return point ? { top: `${String(point.top)}px`, left: `${String(point.left)}px` } : undefined;
+}
+
+// Après le rendu : le menu (ou le sous-menu) vient d'apparaître, ou ses entrées ont changé.
+watch([isOpen, subOpen, () => props.items], place, { flush: "post" });
+
+/** Clic ailleurs : fermeture ; défilement d'une colonne (capture) ou fenêtre redimensionnée : le menu suit. */
+function listen(on: boolean): void {
+  if (on) {
+    document.addEventListener("pointerdown", onOutside, true);
+    document.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+  } else {
+    document.removeEventListener("pointerdown", onOutside, true);
+    document.removeEventListener("scroll", place, true);
+    window.removeEventListener("resize", place);
+  }
+}
+
 function onOutside(event: PointerEvent): void {
   if (!(event.target instanceof Node) || !root.value?.contains(event.target)) close(false);
 }
@@ -75,7 +139,7 @@ function open(last = false): void {
   subActive.value = -1;
   active.value = step(props.items, -1, last ? -1 : 1);
   void focusActive();
-  document.addEventListener("pointerdown", onOutside, true);
+  listen(true);
 }
 
 /** Ferme le menu ; `restore` rend le focus au déclencheur. */
@@ -85,14 +149,16 @@ function close(restore = true): void {
   active.value = -1;
   subOpen.value = null;
   subActive.value = -1;
-  document.removeEventListener("pointerdown", onOutside, true);
+  menuAt.value = null;
+  subAt.value = null;
+  listen(false);
   if (restore) returnFocus?.focus();
   returnFocus = null;
   emit("closed");
 }
 
 onBeforeUnmount(() => {
-  document.removeEventListener("pointerdown", onOutside, true);
+  listen(false);
 });
 
 function toggle(): void {
@@ -235,8 +301,9 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
     <slot name="trigger" :open="isOpen" :attrs="triggerAttrs" />
     <div
       v-if="isOpen"
+      ref="popover"
       class="menu__popover"
-      :class="`menu__popover--${align}`"
+      :style="at(menuAt)"
       @keydown="onMenuKeydown"
     >
       <p v-if="heading" class="menu__heading">{{ heading }}</p>
@@ -283,6 +350,7 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
               role="menu"
               :aria-label="item.label"
               class="menu__list menu__list--sub"
+              :style="at(subAt)"
             >
               <li
                 v-for="(child, childIndex) in item.children"
@@ -319,14 +387,13 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
 
 <style scoped>
 .menu {
-  position: relative;
   display: inline-block;
 }
 
+/* Position fixe : `top` et `left` viennent de place(). */
 .menu__popover {
-  position: absolute;
+  position: fixed;
   z-index: 20;
-  top: calc(100% + 4px);
   width: max-content;
   min-width: 15rem;
   max-width: min(26rem, 90vw);
@@ -335,19 +402,6 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
   border-radius: 10px;
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
-}
-
-.menu__popover--start {
-  left: 0;
-}
-
-.menu__popover--end {
-  right: 0;
-}
-
-.menu__popover--end .menu__list--sub {
-  right: calc(100% + 0.375rem);
-  left: auto;
 }
 
 .menu__heading {
@@ -365,11 +419,11 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
 }
 
 .menu__list--sub {
-  position: absolute;
+  position: fixed;
   z-index: 21;
-  top: -0.375rem;
-  left: calc(100% + 0.375rem);
+  width: max-content;
   min-width: 13rem;
+  max-width: min(26rem, 90vw);
   padding: 0.375rem;
   border: 1px solid var(--color-border);
   border-radius: 10px;

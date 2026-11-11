@@ -118,6 +118,21 @@ describe("barre latérale du projet", () => {
     await click(app, '[role="menuitem"]', "Gérer les environnements…");
     expect(app.get("dialog[open]").text()).toContain("Environnements");
   });
+
+  it("menu ouvert, la pastille perd son infobulle ; la gestion s'ouvre en fenêtre large", async () => {
+    ({ app } = await openProject());
+    const chip = app.get('.project__env [aria-label="Environnement de boutique-tests : Local"]');
+    expect(chip.attributes("title")).toBe("Environnement du projet : Local");
+
+    await chip.trigger("click");
+    await flushPromises();
+    // L'infobulle recouvrirait l'en-tête du menu.
+    expect(chip.attributes("title")).toBeUndefined();
+
+    await click(app, '[role="menuitem"]', "Gérer les environnements…");
+    expect(app.get("dialog[open]").classes()).toContain("dialog--wide");
+    expect(chip.attributes("title")).toBe("Environnement du projet : Local");
+  });
 });
 
 /** Icônes des sections d'un projet (docs/plan-selecteur-workspace.md, I1, I2). */
