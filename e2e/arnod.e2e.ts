@@ -699,6 +699,39 @@ describe("Fenêtres et zones", () => {
     await waitForZoneTabs([["Nouvelle requête", "lister"]]);
     expect(await browser.$("aside").isExisting()).toBe(true);
   });
+
+  it("le menu de l'environnement n'est pas rogné par la barre latérale, sa gestion tient dans la fenêtre", async () => {
+    await browser.$('aside button[aria-label^="Environnement de boutique-tests"]').click();
+    await browser.$('aside [role="menu"]').waitForDisplayed();
+    const whole = await browser.execute(() => {
+      const menu = document.querySelector("aside .menu__popover");
+      if (!menu) return null;
+      const box = menu.getBoundingClientRect();
+      // Près de chaque coin, c'est bien le menu qui est affiché, même hors de la barre latérale.
+      const corners = [
+        [box.left + 4, box.top + 4],
+        [box.right - 4, box.top + 4],
+        [box.left + 4, box.bottom - 4],
+        [box.right - 4, box.bottom - 4],
+      ] as const;
+      return corners.every(([x, y]) => menu.contains(document.elementFromPoint(x, y)));
+    });
+    expect(whole).toBe(true);
+    await screenshot(browser, "08b-menu-environnement");
+
+    await browser.$('[role="menuitem"]*=Gérer les environnements').click();
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForDisplayed();
+    // Aucun champ ne dépasse : le contenu suit la largeur de la fenêtre, sans défilement horizontal.
+    const fits = await browser.execute(() => {
+      const body = document.querySelector("dialog[open] .dialog__body");
+      return body ? body.scrollWidth <= body.clientWidth : null;
+    });
+    expect(fits).toBe(true);
+    await screenshot(browser, "08c-environnements");
+    await browser.keys("Escape");
+    await browser.$("dialog[open]").waitForExist({ reverse: true });
+  });
 });
 
 /** Contrat OpenAPI du serveur de test, servi à `url`. */

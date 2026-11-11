@@ -162,6 +162,7 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
   <BaseDialog
     :open="open"
     title="Environnements"
+    wide
     description="Les variables partagées sont enregistrées dans le projet. Les variables locales restent sur ce poste."
     @close="emit('close')"
   >
@@ -231,10 +232,12 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
             "
             :aria-label="`Valeur de ${name}`"
           />
-          <BaseButton @click="saveLocal(name, true)">Enregistrer comme secret</BaseButton>
-          <BaseButton @click="saveLocal(name, false)">Enregistrer</BaseButton>
+          <span class="envs__local-actions">
+            <BaseButton @click="saveLocal(name, true)">Enregistrer comme secret</BaseButton>
+            <BaseButton @click="saveLocal(name, false)">Enregistrer</BaseButton>
+          </span>
         </div>
-        <div class="envs__var">
+        <div class="envs__declare">
           <input
             v-model="newLocal"
             type="text"
@@ -260,10 +263,18 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
 </template>
 
 <style scoped>
+/* Le contenu suit la largeur de la fenêtre : aucune colonne n'impose de largeur minimale. */
 .envs {
   display: grid;
-  grid-template-columns: 12rem minmax(24rem, 1fr);
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
   gap: 1rem;
+}
+
+/* Fenêtre étroite : la liste passe au-dessus du formulaire. */
+@media (max-width: 40rem) {
+  .envs {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .envs__list {
@@ -284,6 +295,7 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
   font: inherit;
   color: var(--color-text);
   text-align: left;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
@@ -296,11 +308,14 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .envs__form input[type="text"],
 .envs__form input[type="password"],
 .envs__form select {
+  box-sizing: border-box;
+  min-width: 0;
   padding: 0.375rem 0.5rem;
   border: 1px solid var(--color-border-strong);
   border-radius: 6px;
@@ -338,15 +353,39 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
 
 .envs__var {
   display: grid;
-  grid-template-columns: 1fr 1.5fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto;
   gap: 0.375rem;
 }
 
-.envs__local {
+.envs__declare {
   display: grid;
-  grid-template-columns: 8rem 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.375rem;
+}
+
+/* Nom, valeur, puis les deux boutons, qui passent ensemble à la ligne s'il manque de place. */
+.envs__local {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.375rem;
+}
+
+.envs__local code {
+  flex: 0 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.envs__local input {
+  flex: 1 1 10rem;
+}
+
+.envs__local-actions {
+  display: flex;
+  flex: none;
+  gap: 0.375rem;
+  margin-left: auto;
 }
 
 .envs__add {
@@ -367,6 +406,7 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
 
 .envs__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.5rem;
 }

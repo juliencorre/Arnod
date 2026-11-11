@@ -67,7 +67,13 @@ function submit(): void {
 </script>
 
 <template>
-  <BaseDialog :open="mode !== null" :title="copy.title" @close="emit('close')">
+  <!-- Un contrat collé se lit mieux en large ; le formulaire suit la largeur de la fenêtre. -->
+  <BaseDialog
+    :open="mode !== null"
+    :title="copy.title"
+    :wide="mode === 'text'"
+    @close="emit('close')"
+  >
     <form class="contract-form" novalidate @submit.prevent="submit">
       <label :for="fieldId" class="contract-form__label">{{ copy.label }}</label>
       <textarea
@@ -109,7 +115,6 @@ function submit(): void {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  width: min(36rem, 80vw);
 }
 
 .contract-form__label {
