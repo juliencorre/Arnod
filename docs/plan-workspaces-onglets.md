@@ -70,7 +70,7 @@ Les règles R1, R2, R5, R6, R9 et R10 du plan précédent sont inchangées. Cell
 | O9  | Menu ⋯ d'un projet              | 2a         | Ouvrir, Ajouter à un autre workspace ▸, Afficher dans « Tous les projets », Retirer de « X » avec « Annuler ».                                                       | Must     |
 | O10 | Ajouter un projet               | 2c         | Créer, importer un projet Arnod existant, ou reprendre des projets de « Tous les projets » (cases à cocher, workspaces actuels affichés).                            | Must     |
 | O11 | Gérer les workspaces            | 2d         | Liste, nom, couleur, projets avec « Retirer », « + Ajouter un projet », « Supprimer ce workspace », « + Nouveau workspace ». Plus de rôle « par défaut ».            | Must     |
-| O12 | Dernière exécution              | 2e         | Colonne « Dernière exécution » : requêtes réussies sur le total et heure du dernier run, sinon « — ».                                                                | Should   |
+| O12 | Dernière exécution              | 2e         | Colonne « Dernière exécution » (« Exécution » depuis S9 du plan du sélecteur) : requêtes réussies sur le total et heure du dernier run, sinon « — ».                 | Should   |
 
 ## 5. Hors périmètre
 

@@ -10,6 +10,7 @@ import { useNavigationStore } from "@/stores/navigation";
 
 import { type FakeCore, installFakeCore } from "../fakeCore";
 import {
+  AUTH_SSO,
   BOUTIQUE,
   BOUTIQUE_TESTS,
   MES_PROJETS,
@@ -160,7 +161,7 @@ describe("sélecteur de workspace (S1, S2, S8)", () => {
     expect(useNavigationStore().titleSubject).toBe("Recette sprint 42");
   });
 
-  it("« Tous les projets » : sélecteur dans une rangée en haut, sans barre latérale", async () => {
+  it("« Tous les projets » garde la barre latérale, coiffée du sélecteur (2e, 2f)", async () => {
     const core = installFakeCore(richSnapshot());
     wrapper = await mountApp();
 
@@ -169,9 +170,60 @@ describe("sélecteur de workspace (S1, S2, S8)", () => {
     expect(lastArgs(core, "workspace_open")).toEqual({ workspaceId: null });
     expect(core.snapshot().lastWorkspaceId).toBeNull();
     expect(wrapper.get("main h1").text()).toBe("Tous les projets · 3");
+    expect(currentWorkspace(wrapper)).toBe("Tous les projets");
+    expect(wrapper.find(".shell__sidebar > .shell__switcher .switcher").exists()).toBe(true);
+    expect(wrapper.find(".shell__switcher--top").exists()).toBe(false);
+    const aside = wrapper.get("aside");
+    expect(aside.get("h2").text()).toBe("Projets · 3");
+    expect(aside.findAll(".project__name").map((name) => name.text())).toEqual([
+      "boutique-tests",
+      "auth-sso",
+      "notifications",
+    ]);
+    expect(aside.findAll("[aria-expanded='true']")).toHaveLength(0);
+    expect(aside.get(".sidebar__hint").text()).toBe(
+      "Ouvrez un projet ici, ou choisissez un workspace dans le sélecteur.",
+    );
+
+    // On en sort en ouvrant un projet de la liste.
+    const open = aside.findAll(".project__main").find((b) => b.text().includes("auth-sso"));
+    await open?.trigger("click");
+    await flushPromises();
+    expect(useNavigationStore().view).toMatchObject({
+      kind: "project",
+      projectId: AUTH_SSO,
+      workspaceId: null,
+    });
+    expect(wrapper.find(".sidebar__hint").exists()).toBe(false);
+  });
+
+  it("« + Ouvrir un projet » inscrit un dossier projet existant dans « Tous les projets »", async () => {
+    const core = installFakeCore(richSnapshot());
+    core.pickedFolder = "/home/julien/dev/partenaires-v2";
+    wrapper = await mountApp();
+    await chooseWorkspace(wrapper, "Tous les projets");
+
+    const add = wrapper.findAll("aside button").find((b) => b.text() === "+ Ouvrir un projet");
+    await add?.trigger("click");
+    await flushPromises();
+
+    expect(lastArgs(core, "project_add_existing")).toEqual({
+      path: "/home/julien/dev/partenaires-v2",
+      workspaceId: null,
+    });
+    expect(wrapper.get("aside h2").text()).toBe("Projets · 4");
+    expect(wrapper.get(".toast").text()).toBe("« partenaires-v2 » ajouté à « Tous les projets ».");
+  });
+
+  it("gestion des workspaces : sélecteur dans une rangée en haut, sans barre latérale", async () => {
+    installFakeCore(richSnapshot());
+    wrapper = await mountApp();
+
+    await chooseSwitcherAction(wrapper, "Gérer les workspaces…");
+
+    expect(wrapper.get("main h1").text()).toBe("Workspaces");
     expect(wrapper.find("aside").exists()).toBe(false);
     expect(wrapper.find(".shell__switcher--top .switcher").exists()).toBe(true);
-    expect(currentWorkspace(wrapper)).toBe("Tous les projets");
   });
 
   it("clavier : ↓ ouvre, flèches, Début, Fin, Entrée ; Échap rend le focus", async () => {
@@ -416,7 +468,9 @@ describe("actions d'un workspace (S4)", () => {
 describe("glisser un projet sur le sélecteur (S6)", () => {
   async function dragOverSwitcher(app: AppWrapper, projectName: string) {
     await chooseWorkspace(app, "Tous les projets");
-    const row = app.findAll("main tbody tr").find((r) => r.find("th").text() === projectName);
+    const row = app
+      .findAll("main tbody tr")
+      .find((r) => r.find(".all__project").text() === projectName);
     if (!row) throw new Error(`ligne « ${projectName} » introuvable`);
     const transfer = dataTransfer();
     dispatchDrag(row.element, "dragstart", transfer);

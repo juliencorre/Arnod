@@ -438,7 +438,7 @@ describe("Arnod, de bout en bout", () => {
     // s'ouvre au survol, puis le projet se dépose sur un workspace.
     await browser.execute(() => {
       const row = Array.from(document.querySelectorAll("main tbody tr")).find(
-        (tr) => tr.querySelector("th")?.textContent === "boutique-tests",
+        (tr) => tr.querySelector(".all__project")?.textContent.trim() === "boutique-tests",
       );
       const trigger = document.querySelector(".switcher__trigger");
       if (!row || !trigger) throw new Error("ligne ou sélecteur introuvable");
@@ -504,14 +504,21 @@ describe("Arnod, de bout en bout", () => {
   });
 
   it("« Tous les projets » liste chaque projet une fois avec ses workspaces (2e, O1)", async () => {
-    expect(await browser.$$("main tbody th").map((row) => row.getText())).toEqual([
+    expect(await browser.$$("main tbody .all__project").map((name) => name.getText())).toEqual([
       "boutique-tests",
       "paiements-v3",
     ]);
     expect(
       await browser.$$("main tbody tr:first-child .chip").map((chip) => chip.getText()),
     ).toEqual(["E-commerce", "Recette"]);
-    expect(await browser.$("aside").isExisting()).toBe(false);
+    // La barre latérale reste : on en sort en ouvrant un projet ou par le sélecteur (2e, 2f).
+    expect(await browser.$$("aside .project__name").map((name) => name.getText())).toEqual([
+      "boutique-tests",
+      "paiements-v3",
+    ]);
+    expect(await browser.$("aside .sidebar__hint").getText()).toBe(
+      "Ouvrez un projet ici, ou choisissez un workspace dans le sélecteur.",
+    );
     await screenshot(browser, "05-tous-les-projets");
   });
 

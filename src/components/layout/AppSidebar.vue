@@ -1,15 +1,17 @@
 <script setup lang="ts">
 /**
  * Barre latérale. Au premier lancement (1a) : « Aucun projet pour l'instant. ».
- * Ensuite (2a) : les projets de l'onglet actif (ceux du workspace, ou tous), chacun
+ * Ensuite (2a) : « Projets · N », les projets du workspace ouvert (ou tous), chacun
  * avec ses actions, son environnement et son arborescence (`SidebarProject`,
- * docs/plan-barre-laterale-projet.md) ; « + Ajouter un projet » (W6) ; un dossier
- * introuvable est signalé (P10). Ctrl+N crée une requête et Ctrl+Maj+E ouvre les
- * environnements du projet sélectionné (B6).
+ * docs/plan-barre-laterale-projet.md) ; « + Ajouter un projet » (W6), ou
+ * « + Ouvrir un projet » hors workspace ; un dossier introuvable est signalé (P10).
+ * Sur « Tous les projets » (2e, 2f), un rappel dit comment en sortir. Ctrl+N crée une
+ * requête et Ctrl+Maj+E ouvre les environnements du projet sélectionné (B6).
  */
 import { computed, onBeforeUnmount, onMounted, useId, watch } from "vue";
 
 import SidebarProject from "@/components/layout/SidebarProject.vue";
+import { useProjectActions } from "@/composables/useProjectActions";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
 import { useNavigationStore } from "@/stores/navigation";
@@ -21,6 +23,7 @@ const dialogs = useDialogStore();
 const navigation = useNavigationStore();
 const workbench = useWorkbenchStore();
 const windows = useWindowsStore();
+const { addExistingProject } = useProjectActions();
 const projectsLabelId = useId();
 
 const workspaceId = computed(() => navigation.currentWorkspaceId);
@@ -40,8 +43,15 @@ watch(
   { immediate: true },
 );
 
+/**
+ * Sur « Tous les projets » de la fenêtre principale : on en sort en ouvrant un projet
+ * de la liste ou en choisissant un workspace (la barre détachée n'ouvre pas de projet).
+ */
+const showHint = computed(() => navigation.view.kind === "all" && windows.kind !== "sidebar");
+
+/** Hors workspace, ouvre un dossier projet existant ; sinon, ajoute au workspace (W6). */
 function add(): void {
-  if (workspaceId.value === null) dialogs.openNewProject(null);
+  if (workspaceId.value === null) void addExistingProject(null);
   else dialogs.openAddProjects(workspaceId.value);
 }
 
@@ -90,7 +100,9 @@ onBeforeUnmount(() => {
   <aside class="sidebar" aria-label="Barre latérale">
     <p v-if="catalog.isFirstRun" class="sidebar__empty">Aucun projet pour l'instant.</p>
     <nav v-else class="sidebar__section" :aria-labelledby="projectsLabelId">
-      <h2 :id="projectsLabelId" class="sidebar__label">Projets</h2>
+      <h2 :id="projectsLabelId" class="sidebar__label">
+        Projets <span class="sidebar__count">· {{ projects.length }}</span>
+      </h2>
       <ul class="sidebar__projects">
         <SidebarProject
           v-for="project in projects"
@@ -102,8 +114,11 @@ onBeforeUnmount(() => {
         />
       </ul>
       <button type="button" class="sidebar__add" @click="add">
-        {{ workspaceId === null ? "+ Nouveau projet" : "+ Ajouter un projet" }}
+        {{ workspaceId === null ? "+ Ouvrir un projet" : "+ Ajouter un projet" }}
       </button>
+      <p v-if="showHint" class="sidebar__hint">
+        Ouvrez un projet ici, ou choisissez un workspace dans le sélecteur.
+      </p>
     </nav>
     <slot name="footer" />
   </aside>
@@ -159,6 +174,10 @@ onBeforeUnmount(() => {
   color: var(--color-muted);
 }
 
+.sidebar__count {
+  font-weight: 400;
+}
+
 .sidebar__projects {
   display: flex;
   flex-direction: column;
@@ -180,6 +199,14 @@ onBeforeUnmount(() => {
   color: var(--color-link);
   background: none;
   cursor: pointer;
+}
+
+.sidebar__hint {
+  margin: 0;
+  padding: 0 var(--tree-pad);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-muted);
 }
 
 .sidebar__add:focus-visible {

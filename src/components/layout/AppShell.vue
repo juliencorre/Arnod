@@ -2,9 +2,10 @@
 /**
  * Fenêtre principale : barre latérale (largeur réglable, détachable : F5, F9) coiffée
  * du sélecteur de workspace, à la hauteur des onglets de contenu (S1, S8), puis vue
- * courante ; plus les fenêtres partagées. « Tous les projets », la gestion des
- * workspaces et le catalogue des étapes occupent toute la largeur (2d, 2e) : le
- * sélecteur passe alors dans une rangée en haut.
+ * courante ; plus les fenêtres partagées. « Tous les projets » garde la barre latérale,
+ * d'où l'on ouvre un projet (2e, 2f). La gestion des workspaces et le catalogue des
+ * étapes occupent toute la largeur (2d) : le sélecteur passe alors dans une rangée en
+ * haut.
  */
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from "vue";
 
@@ -17,11 +18,9 @@ import ProjectView from "@/components/projects/ProjectView.vue";
 import StepsCatalog from "@/components/steps/StepsCatalog.vue";
 import WorkspaceHome from "@/components/workspaces/WorkspaceHome.vue";
 import SplitHandle from "@/components/zones/SplitHandle.vue";
-import { useCatalogStore } from "@/stores/catalog";
 import { useNavigationStore } from "@/stores/navigation";
 import { useWindowsStore } from "@/stores/windows";
 
-const catalog = useCatalogStore();
 const navigation = useNavigationStore();
 const windows = useWindowsStore();
 const body = useTemplateRef<HTMLElement>("body");
@@ -33,16 +32,9 @@ const workspaceView = computed(() =>
 const projectView = computed(() => (navigation.view.kind === "project" ? navigation.view : null));
 const manageView = computed(() => (navigation.view.kind === "manage" ? navigation.view : null));
 const stepsView = computed(() => navigation.view.kind === "steps");
-/**
- * Pas de barre latérale sur le tableau « Tous les projets », dans la gestion, dans
- * le catalogue des étapes, ni détachée.
- */
+/** Pas de barre latérale dans la gestion, dans le catalogue des étapes, ni détachée. */
 const withSidebar = computed(
-  () =>
-    !windows.main?.sidebarDetached &&
-    !manageView.value &&
-    !stepsView.value &&
-    !(allView.value !== null && !catalog.isFirstRun),
+  () => !windows.main?.sidebarDetached && !manageView.value && !stepsView.value,
 );
 
 const preview = ref<number | null>(null);
