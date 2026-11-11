@@ -512,10 +512,15 @@ describe("Arnod, de bout en bout", () => {
       await browser.$$("main tbody tr:first-child .chip").map((chip) => chip.getText()),
     ).toEqual(["E-commerce", "Recette"]);
     // La barre latérale reste : on en sort en ouvrant un projet ou par le sélecteur (2e, 2f).
-    expect(await browser.$$("aside .project__name").map((name) => name.getText())).toEqual([
-      "boutique-tests",
-      "paiements-v3",
-    ]);
+    // Noms lus par textContent, comme ceux du sélecteur : sous WebKitWebDriver, getText
+    // (innerText) renvoie une chaîne vide pour un nom en text-overflow: ellipsis.
+    expect(
+      await browser.execute(() =>
+        Array.from(document.querySelectorAll("aside .project__name")).map((name) =>
+          name.textContent.trim(),
+        ),
+      ),
+    ).toEqual(["boutique-tests", "paiements-v3"]);
     expect(await browser.$("aside .sidebar__hint").getText()).toBe(
       "Ouvrez un projet ici, ou choisissez un workspace dans le sélecteur.",
     );
