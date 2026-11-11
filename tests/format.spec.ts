@@ -30,4 +30,12 @@ describe("pathSegments", () => {
     expect(pathSegments("projet")).toEqual(["projet"]);
     expect(pathSegments("")).toEqual([""]);
   });
+
+  it("garde chaque caractère : séparateur final ou doublé, rien n'est perdu", () => {
+    expect(pathSegments("/home/julien/")).toEqual(["/", "home/", "julien/"]);
+    expect(pathSegments("//serveur\\partage")).toEqual(["/", "/", "serveur\\", "partage"]);
+    for (const path of ["/a//b/", "C:\\x\\", "a"]) {
+      expect(pathSegments(path).join("")).toBe(path);
+    }
+  });
 });

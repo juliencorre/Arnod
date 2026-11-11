@@ -58,5 +58,16 @@ export function formatDayTime(timestampMs: number): string {
  * dossiers : « /home/a/b » donne « / », « home/ », « a/ », « b ».
  */
 export function pathSegments(path: string): string[] {
-  return path.match(/[^/\\]*[/\\]|[^/\\]+$/g) ?? [path];
+  const segments: string[] = [];
+  let start = 0;
+  for (let index = 0; index < path.length; index++) {
+    const char = path[index];
+    if (char === "/" || char === "\\") {
+      segments.push(path.slice(start, index + 1));
+      start = index + 1;
+    }
+  }
+  // Le dernier dossier, ou le chemin entier s'il n'a pas de séparateur (même vide).
+  if (start < path.length || segments.length === 0) segments.push(path.slice(start));
+  return segments;
 }
