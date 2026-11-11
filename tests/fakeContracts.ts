@@ -9,10 +9,13 @@ import type {
   ContractSummary,
   ContractView,
   GenerateReport,
+  HttpMethod,
+  LinkedView,
   OperationView,
+  ResourceView,
 } from "@/types/ipc";
 
-import { newRequest, runOf, type FakeWorkbench } from "./fakeWorkbench";
+import { buildTree, newRequest, runOf, testsView, type FakeWorkbench } from "./fakeWorkbench";
 
 /** Opération d'un faux contrat. */
 export type FakeOperation = Pick<OperationView, "key" | "method" | "path" | "summary" | "tag">;
@@ -79,10 +82,11 @@ function parse(text: string): FakeContract {
   };
 }
 
+/** Requête de chaque opération : la première dans l'ordre de l'arborescence, l'endpoint (R3). */
 function linked(wb: FakeWorkbench, path: string): Map<string, string> {
   const found = new Map<string, string>();
-  for (const [requestPath, request] of wb.requests) {
-    if (request.contract?.file === path) found.set(request.contract.operation, requestPath);
+  for (const { path: requestPath, operation } of linkedRequests(wb, path)) {
+    if (!found.has(operation)) found.set(operation, requestPath);
   }
   return found;
 }
@@ -121,7 +125,54 @@ function view(fc: FakeContracts, wb: FakeWorkbench, path: string): ContractView 
   };
 }
 
-function summaries(fc: FakeContracts): ContractSummary[] {
+/** Requêtes liées au contrat `path`, dans l'ordre des chemins (comme l'arborescence). */
+interface Link {
+  path: string;
+  name: string;
+  method: HttpMethod;
+  operation: string;
+}
+
+function linkedRequests(wb: FakeWorkbench, path: string): Link[] {
+  return [...wb.requests]
+    .filter(([, request]) => request.contract?.file === path)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([requestPath, request]) => ({
+      path: requestPath,
+      name: request.name,
+      method: request.method,
+      operation: request.contract?.operation ?? "",
+    }));
+}
+
+/** Ressources, opérations et requêtes liées d'un contrat (R2 à R4). */
+function resources(
+  contract: FakeContract,
+  links: Link[],
+): Pick<ContractSummary, "resources" | "unplaced"> {
+  const view = ({ path, name, method }: Link): LinkedView => ({ path, name, method });
+  const out: ResourceView[] = [];
+  for (const operation of contract.operations) {
+    const resource = `/${operation.path.replace(/^\//, "").split("/")[0] ?? ""}`;
+    const node = {
+      key: operation.key,
+      method: operation.method,
+      path: operation.path,
+      summary: operation.summary,
+      supported: true,
+      requests: links.filter((l) => l.operation === operation.key).map(view),
+    };
+    const group = out.find((r) => r.path === resource);
+    if (group) group.operations.push(node);
+    else out.push({ path: resource, operations: [node] });
+  }
+  const unplaced = links
+    .filter((l) => !contract.operations.some((o) => o.key === l.operation))
+    .map(view);
+  return { resources: out, unplaced };
+}
+
+function summaries(fc: FakeContracts, wb: FakeWorkbench): ContractSummary[] {
   return [...fc.files]
     .map(([path, contract]) => ({
       deduced: contract.deduced ?? false,
@@ -130,6 +181,7 @@ function summaries(fc: FakeContracts): ContractSummary[] {
       version: contract.version,
       operationCount: contract.operations.length,
       error: null,
+      ...resources(contract, linkedRequests(wb, path)),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -223,7 +275,12 @@ export function handleContracts(
   const path = String(args.path);
   switch (cmd) {
     case "contract_list":
-      return summaries(fc);
+      return summaries(fc, wb);
+    case "tree_load": {
+      // Le référentiel de tests dépend des contrats présents (R1, R5).
+      const nodes = buildTree(wb);
+      return { nodes, tests: testsView(nodes, new Set(fc.files.keys())), collapsed: wb.collapsed };
+    }
     case "contract_read":
       return view(fc, wb, path);
     case "contract_add": {

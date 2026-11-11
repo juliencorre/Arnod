@@ -2,8 +2,9 @@
 /**
  * Un projet dans la barre latérale (docs/plan-barre-laterale-projet.md, B1 à B6) : une ligne
  * pour le projet et ses actions (▶ exécuter, + ajouter, ⋯ autres), visibles au survol comme au
- * focus ; sous le nom, la pastille d'environnement ; puis ses requêtes et ses contrats. Replié,
- * le projet montre son environnement à droite de son nom.
+ * focus ; sous le nom, la pastille d'environnement ; puis ses contrats, avec leurs requêtes, et
+ * son référentiel de tests (docs/plan-requetes-dans-contrats.md, RC6). Replié, le projet montre
+ * son environnement à droite de son nom.
  *
  * Grille commune (`--tree-*`, défini par `AppSidebar`) : le chevron du projet, puis sa pastille
  * au retrait d'un niveau, le nom après la colonne de tête ; la pastille d'environnement
@@ -254,8 +255,8 @@ defineExpose({
       <div class="project__env">
         <EnvironmentChip ref="environment" :project-id="id" />
       </div>
-      <TreePanel ref="tree" :project-id="id" />
       <ContractsSection ref="contracts" :project-id="id" />
+      <TreePanel ref="tree" :project-id="id" />
     </div>
   </li>
 </template>

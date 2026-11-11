@@ -3,6 +3,7 @@
 //! Module sans Tauri ni état : il travaille sur le dossier du projet. Les
 //! chemins échangés sont relatifs à la racine du projet, séparés par `/`.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
@@ -41,6 +42,8 @@ pub enum TreeNode {
         assertion_count: usize,
         /// Fichier illisible : listé sans bloquer le reste (A10).
         invalid: bool,
+        /// Contrat lié (`contracts/petstore.yaml`), d'après l'étiquette `contract:`.
+        contract: Option<String>,
     },
 }
 
@@ -131,6 +134,7 @@ fn read_dir(
                     method: Some(request.method),
                     assertion_count: request.assertions.len(),
                     invalid: false,
+                    contract: request.contract.map(|link| link.file),
                 },
                 Err(_) => TreeNode::Request {
                     name: stem,
@@ -138,6 +142,7 @@ fn read_dir(
                     method: None,
                     assertion_count: 0,
                     invalid: true,
+                    contract: None,
                 },
             });
         }
@@ -149,6 +154,41 @@ fn read_dir(
     requests.sort_by_key(key);
     folders.extend(requests);
     Ok(folders)
+}
+
+/// Référentiel de tests (docs/plan-requetes-dans-contrats.md, R1, R5, R6) :
+/// l'arborescence sans les requêtes liées à un contrat présent dans `contracts`.
+/// Un dossier qui contenait des requêtes et n'en garde aucune disparaît ; un
+/// dossier vide reste.
+pub fn tests_view(nodes: &[TreeNode], contracts: &HashSet<String>) -> Vec<TreeNode> {
+    nodes
+        .iter()
+        .filter_map(|node| match node {
+            TreeNode::Request {
+                contract: Some(file),
+                ..
+            } if contracts.contains(file) => None,
+            TreeNode::Request { .. } => Some(node.clone()),
+            TreeNode::Folder {
+                name,
+                path,
+                children,
+                request_count,
+            } => {
+                let kept = tests_view(children, contracts);
+                let count: usize = kept.iter().map(TreeNode::count).sum();
+                if *request_count > 0 && count == 0 && kept.is_empty() {
+                    return None;
+                }
+                Some(TreeNode::Folder {
+                    name: name.clone(),
+                    path: path.clone(),
+                    children: kept,
+                    request_count: count,
+                })
+            }
+        })
+        .collect()
 }
 
 fn relative_path(root: &Path, path: &Path) -> String {

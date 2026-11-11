@@ -69,6 +69,9 @@ Les règles vivent dans le cœur Rust, module pur `contract/`, avec au moins un 
 | R11 | Une requête liée dont l'opération a disparu du contrat est signalée dans l'onglet du contrat ; sa vérification de conformité échoue en le disant.                                                                |
 | R12 | Le run d'un contrat exécute toutes ses requêtes liées, dans l'ordre de l'arborescence.                                                                                                                           |
 
+R5 vaut pour le disque ; dans la barre latérale, les requêtes liées sont montrées sous leur contrat
+([`plan-requetes-dans-contrats.md`](plan-requetes-dans-contrats.md)).
+
 ## 4. Cas d'usage
 
 | ID  | Cas d'usage          | Écrans | Comportement attendu                                                                                                                                                                    | Priorité |

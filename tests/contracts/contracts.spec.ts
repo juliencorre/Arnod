@@ -155,13 +155,20 @@ describe("onglet du contrat (C5, C6, C10)", () => {
       environment: "Local",
     });
     expect(app?.get(".toast").text()).toBe(
-      "2 requêtes créées dans « Petstore ». baseUrl de « Local » : http://127.0.0.1:8080.",
+      "2 requêtes créées sous le contrat « Petstore ». baseUrl de « Local » : http://127.0.0.1:8080.",
     );
     expect(app?.get(".contract__coverage").text()).toBe("3 opérations · 2 avec requête");
     expect(app?.findAll(".op__open")).toHaveLength(2);
     expect(app?.get(".contract__actions").text()).toContain("Créer les requêtes (0)");
-    // Les requêtes créées apparaissent dans l'arborescence.
-    expect(app?.findAll('[role="treeitem"]').some((i) => i.text().includes("Petstore"))).toBe(true);
+    // Les requêtes créées apparaissent sous le contrat, qui se déplie, pas dans le référentiel
+    // de tests (RC7).
+    expect(app?.get('[aria-label="Replier le contrat Petstore"]').attributes("aria-expanded")).toBe(
+      "true",
+    );
+    expect(app?.find('[aria-label="Ouvrir GET /pets"]').exists()).toBe(true);
+    expect(app?.findAll('[role="treeitem"]').some((i) => i.text().includes("Petstore"))).toBe(
+      false,
+    );
 
     // Cocher à nouveau l'opération restante : une seule requête de plus.
     await app?.get('[aria-label="Créer la requête de GET /health"]').trigger("change");

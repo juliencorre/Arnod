@@ -146,6 +146,26 @@ describe("accueil (A1 à A5)", () => {
     expect(app.find(".editor__version").exists()).toBe(false);
   });
 
+  it("RC8 : l'essai paraît sous le contrat déduit, à son opération, hors du référentiel", async () => {
+    installFakeCore(firstRunSnapshot());
+    app = await mountApp();
+    await type(app, URL_PRODUCTS);
+    await app.get(".try__form").trigger("submit");
+    await flushPromises();
+
+    // La requête active est révélée : contrat et ressource dépliés, opération mise en évidence.
+    const aside = app.get("aside");
+    expect(
+      aside.get('[aria-label="Replier le contrat api.boutique.dev"]').attributes("aria-expanded"),
+    ).toBe("true");
+    expect(aside.findAll(".crow__resource .crow__name").map((n) => n.text())).toEqual([
+      "/products",
+    ]);
+    expect(aside.get(".crow--selected").attributes("class")).toContain("crow--operation");
+    expect(aside.find('[aria-label="Ouvrir GET /products"]').exists()).toBe(true);
+    expect(aside.findAll('[role="treeitem"]')).toHaveLength(0);
+  });
+
   it("A5 : un envoi en échec garde l'accueil et dit pourquoi", async () => {
     const core = installFakeCore(firstRunSnapshot());
     core.failNext("trial_send", {

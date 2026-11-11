@@ -174,6 +174,7 @@ fn r11_numero_d_essai_libre() {
             method: None,
             assertion_count: 0,
             invalid: false,
+            contract: None,
         },
         TreeNode::Folder {
             name: "d".to_owned(),
@@ -184,6 +185,7 @@ fn r11_numero_d_essai_libre() {
                 method: None,
                 assertion_count: 0,
                 invalid: false,
+                contract: None,
             }],
             request_count: 1,
         },
@@ -193,6 +195,7 @@ fn r11_numero_d_essai_libre() {
             method: None,
             assertion_count: 0,
             invalid: false,
+            contract: None,
         },
     ];
     assert_eq!(next_number(&nodes), 8);

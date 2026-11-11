@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * Arborescence d'un projet (A1 à A8), sous son nom dans la barre latérale :
- * dossiers, requêtes et actions. Une requête choisie s'ouvre en onglet, dans
- * la fenêtre qui suit la sélection (Z5). Les créations partent du « + » de la
- * ligne du projet ou de l'en-tête « Requêtes » (`newRequest`, `newFolder`) ; un
- * projet vide montre la ligne « Nouvelle requête » (plan de la barre latérale du
- * projet, B4).
+ * Référentiel de tests d'un projet (A1 à A8, RC6 de docs/plan-requetes-dans-contrats.md), sous
+ * ses contrats dans la barre latérale : dossiers, requêtes sans contrat et actions ; les requêtes
+ * liées à un contrat sont rangées sous ce contrat (R1, R5). Une requête choisie s'ouvre en
+ * onglet, dans la fenêtre qui suit la sélection (Z5). Les créations partent du « + » de la ligne
+ * du projet ou de l'en-tête de la section (`newRequest`, `newFolder`) ; un référentiel vide montre
+ * la ligne « Nouvelle requête » (plan de la barre latérale du projet, B4).
  */
 import { computed, ref } from "vue";
 
@@ -22,7 +22,8 @@ import type { TreeNode } from "@/types/ipc";
 const props = defineProps<{ projectId: string }>();
 
 const workbench = useWorkbenchStore();
-const nodes = computed(() => workbench.trees[props.projectId]?.nodes ?? []);
+/** Arborescence sans les requêtes liées à un contrat, calculée par le cœur (R5). */
+const nodes = computed(() => workbench.trees[props.projectId]?.tests ?? []);
 const projectName = computed(() => useCatalogStore().projectById(props.projectId)?.name ?? "");
 const toasts = useToastStore();
 
@@ -34,7 +35,7 @@ type NameAction =
 const nameAction = ref<NameAction | null>(null);
 const nameError = ref<string | null>(null);
 
-/** Nombre de requêtes du projet, pour l'en-tête de la section (I1). */
+/** Nombre de requêtes du référentiel, pour l'en-tête de la section (I1). */
 const requestCount = computed(() => {
   const count = (list: TreeNode[]): number =>
     list.reduce((sum, node) => sum + (node.kind === "folder" ? count(node.children) : 1), 0);
@@ -160,10 +161,10 @@ async function submitName(name: string): Promise<void> {
 
 <template>
   <div class="tree">
-    <SectionHeading icon="requests" title="Requêtes" :count="requestCount">
+    <SectionHeading icon="tests" title="Référentiel de tests" :count="requestCount">
       <BaseMenu
         :items="ADD_ITEMS"
-        :label="`Ajouter aux requêtes de ${projectName}`"
+        :label="`Ajouter au référentiel de tests de ${projectName}`"
         align="end"
         @select="onAdd"
       >
@@ -172,8 +173,8 @@ async function submitName(name: string): Promise<void> {
             type="button"
             class="tree__tool"
             v-bind="attrs"
-            :aria-label="`Ajouter aux requêtes de ${projectName}`"
-            :title="`Ajouter aux requêtes de ${projectName}`"
+            :aria-label="`Ajouter au référentiel de tests de ${projectName}`"
+            :title="`Ajouter au référentiel de tests de ${projectName}`"
           >
             <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true">
               <path d="M6 2.5v7M2.5 6h7" />
@@ -186,7 +187,7 @@ async function submitName(name: string): Promise<void> {
       v-if="nodes.length > 0"
       role="tree"
       class="tree__list"
-      :aria-label="`Requêtes de ${projectName}`"
+      :aria-label="`Référentiel de tests de ${projectName}`"
     >
       <TreeRow
         v-for="node in nodes"

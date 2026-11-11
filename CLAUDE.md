@@ -20,8 +20,10 @@ projet »), puis résultat détachable selon `docs/plan-resultat-detachable.md` 
 zones »), puis accueil, catalogue des étapes et Non classés selon `docs/plan-accueil-non-classes.md`
 et l'étude `docs/etude-catalogue-etapes.md` (section « Accueil, catalogue des étapes et Non
 classés »), puis sélecteur de workspace et icônes des sections selon
-`docs/plan-selecteur-workspace.md` (section « Projets et workspaces »). Un nouveau lot commence par
-un plan rédigé à partir de `docs/modele-plan.md`.
+`docs/plan-selecteur-workspace.md` (section « Projets et workspaces »), puis requêtes rangées dans
+leur contrat selon `docs/plan-requetes-dans-contrats.md` (sections « Contrats de services » et
+« Barre latérale du projet »). Un nouveau lot commence par un plan rédigé à partir de
+`docs/modele-plan.md`.
 
 ## Architecture
 
@@ -292,6 +294,13 @@ Référence : `docs/plan-contrats-services.md` (cas C1 à C12, règles R1 à R12
 - Les commandes `contract_*` qui modifient émettent `arnod://projet` en portée `contracts` (et
   `tree` pour les requêtes créées) ; supprimer un contrat ferme ses onglets dans toutes les
   fenêtres.
+- Barre latérale (`docs/plan-requetes-dans-contrats.md`, RC1 à RC9, R1 à R7) : une requête liée est
+  montrée **sous son contrat** (ressource = premier segment du chemin, puis opération, puis
+  requêtes ; la première est l'endpoint), jamais dans le référentiel de tests ; « Hors contrat »
+  pour une opération absente ou un contrat illisible. Le cœur calcule tout : `ContractSummary`
+  (`resources`, `unplaced`) et `TreeView.tests` (`tree::tests_view`). Sur disque, rien ne change
+  (`<contrat>/<tag>/`). Côté interface, relire l'arborescence relit les contrats du projet (et
+  inversement, `contracts.sync`) ; l'état déplié est en mémoire (store `contracts`).
 
 ## Format OpenCollection
 
@@ -339,8 +348,10 @@ du projet » (option a), captures `docs/maquettes/6*.png`.
 
 - Un projet = `SidebarProject.vue` : chevron, pastille, nom, puis ▶ (exécuter), + (ajouter) et ⋯
   (autres), visibles au survol, au focus et sur le projet ouvert ; sous le nom, la pastille
-  d'environnement (`EnvironmentChip`) ; puis `TreePanel` et `ContractsSection`, dont les créations
-  passent par leurs méthodes exposées. Un projet replié montre sa pastille compacte à droite.
+  d'environnement (`EnvironmentChip`) ; puis `ContractsSection` (« Contrats de service », avec les
+  requêtes liées) et `TreePanel` (« Référentiel de tests » : les requêtes sans contrat), dont les
+  créations passent par leurs méthodes exposées. Plus de section « Requêtes ». Un projet replié
+  montre sa pastille compacte à droite.
 - Toute ligne de la barre latérale suit la grille `--tree-pad`, `--tree-indent`, `--tree-lead`,
   `--tree-gap` (définie par `AppSidebar`) : une colonne de tête de largeur fixe, le libellé
   après ; une nouvelle ligne la reprend au lieu de marges propres.

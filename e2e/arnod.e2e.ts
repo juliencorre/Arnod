@@ -880,6 +880,32 @@ describe("Contrats de services", () => {
     expect(request).toContain("operator: eq");
     expect(request).not.toContain("matchesContract");
     expect(readFileSync(path.join(project(), "environments", "local.yml"), "utf8")).toContain(url);
+
+    // Rangées sous le contrat, qui se déplie (RC7) ; aucune dans le référentiel de tests (RC6).
+    const operation = browser.$('aside [aria-label="Ouvrir GET /pets/{petId}"]');
+    await operation.waitForExist({
+      timeout: 10_000,
+      timeoutMsg: "opération absente du contrat déplié",
+    });
+    // Texte du DOM : une ligne hors de la partie visible de la barre latérale compte aussi.
+    const sidebar = () =>
+      browser.execute(() => ({
+        resources: Array.from(document.querySelectorAll("aside .crow__resource .crow__name")).map(
+          (n) => n.textContent.trim(),
+        ),
+        tests: Array.from(document.querySelectorAll('aside [role="treeitem"]')).map((i) =>
+          i.textContent.trim(),
+        ),
+      }));
+    expect((await sidebar()).resources).toEqual(["/pets"]);
+    expect((await sidebar()).tests.some((text) => text.includes("Animalerie"))).toBe(false);
+    // Un clic sur l'opération ouvre son endpoint (RC2).
+    await operation.click();
+    await browser.waitUntil(async () => (await zoneTabs()).flat().includes("Trouver un animal"), {
+      timeout: 10_000,
+      timeoutMsg: "endpoint de l'opération non ouvert",
+    });
+    await clickText(".zone__tab-button", "Animalerie");
     await screenshot(browser, "09-contrat");
   });
 
@@ -1175,6 +1201,17 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
     expect(request).toContain("name: Essai 1");
     expect(request).toContain("contract:contracts/");
     expect(request).toContain("GET /sante");
+
+    // Dans la barre latérale, l'essai est sous le contrat déduit, à son opération (RC8).
+    const operation = browser.$('aside [aria-label="Ouvrir GET /sante"]');
+    await operation.waitForExist({
+      timeout: 10_000,
+      timeoutMsg: "essai absent du contrat déduit",
+    });
+    const tests = await browser.execute(() =>
+      Array.from(document.querySelectorAll('aside [role="treeitem"]')).map((i) => i.textContent),
+    );
+    expect(tests.some((text) => text.includes("Essai 1"))).toBe(false);
 
     // La réponse est déjà dans l'onglet, vérifications proposées comprises.
     const status = await browser.execute(() => {

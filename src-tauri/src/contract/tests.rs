@@ -980,3 +980,184 @@ fn unions_typescript_concordantes() {
         )
     );
 }
+
+// --- Barre latérale : requêtes rangées dans leur contrat (docs/plan-requetes-dans-contrats.md) ---
+
+#[test]
+fn rc_r2_ressource_d_un_chemin() {
+    assert_eq!(file::resource_of("/pets/{petId}"), "/pets");
+    assert_eq!(file::resource_of("/pets"), "/pets");
+    assert_eq!(file::resource_of("/"), "/");
+    assert_eq!(file::resource_of("/{id}/suivi"), "/{id}");
+    assert_eq!(file::resource_of("sans-barre/x"), "/sans-barre");
+}
+
+#[test]
+fn rc_r2_operations_groupees_par_ressource_dans_l_ordre_du_contrat() {
+    let dir = project();
+    file::add(dir.path(), PETSTORE).unwrap();
+    let contract = load(PETSTORE).unwrap();
+    let list = file::list(dir.path());
+    let summary = &list[0];
+    // Les ressources suivent l'ordre de leur première opération.
+    let mut expected: Vec<String> = Vec::new();
+    for operation in &contract.operations {
+        let resource = file::resource_of(&operation.path);
+        if !expected.contains(&resource) {
+            expected.push(resource);
+        }
+    }
+    let resources: Vec<&str> = summary.resources.iter().map(|r| r.path.as_str()).collect();
+    assert_eq!(resources, expected);
+    let pets = summary
+        .resources
+        .iter()
+        .find(|r| r.path == "/pets")
+        .unwrap();
+    let keys: Vec<&str> = pets.operations.iter().map(|o| o.key.as_str()).collect();
+    let in_contract: Vec<&str> = contract
+        .operations
+        .iter()
+        .filter(|o| o.path.starts_with("/pets"))
+        .map(|o| o.key.as_str())
+        .collect();
+    assert_eq!(keys, in_contract);
+    assert_eq!(keys.len(), 5);
+    let trace = pets
+        .operations
+        .iter()
+        .find(|o| o.key == "TRACE /pets/{petId}")
+        .unwrap();
+    assert!(!trace.supported);
+    // Aucune requête encore : toutes les opérations sont vides.
+    assert!(
+        summary
+            .resources
+            .iter()
+            .all(|r| r.operations.iter().all(|o| o.requests.is_empty()))
+    );
+    assert!(summary.unplaced.is_empty());
+}
+
+#[test]
+fn rc_r3_requetes_sous_leur_operation_l_endpoint_d_abord() {
+    let dir = project();
+    let path = file::add(dir.path(), PETSTORE).unwrap();
+    let keys = vec!["GET /pets".to_owned(), "POST /pets".to_owned()];
+    file::generate(dir.path(), &path, &keys, None).unwrap();
+    // Une copie de la requête liée reste liée : un essai de plus sur l'opération.
+    let copy = tree::duplicate(dir.path(), "Petstore/animaux/lister-les-animaux.yml").unwrap();
+    let summary = &file::list(dir.path())[0];
+    let pets = summary
+        .resources
+        .iter()
+        .find(|r| r.path == "/pets")
+        .unwrap();
+    let get = pets
+        .operations
+        .iter()
+        .find(|o| o.key == "GET /pets")
+        .unwrap();
+    let paths: Vec<&str> = get.requests.iter().map(|r| r.path.as_str()).collect();
+    assert_eq!(
+        paths,
+        ["Petstore/animaux/lister-les-animaux.yml", copy.as_str()]
+    );
+    assert_eq!(get.requests[0].name, "Lister les animaux");
+    let post = pets
+        .operations
+        .iter()
+        .find(|o| o.key == "POST /pets")
+        .unwrap();
+    assert_eq!(post.requests.len(), 1);
+    assert!(summary.unplaced.is_empty());
+}
+
+#[test]
+fn rc_r4_requete_sans_operation_hors_contrat() {
+    let dir = project();
+    let path = file::add(dir.path(), PETSTORE).unwrap();
+    file::generate(dir.path(), &path, &["GET /pets".to_owned()], None).unwrap();
+    let request_path = dir.path().join("Petstore/animaux/lister-les-animaux.yml");
+    let mut request = request_file::read(&request_path).unwrap();
+    if let Some(link) = request.contract.as_mut() {
+        link.operation = "GET /disparu".to_owned();
+    }
+    request_file::write(&request_path, &request).unwrap();
+    let summary = &file::list(dir.path())[0];
+    assert_eq!(summary.unplaced.len(), 1);
+    assert_eq!(
+        summary.unplaced[0].path,
+        "Petstore/animaux/lister-les-animaux.yml"
+    );
+    assert!(
+        summary
+            .resources
+            .iter()
+            .all(|r| r.operations.iter().all(|o| o.requests.is_empty()))
+    );
+}
+
+#[test]
+fn rc_r4_contrat_illisible_ses_requetes_hors_contrat() {
+    let dir = project();
+    let path = file::add(dir.path(), PETSTORE).unwrap();
+    file::generate(dir.path(), &path, &["GET /pets".to_owned()], None).unwrap();
+    fs::write(dir.path().join(&path), "ceci n'est plus un contrat").unwrap();
+    let summary = &file::list(dir.path())[0];
+    assert!(summary.error.is_some());
+    assert!(summary.resources.is_empty());
+    assert_eq!(summary.unplaced.len(), 1);
+    // Le fichier existe encore : ses requêtes restent rangées sous lui.
+    assert!(file::paths(dir.path()).contains(&path));
+}
+
+#[test]
+fn rc_r1_r6_referentiel_sans_les_requetes_rangees_sous_un_contrat() {
+    let dir = project();
+    let path = file::add(dir.path(), PETSTORE).unwrap();
+    file::generate(dir.path(), &path, &all_keys(), None).unwrap();
+    tree::create_request(dir.path(), "", Some("google")).unwrap();
+    let nodes = tree::read(dir.path()).unwrap();
+    // R1 : le dossier du contrat ne contient que des requêtes liées, il quitte le référentiel.
+    let tests = tree::tests_view(&nodes, &file::paths(dir.path()));
+    assert_eq!(tests.len(), 1);
+    assert!(matches!(&tests[0], TreeNode::Request { name, .. } if name == "google"));
+    // R6 : contrat supprimé, ses requêtes reviennent dans le référentiel.
+    file::delete(dir.path(), &path, true).unwrap();
+    let tests = tree::tests_view(&nodes, &file::paths(dir.path()));
+    assert!(
+        matches!(&tests[0], TreeNode::Folder { name, request_count: 6, .. } if name == "Petstore")
+    );
+}
+
+#[test]
+fn rc_resume_de_contrat_serialise() {
+    let dir = project();
+    let path = file::add(dir.path(), PETSTORE).unwrap();
+    file::generate(dir.path(), &path, &["GET /pets".to_owned()], None).unwrap();
+    let summary = &file::list(dir.path())[0];
+    let json = serde_json::to_value(summary).unwrap();
+    let pets = json["resources"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["path"] == "/pets")
+        .unwrap();
+    assert_eq!(
+        pets["operations"][0],
+        json!({
+            "key": "GET /pets",
+            "method": "GET",
+            "path": "/pets",
+            "summary": "Lister les animaux",
+            "supported": true,
+            "requests": [{
+                "path": "Petstore/animaux/lister-les-animaux.yml",
+                "name": "Lister les animaux",
+                "method": "GET",
+            }],
+        })
+    );
+    assert_eq!(json["unplaced"], json!([]));
+}
