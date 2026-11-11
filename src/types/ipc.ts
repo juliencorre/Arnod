@@ -250,11 +250,18 @@ export type TreeNode =
       method: HttpMethod;
       assertionCount: number;
       invalid: boolean;
+      /** Contrat lié (`contracts/petstore.yaml`), d'après l'étiquette `contract:`. */
+      contract: string | null;
     };
 
 /** Arborescence et dossiers repliés (`TreeView`). */
 export interface TreeView {
   nodes: TreeNode[];
+  /**
+   * Référentiel de tests : l'arborescence sans les requêtes rangées sous un contrat
+   * (docs/plan-requetes-dans-contrats.md, R1, R5).
+   */
+  tests: TreeNode[];
   collapsed: string[];
 }
 
@@ -699,6 +706,35 @@ export interface ContractSummary {
   operationCount: number;
   /** Fichier illisible (R10) : la raison. */
   error: string | null;
+  /** Ressources, opérations et requêtes liées, pour la barre latérale (R2, R3). */
+  resources: ResourceView[];
+  /** Requêtes liées sans opération dans le contrat, ou contrat illisible (R4). */
+  unplaced: LinkedView[];
+}
+
+/** Ressource d'un contrat : premier segment du chemin de ses opérations (`ResourceView`). */
+export interface ResourceView {
+  /** `/pets`, ou `/` pour la racine. */
+  path: string;
+  operations: OperationNode[];
+}
+
+/** Opération d'une ressource et ses requêtes liées ; la première est l'endpoint (`OperationNode`). */
+export interface OperationNode {
+  key: string;
+  method: string;
+  path: string;
+  summary: string | null;
+  /** Méthode envoyable : une requête peut être créée. */
+  supported: boolean;
+  requests: LinkedView[];
+}
+
+/** Requête liée, telle que la barre latérale la montre (`LinkedView`). */
+export interface LinkedView {
+  path: string;
+  name: string;
+  method: HttpMethod;
 }
 
 /** Opération affichée dans l'onglet du contrat (`OperationView`). */

@@ -56,7 +56,7 @@ Cas d'usage détaillés dans [`docs/plan-projets-workspaces.md`](docs/plan-proje
 | S1, S2, R7   | Sélecteur en tête de la barre latérale : « Tous les projets » puis les workspaces (Ctrl+0…9) ; Arnod rouvre le dernier, gardé dans `arnod.json`.  |
 | S3, S4, S5   | « + Nouveau workspace » ; « ⋯ », clic droit ou Maj+F10 sur un workspace : renommer (F2), couleur, gérer (Ctrl+Maj+W), supprimer avec « Annuler ». |
 | S6           | Glisser une ligne de « Tous les projets » sur le sélecteur l'ouvre ; la déposer sur un workspace y ajoute le projet.                              |
-| I1, I2       | Dans un projet déplié, « Requêtes » et « Contrats de service » sont précédées d'une icône, avec leur nombre et « + ».                             |
+| I1, I2, RC6  | Dans un projet déplié, « Contrats de service » puis « Référentiel de tests » sont précédés d'une icône, avec leur nombre et « + ».                |
 | W6, O10      | « Ajouter un projet » à un workspace : créer, importer, ou reprendre des projets existants.                                                       |
 | O11          | Gestion des workspaces : nom, couleur, projets, suppression avec « Annuler ».                                                                     |
 | F4           | Fermeture propre par le menu **Fichier › Quitter** (`Ctrl+Q`) ou la croix de la fenêtre.                                                          |
@@ -106,7 +106,8 @@ et zones »).
 
 ### Contrats de services
 
-Cas C1 à C12 de [`docs/plan-contrats-services.md`](docs/plan-contrats-services.md).
+Cas C1 à C12 de [`docs/plan-contrats-services.md`](docs/plan-contrats-services.md), RC1 à RC9 de
+[`docs/plan-requetes-dans-contrats.md`](docs/plan-requetes-dans-contrats.md).
 
 | Thème clair                                                          | Thème sombre                                                               |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -121,6 +122,9 @@ Cas C1 à C12 de [`docs/plan-contrats-services.md`](docs/plan-contrats-services.
 | C9       | Vue « Source » : texte modifiable, enregistré seulement s'il reste un contrat lisible (Ctrl+S), ou remplacé par un fichier.                                                            |
 | C10      | « Exécuter » lance le run des requêtes du contrat.                                                                                                                                     |
 | C11, C12 | Contrat mis à la corbeille ; requêtes dont l'opération a disparu signalées « hors contrat ».                                                                                           |
+| RC1, RC2 | Dans la barre latérale, un contrat se déplie en ressources, opérations et requêtes ; un clic sur une opération ouvre son endpoint.                                                     |
+| RC3, RC4 | Une opération sans requête est estompée : un clic crée sa requête et l'ouvre ; la requête active est révélée sous son contrat.                                                         |
+| RC6, RC7 | Le référentiel de tests ne garde que les requêtes sans contrat ; « Créer les requêtes » les range sous le contrat, qui se déplie.                                                      |
 
 ### Barre latérale du projet
 

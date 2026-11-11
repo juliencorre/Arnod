@@ -137,24 +137,24 @@ describe("barre latérale du projet", () => {
 
 /** Icônes des sections d'un projet (docs/plan-selecteur-workspace.md, I1, I2). */
 describe("sections d'un projet", () => {
-  it("« Requêtes » et « Contrats de service » : icône décorative, nombre et « + » (I1, I2)", async () => {
+  it("« Contrats de service » puis « Référentiel de tests » : icône décorative, nombre et « + » (I1, I2, RC6)", async () => {
     ({ app } = await openProject());
     const heads = app.findAll(".section-head");
-    expect(heads.map((h) => h.get("h3").text())).toEqual(["Requêtes", "Contrats de service"]);
-    expect(heads.map((h) => h.get("svg").attributes("data-icon"))).toEqual([
-      "requests",
-      "contracts",
+    expect(heads.map((h) => h.get("h3").text())).toEqual([
+      "Contrats de service",
+      "Référentiel de tests",
     ]);
+    expect(heads.map((h) => h.get("svg").attributes("data-icon"))).toEqual(["contracts", "tests"]);
     expect(heads.map((h) => h.get("svg").attributes("aria-hidden"))).toEqual(["true", "true"]);
-    expect(heads[0]?.get(".section-head__count").text()).toBe("3");
     // Aucun contrat : pas de nombre, la ligne d'ajout suffit.
-    expect(heads[1]?.find(".section-head__count").exists()).toBe(false);
+    expect(heads[0]?.find(".section-head__count").exists()).toBe(false);
+    expect(heads[1]?.get(".section-head__count").text()).toBe("3");
   });
 
-  it("le « + » de « Requêtes » crée une requête ou un dossier, au clavier", async () => {
+  it("le « + » du référentiel de tests crée une requête ou un dossier, au clavier", async () => {
     let core;
     ({ app, core } = await openProject());
-    const add = app.get('[aria-label="Ajouter aux requêtes de boutique-tests"]');
+    const add = app.get('[aria-label="Ajouter au référentiel de tests de boutique-tests"]');
     await add.trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
     expect(menuTexts(app)).toEqual(["Nouvelle requêteCtrl+N", "Nouveau dossier"]);

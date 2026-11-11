@@ -9,6 +9,7 @@ use serde::Serialize;
 use tauri::{Manager, State, WebviewWindow};
 use uuid::Uuid;
 
+use crate::contract;
 use crate::error::CommandError;
 use crate::layout::windows::Windows;
 use crate::local;
@@ -22,14 +23,20 @@ use crate::windows::{self, ProjectScope};
 #[serde(rename_all = "camelCase")]
 pub struct TreeView {
     pub nodes: Vec<TreeNode>,
+    /// Référentiel de tests : l'arborescence sans les requêtes rangées sous un
+    /// contrat (docs/plan-requetes-dans-contrats.md, R1, R5).
+    pub tests: Vec<TreeNode>,
     pub collapsed: Vec<String>,
 }
 
 #[tauri::command]
 pub fn tree_load(state: State<'_, AppState>, project: Uuid) -> Result<TreeView, CommandError> {
     let ctx = state.project_ctx(project)?;
+    let nodes = tree::read(&ctx.root)?;
+    let tests = tree::tests_view(&nodes, &contract::file::paths(&ctx.root));
     Ok(TreeView {
-        nodes: tree::read(&ctx.root)?,
+        nodes,
+        tests,
         collapsed: local::load(&ctx.data_dir, ctx.id).collapsed,
     })
 }

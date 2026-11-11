@@ -13,6 +13,7 @@ import NaturePill from "@/components/steps/NaturePill.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import { IpcError } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
+import { useContractsStore } from "@/stores/contracts";
 import { useNavigationStore } from "@/stores/navigation";
 import { useStepsStore } from "@/stores/steps";
 import { useToastStore } from "@/stores/toasts";
@@ -27,6 +28,7 @@ const emit = defineEmits<{ open: [boolean] }>();
 
 const steps = useStepsStore();
 const catalog = useCatalogStore();
+const contracts = useContractsStore();
 const navigation = useNavigationStore();
 const workbench = useWorkbenchStore();
 const toasts = useToastStore();
@@ -120,6 +122,8 @@ async function send(): Promise<void> {
     const result = await steps.send(current.id, text.value.trim(), values.value);
     // L'instantané d'abord : « Non classés » existe avant d'être ouvert.
     catalog.apply(result.snapshot);
+    // « Non classés » déjà affiché : l'essai paraît sous le contrat déduit (RC8).
+    await contracts.sync(result.projectId);
     navigation.showProject(result.projectId, null);
     await workbench.openRequest(result.projectId, result.path);
     toasts.show(`✓ Essai gardé dans « Non classés », sous le contrat de son serveur.`);

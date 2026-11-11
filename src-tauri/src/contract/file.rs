@@ -1,7 +1,7 @@
 //! Contrats d'un projet sur disque : dossier `contracts/`, requêtes liées,
 //! création des requêtes (R2, R4, R5, R8, R10, R11, R12).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -15,7 +15,7 @@ use crate::environment;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::request::assertions::{AssertionResult, ResponseData};
 use crate::request::file as request_file;
-use crate::request::model::{ContractLink, Request};
+use crate::request::model::{ContractLink, Method, Request};
 use crate::tree::{self, ENVIRONMENTS_DIR, TreeNode};
 
 /// Dossier des contrats, à la racine du projet (réservé comme `environments/`).
@@ -37,6 +37,42 @@ pub struct ContractSummary {
     pub operation_count: usize,
     /// Fichier illisible (R10) : la raison, et le contrat reste listé.
     pub error: Option<String>,
+    /// Ressources, opérations et requêtes liées, pour la barre latérale
+    /// (docs/plan-requetes-dans-contrats.md, R2, R3).
+    pub resources: Vec<ResourceView>,
+    /// Requêtes liées sans opération dans le contrat, ou contrat illisible (R4).
+    pub unplaced: Vec<LinkedView>,
+}
+
+/// Ressource d'un contrat : premier segment du chemin de ses opérations (R2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceView {
+    /// `/pets`, ou `/` pour la racine.
+    pub path: String,
+    pub operations: Vec<OperationNode>,
+}
+
+/// Opération d'une ressource et ses requêtes liées ; la première est l'endpoint (R3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OperationNode {
+    pub key: String,
+    pub method: String,
+    pub path: String,
+    pub summary: Option<String>,
+    /// Méthode envoyable (TRACE ne l'est pas) : une requête peut être créée.
+    pub supported: bool,
+    pub requests: Vec<LinkedView>,
+}
+
+/// Requête liée, telle que la barre latérale la montre.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkedView {
+    pub path: String,
+    pub name: String,
+    pub method: Method,
 }
 
 /// Opération affichée dans l'onglet du contrat.
@@ -184,38 +220,113 @@ fn stem(path: &Path) -> String {
 
 /// Contrats du projet, par nom (C5) ; un fichier illisible est listé avec son erreur.
 pub fn list(root: &Path) -> Vec<ContractSummary> {
-    let Ok(entries) = fs::read_dir(dir(root)) else {
+    let files = contract_files(root);
+    if files.is_empty() {
         return Vec::new();
-    };
-    let mut list: Vec<ContractSummary> = entries
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| path.is_file() && is_contract_file(path))
-        .filter(|path| !stem(path).starts_with('.'))
+    }
+    let links = linked(root);
+    let mut list: Vec<ContractSummary> = files
+        .into_iter()
         .map(|path| {
             let text = fs::read_to_string(&path).unwrap_or_default();
+            let relative = relative(&path);
+            let mine: Vec<&Linked> = links.iter().filter(|l| l.link.file == relative).collect();
             match load(&text) {
-                Ok(contract) => ContractSummary {
-                    deduced: deduce::is_deduced(&contract.doc),
-                    path: relative(&path),
-                    name: contract.title,
-                    version: contract.version,
-                    operation_count: contract.operations.len(),
-                    error: None,
-                },
+                Ok(contract) => {
+                    let (resources, unplaced) = resources(&contract, &mine);
+                    ContractSummary {
+                        deduced: deduce::is_deduced(&contract.doc),
+                        path: relative,
+                        name: contract.title,
+                        version: contract.version,
+                        operation_count: contract.operations.len(),
+                        error: None,
+                        resources,
+                        unplaced,
+                    }
+                }
                 Err(reason) => ContractSummary {
                     deduced: false,
-                    path: relative(&path),
+                    path: relative,
                     name: stem(&path),
                     version: String::new(),
                     operation_count: 0,
                     error: Some(reason),
+                    resources: Vec::new(),
+                    unplaced: mine.iter().map(|l| l.view()).collect(),
                 },
             }
         })
         .collect();
     list.sort_by_key(|summary| (sort_key(&summary.name), summary.path.clone()));
     list
+}
+
+/// Fichiers de contrat de `contracts/`, sans les fichiers cachés.
+fn contract_files(root: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(dir(root)) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file() && is_contract_file(path))
+        .filter(|path| !stem(path).starts_with('.'))
+        .collect()
+}
+
+/// Chemins des contrats présents (`contracts/petstore.yaml`), lisibles ou non :
+/// leurs requêtes liées quittent le référentiel de tests (R1, R6).
+pub fn paths(root: &Path) -> HashSet<String> {
+    contract_files(root)
+        .iter()
+        .map(|path| relative(path))
+        .collect()
+}
+
+/// Ressource d'un chemin d'opération : son premier segment (R2).
+pub fn resource_of(path: &str) -> String {
+    let first = path
+        .trim_start_matches('/')
+        .split('/')
+        .next()
+        .unwrap_or_default();
+    format!("/{first}")
+}
+
+/// Ressources d'un contrat et requêtes sans opération (R2 à R4). Les ressources
+/// suivent l'ordre de leur première opération dans le contrat ; les requêtes
+/// liées, l'ordre de l'arborescence.
+pub fn resources(contract: &Contract, links: &[&Linked]) -> (Vec<ResourceView>, Vec<LinkedView>) {
+    let mut out: Vec<ResourceView> = Vec::new();
+    for operation in &contract.operations {
+        let node = OperationNode {
+            key: operation.key.clone(),
+            method: operation.method.clone(),
+            path: operation.path.clone(),
+            summary: operation.summary.clone(),
+            supported: supported(operation),
+            requests: links
+                .iter()
+                .filter(|l| l.link.operation == operation.key)
+                .map(|l| l.view())
+                .collect(),
+        };
+        let resource = resource_of(&operation.path);
+        match out.iter_mut().find(|r| r.path == resource) {
+            Some(group) => group.operations.push(node),
+            None => out.push(ResourceView {
+                path: resource,
+                operations: vec![node],
+            }),
+        }
+    }
+    let unplaced = links
+        .iter()
+        .filter(|l| contract.operation(&l.link.operation).is_none())
+        .map(|l| l.view())
+        .collect();
+    (out, unplaced)
 }
 
 /// Contrat lu depuis le projet.
@@ -230,7 +341,18 @@ pub fn read(root: &Path, path: &str) -> Result<Contract, CommandError> {
 pub struct Linked {
     pub path: String,
     pub name: String,
+    pub method: Method,
     pub link: ContractLink,
+}
+
+impl Linked {
+    fn view(&self) -> LinkedView {
+        LinkedView {
+            path: self.path.clone(),
+            name: self.name.clone(),
+            method: self.method,
+        }
+    }
 }
 
 /// Requêtes du projet liées à un contrat, dans l'ordre de l'arborescence.
@@ -247,6 +369,7 @@ pub fn linked(root: &Path) -> Vec<Linked> {
                     let request = tree::resolve(root, path).and_then(|p| request_file::read(&p));
                     if let Ok(Request {
                         name,
+                        method,
                         contract: Some(link),
                         ..
                     }) = request
@@ -254,6 +377,7 @@ pub fn linked(root: &Path) -> Vec<Linked> {
                         out.push(Linked {
                             path: path.clone(),
                             name,
+                            method,
                             link,
                         });
                     }

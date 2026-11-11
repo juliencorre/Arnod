@@ -267,3 +267,93 @@ fn liens_en_boucle_ignores_liens_externes_suivis() {
         ["a/partage/commune.yml", "a/r1.yml"]
     );
 }
+
+// --- Référentiel de tests (docs/plan-requetes-dans-contrats.md, R1, R5, R6) ---
+
+fn request(name: &str, path: &str, contract: Option<&str>) -> TreeNode {
+    TreeNode::Request {
+        name: name.to_owned(),
+        path: path.to_owned(),
+        method: Some(Method::Get),
+        assertion_count: 0,
+        invalid: false,
+        contract: contract.map(str::to_owned),
+    }
+}
+
+fn folder(path: &str, children: Vec<TreeNode>) -> TreeNode {
+    let request_count = children.iter().map(TreeNode::count).sum();
+    TreeNode::Folder {
+        name: path.rsplit('/').next().unwrap_or(path).to_owned(),
+        path: path.to_owned(),
+        children,
+        request_count,
+    }
+}
+
+#[test]
+fn r5_referentiel_sans_les_requetes_liees() {
+    let contracts: HashSet<String> = ["contracts/petstore.yaml".to_owned()].into();
+    let nodes = vec![
+        // Dossier du contrat : seulement des requêtes liées, il disparaît.
+        folder(
+            "Petstore",
+            vec![folder(
+                "Petstore/animaux",
+                vec![request(
+                    "Lister",
+                    "Petstore/animaux/lister.yml",
+                    Some("contracts/petstore.yaml"),
+                )],
+            )],
+        ),
+        // Dossier mixte : il garde ses requêtes libres, avec leur nombre.
+        folder(
+            "Mixte",
+            vec![
+                request("Libre", "Mixte/libre.yml", None),
+                request("Liée", "Mixte/liee.yml", Some("contracts/petstore.yaml")),
+            ],
+        ),
+        // Dossier vide créé à la main : il reste.
+        folder("Vide", vec![]),
+        // R6 : contrat absent, la requête reste dans le référentiel.
+        request(
+            "Orpheline",
+            "orpheline.yml",
+            Some("contracts/supprime.yaml"),
+        ),
+        request("google", "google.yml", None),
+    ];
+    let tests = tests_view(&nodes, &contracts);
+    assert_eq!(names(&tests), ["Mixte", "Vide", "Orpheline", "google"]);
+    assert!(
+        matches!(&tests[0], TreeNode::Folder { request_count: 1, children, .. } if names(children) == ["Libre"])
+    );
+    assert!(matches!(
+        &tests[1],
+        TreeNode::Folder {
+            request_count: 0,
+            ..
+        }
+    ));
+    // Sans contrat présent, tout reste.
+    assert_eq!(tests_view(&nodes, &HashSet::new()), nodes);
+}
+
+#[test]
+fn le_lien_au_contrat_est_lu_dans_l_arborescence() {
+    let dir = project();
+    let path = create_request(dir.path(), "", Some("liée")).unwrap();
+    let absolute = dir.path().join(&path);
+    let mut request = file::read(&absolute).unwrap();
+    request.contract = Some(crate::request::model::ContractLink {
+        file: "contracts/petstore.yaml".to_owned(),
+        operation: "GET /pets".to_owned(),
+    });
+    file::write(&absolute, &request).unwrap();
+    assert!(matches!(
+        &read(dir.path()).unwrap()[0],
+        TreeNode::Request { contract: Some(file), .. } if file == "contracts/petstore.yaml"
+    ));
+}

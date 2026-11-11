@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { reactive, ref } from "vue";
+import { reactive, ref, watch } from "vue";
 
 import { events, ipc } from "@/lib/ipc";
 import { contentKey, useWindowsStore } from "@/stores/windows";
@@ -38,6 +38,23 @@ export function contractKey(projectId: string, path: string): string {
   return contentKey({ kind: "contract", projectId, path });
 }
 
+/**
+ * Nœud dépliable d'un contrat dans la barre latérale (docs/plan-requetes-dans-contrats.md, RC1) :
+ * le contrat, une ressource, une opération ou le groupe « Hors contrat ».
+ */
+export type ContractNode =
+  | { kind: "contract"; path: string }
+  | { kind: "resource"; path: string; resource: string }
+  | { kind: "operation"; path: string; operation: string }
+  | { kind: "unplaced"; path: string };
+
+/** Clé d'un nœud déplié, par projet. */
+export function nodeKey(projectId: string, node: ContractNode): string {
+  const part =
+    node.kind === "resource" ? node.resource : node.kind === "operation" ? node.operation : "";
+  return [projectId, node.kind, node.path, part].join("\u0000");
+}
+
 /** Message d'une erreur, prêt à afficher. */
 function messageOf(caught: unknown): string {
   return caught instanceof Error ? caught.message : String(caught);
@@ -56,10 +73,96 @@ export const useContractsStore = defineStore("contracts", () => {
   const open = reactive<Record<string, OpenContract>>({});
   /** Contrats à ouvrir sur leur source : créés vides (C4). */
   const sourceFirst = new Set<string>();
+  /** Nœuds dépliés dans la barre latérale de cette fenêtre ; repliés par défaut (RC1). */
+  const expanded = ref<string[]>([]);
+  /** Projets dont l'arborescence est relue avec leurs contrats : l'observateur n'y revient pas. */
+  const syncing = new Set<string>();
   let subscribed = false;
 
   async function loadList(projectId: string): Promise<void> {
     lists.value[projectId] = await ipc.contractList(projectId);
+  }
+
+  /**
+   * Relit les contrats et l'arborescence d'un projet chargé : le référentiel de tests ne garde que
+   * les requêtes sans contrat (R5, R6), les contrats montrent leurs requêtes (R1).
+   */
+  async function sync(projectId: string): Promise<void> {
+    await Promise.all([
+      lists.value[projectId] ? loadList(projectId) : Promise.resolve(),
+      refreshTree(projectId),
+    ]);
+  }
+
+  /** Relit l'arborescence d'un projet chargé, sans que l'observateur relise ses contrats. */
+  async function refreshTree(projectId: string): Promise<void> {
+    if (!workbench.trees[projectId]) return;
+    syncing.add(projectId);
+    try {
+      await workbench.refreshTree(projectId);
+    } catch (caught) {
+      syncing.delete(projectId);
+      throw caught;
+    }
+  }
+
+  // Arborescence relue (requête créée, renommée, déplacée, supprimée, ici ou ailleurs) : les
+  // requêtes rangées sous les contrats aussi (RC9).
+  watch(
+    () => ({ ...workbench.trees }),
+    (now, before) => {
+      for (const [projectId, tree] of Object.entries(now)) {
+        const previous = before[projectId];
+        if (previous === undefined || previous === tree) continue;
+        if (syncing.delete(projectId) || !lists.value[projectId]) continue;
+        loadList(projectId).catch((caught: unknown) => {
+          toasts.showError(caught);
+        });
+      }
+    },
+  );
+
+  function isExpanded(projectId: string, node: ContractNode): boolean {
+    return expanded.value.includes(nodeKey(projectId, node));
+  }
+
+  function setExpanded(projectId: string, node: ContractNode, open: boolean): void {
+    const key = nodeKey(projectId, node);
+    const present = expanded.value.includes(key);
+    if (open && !present) expanded.value = [...expanded.value, key];
+    else if (!open && present) expanded.value = expanded.value.filter((k) => k !== key);
+  }
+
+  function toggleExpanded(projectId: string, node: ContractNode): void {
+    setExpanded(projectId, node, !isExpanded(projectId, node));
+  }
+
+  /**
+   * Déplie le chemin d'une requête liée (RC4) : son contrat, sa ressource et, si elle n'y est pas
+   * seule, son opération. `false` si elle n'est sous aucun contrat de la liste.
+   */
+  function reveal(projectId: string, request: string): boolean {
+    for (const contract of lists.value[projectId] ?? []) {
+      const path = contract.path;
+      if (contract.unplaced.some((r) => r.path === request)) {
+        setExpanded(projectId, { kind: "contract", path }, true);
+        setExpanded(projectId, { kind: "unplaced", path }, true);
+        return true;
+      }
+      for (const resource of contract.resources) {
+        const operation = resource.operations.find((o) =>
+          o.requests.some((r) => r.path === request),
+        );
+        if (!operation) continue;
+        setExpanded(projectId, { kind: "contract", path }, true);
+        setExpanded(projectId, { kind: "resource", path, resource: resource.path }, true);
+        if (operation.requests.length > 1) {
+          setExpanded(projectId, { kind: "operation", path, operation: operation.key }, true);
+        }
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Ouvre un contrat en onglet, dans la fenêtre qui suit la sélection (Z5). */
@@ -134,7 +237,7 @@ export const useContractsStore = defineStore("contracts", () => {
   async function add(projectId: string, source: ContractSource): Promise<ContractView> {
     const view = await ipc.contractAdd(projectId, source);
     if (source.kind === "template") sourceFirst.add(contractKey(projectId, view.path));
-    await loadList(projectId);
+    await sync(projectId);
     await show(projectId, view.path);
     return view;
   }
@@ -144,7 +247,7 @@ export const useContractsStore = defineStore("contracts", () => {
     try {
       const view = await ipc.contractImportFile(projectId, null);
       if (view === null) return;
-      await loadList(projectId);
+      await sync(projectId);
       await show(projectId, view.path);
       toasts.show(`Contrat « ${view.name} » ajouté.`);
     } catch (caught) {
@@ -161,7 +264,7 @@ export const useContractsStore = defineStore("contracts", () => {
       if (view === null) return;
       entry.draft = view.source;
       apply(key, view);
-      await loadList(entry.projectId);
+      await sync(entry.projectId);
       toasts.show(`Contrat « ${view.name} » mis à jour.`);
     } catch (caught) {
       toasts.showError(caught);
@@ -177,7 +280,7 @@ export const useContractsStore = defineStore("contracts", () => {
       const view = await ipc.contractSave(entry.projectId, entry.path, entry.draft);
       entry.draft = view.source;
       apply(key, view);
-      await loadList(entry.projectId);
+      await sync(entry.projectId);
       return true;
     } catch (caught) {
       entry.saveError = messageOf(caught);
@@ -185,12 +288,15 @@ export const useContractsStore = defineStore("contracts", () => {
     }
   }
 
-  /** Met un contrat à la corbeille (C11) ; ses onglets se ferment partout. */
+  /**
+   * Met un contrat à la corbeille (C11) ; ses onglets se ferment partout et ses requêtes reviennent
+   * dans le référentiel de tests (R6).
+   */
   async function remove(projectId: string, path: string, name: string): Promise<void> {
     await ipc.contractDelete(projectId, path, false);
     await windows.load();
     Reflect.deleteProperty(open, contractKey(projectId, path));
-    await loadList(projectId);
+    await sync(projectId);
     toasts.show(`Contrat « ${name} » mis à la corbeille.`);
   }
 
@@ -207,32 +313,55 @@ export const useContractsStore = defineStore("contracts", () => {
     if (entry) entry.selected = operations;
   }
 
+  /**
+   * Crée les requêtes d'opérations du contrat, relit le projet et montre les requêtes créées sous
+   * le contrat, qui se déplie (RC7) : le bilan, ou `null` si le cœur refuse.
+   */
+  async function createRequests(
+    projectId: string,
+    path: string,
+    operations: string[],
+  ): Promise<GenerateReport> {
+    const report = await ipc.contractGenerate(
+      projectId,
+      path,
+      operations,
+      workbench.activeEnvironment(projectId),
+    );
+    const key = contractKey(projectId, path);
+    await Promise.all([
+      open[key] ? reload(key) : Promise.resolve(),
+      refreshTree(projectId),
+      loadList(projectId),
+      report.baseUrl && workbench.environments[projectId]
+        ? workbench.refreshEnvironments(projectId)
+        : Promise.resolve(),
+    ]);
+    await workbench.expand(projectId);
+    setExpanded(projectId, { kind: "contract", path }, true);
+    const contract = lists.value[projectId]?.find((c) => c.path === path);
+    for (const resource of contract?.resources ?? []) {
+      const created = resource.operations.some((o) =>
+        o.requests.some((r) => report.created.includes(r.path)),
+      );
+      if (created)
+        setExpanded(projectId, { kind: "resource", path, resource: resource.path }, true);
+    }
+    return report;
+  }
+
   /** Crée les requêtes des opérations cochées (C6) et en fait le bilan. */
   async function generate(key: string): Promise<GenerateReport | null> {
     const entry = open[key];
     if (!entry?.view || entry.busy || entry.selected.length === 0) return null;
     entry.busy = true;
     try {
-      const { projectId } = entry;
-      const report = await ipc.contractGenerate(
-        projectId,
-        entry.path,
-        entry.selected,
-        workbench.activeEnvironment(projectId),
-      );
-      await Promise.all([
-        reload(key),
-        workbench.trees[projectId] ? workbench.refreshTree(projectId) : Promise.resolve(),
-        report.baseUrl && workbench.environments[projectId]
-          ? workbench.refreshEnvironments(projectId)
-          : Promise.resolve(),
-      ]);
-      await workbench.expand(projectId);
+      const report = await createRequests(entry.projectId, entry.path, entry.selected);
       const count = report.created.length;
       let message =
         count === 0
           ? "Aucune requête créée."
-          : `${String(count)} requête${count > 1 ? "s" : ""} créée${count > 1 ? "s" : ""} dans « ${report.folder} ».`;
+          : `${String(count)} requête${count > 1 ? "s" : ""} créée${count > 1 ? "s" : ""} sous le contrat « ${entry.view.name} ».`;
       if (report.baseUrl) {
         message += ` baseUrl de « ${report.baseUrl.environment} » : ${report.baseUrl.value}.`;
       }
@@ -243,6 +372,26 @@ export const useContractsStore = defineStore("contracts", () => {
       return null;
     } finally {
       entry.busy = false;
+    }
+  }
+
+  /** Opération sans requête cliquée dans la barre latérale : crée sa requête et l'ouvre (RC3). */
+  async function createForOperation(
+    projectId: string,
+    path: string,
+    operation: string,
+  ): Promise<void> {
+    try {
+      const report = await createRequests(projectId, path, [operation]);
+      const created = report.created[0];
+      if (created === undefined) {
+        toasts.show(report.skipped[0]?.reason ?? "Aucune requête créée.", { tone: "error" });
+        return;
+      }
+      reveal(projectId, created);
+      await workbench.openRequest(projectId, created);
+    } catch (caught) {
+      toasts.showError(caught);
     }
   }
 
@@ -257,12 +406,15 @@ export const useContractsStore = defineStore("contracts", () => {
     }
   }
 
-  /** Modification faite dans une autre fenêtre (F11). */
+  /**
+   * Modification faite dans une autre fenêtre (F11). Une arborescence relue relit les contrats
+   * (observateur ci-dessus) ; un contrat ajouté ou supprimé relit aussi l'arborescence (RC9).
+   */
   async function onProjectChange(change: ProjectChange): Promise<void> {
     if (change.origin === windows.label) return;
     if (change.scope !== "contracts" && change.scope !== "tree") return;
     const { projectId } = change;
-    if (change.scope === "contracts" && lists.value[projectId]) await loadList(projectId);
+    if (change.scope === "contracts") await sync(projectId);
     // Arborescence ou contrat changé : les liens des onglets ouverts aussi.
     for (const [key, entry] of Object.entries(open)) {
       if (entry.projectId === projectId) await reload(key);
@@ -280,7 +432,13 @@ export const useContractsStore = defineStore("contracts", () => {
   return {
     lists,
     open,
+    expanded,
     loadList,
+    sync,
+    isExpanded,
+    setExpanded,
+    toggleExpanded,
+    reveal,
     show,
     isDirty,
     openTab,
@@ -294,6 +452,7 @@ export const useContractsStore = defineStore("contracts", () => {
     toggle,
     setSelection,
     generate,
+    createForOperation,
     run,
     onProjectChange,
     subscribe,

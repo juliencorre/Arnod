@@ -129,7 +129,7 @@ const fail = (kind: CommandError["kind"], message: string): never => {
   throw { kind, message } satisfies CommandError;
 };
 
-function buildTree(wb: FakeWorkbench): TreeNode[] {
+export function buildTree(wb: FakeWorkbench): TreeNode[] {
   const build = (parent: string): TreeNode[] => {
     const prefix = parent === "" ? "" : `${parent}/`;
     const folders = [...wb.folders]
@@ -157,12 +157,30 @@ function buildTree(wb: FakeWorkbench): TreeNode[] {
           method: request.method,
           assertionCount: request.assertions.length,
           invalid: false,
+          contract: request.contract?.file ?? null,
         });
       }
     }
     return nodes;
   };
   return build("");
+}
+
+/** Référentiel de tests : sans les requêtes liées à un contrat présent (R1, R5). */
+export function testsView(nodes: TreeNode[], contracts: Set<string>): TreeNode[] {
+  const kept: TreeNode[] = [];
+  for (const node of nodes) {
+    if (node.kind === "request") {
+      if (node.contract === null || !contracts.has(node.contract)) kept.push(node);
+      continue;
+    }
+    const children = testsView(node.children, contracts);
+    const count = (list: TreeNode[]): number =>
+      list.reduce((sum, n) => sum + (n.kind === "folder" ? count(n.children) : 1), 0);
+    if (node.requestCount > 0 && children.length === 0) continue;
+    kept.push({ ...node, children, requestCount: count(children) });
+  }
+  return kept;
 }
 
 function envView(wb: FakeWorkbench): EnvironmentsView {
@@ -211,8 +229,11 @@ export function handleWorkbench(
   args: Record<string, unknown>,
 ): unknown {
   switch (cmd) {
-    case "tree_load":
-      return { nodes: buildTree(wb), collapsed: wb.collapsed };
+    case "tree_load": {
+      // Sans contrat (le faux cœur des contrats répond quand il y en a) : tout est au référentiel.
+      const nodes = buildTree(wb);
+      return { nodes, tests: nodes, collapsed: wb.collapsed };
+    }
     case "tree_set_collapsed":
       wb.collapsed = args.collapsed as string[];
       return null;
