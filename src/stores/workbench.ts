@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch, type ComputedRef } from "vue";
 
 import { events, ipc, IpcError } from "@/lib/ipc";
 import { contentKey, useWindowsStore } from "@/stores/windows";
@@ -226,13 +226,40 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     }
   }
 
+  /**
+   * Brouillon sérialisé de chaque requête ouverte. Calculé une fois par modification, quel que
+   * soit le nombre de lecteurs (enregistrement automatique, pastilles des onglets et de l'arbre).
+   */
+  const serialized = new Map<string, ComputedRef<string | null>>();
+
+  function draftText(key: string): string | null {
+    let text = serialized.get(key);
+    if (!text) {
+      text = computed(() => {
+        const draft = editors[key]?.draft;
+        return draft ? JSON.stringify(draft) : null;
+      });
+      serialized.set(key, text);
+    }
+    return text.value;
+  }
+
   function isDirty(key: string): boolean {
     const editor = editors[key];
-    return !!editor?.draft && JSON.stringify(editor.draft) !== editor.saved;
+    // Sans requête ouverte, rien à comparer (ni à mémoriser : une ligne de l'arbre par requête).
+    if (!editor?.draft) return false;
+    return draftText(key) !== editor.saved;
   }
 
   const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const saving = new Map<string, Promise<void>>();
+
+  /** Oublie une requête ouverte : brouillon, texte mémorisé et enregistrement programmé. */
+  function forget(key: string): void {
+    clearSaveTimer(key);
+    serialized.delete(key);
+    Reflect.deleteProperty(editors, key);
+  }
 
   function clearSaveTimer(key: string): void {
     const timer = saveTimers.get(key);
@@ -255,12 +282,15 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     );
   }
 
-  // Toute modification d'un brouillon déclenche son enregistrement automatique.
+  // Toute modification d'un brouillon déclenche son enregistrement automatique : le sien
+  // seulement, pour qu'une frappe dans une requête ne retarde pas celui des autres.
   watch(
-    () => Object.keys(editors).map((key) => `${key}\u0000${JSON.stringify(editors[key]?.draft)}`),
-    () => {
-      for (const key of Object.keys(editors)) {
-        if (isDirty(key)) scheduleSave(key);
+    () => Object.keys(editors).map((key) => [key, draftText(key)] as const),
+    (now, before) => {
+      const previous = new Map(before);
+      for (const [key, text] of now) {
+        if (text === null || text === previous.get(key)) continue;
+        if (text !== editors[key]?.saved) scheduleSave(key);
       }
     },
   );
@@ -273,12 +303,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     const running = saving.get(key);
     if (running) await running.catch(() => undefined);
     const editor = editors[key];
-    if (!editor?.draft || !isDirty(key)) {
+    const snapshot = editor?.draft ? draftText(key) : null;
+    if (!editor || snapshot === null || snapshot === editor.saved) {
       if (editor && editor.saveState !== "error") editor.saveState = "saved";
       return;
     }
     clearSaveTimer(key);
-    const snapshot = JSON.stringify(editor.draft);
     editor.saveState = "saving";
     const write = (async () => {
       try {
@@ -312,8 +342,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
   /** Oublie une requête qui n'est plus ouverte dans aucun onglet de la fenêtre. */
   function release(key: string): void {
     if (isDirty(key)) return;
-    clearSaveTimer(key);
-    Reflect.deleteProperty(editors, key);
+    forget(key);
   }
 
   /** Envoie la requête (E1) ; un environnement protégé demande confirmation (R8). */
@@ -321,11 +350,14 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     const editor = editors[key];
     const environment = editor ? activeEnvironment(editor.projectId) : null;
     if (!editor?.draft || environment === null || editor.sending) return;
-    await save(key);
+    // Marqué dès maintenant : un second envoi demandé pendant l'enregistrement ne part pas.
     editor.sending = true;
     editor.sendError = null;
-    editor.execId = crypto.randomUUID();
     try {
+      // L'envoi part du brouillon (E1) : un enregistrement impossible, signalé par l'éditeur
+      // (« Non enregistré · Réessayer »), ne le bloque pas.
+      await save(key).catch(() => undefined);
+      editor.execId = crypto.randomUUID();
       editor.outcome = await ipc.requestSend(
         editor.projectId,
         editor.execId,
@@ -435,7 +467,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       if (editor.projectId !== projectId) continue;
       if (editor.path !== from && !editor.path.startsWith(`${from}/`)) continue;
       editor.path = `${to}${editor.path.slice(from.length)}`;
-      Reflect.deleteProperty(editors, key);
+      forget(key);
       editors[requestKey(projectId, editor.path)] = editor;
     }
   }
@@ -473,7 +505,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
         editor.projectId === projectId &&
         (editor.path === path || editor.path.startsWith(`${path}/`))
       ) {
-        Reflect.deleteProperty(editors, key);
+        forget(key);
       }
     }
     await refreshTree(projectId);

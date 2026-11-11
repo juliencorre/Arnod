@@ -33,21 +33,35 @@ pub struct Variables {
 }
 
 impl Variables {
-    /// Valeurs secrètes non vides, à masquer partout (R9).
+    /// Valeurs secrètes non vides, à masquer partout (R9), les plus longues
+    /// d'abord : un secret contenu dans un autre ne le découpe pas, ce qui en
+    /// laisserait la fin lisible.
     fn secret_values(&self) -> Vec<&str> {
-        self.secrets
+        let mut values: Vec<&str> = self
+            .secrets
             .iter()
             .filter_map(|name| self.values.get(name))
             .map(String::as_str)
             .filter(|value| !value.is_empty())
-            .collect()
+            .collect();
+        values.sort_by_key(|value| std::cmp::Reverse(value.len()));
+        values
     }
 
     /// Remplace chaque valeur secrète de `text` par `••••` (R9).
     pub fn mask(&self, text: &str) -> String {
-        self.secret_values()
-            .into_iter()
-            .fold(text.to_owned(), |text, secret| text.replace(secret, MASK))
+        self.mask_owned(text.to_owned())
+    }
+
+    /// Comme [`Self::mask`], sans copier un texte où rien n'est à masquer
+    /// (corps d'une réponse, jusqu'à 5 Mo).
+    pub fn mask_owned(&self, mut text: String) -> String {
+        for secret in self.secret_values() {
+            if text.contains(secret) {
+                text = text.replace(secret, MASK);
+            }
+        }
+        text
     }
 }
 
@@ -436,10 +450,23 @@ mod tests {
         let v = vars(&[("token", "s3cret")], &["token"]);
         assert_eq!(v.mask("Bearer s3cret et s3cret"), "Bearer •••• et ••••");
         assert_eq!(v.mask("rien"), "rien");
+        assert_eq!(v.mask_owned("Bearer s3cret".to_owned()), "Bearer ••••");
     }
 
     #[test]
     fn liste_les_noms_de_variables() {
         assert_eq!(variable_names("{{a}}/x/{{ b }}"), ["a", "b"]);
+    }
+
+    #[test]
+    fn un_secret_contenu_dans_un_autre_ne_le_devoile_pas() {
+        let v = vars(
+            &[("court", "abc"), ("long", "abcdef-123")],
+            &["court", "long"],
+        );
+        assert_eq!(
+            v.mask("jeton abcdef-123 puis abc"),
+            format!("jeton {MASK} puis {MASK}")
+        );
     }
 }

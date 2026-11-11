@@ -221,3 +221,49 @@ fn requetes_d_un_dossier_dans_l_ordre_de_l_arborescence() {
     );
     assert_eq!(requests_in(dir.path(), "").unwrap().len(), 3);
 }
+
+#[test]
+fn nom_de_fichier_jamais_reserve_par_windows() {
+    assert_eq!(slug("Con!"), "_con");
+    assert_eq!(slug("nul ?"), "_nul");
+    assert_eq!(slug("Console"), "console");
+    let dir = project();
+    assert_eq!(
+        create_request(dir.path(), "", Some("Con!")).unwrap(),
+        "_con.yml"
+    );
+}
+
+/// Un lien qui ramène à un dossier parent n'est pas suivi : sans cela la
+/// lecture ne finit pas (deux liens doublent l'arbre à chaque niveau).
+#[cfg(unix)]
+#[test]
+fn liens_en_boucle_ignores_liens_externes_suivis() {
+    use std::os::unix::fs::symlink;
+
+    let dir = project();
+    let a = create_folder(dir.path(), "", "a").unwrap();
+    create_request(dir.path(), &a, Some("r1")).unwrap();
+    symlink(dir.path().join("a"), dir.path().join("a/boucle")).unwrap();
+    symlink(dir.path(), dir.path().join("a/racine")).unwrap();
+    // Dossier partagé hors du projet : un lien légitime reste suivi.
+    let shared = tempfile::tempdir().unwrap();
+    create_request(shared.path(), "", Some("commune")).unwrap();
+    symlink(shared.path(), dir.path().join("a/partage")).unwrap();
+
+    let tree = read(dir.path()).unwrap();
+    let TreeNode::Folder {
+        children,
+        request_count,
+        ..
+    } = &tree[0]
+    else {
+        panic!()
+    };
+    assert_eq!(names(children), ["partage", "r1"]);
+    assert_eq!(*request_count, 2);
+    assert_eq!(
+        requests_in(dir.path(), "").unwrap(),
+        ["a/partage/commune.yml", "a/r1.yml"]
+    );
+}

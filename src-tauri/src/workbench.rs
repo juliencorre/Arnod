@@ -5,31 +5,34 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Notify, Semaphore};
+use tokio::sync::Semaphore;
 use uuid::Uuid;
 
 use crate::contract::file as contract_file;
 use crate::environment::{self, Environment};
 use crate::error::{CommandError, CommandErrorKind};
-use crate::http::{self, HttpResponse};
+use crate::http::{self, Cancel, HttpResponse};
 use crate::local::{self, LocalData, LocalVar};
 use crate::request::assertions::{self, AssertionResult, DEFAULT_LIMIT};
 use crate::request::model::{Method, Request};
-use crate::request::{file, inherit};
-
-/// Identifiant du résultat de conformité au contrat d'une requête liée.
-pub const CONTRACT_CHECK: &str = "contrat";
 use crate::request::resolve::{self, Variables};
+use crate::request::{file, inherit};
 use crate::secrets::{self, SecretStore};
 use crate::tree;
 
+/// Identifiant du résultat de conformité au contrat d'une requête liée.
+pub const CONTRACT_CHECK: &str = "contrat";
+
 /// Requêtes envoyées en parallèle pendant un run.
 pub const RUN_CONCURRENCY: usize = 8;
+
+/// Runs terminés gardés en mémoire pour être relus ou relancés (R15) ; les
+/// plus anciens sont oubliés, un run en cours ne l'est jamais.
+pub const MAX_FINISHED_RUNS: usize = 20;
 
 /// Où se trouve un projet : identifiant, dossier et données locales.
 #[derive(Debug, Clone)]
@@ -147,14 +150,13 @@ impl ProjectLastRun {
 
 struct RunHandle {
     view: Mutex<RunView>,
-    cancel: Notify,
-    cancelled: AtomicBool,
+    cancel: Cancel,
 }
 
 /// Exécutions en cours et coffre des secrets.
 pub struct Workbench {
     secrets: Arc<dyn SecretStore>,
-    executions: Mutex<HashMap<Uuid, Arc<Notify>>>,
+    executions: Mutex<HashMap<Uuid, Arc<Cancel>>>,
     runs: Mutex<HashMap<Uuid, Arc<RunHandle>>>,
 }
 
@@ -395,9 +397,9 @@ impl Workbench {
     }
 
     fn mask_response(variables: &Variables, mut response: HttpResponse) -> HttpResponse {
-        response.body = variables.mask(&response.body);
+        response.body = variables.mask_owned(std::mem::take(&mut response.body));
         for (_, value) in &mut response.headers {
-            *value = variables.mask(value);
+            *value = variables.mask_owned(std::mem::take(value));
         }
         response
     }
@@ -427,7 +429,7 @@ impl Workbench {
         let (variables, environment) = self.variables(ctx, env)?;
         Self::check_protected(&environment, &[request.method], confirmed)?;
         let prepared = resolve::prepare(&request, &variables)?;
-        let cancel = Arc::new(Notify::new());
+        let cancel = Arc::new(Cancel::new());
         self.executions
             .lock()
             .map_err(|_| busy())?
@@ -456,7 +458,7 @@ impl Workbench {
             ..Variables::default()
         };
         let prepared = resolve::prepare(request, &variables)?;
-        let cancel = Arc::new(Notify::new());
+        let cancel = Arc::new(Cancel::new());
         self.executions
             .lock()
             .map_err(|_| busy())?
@@ -498,7 +500,7 @@ impl Workbench {
             .ok()
             .and_then(|m| m.get(&exec_id).cloned())
         {
-            cancel.notify_one();
+            cancel.cancel();
         }
     }
 
@@ -599,13 +601,13 @@ impl Workbench {
         };
         let handle = Arc::new(RunHandle {
             view: Mutex::new(view.clone()),
-            cancel: Notify::new(),
-            cancelled: AtomicBool::new(false),
+            cancel: Cancel::new(),
         });
-        self.runs
-            .lock()
-            .map_err(|_| busy())?
-            .insert(view.id, handle.clone());
+        {
+            let mut runs = self.runs.lock().map_err(|_| busy())?;
+            Self::forget_old_runs(&mut runs);
+            runs.insert(view.id, handle.clone());
+        }
         if view.finished {
             Self::save_last_run(ctx, &view);
             return Ok(view);
@@ -615,6 +617,24 @@ impl Workbench {
         // exécutée dans un contexte tokio (commande synchrone, fil principal).
         tauri::async_runtime::spawn(Self::execute(ctx, handle, variables));
         Ok(view)
+    }
+
+    /// Ne garde que les [`MAX_FINISHED_RUNS`] runs terminés les plus récents :
+    /// sans cela, chaque run resterait en mémoire jusqu'à la fermeture d'Arnod.
+    fn forget_old_runs(runs: &mut HashMap<Uuid, Arc<RunHandle>>) {
+        let mut finished: Vec<(u64, Uuid)> = runs
+            .iter()
+            .filter_map(|(id, handle)| {
+                let view = handle.view.lock().ok()?;
+                view.finished.then_some((view.started_at, *id))
+            })
+            .collect();
+        // Place pour le run qui démarre.
+        let excess = (finished.len() + 1).saturating_sub(MAX_FINISHED_RUNS);
+        finished.sort_unstable();
+        for (_, id) in finished.into_iter().take(excess) {
+            runs.remove(&id);
+        }
     }
 
     async fn execute(ctx: ProjectCtx, handle: Arc<RunHandle>, variables: Variables) {
@@ -640,7 +660,7 @@ impl Workbench {
         }
         if let Ok(mut view) = handle.view.lock() {
             view.finished = true;
-            view.cancelled = handle.cancelled.load(Ordering::SeqCst);
+            view.cancelled = handle.cancel.is_cancelled();
             Self::save_last_run(&ctx, &view);
         }
     }
@@ -660,7 +680,7 @@ impl Workbench {
             .ok()
             .and_then(|v| v.items.get(index).map(|i| i.path.clone()))
             .unwrap_or_default();
-        if handle.cancelled.load(Ordering::SeqCst) {
+        if handle.cancel.is_cancelled() {
             Self::update(handle, index, |i| i.status = ItemStatus::Cancelled);
             return;
         }
@@ -735,9 +755,8 @@ impl Workbench {
     }
 
     pub fn cancel_run(&self, run_id: Uuid) -> Result<(), CommandError> {
-        let handle = self.handle(run_id)?;
-        handle.cancelled.store(true, Ordering::SeqCst);
-        handle.cancel.notify_waiters();
+        // Mémorisée : une requête dont l'envoi commence juste après n'est pas envoyée.
+        self.handle(run_id)?.cancel.cancel();
         Ok(())
     }
 
@@ -748,7 +767,14 @@ impl Workbench {
         run_id: Uuid,
         confirmed: bool,
     ) -> Result<RunView, CommandError> {
-        let previous = self.run_status(run_id)?;
+        // Run oublié (redémarrage d'Arnod, runs plus récents) : le dernier run
+        // du projet, gardé sur disque, se relance aussi.
+        let previous = match self.run_status(run_id) {
+            Ok(view) => view,
+            Err(error) => Self::last_run(ctx)
+                .filter(|run| run.id == run_id)
+                .ok_or(error)?,
+        };
         let failed: Vec<String> = previous
             .items
             .iter()

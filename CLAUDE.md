@@ -199,6 +199,12 @@ Linux : installer d'abord les dépendances système
   coffre du système, jamais dans le projet.
 - Une tâche de fond lancée depuis une commande passe par `tauri::async_runtime::spawn` : une
   commande synchrone ne s'exécute pas dans un contexte tokio (`tokio::spawn` y panique).
+- Une annulation (envoi, run) passe par `http::Cancel`, qui la mémorise : un `Notify` seul ne
+  réveille que les envois déjà en attente et laisse partir celui qui commence juste après.
+- Le cœur ne garde en mémoire que les `MAX_FINISHED_RUNS` derniers runs terminés ; relancer les
+  échecs d'un run oublié repart du dernier run du projet, gardé sur disque.
+- Côté interface, l'état « modifié » d'une requête se lit par `workbench.isDirty` (brouillon
+  sérialisé une fois par modification) : ne pas sérialiser un brouillon dans un composant.
 
 ## Projets et workspaces
 
