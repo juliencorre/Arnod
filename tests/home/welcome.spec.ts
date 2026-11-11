@@ -238,7 +238,7 @@ describe("Non classés dans « Tous les projets » (N2, N3)", () => {
     app = await mountApp();
 
     const first = app.get("main tbody tr");
-    expect(first.get("th").text()).toBe("Non classés");
+    expect(first.get(".all__project").text()).toBe("Non classés");
     expect(first.find("th svg").exists()).toBe(true);
     expect(first.attributes("draggable")).toBe("false");
     expect(first.text()).toContain("Hors workspaces");

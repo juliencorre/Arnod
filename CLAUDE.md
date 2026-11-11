@@ -210,7 +210,7 @@ Linux : installer d'abord les dépendances système
 
 Référence : `docs/plan-projets-workspaces.md` (cas d'usage P1 à P12 et W1 à W11, règles R1 à
 R11), révisé par `docs/plan-workspaces-onglets.md` (cas O1 à O12, règles R3, R4, R7, R8, R11 et
-R12) puis par `docs/plan-selecteur-workspace.md` (cas S1 à S8, I1, I2). Cocher une tâche dans le
+R12) puis par `docs/plan-selecteur-workspace.md` (cas S1 à S9, I1, I2). Cocher une tâche dans le
 plan quand elle est livrée.
 
 - « Tous les projets » est le référentiel, proposé en tête du sélecteur de workspace ; ce n'est pas
@@ -218,8 +218,10 @@ plan quand elle est livrée.
   workspaces. Le sélecteur suit l'ordre de création ; `lastWorkspaceId` vaut `null` pour
   « Tous les projets ».
 - Sélecteur (`WorkspaceSwitcher.vue`) : en tête de la colonne de la barre latérale, à la hauteur de
-  `.zone__bar` ; sans barre latérale (tableau, gestion, catalogue, barre détachée), dans une rangée
-  en haut. Plus de rangée d'onglets de workspaces. Son menu (`role="menu"`, `menuitemradio`) porte
+  `.zone__bar` ; sans barre latérale (gestion, catalogue, barre détachée), dans une rangée en haut.
+  « Tous les projets » garde la barre latérale (S9) : on en sort en ouvrant un projet ou par le
+  sélecteur ; hors workspace, sa ligne d'ajout est « + Ouvrir un projet » (dossier existant). Plus
+  de rangée d'onglets de workspaces. Son menu (`role="menu"`, `menuitemradio`) porte
   la création, les actions d'un workspace (« ⋯ », clic droit, Maj+F10 : renommer F2, couleur,
   gérer, supprimer Suppr) et le dépôt d'un projet glissé ; Ctrl+0…9 et Ctrl+Maj+W partout (code de
   la touche, pour l'AZERTY). Tests : aides `tests/switcher.ts`.

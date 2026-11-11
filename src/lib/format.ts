@@ -52,3 +52,22 @@ const dayTimeFormatter = new Intl.DateTimeFormat("fr-FR", {
 export function formatDayTime(timestampMs: number): string {
   return dayTimeFormatter.format(new Date(timestampMs));
 }
+
+/**
+ * Chemin découpé après chaque séparateur (« / » ou « \ »), pour ne le couper qu'entre deux
+ * dossiers : « /home/a/b » donne « / », « home/ », « a/ », « b ».
+ */
+export function pathSegments(path: string): string[] {
+  const segments: string[] = [];
+  let start = 0;
+  for (let index = 0; index < path.length; index++) {
+    const char = path[index];
+    if (char === "/" || char === "\\") {
+      segments.push(path.slice(start, index + 1));
+      start = index + 1;
+    }
+  }
+  // Le dernier dossier, ou le chemin entier s'il n'a pas de séparateur (même vide).
+  if (start < path.length || segments.length === 0) segments.push(path.slice(start));
+  return segments;
+}

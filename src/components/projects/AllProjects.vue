@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /**
- * Onglet épinglé « Tous les projets » (2e, O1) : chaque projet une fois, ses
- * workspaces en pastilles, sa dernière exécution (O12), « Ajouter à… » (P6) et
- * « Oublier » avec « Annuler » (P11) ; dossier introuvable signalé (P10). Une
- * ligne se glisse sur un onglet pour ajouter le projet au workspace (O7). Sans
- * projet : le premier lancement (1a).
+ * « Tous les projets » (2e, 2f, O1) : chaque projet une fois, son dossier sous son nom,
+ * ses workspaces en pastilles, sa dernière exécution (O12), « Ajouter à… » (P6) et
+ * « Oublier » avec « Annuler » (P11) ; dossier introuvable signalé (P10). Le tableau
+ * tient dans la largeur laissée par la barre latérale. Une ligne se glisse sur le
+ * sélecteur pour ajouter le projet au workspace (S6). Sans projet : le premier
+ * lancement (1a).
  */
 import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from "vue";
 
@@ -18,7 +19,7 @@ import SearchInput from "@/components/ui/SearchInput.vue";
 import TrayIcon from "@/components/ui/TrayIcon.vue";
 import { ALL_PROJECTS, useProjectActions } from "@/composables/useProjectActions";
 import { startProjectDrag } from "@/lib/dnd";
-import { formatDayTime } from "@/lib/format";
+import { formatDayTime, pathSegments } from "@/lib/format";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
 import type { ProjectLastRun, ProjectView } from "@/types/ipc";
@@ -108,9 +109,8 @@ onMounted(async () => {
         <thead>
           <tr>
             <th scope="col">Projet</th>
-            <th scope="col">Dossier</th>
             <th scope="col">Workspaces</th>
-            <th scope="col">Dernière exécution</th>
+            <th scope="col">Exécution</th>
             <th scope="col"><span class="visually-hidden">Actions</span></th>
           </tr>
         </thead>
@@ -129,17 +129,17 @@ onMounted(async () => {
             @dragstart="startProjectDrag($event, project.id)"
           >
             <th scope="row" class="all__name">
-              <span v-if="catalog.isInbox(project.id)" class="all__inbox">
-                <TrayIcon />{{ project.name }}
+              <span class="all__project">
+                <TrayIcon v-if="catalog.isInbox(project.id)" />{{ project.name }}
               </span>
-              <template v-else>{{ project.name }}</template>
-            </th>
-            <td>
-              <code class="all__path">{{ project.path }}</code>
+              <code class="all__path"
+                ><template v-for="(part, index) in pathSegments(project.path)" :key="index"
+                  >{{ part }}<wbr /></template
+              ></code>
               <span v-if="project.status === 'missing'" class="all__missing">
                 Dossier introuvable
               </span>
-            </td>
+            </th>
             <td>
               <ul class="chips" aria-label="Workspaces du projet">
                 <li v-for="id in project.workspaceIds" :key="id" class="chip">
@@ -163,9 +163,9 @@ onMounted(async () => {
                 >
                   {{ lastRuns.get(project.id)?.passed }}/{{ lastRuns.get(project.id)?.total }}
                 </span>
-                <span class="all__muted">
-                  · {{ formatDayTime(lastRuns.get(project.id)?.startedAt ?? 0) }}</span
-                >
+                <span class="all__when">
+                  {{ formatDayTime(lastRuns.get(project.id)?.startedAt ?? 0) }}
+                </span>
               </template>
               <span v-else class="all__muted">—</span>
             </td>
@@ -200,7 +200,7 @@ onMounted(async () => {
             </td>
           </tr>
           <tr v-if="rows.length === 0">
-            <td colspan="5" class="all__muted">Aucun projet ne correspond.</td>
+            <td colspan="4" class="all__muted">Aucun projet ne correspond.</td>
           </tr>
         </tbody>
       </table>
@@ -220,11 +220,10 @@ onMounted(async () => {
   background: var(--color-surface);
 }
 
-.all__inbox {
+.all__project {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--color-text);
 }
 
 .all__row--inbox > * {
@@ -236,6 +235,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  min-width: 0;
   padding: 1.75rem 2rem;
 }
 
@@ -267,9 +267,17 @@ onMounted(async () => {
   cursor: grab;
 }
 
+/* La date passe sous le ratio, comme le dossier sous le nom : le tableau reste étroit. */
 .all__run {
-  white-space: nowrap;
   font-size: 0.875rem;
+}
+
+.all__when {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  color: var(--color-muted);
 }
 
 .all__run--ok {
@@ -311,7 +319,7 @@ onMounted(async () => {
 
 .all__table th,
 .all__table td {
-  padding: 0.75rem 1rem;
+  padding: 0.75rem;
   text-align: left;
   vertical-align: middle;
 }
@@ -341,14 +349,23 @@ onMounted(async () => {
   font-weight: 600;
 }
 
+/*
+ * Le dossier se coupe après un séparateur (`pathSegments`) ; sa largeur minimale garde la
+ * colonne lisible quand le tableau se serre.
+ */
 .all__path {
-  font: 0.8125rem var(--font-mono);
+  display: block;
+  min-width: 10rem;
+  margin-top: 0.125rem;
+  font: 400 0.8125rem var(--font-mono);
+  overflow-wrap: anywhere;
   color: var(--color-muted);
 }
 
 .all__missing {
   display: block;
   font-size: 0.8125rem;
+  font-weight: 400;
   color: var(--color-danger);
 }
 
@@ -361,6 +378,7 @@ onMounted(async () => {
   list-style: none;
 }
 
+/* Un nom long ne passe à la ligne que si la colonne manque de place (fenêtre étroite). */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -407,9 +425,5 @@ onMounted(async () => {
   color: var(--color-muted);
   background: none;
   cursor: pointer;
-}
-
-.all__action {
-  white-space: nowrap;
 }
 </style>

@@ -1,6 +1,6 @@
 # Plan - Sélecteur de workspace et icônes des sections
 
-**Version** 0.1 · **Date** 2026-11-10 · **Statut** Livré · **Base** version 0.0.2 + lot « accueil,
+**Version** 0.2 · **Date** 2026-11-11 · **Statut** Livré · **Base** version 0.0.2 + lot « accueil,
 catalogue des étapes et Non classés »
 
 Plan d'implémentation de la solution « b » retenue pour la barre des workspaces : les onglets de
@@ -11,7 +11,8 @@ devant chaque section d'un projet dans la barre latérale.
 
 Source : maquette Claude Design, page « Workspaces » (2a, 2b, 2b bis, 2e) et toutes les pages qui
 montrent la barre de titre (version 165), page « Barre latérale » (icônes des sections, version
-164).
+164). Révision 0.2 : page « Workspaces » écran 2e et page « Premier usage » écran 2 f, qui gardent
+désormais la barre latérale sur « Tous les projets » (S9).
 
 ## 1. Objectif
 
@@ -22,6 +23,8 @@ montrent la barre de titre (version 165), page « Barre latérale » (icônes de
 - liste dans ce sélecteur « Tous les projets » puis les workspaces (couleur, nombre de projets,
   raccourci), et y regroupe la création, le renommage, la couleur, la suppression et la gestion ;
 - accepte qu'on glisse un projet sur le sélecteur pour l'ajouter à un workspace ;
+- garde la barre latérale sur « Tous les projets », pour qu'on en sorte en ouvrant un projet, le
+  tableau tenant dans la largeur restante ;
 - précède chaque section d'un projet (« Requêtes », « Contrats de service ») d'une icône qui dit
   son rôle.
 
@@ -32,7 +35,8 @@ montrent la barre de titre (version 165), page « Barre latérale » (icônes de
 | 2a     | Workspaces              | S1 (sélecteur fermé)           |
 | 2b     | Workspaces              | S2, S3, S5 (sélecteur ouvert)  |
 | 2b bis | Workspaces              | S4 (menu « ⋯ » d'un workspace) |
-| 2e     | Workspaces              | S6 (glisser un projet)         |
+| 2e     | Workspaces              | S6 (glisser un projet), S9     |
+| 2 f    | Premier usage           | S9 (Non classés en tête)       |
 | toutes | barre de titre          | S1, S8 (une rangée de moins)   |
 | 2a     | Barre latérale (icônes) | I1, I2                         |
 
@@ -46,18 +50,19 @@ suppression avec « Annuler »).
 
 ## 4. Cas d'usage
 
-| ID  | Cas d'usage                  | Écrans | Comportement attendu                                                                                                                                                                                                                            | Priorité |
-| --- | ---------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| S1  | Voir le workspace ouvert     | 2a     | En haut de la barre latérale, à la hauteur des onglets de contenu : pastille de couleur (grille pour « Tous les projets »), nom, ▾. Sans barre latérale (tableau, gestion, catalogue, barre détachée) : même sélecteur dans une rangée en haut. | Must     |
-| S2  | Changer de workspace         | 2b     | Clic ou ↓ sur le sélecteur : menu « Tous les projets », puis « Workspaces · N » avec couleur, nombre de projets et Ctrl+1…9 ; l'actuel est coché. Flèches, Début, Fin, Entrée ; Échap rend le focus au sélecteur. Ctrl+0 à Ctrl+9 partout.      | Must     |
-| S3  | Créer un workspace           | 2b     | « + Nouveau workspace » en bas du menu ouvre « Nouveau workspace » sous le sélecteur ; « Créer » ouvre le workspace créé.                                                                                                                       | Must     |
-| S4  | Renommer, couleur, supprimer | 2b bis | « ⋯ » au survol d'un workspace, clic droit, Maj+F10 ou touche Menu : Renommer (F2), Changer la couleur ▸, Gérer les workspaces…, Supprimer (Suppr) avec « Annuler ». Renommer ouvre une fenêtre de saisie ; nom pris : erreur sous le champ.    | Must     |
-| S5  | Gérer les workspaces         | 2b     | « Gérer les workspaces… » (Ctrl+Maj+W) ouvre la gestion sur le workspace ouvert.                                                                                                                                                                | Must     |
-| S6  | Glisser un projet            | 2e     | Une ligne de « Tous les projets » glissée sur le sélecteur l'ouvre ; le workspace survolé s'entoure et « Ajouter à « X » » s'affiche ; le dépôt ajoute le projet et le notifie ; déjà présent, rien n'est ajouté (notification).                | Should   |
-| S7  | Barre latérale détachée      | -      | La fenêtre de la barre détachée porte le même sélecteur ; la fenêtre principale garde le sien.                                                                                                                                                  | Must     |
-| S8  | Hauteur rendue               | toutes | Plus de rangée d'onglets de workspaces : la zone centrale commence en haut de la fenêtre.                                                                                                                                                       | Must     |
-| I1  | Icônes des sections          | 2a     | Dans un projet déplié, « Requêtes » et « Contrats de service » sont des en-têtes précédés d'une icône (requête envoyée, document de contrat), avec leur nombre et « + ».                                                                        | Must     |
-| I2  | Icônes cohérentes            | 2a     | Icônes en trait de 1,4 px sur 16 px, couleur du texte (thème clair et sombre), décoratives (`aria-hidden`) : le nom de la section reste le texte.                                                                                               | Must     |
+| ID  | Cas d'usage                            | Écrans  | Comportement attendu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Priorité |
+| --- | -------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| S1  | Voir le workspace ouvert               | 2a      | En haut de la barre latérale, à la hauteur des onglets de contenu : pastille de couleur (grille pour « Tous les projets »), nom, ▾. Sans barre latérale (gestion, catalogue, barre détachée) : même sélecteur dans une rangée en haut.                                                                                                                                                                                                                                                              | Must     |
+| S2  | Changer de workspace                   | 2b      | Clic ou ↓ sur le sélecteur : menu « Tous les projets », puis « Workspaces · N » avec couleur, nombre de projets et Ctrl+1…9 ; l'actuel est coché. Flèches, Début, Fin, Entrée ; Échap rend le focus au sélecteur. Ctrl+0 à Ctrl+9 partout.                                                                                                                                                                                                                                                          | Must     |
+| S3  | Créer un workspace                     | 2b      | « + Nouveau workspace » en bas du menu ouvre « Nouveau workspace » sous le sélecteur ; « Créer » ouvre le workspace créé.                                                                                                                                                                                                                                                                                                                                                                           | Must     |
+| S4  | Renommer, couleur, supprimer           | 2b bis  | « ⋯ » au survol d'un workspace, clic droit, Maj+F10 ou touche Menu : Renommer (F2), Changer la couleur ▸, Gérer les workspaces…, Supprimer (Suppr) avec « Annuler ». Renommer ouvre une fenêtre de saisie ; nom pris : erreur sous le champ.                                                                                                                                                                                                                                                        | Must     |
+| S5  | Gérer les workspaces                   | 2b      | « Gérer les workspaces… » (Ctrl+Maj+W) ouvre la gestion sur le workspace ouvert.                                                                                                                                                                                                                                                                                                                                                                                                                    | Must     |
+| S6  | Glisser un projet                      | 2e      | Une ligne de « Tous les projets » glissée sur le sélecteur l'ouvre ; le workspace survolé s'entoure et « Ajouter à « X » » s'affiche ; le dépôt ajoute le projet et le notifie ; déjà présent, rien n'est ajouté (notification).                                                                                                                                                                                                                                                                    | Should   |
+| S7  | Barre latérale détachée                | -       | La fenêtre de la barre détachée porte le même sélecteur ; la fenêtre principale garde le sien.                                                                                                                                                                                                                                                                                                                                                                                                      | Must     |
+| S8  | Hauteur rendue                         | toutes  | Plus de rangée d'onglets de workspaces : la zone centrale commence en haut de la fenêtre.                                                                                                                                                                                                                                                                                                                                                                                                           | Must     |
+| S9  | « Tous les projets » et barre latérale | 2e, 2 f | La barre latérale reste, coiffée du sélecteur : « Projets · N », tous les projets repliés (« Non classés » en tête avec son bac, « ! » sur un dossier introuvable), « + Ouvrir un projet » (dossier projet existant), puis le rappel « Ouvrez un projet ici, ou choisissez un workspace dans le sélecteur. ». Le tableau tient dans la largeur restante : le dossier passe sous le nom du projet, « Dernière exécution » devient « Exécution » (la date sous le ratio), aucune information retirée. | Must     |
+| I1  | Icônes des sections                    | 2a      | Dans un projet déplié, « Requêtes » et « Contrats de service » sont des en-têtes précédés d'une icône (requête envoyée, document de contrat), avec leur nombre et « + ».                                                                                                                                                                                                                                                                                                                            | Must     |
+| I2  | Icônes cohérentes                      | 2a      | Icônes en trait de 1,4 px sur 16 px, couleur du texte (thème clair et sombre), décoratives (`aria-hidden`) : le nom de la section reste le texte.                                                                                                                                                                                                                                                                                                                                                   | Must     |
 
 ## 5. Hors périmètre
 
@@ -66,6 +71,9 @@ suppression avec « Annuler »).
   sont prêtes dans `SectionIcon`, les sections viendront avec leurs lots.
 - Les onglets de contenu dans la barre de titre native : Arnod garde la barre du système ; le
   sélecteur s'aligne sur la rangée d'onglets des zones.
+- Le nombre de tests d'un projet replié dans la barre latérale (« 3 tests » sur « Non classés »
+  dans la maquette 2 f) : il demanderait de lire l'arborescence de chaque projet replié ; un
+  projet replié garde sa pastille d'environnement.
 
 ## 6. Architecture
 
@@ -89,8 +97,11 @@ Aucune commande nouvelle.
   (`lib/dnd.ts`), raccourcis globaux Ctrl+0…9 et Ctrl+Maj+W.
 - `NewWorkspacePopover.vue` s'ouvre sous le sélecteur (aligné à gauche).
 - `AppShell.vue` : le sélecteur coiffe la barre latérale (hauteur de `.zone__bar`) ; sans barre
-  latérale, il occupe une rangée en haut de la zone principale. `SidebarWindow.vue` : le sélecteur
-  remplace les onglets compacts.
+  latérale (gestion, catalogue, barre détachée), il occupe une rangée en haut de la zone
+  principale. `SidebarWindow.vue` : le sélecteur remplace les onglets compacts.
+- S9 : `AppShell.vue` garde la barre latérale sur « Tous les projets » ; `AppSidebar.vue` compte
+  les projets, propose « + Ouvrir un projet » hors workspace et le rappel ; `AllProjects.vue`
+  range le dossier sous le nom (colonne « Projet ») et renomme la colonne « Exécution » (date sous le ratio) ; `lib/format.ts` `pathSegments` ne coupe un dossier qu'après un séparateur.
 - `components/ui/SectionIcon.vue` : icônes des sections (celles de la maquette, plus « requêtes »).
   `TreePanel.vue` et `ContractsSection.vue` reçoivent un en-tête de section commun.
 
@@ -113,6 +124,11 @@ Jetons existants seulement (`--color-surface`, `--color-border`, `--color-chip`,
 - [x] **T2** `WorkspaceSwitcher` (S1 à S7) et mise en page (S8) ; Vitest au clavier.
 - [x] **T3** `SectionIcon` et en-têtes de sections (I1, I2) ; Vitest.
 - [x] **T4** Tests adaptés, e2e clair et sombre, `CLAUDE.md`, README.
+
+**Lot B - « Tous les projets » avec barre latérale** (une pull request)
+
+- [x] **T5** Barre latérale sur « Tous les projets » et tableau resserré (S9) ; Vitest, e2e,
+      `CLAUDE.md`.
 
 ## 9. Critères d'acceptation
 

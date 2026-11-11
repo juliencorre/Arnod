@@ -211,7 +211,7 @@ describe("Tous les projets (2e, O1, O12, P6, P8, P10)", () => {
     expect(currentWorkspace(wrapper)).toBe("Tous les projets");
     expect(wrapper.get("main h1").text()).toBe("Tous les projets · 3");
     const rows = wrapper.findAll("tbody tr");
-    expect(rows.map((row) => row.get("th").text())).toEqual([
+    expect(rows.map((row) => row.get(".all__project").text())).toEqual([
       "boutique-tests",
       "auth-sso",
       "notifications",
@@ -220,9 +220,17 @@ describe("Tous les projets (2e, O1, O12, P6, P8, P10)", () => {
       "Mes projets",
       "Boutique",
     ]);
-    expect(rows[1]?.text()).toContain("Dossier introuvable");
+    // Le dossier passe sous le nom du projet, dans la même cellule.
+    expect(rows[0]?.get("th .all__path").text()).toBe(snapshot.projects[0]?.path);
+    expect(rows[1]?.get("th").text()).toContain("Dossier introuvable");
     expect(rows[2]?.text()).toContain("Aucun workspace");
-    expect(rows[0]?.findAll("td")[2]?.text()).toBe("—");
+    expect(wrapper.findAll("thead th").map((th) => th.text())).toEqual([
+      "Projet",
+      "Workspaces",
+      "Exécution",
+      "Actions",
+    ]);
+    expect(rows[0]?.findAll("td")[1]?.text()).toBe("—");
     expect(rows.every((row) => row.attributes("draggable") === "true")).toBe(true);
     expect(wrapper.get("main").text()).toContain("Un projet sans workspace reste ici");
   });
@@ -234,7 +242,7 @@ describe("Tous les projets (2e, O1, O12, P6, P8, P10)", () => {
 
     await wrapper.get('main input[type="search"]').setValue("AUTH");
 
-    expect(wrapper.findAll("tbody th").map((th) => th.text())).toEqual(["auth-sso"]);
+    expect(wrapper.findAll("tbody .all__project").map((name) => name.text())).toEqual(["auth-sso"]);
   });
 
   it("« Ajouter à… » ajoute le projet à un workspace", async () => {
@@ -288,7 +296,9 @@ describe("Tous les projets (2e, O1, O12, P6, P8, P10)", () => {
     await button(toast, "Annuler").trigger("click");
     await flushPromises();
     expect(wrapper.get("main h1").text()).toBe("Tous les projets · 3");
-    expect(wrapper.findAll("tbody th").map((th) => th.text())[0]).toBe("boutique-tests");
+    expect(wrapper.findAll("tbody .all__project").map((name) => name.text())[0]).toBe(
+      "boutique-tests",
+    );
   });
 
   it("« Afficher dans « Tous les projets » » met le projet en évidence (P8)", async () => {
@@ -335,10 +345,11 @@ describe("Tous les projets (2e, O1, O12, P6, P8, P10)", () => {
     wrapper = await mountApp();
     await openAll(wrapper);
 
-    const runs = wrapper.findAll("tbody .all__run").map((cell) => cell.text());
-    expect(runs[0]).toMatch(/^8\/10 · /);
-    expect(wrapper.findAll("tbody .all__run")[0]?.find(".all__run--ko").exists()).toBe(true);
-    expect(runs[1]).toMatch(/^3\/3 · /);
-    expect(runs[2]).toBe("—");
+    const cells = wrapper.findAll("tbody .all__run");
+    // Le ratio, puis la date dessous.
+    expect(cells[0]?.get(".all__run--ko").text()).toBe("8/10");
+    expect(cells[0]?.get(".all__when").text()).toMatch(/^9 nov\./);
+    expect(cells[1]?.get(".all__run--ok").text()).toBe("3/3");
+    expect(cells[2]?.text()).toBe("—");
   });
 });
