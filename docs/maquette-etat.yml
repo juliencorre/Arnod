@@ -1,0 +1,661 @@
+# État de chaque écran de la maquette par rapport au code.
+#
+# Source des pastilles, des fiches et de l'index de la maquette (page 0.1). Une pull request qui
+# livre, modifie ou écarte un écran met ce fichier à jour ; scripts/check-maquette.mjs le vérifie
+# (npm run check et CI). Règles : docs/plan-suivi-maquette.md.
+#
+# Repère d'écran : <code de page>-<lettre>, par exemple 3.2-a2. États : livré, en partie,
+# à faire, variante, remplacé, à décider (référence pour les pages de cadre). Un écart dit en quoi
+# le code diffère de l'écran et quoi aligner : la maquette, le code, ou « à décider ».
+version: 1
+transverses:
+  - texte: "Barre de titre : les écrans dessinent une barre intégrée (logo, sélecteur de workspace, boutons de fenêtre) ; l'application garde la barre du système et place le sélecteur en tête de la barre latérale (plan-selecteur-workspace)."
+    aligner: maquette
+  - texte: "Barre d'état : présente sur tous les écrans (mocks actifs, catalogue, modifications à envoyer, partage) ; absente de l'application."
+    aligner: code
+  - texte: "Vocabulaire : les écrans parlent de « test » et d'« assertion » ; l'application de « requête » et de « vérification » (0.2 : une requête est une étape d'un test)."
+    aligner: maquette
+  - texte: "Environnement : l'application crée « Local » dans chaque projet et dans Non classés ; plusieurs écrans montrent « Aucun environnement » (1.2-d, 2.2-a)."
+    aligner: maquette
+pages:
+  "0.1":
+    nom: "Périmètre et feuille de route"
+    version: Cadre
+    etat: référence
+    developpement: "Tenue à jour à chaque lot fusionné : docs/maquette-etat.yml, index 0.1-b."
+    questions:
+      - "macOS et Linux : les annoncer, et pour quelle version ?"
+      - "Tests de sécurité et de charge : les dessiner ou les sortir du périmètre ?"
+    journal:
+      - "2026-11-12 : Devient l'index de la maquette : état au 12 novembre, index des pages (b), repères (c), correspondance des anciens repères (d)."
+    ecrans:
+      a: { etat: référence }
+      b: { etat: référence }
+      c: { etat: référence }
+      d: { etat: référence }
+  "0.2":
+    nom: "Modèle et vocabulaire"
+    version: Cadre
+    etat: référence
+    developpement: "CLAUDE.md (vocabulaire) ; pas encore de plan « tests et étapes »."
+    liees: ["4.2", "6.3"]
+    journal:
+      - "2026-11 : Décision : plus de suites de tests ; un test est un dossier d'étapes, une campagne joue une sélection de tests."
+      - "2026-11-12 : Encart repris de « Tests et étapes » pour servir à toutes les pages."
+    ecrans: {}
+  "0.3":
+    nom: "Démarrage et erreurs"
+    version: MVP
+    developpement: "Écran d'erreur minimal du socle (App.vue : « Arnod ne peut pas démarrer ») ; pas de plan."
+    liees: ["2.1"]
+    reste: "squelette au démarrage lent (a), issues proposées (b), fichier verrouillé (b bis), détails pour le support (b ter)."
+    journal:
+      - "2026-11-12 : Écrans repris de « Premier usage » (Démarrage → a, Erreur → b, Erreur bis → b bis, Erreur ter → b ter)."
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: en partie, pr: [7] }
+      "b bis": { etat: à faire }
+      "b ter": { etat: à faire }
+  "0.4":
+    nom: "Thème sombre"
+    version: MVP
+    etat: livré
+    developpement: "Socle : jetons de styles.css pour les deux thèmes, contrastes vérifiés (tests/theme.spec.ts)."
+    journal:
+      - "2026-11-09 : Thème clair ou sombre selon Windows, livré avec le premier usage."
+      - "2026-11-12 : Les écrans b et c montrent des pages encore à faire (6.3, 6.7)."
+    ecrans:
+      a: { etat: livré, pr: [4, 27] }
+      b: { etat: à faire }
+      c: { etat: à faire }
+  "1.1":
+    nom: "Workspaces"
+    version: MVP
+    plans:
+      - "plan-projets-workspaces (P1–P12, W1–W11)"
+      - "plan-workspaces-onglets (O1–O12)"
+      - "plan-selecteur-workspace (S1–S9)"
+    liees: ["1.2", "2.2"]
+    journal:
+      - "2026-11-09 : Workspaces en onglets."
+      - "2026-11-10 : Sélecteur de workspace à la place des onglets (PR #36)."
+    ecrans:
+      a:
+        {
+          etat: livré,
+          pr: [9, 27],
+          captures: [03-workspace-boutique],
+          ecart:
+            {
+              texte: "Les cartes de projet n'affichent pas leur nombre de contrats de service.",
+              aligner: code,
+            },
+        }
+      "a bis": { etat: livré, pr: [27] }
+      b: { etat: livré, pr: [36], captures: [02b-selecteur-workspace] }
+      "b bis": { etat: livré, pr: [36], captures: [02b-selecteur-workspace] }
+      c: { etat: livré, pr: [14] }
+      d: { etat: livré, pr: [10], captures: [04-gerer-workspaces] }
+      e:
+        {
+          etat: livré,
+          pr: [10, 11, 39],
+          captures: [05-tous-les-projets],
+          ecart:
+            {
+              texte: "Pas de colonne « Contrats » ; l'application place l'entrée « Essayer une étape » en tête de la page, absente de l'écran.",
+              aligner: à décider,
+            },
+        }
+  "1.2":
+    nom: "Barre latérale du projet"
+    version: MVP
+    plans:
+      - "plan-barre-laterale-projet (B1–B6)"
+      - "plan-requetes-dans-contrats (RC6)"
+      - "plan-selecteur-workspace (I1, I2)"
+    liees: ["3.3", "3.1", "4.1"]
+    reste: "« Plus » et ses sept sections (d bis)."
+    journal:
+      - "2026-11-10 : Option a retenue et livrée (PR #33) ; b et c restent des variantes."
+      - "2026-11-11 : Sections « Contrats de service » puis « Référentiel de tests » (PR #40)."
+      - "2026-11-12 : Page ajoutée à la liste ; écrans repris de « Premier usage » (b → d, b bis → d bis)."
+    ecrans:
+      "0": { etat: remplacé }
+      a: { etat: livré, pr: [33], captures: [03-workspace-boutique] }
+      "a bis": { etat: livré, pr: [33], captures: [08b-menu-environnement] }
+      "a ter": { etat: livré, pr: [33] }
+      b: { etat: variante }
+      c: { etat: variante }
+      d:
+        {
+          etat: en partie,
+          pr: [36, 40],
+          captures: [02-projet-cree],
+          ecart:
+            {
+              texte: "Le projet ouvert montre un texte et « + Nouvelle requête » au lieu des quatre points de départ ; sections vides suivies d'une ligne d'ajout (comme 1.2-a ter) au lieu de sections repliées.",
+              aligner: code,
+            },
+        }
+      "d bis": { etat: à faire }
+  "1.3":
+    nom: "Onglets"
+    version: MVP
+    plans:
+      - "plan-fenetres-zones (onglets des zones)"
+    liees: ["1.4"]
+    reste: "aperçu en italique (a), « +3 » pour les onglets en trop (b), Ctrl+Tab (c)."
+    journal:
+      - "2026-11-12 : Nom aligné sur le contenu (fichier « Récents »)."
+    ecrans:
+      a: { etat: en partie, pr: [27] }
+      b: { etat: à faire }
+      c: { etat: à faire }
+  "1.4":
+    nom: "Fenêtres et zones"
+    version: MVP
+    plans:
+      - "plan-fenetres-zones (F1–F14)"
+      - "plan-resultat-detachable (D1–D7)"
+    liees: ["1.3", "5.1"]
+    reste: "Ctrl+J et Ctrl+\\ (j)."
+    journal:
+      - "2026-11-09 : Fenêtres et zones (PR #27)."
+      - "2026-11-10 : Résultat détachable, écran i (PR #34)."
+    ecrans:
+      a: { etat: livré, pr: [27], captures: [06-zones] }
+      b: { etat: livré, pr: [27], captures: [06-zones] }
+      c: { etat: livré, pr: [27] }
+      d: { etat: livré, pr: [27] }
+      e: { etat: livré, pr: [27], captures: [08-barre-detachee] }
+      "e — survol": { etat: livré, pr: [27] }
+      f: { etat: livré, pr: [27], captures: [07-fenetre-contenu] }
+      g: { etat: livré, pr: [27] }
+      h: { etat: livré, pr: [27] }
+      i:
+        {
+          etat: livré,
+          pr: [34],
+          captures: [13-fenetre-requete, 14-fenetre-resultat, 15-fenetre-barre],
+        }
+      j: { etat: à faire, version: MVP }
+  "1.5":
+    nom: "Recherche"
+    version: Plus tard
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+  "1.6":
+    nom: "Préférences"
+    version: [V1, Plus tard]
+    liees: ["3.4"]
+    journal:
+      - "2026-11-12 : Écrans repris de « Authentification et Préférences » (e, f, f bis)."
+    ecrans:
+      e: { etat: à faire }
+      f: { etat: à faire }
+      "f bis": { etat: à faire, version: V1 }
+  "2.1":
+    nom: "Accueil et premier essai"
+    version: MVP
+    plans:
+      - "plan-accueil-non-classes (A1–A4)"
+      - "plan-workspaces-onglets (O8)"
+    liees: ["2.2", "4.4", "0.3"]
+    reste: "natures autres que REST (a ter à a quinquies), commande cURL collée (a sexies)."
+    journal:
+      - "2026-11-10 : Accueil « Essayer une étape », REST seule (PR #35)."
+      - "2026-11-12 : Ancienne page « Premier usage » : démarrage et erreurs → 0.3, projet créé → 1.2, Non classés → 2.2."
+    ecrans:
+      a: { etat: livré, pr: [8, 35], captures: [01-premier-lancement] }
+      "a bis": { etat: livré, pr: [27] }
+      "a ter": { etat: en partie, pr: [35], captures: [01b-accueil-rest] }
+      "a quater": { etat: en partie, pr: [35] }
+      "a quinquies": { etat: en partie, pr: [35] }
+      "a sexies": { etat: à faire, version: MVP }
+  "2.2":
+    nom: "Non classés"
+    version: MVP
+    plans:
+      - "plan-accueil-non-classes (A5, N1–N5)"
+      - "plan-requetes-dans-contrats (RC8)"
+    liees: ["2.1", "3.1", "3.2"]
+    reste: "transférer au référentiel (b), chemins généralisés (c), ranger dans un projet (d) : lot « Ranger les essais »."
+    questions:
+      - "« Contrats de service » ne décrit que des API : où ranger un essai SQL, Kafka ou batch (section « Systèmes testés » ?)"
+    journal:
+      - "2026-11-10 : Non classés et contrat déduit (PR #35)."
+      - "2026-11-11 : Essais rangés sous leur opération (PR #40)."
+      - "2026-11-12 : Partie 2 de « Premier usage » devenue une page."
+    ecrans:
+      a:
+        {
+          etat: livré,
+          pr: [35, 40],
+          captures: [17-essai-non-classes],
+          ecart:
+            {
+              texte: "Un essai s'ouvre dans l'éditeur complet de requête ; l'écran dessine une vue simplifiée (adresse, « Gardé dans Non classés », assertions proposées à cocher).",
+              aligner: à décider,
+            },
+        }
+      b: { etat: à faire }
+      c: { etat: en partie, pr: [35] }
+      d: { etat: à faire }
+      f: { etat: livré, pr: [35, 39], captures: [18-tous-les-projets-non-classes] }
+  "2.3":
+    nom: "Import"
+    version: [MVP, Plus tard]
+    plans:
+      - "plan-opencollection (S1–S8)"
+      - "plan-projets-workspaces (P12)"
+    liees: ["3.1"]
+    reste: "collections Bruno .bru (a), « Reprendre l'existant » (b) ; Postman et SoapUI plus tard."
+    journal:
+      - "2026-11-09 : Un projet Bruno au format OpenCollection s'ouvre (PR #29)."
+    ecrans:
+      a: { etat: en partie, pr: [11, 29] }
+      b: { etat: à faire }
+      d: { etat: à faire, version: Plus tard }
+      e: { etat: à faire, version: Plus tard }
+  "3.1":
+    nom: "Contrats de service"
+    version: MVP
+    plans:
+      - "plan-contrats-services (C1–C12)"
+      - "plan-requetes-dans-contrats (RC1–RC9)"
+    liees: ["3.2", "2.3", "5.2"]
+    journal:
+      - "2026-11-09 : Contrats OpenAPI, requêtes créées, conformité (PR #28)."
+      - "2026-11-11 : Requêtes rangées sous leur contrat : ressource, opération, requêtes (PR #40)."
+      - "2026-11-12 : Écrans repris de « Contrats de service » (e, f, g) ; a à d forment 3.2."
+    ecrans:
+      e:
+        {
+          etat: livré,
+          pr: [28, 40],
+          captures: [09-contrat],
+          ecart:
+            {
+              texte: "L'écran décrit un contrat écrit dans Arnod (« + Groupe », « + Endpoint », version et description modifiables, colonne Tests) ; l'application montre un fichier OpenAPI (onglets Opérations et Source, « Créer les requêtes » par cases à cocher).",
+              aligner: à décider,
+            },
+        }
+      f: { etat: livré, pr: [28] }
+      g:
+        {
+          etat: livré,
+          pr: [28],
+          captures: [10-run-contrat],
+          ecart:
+            {
+              texte: "Les résultats s'affichent en place dans la vue du contrat (conformes / écarts, détail à droite) ; l'application ouvre un onglet de run (réussi / en échec, résultat par dossier).",
+              aligner: à décider,
+            },
+        }
+  "3.2":
+    nom: "Endpoint"
+    version: MVP
+    plans:
+      - "plan-configuration-endpoint (EP1–EP10)"
+    liees: ["3.1", "4.2", "4.8"]
+    reste: "réponses attendues dans l'arborescence (a3), test transféré au référentiel ou aux templates (b, c, d)."
+    journal:
+      - "2026-11-09 : Configuration d'un endpoint (PR #32)."
+      - "2026-11-12 : Page « Contrats de service » (fichier « Endpoints ») recentrée sur l'endpoint ; e, f, g → 3.1."
+    ecrans:
+      a:
+        {
+          etat: livré,
+          pr: [32],
+          captures: [12-endpoint],
+          ecart:
+            {
+              texte: "L'endpoint porte « + Test » et un onglet « Tests et templates » ; dans l'application l'endpoint est une requête : « Envoyer », onglet Vérifications, « Délier » du contrat.",
+              aligner: maquette,
+            },
+        }
+      a2: { etat: livré, pr: [32], captures: [12-endpoint] }
+      a3: { etat: à faire, version: MVP }
+      b:
+        {
+          etat: en partie,
+          pr: [28],
+          captures: [11-requete-liee],
+          ecart:
+            {
+              texte: "Le test sur un endpoint propose des assertions à cocher et « Test au point ? » ; l'application ouvre l'éditeur de la requête liée, avec ses vérifications et la conformité au contrat vérifiée à chaque envoi.",
+              aligner: à décider,
+            },
+        }
+      c: { etat: à faire }
+      d: { etat: à faire, version: Plus tard }
+  "3.3":
+    nom: "Environnements"
+    version: MVP
+    plans:
+      - "plan-premier-usage (N1–N6)"
+    liees: ["1.2", "3.4"]
+    journal:
+      - "2026-11-09 : Environnements livrés avec le premier usage."
+    ecrans:
+      "0": { etat: livré, pr: [33], captures: [08b-menu-environnement] }
+      a:
+        {
+          etat: livré,
+          pr: [27],
+          captures: [08c-environnements],
+          ecart:
+            {
+              texte: "Dialogue modal avec « Enregistrer », variables partagées et locales en deux listes, ordre par ↑ ↓ ; l'écran dessine un onglet enregistré sur place, un tableau unique avec la portée de chaque variable, l'utilisation et « Copier depuis un autre projet… ».",
+              aligner: à décider,
+            },
+        }
+      b: { etat: livré, pr: [27] }
+      c: { etat: livré, pr: [27] }
+  "3.4":
+    nom: "Authentification"
+    version: [MVP, Plus tard]
+    plans:
+      - "plan-premier-usage (§ 4.2, auth)"
+      - "plan-configuration-endpoint (héritage)"
+    liees: ["3.3", "1.6"]
+    reste: "OAuth 2 par identifiants client (a), cookies (g) ; WS-Security et certificats plus tard (c, d)."
+    journal:
+      - "2026-11-09 : Basic, Bearer, clé d'API et héritage des dossiers."
+      - "2026-11-12 : Préférences (e, f, f bis) → 1.6."
+    ecrans:
+      a: { etat: à faire, version: MVP }
+      b: { etat: livré, pr: [27, 32] }
+      c: { etat: à faire, version: Plus tard }
+      d: { etat: à faire, version: Plus tard }
+      g: { etat: à faire, version: MVP }
+  "3.5":
+    nom: "Mocks"
+    version: Plus tard
+    liees: ["3.1", "1.4"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+      "c bis": { etat: à faire }
+      d: { etat: à faire }
+  "4.1":
+    nom: "Référentiel de tests"
+    version: MVP
+    plans:
+      - "plan-premier-usage (A1–A10)"
+      - "plan-requetes-dans-contrats (R5)"
+      - "plan-fin-premier-usage (ST1–ST4)"
+    liees: ["4.2", "3.1"]
+    reste: "sélection multiple (a quater)."
+    journal:
+      - "2026-11-09 : Arborescence livrée avec le premier usage."
+      - "2026-11-11 : Devient le référentiel : les requêtes liées à un contrat sont rangées sous lui (PR #40)."
+      - "2026-11-12 : Écrans du test (c, c bis, d) → 4.2."
+    ecrans:
+      a: { etat: livré, pr: [27, 40, 42], captures: [19-verification-en-echec] }
+      "a bis": { etat: livré, pr: [27] }
+      "a ter": { etat: livré, pr: [27] }
+      "a quater": { etat: à faire }
+      b: { etat: livré, pr: [27] }
+  "4.2":
+    nom: "Tests et étapes"
+    version: MVP
+    plans:
+      - "plan-premier-usage (B1–B7, V1–V5)"
+      - "plan-fin-premier-usage (VT1–VT4)"
+    liees: ["0.2", "4.1", "4.3"]
+    reste: "verdict du test, arrêt sur échec, valeurs passées d'une étape à l'autre (a, b bis), secret proposé en variable locale (c)."
+    journal:
+      - "2026-11-12 : Encart de vocabulaire → 0.2 ; écrans repris du référentiel (c → b, c bis → b bis, d → c)."
+    ecrans:
+      a: { etat: en partie, pr: [27] }
+      b:
+        {
+          etat: livré,
+          pr: [27, 42],
+          captures: [19-verification-en-echec],
+          ecart:
+            {
+              texte: "Pas d'indication « modifié, pas encore envoyé » ni « Revenir à la version envoyée » ; temps de la réponse sur une ligne au lieu d'un onglet Chronologie.",
+              aligner: code,
+            },
+        }
+      "b bis": { etat: à faire }
+      c: { etat: à faire }
+  "4.3":
+    nom: "Tests en schéma"
+    version: Plus tard
+    liees: ["4.2", "4.4"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      "b bis": { etat: à faire }
+      "b ter": { etat: à faire }
+      "b quater": { etat: à faire }
+      c: { etat: à faire }
+      d: { etat: à faire }
+      e: { etat: à faire }
+      f: { etat: à faire }
+      g: { etat: à faire }
+      h: { etat: à faire }
+      i: { etat: à faire }
+  "4.4":
+    nom: "Catalogue des étapes"
+    version: Plus tard
+    plans:
+      - "plan-accueil-non-classes (K1, K2)"
+      - "etude-catalogue-etapes"
+    liees: ["2.1", "4.3"]
+    reste: "accès par la barre d'état et le sélecteur d'étape (a, b), ajout d'une nature à version fixée (d)."
+    journal:
+      - "2026-11-10 : Catalogue en lecture seule, REST intégrée (PR #35)."
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c:
+        {
+          etat: en partie,
+          pr: [35],
+          captures: [16-catalogue-etapes],
+          ecart:
+            {
+              texte: "Catalogue en page pleine (« ← Retour ») avec la fiche de la nature à droite ; l'écran le dessine en onglet du projet.",
+              aligner: à décider,
+            },
+        }
+      d: { etat: en partie, pr: [35], captures: [16-catalogue-etapes] }
+  "4.5":
+    nom: "Protocoles"
+    version: Plus tard
+    liees: ["4.2"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+  "4.6":
+    nom: "Étapes manuelles"
+    version: Plus tard
+    liees: ["4.2", "6.3", "5.3"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+  "4.7":
+    nom: "Jeux de données"
+    version: Plus tard
+    liees: ["4.2", "5.2"]
+    ecrans:
+      a: { etat: à faire }
+      "a bis": { etat: à faire }
+      b: { etat: à faire }
+      "b bis": { etat: à faire }
+      c: { etat: à faire }
+      "c bis": { etat: à faire }
+  "4.8":
+    nom: "Templates"
+    version: Plus tard
+    liees: ["3.2", "4.2"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+      d: { etat: à faire }
+  "4.9":
+    nom: "Étiquettes"
+    version: [MVP, Plus tard]
+    plans:
+      - "plan-configuration-endpoint (étiquettes)"
+    liees: ["4.1", "6.3", "5.3"]
+    reste: "filtrer, composer une campagne, ligne de commande (b, c, d)."
+    journal:
+      - "2026-11-09 : Étiquettes libres d'une requête (PR #32)."
+    ecrans:
+      a: { etat: en partie, pr: [32] }
+      b: { etat: à faire, version: Plus tard }
+      c: { etat: à faire, version: Plus tard }
+      d: { etat: à faire, version: Plus tard }
+  "5.1":
+    nom: "Envoi et réponse"
+    version: [MVP, V1]
+    plans:
+      - "plan-premier-usage (X1–X5)"
+    liees: ["5.2", "1.4"]
+    reste: "format, aperçu et filtre (b bis), variables inconnues (b ter), édition en texte et cURL (b quater), chronologie détaillée DNS, connexion, TLS (c) ; historique en V1 (c bis)."
+    journal:
+      - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
+      - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
+    ecrans:
+      a: { etat: livré, pr: [27] }
+      b: { etat: livré, pr: [27, 42], captures: [19-verification-en-echec] }
+      "b bis": { etat: à faire, version: MVP }
+      "b ter": { etat: à faire, version: MVP }
+      "b quater": { etat: à faire, version: MVP }
+      c: { etat: en partie, pr: [27] }
+      "c bis": { etat: à faire, version: V1 }
+  "5.2":
+    nom: "Exécution d'un dossier"
+    version: MVP
+    plans:
+      - "plan-premier-usage (L1–L7)"
+      - "plan-contrats-services (C10)"
+      - "plan-resultat-detachable (D7)"
+      - "plan-fin-premier-usage (RU1–RU6)"
+    liees: ["5.1", "6.3", "5.3"]
+    journal:
+      - "2026-11-09 : Run d'un dossier, d'un projet ou d'un contrat ; relancer les échecs."
+      - "2026-11-12 : Écrans repris de « Exécution » (d, e, f)."
+    ecrans:
+      d: { etat: livré, pr: [27, 42] }
+      e: { etat: livré, pr: [27, 42], captures: [20-run-dossier] }
+      f:
+        {
+          etat: livré,
+          pr: [27, 42],
+          captures: [20-run-dossier],
+          ecart:
+            {
+              texte: "L'encadré « Le projet garde la dernière exécution » est remplacé par « Résultat par dossier » ; regroupement par dossier ajouté.",
+              aligner: maquette,
+            },
+        }
+  "5.3":
+    nom: "Ligne de commande"
+    version: Plus tard
+    liees: ["5.2", "4.9"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+      d: { etat: à faire }
+  "6.1":
+    nom: "Produits et versions"
+    version: Plus tard
+    liees: ["6.2", "6.3"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+  "6.2":
+    nom: "Exigences"
+    version: Plus tard
+    liees: ["6.1", "6.6", "4.2"]
+    ecrans:
+      a: { etat: à faire }
+      "a bis": { etat: à faire }
+      "a ter": { etat: à faire }
+      b: { etat: à faire }
+      "b bis": { etat: à faire }
+      "b ter": { etat: à faire }
+      "b quater": { etat: à faire }
+      "b quinquies": { etat: à faire }
+      c: { etat: à faire }
+      d: { etat: à faire }
+  "6.3":
+    nom: "Campagnes"
+    version: Plus tard
+    liees: ["6.1", "6.5", "5.2"]
+    journal:
+      - "2026-11-12 : Écran « Depuis une campagne » repris de « Exécution » (g → f)."
+    ecrans:
+      "0": { etat: à faire }
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+      d: { etat: à faire }
+      e: { etat: à faire }
+      f: { etat: à faire }
+  "6.4":
+    nom: "Anomalies"
+    version: Plus tard
+    liees: ["6.3", "6.7"]
+    ecrans:
+      a: { etat: à faire }
+      "a bis": { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+      d: { etat: à faire }
+      e: { etat: à faire }
+      f: { etat: à faire }
+  "6.5":
+    nom: "Critères de sortie et PV"
+    version: Plus tard
+    liees: ["6.3", "6.4"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      "b bis": { etat: à faire }
+      c: { etat: à faire }
+      d: { etat: à faire }
+      e: { etat: à faire }
+  "6.6":
+    nom: "Impact des changements"
+    version: Plus tard
+    liees: ["6.2", "3.1"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+      d: { etat: à faire }
+      e: { etat: à faire }
+  "6.7":
+    nom: "Tableau de bord"
+    version: Plus tard
+    liees: ["6.3", "6.2", "6.4"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+      d: { etat: à faire }
+  "7.1":
+    nom: "Synchronisation"
+    version: Plus tard
+    liees: ["3.3"]
+    ecrans:
+      a: { etat: à faire }
+      b: { etat: à faire }
+      c: { etat: à faire }
+      d: { etat: à faire }
+      e: { etat: à faire }

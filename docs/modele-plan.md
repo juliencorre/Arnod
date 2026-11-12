@@ -5,13 +5,16 @@
 > **Mode d'emploi.** Copier ce fichier en `docs/plan-{sujet}.md`, remplir chaque section et
 > retirer les indications entre accolades. Lister les questions ouvertes au § 11 et les trancher
 > avant la première tâche. Pendant le travail : un lot = une pull request, une tâche cochée dès
-> qu'elle est livrée, `CLAUDE.md` (« Travail en cours ») pointe vers ce plan. Modèle tiré de
+> qu'elle est livrée, `CLAUDE.md` (« Travail en cours ») pointe vers ce plan, chaque écran livré
+> ou écarté est reporté dans `docs/maquette-etat.yml`. Modèle tiré de
 > [`plan-projets-workspaces.md`](plan-projets-workspaces.md), à consulter comme exemple.
 
 Plan d'implémentation de {cas d'usage}. Il part de la version {x.y.z} et respecte les règles de
 [`CLAUDE.md`](../CLAUDE.md).
 
-Source : {maquette, PRD, demande}. Les écrans sont capturés dans [`docs/maquettes/`](maquettes/).
+Source : {maquette, PRD, demande}. Les écrans sont cités par leur repère de maquette (`3.2-a2` :
+code de page et lettre, voir [`plan-suivi-maquette.md`](plan-suivi-maquette.md)) et capturés dans
+[`docs/maquettes/`](maquettes/).
 
 ## 1. Objectif
 
@@ -22,9 +25,9 @@ Source : {maquette, PRD, demande}. Les écrans sont capturés dans [`docs/maquet
 
 ## 2. Maquettes
 
-| Écran | Capture                   | Dans ce plan           |
-| ----- | ------------------------- | ---------------------- |
-| {id}  | `maquettes/{fichier}.png` | {cas d'usage couverts} |
+| Repère   | Capture                   | Dans ce plan           |
+| -------- | ------------------------- | ---------------------- |
+| {3.2-a2} | `maquettes/{fichier}.png` | {cas d'usage couverts} |
 
 ## 3. Modèle et règles
 

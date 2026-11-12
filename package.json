@@ -21,7 +21,7 @@
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "build:e2e": "tauri build --debug --no-bundle",
-    "check": "node scripts/check-version.mjs && npm run format:check && npm run lint && npm run typecheck && npm test && npm run check:rust",
+    "check": "node scripts/check-version.mjs && node scripts/check-maquette.mjs && npm run format:check && npm run lint && npm run typecheck && npm test && npm run check:rust",
     "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml --locked"
   },
   "dependencies": {
@@ -44,6 +44,7 @@
     "vite": "^8.3.6",
     "vitest": "^5.1.0",
     "vue-tsc": "^3.3.14",
-    "webdriverio": "^10.2.0"
+    "webdriverio": "^10.2.0",
+    "yaml": "^2.9.1"
   }
 }

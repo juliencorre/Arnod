@@ -12,7 +12,7 @@ Exemple : « feat: gestion des workspaces (lot F) ».
 
 <!--
 Plan de référence (docs/…), lot, tâches livrées (T…), cas d'usage (P…, W…) et règles (R…)
-concernés. Issue liée : « Closes #… ».
+concernés, repères des écrans de la maquette (3.2-a2…). Issue liée : « Closes #… ».
 -->
 
 ## Vérifications
@@ -20,6 +20,7 @@ concernés. Issue liée : « Closes #… ».
 - [ ] `npm run check` passe (format, lint, typecheck, Vitest, `cargo fmt`, clippy, `cargo test`)
 - [ ] Tests e2e étendus si le changement est visible (`e2e/`)
 - [ ] Tâches cochées dans le plan ; `CLAUDE.md` et README à jour si besoin
+- [ ] `docs/maquette-etat.yml` à jour : écrans livrés (repère, PR, captures) et écarts avec la maquette
 - [ ] Aucun nouveau plugin ni nouvelle permission Tauri, ou décision notée dans le plan
 
 ## Captures

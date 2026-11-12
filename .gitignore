@@ -20,3 +20,5 @@ coverage
 
 # Tests e2e : captures et journaux
 e2e/artifacts
+# Pages de la maquette lues et régénérées par scripts/maquette-sync.py
+.maquette/
