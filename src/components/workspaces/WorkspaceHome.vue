@@ -141,7 +141,7 @@ function cancelRename(): void {
 
 .workspace-home__label {
   margin: 0;
-  font: 600 0.6875rem / 1.4 var(--font-mono);
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-muted);
@@ -152,8 +152,8 @@ function cancelRename(): void {
   align-items: center;
   gap: 0.625rem;
   margin: 0;
-  font-size: 1.75rem;
-  font-weight: 650;
+  font-size: var(--text-display);
+  font-weight: 600;
 }
 
 .workspace-home__summary {
@@ -176,9 +176,9 @@ function cancelRename(): void {
 .rename__input {
   padding: 0.375rem 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 1.25rem;
+  font-size: var(--text-display);
   font-weight: 600;
   color: var(--color-text);
   background: var(--color-surface);
@@ -191,7 +191,7 @@ function cancelRename(): void {
 .rename__error {
   flex-basis: 100%;
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-danger);
 }
 
@@ -210,7 +210,7 @@ function cancelRename(): void {
   min-height: 7rem;
   padding: 1rem;
   border: 1px dashed var(--color-border-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   font: inherit;
   color: var(--color-muted);
   background: none;
@@ -232,6 +232,6 @@ function cancelRename(): void {
 }
 
 .add-card__text {
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 </style>

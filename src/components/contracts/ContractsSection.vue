@@ -523,7 +523,7 @@ async function rename(name: string): Promise<void> {
   height: 1.625rem;
   padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: none;
   cursor: pointer;
 }
@@ -548,7 +548,7 @@ async function rename(name: string): Promise<void> {
 .crow__main:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -2px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .contracts__list,
@@ -567,10 +567,10 @@ async function rename(name: string): Promise<void> {
   min-height: 1.75rem;
   padding: 0 var(--tree-pad) 0 calc(var(--tree-pad) + var(--tree-indent));
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: var(--text-body);
+  font-weight: 400;
   text-align: left;
   color: var(--color-link);
   background: none;
@@ -592,7 +592,7 @@ async function rename(name: string): Promise<void> {
   display: flex;
   align-items: center;
   padding-left: calc(var(--tree-pad) + var(--tree-indent));
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .contract-row:hover,
@@ -611,7 +611,7 @@ async function rename(name: string): Promise<void> {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
@@ -625,7 +625,7 @@ async function rename(name: string): Promise<void> {
   padding: 0 0.375rem 0 0;
   border: none;
   font: inherit;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   text-align: center;
   color: var(--color-muted);
   background: none;
@@ -635,7 +635,7 @@ async function rename(name: string): Promise<void> {
 .contract-row__badge {
   flex: none;
   width: calc(var(--tree-lead) - var(--tree-indent));
-  font: 700 0.6875rem var(--font-mono);
+  font: 700 var(--text-caption) var(--font-mono);
   color: var(--color-link);
 }
 
@@ -647,7 +647,7 @@ async function rename(name: string): Promise<void> {
 
 .contract-row__version {
   margin-left: auto;
-  font: 0.6875rem var(--font-mono);
+  font: var(--text-caption) var(--font-mono);
   color: var(--color-muted);
 }
 
@@ -670,7 +670,7 @@ async function rename(name: string): Promise<void> {
   align-items: center;
   padding-left: calc(var(--tree-pad) + var(--tree-indent) * var(--depth));
   padding-right: 0.5rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .crow:hover,
@@ -685,7 +685,7 @@ async function rename(name: string): Promise<void> {
   padding: 0;
   border: none;
   font: inherit;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   text-align: center;
   color: var(--color-muted);
   background: none;
@@ -703,7 +703,7 @@ async function rename(name: string): Promise<void> {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
@@ -728,7 +728,7 @@ async function rename(name: string): Promise<void> {
 
 .crow__chevron {
   width: 0.875rem;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   text-align: center;
   color: var(--color-muted);
 }
@@ -755,14 +755,14 @@ async function rename(name: string): Promise<void> {
 
 .crow__count {
   margin-left: auto;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
 .crow__hint {
   margin-left: auto;
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: var(--text-small);
+  font-weight: 400;
   color: var(--color-link);
   opacity: 0;
 }
@@ -773,7 +773,7 @@ async function rename(name: string): Promise<void> {
 }
 
 .crow__method {
-  font: 700 0.6875rem var(--font-mono);
+  font: 700 var(--text-caption) var(--font-mono);
   color: var(--color-muted);
 }
 

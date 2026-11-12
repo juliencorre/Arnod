@@ -20,7 +20,7 @@ withDefaults(defineProps<{ name: string; family: StepFamily; size?: "sm" | "md" 
   align-items: center;
   box-sizing: border-box;
   border: 1px solid var(--pill-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-family: var(--font-mono);
   font-weight: 600;
   white-space: nowrap;
@@ -31,13 +31,13 @@ withDefaults(defineProps<{ name: string; family: StepFamily; size?: "sm" | "md" 
 .pill--sm {
   height: 1.25rem;
   padding: 0 0.5rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-caption);
 }
 
 .pill--md {
   height: 1.5rem;
   padding: 0 0.5625rem;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
 }
 
 .pill--calls {

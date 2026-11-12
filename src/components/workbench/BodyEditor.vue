@@ -146,13 +146,15 @@ function select(index: number): void {
 .body__type,
 .body__name input,
 .body__content {
-  padding: 0.4375rem 0.625rem;
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-text);
-  background: var(--color-surface);
+  background-color: var(--color-surface);
 }
 
 .body__variants {
@@ -165,18 +167,19 @@ function select(index: number): void {
 
 .body__variant,
 .body__action {
-  padding: 0.3125rem 0.75rem;
+  min-height: var(--control-sm);
+  padding: 0 0.75rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   background: var(--color-surface);
   cursor: pointer;
 }
 
 .body__action {
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .body__variant[aria-pressed="true"] {
@@ -190,7 +193,7 @@ function select(index: number): void {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -201,13 +204,13 @@ function select(index: number): void {
 
 .body__content {
   min-height: 11rem;
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   resize: vertical;
 }
 
 .hint {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -223,5 +226,10 @@ function select(index: number): void {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* La flèche de la liste déroulante garde sa place (styles.css). */
+.body__type {
+  padding-right: 1.75rem;
 }
 </style>

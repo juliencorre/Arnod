@@ -100,7 +100,7 @@ function hasRequest(zone: (typeof windows.zones)[number], wanted: string): boole
 
 .result-tab__method {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 700;
   color: var(--color-success);
 }
@@ -120,7 +120,7 @@ function hasRequest(zone: (typeof windows.zones)[number], wanted: string): boole
 }
 
 .result-tab__where {
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 

@@ -216,7 +216,7 @@ onMounted(async () => {
 .all__try {
   padding: 0.875rem 1rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 
@@ -253,12 +253,12 @@ onMounted(async () => {
 
 .all__title {
   margin: 0 0 0.25rem;
-  font-size: 1.5rem;
-  font-weight: 650;
+  font-size: var(--text-display);
+  font-weight: 600;
 }
 
 .all__count {
-  font-size: 1rem;
+  font-size: var(--text-body-large);
   font-weight: 400;
   color: var(--color-muted);
 }
@@ -269,24 +269,24 @@ onMounted(async () => {
 
 /* La date passe sous le ratio, comme le dossier sous le nom : le tableau reste étroit. */
 .all__run {
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .all__when {
   display: block;
   margin-top: 0.125rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   white-space: nowrap;
   color: var(--color-muted);
 }
 
 .all__run--ok {
-  font: 600 0.875rem var(--font-mono);
+  font: 600 var(--text-body) var(--font-mono);
   color: var(--color-success);
 }
 
 .all__run--ko {
-  font: 600 0.875rem var(--font-mono);
+  font: 600 var(--text-body) var(--font-mono);
   color: var(--color-danger);
 }
 
@@ -308,7 +308,7 @@ onMounted(async () => {
 
 .all__table-wrap {
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 
@@ -325,7 +325,7 @@ onMounted(async () => {
 }
 
 .all__table thead th {
-  font: 600 0.6875rem / 1.4 var(--font-mono);
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-muted);
@@ -357,14 +357,14 @@ onMounted(async () => {
   display: block;
   min-width: 10rem;
   margin-top: 0.125rem;
-  font: 400 0.8125rem var(--font-mono);
+  font: 400 var(--text-body) var(--font-mono);
   overflow-wrap: anywhere;
   color: var(--color-muted);
 }
 
 .all__missing {
   display: block;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 400;
   color: var(--color-danger);
 }
@@ -385,13 +385,13 @@ onMounted(async () => {
   gap: 0.375rem;
   padding: 0.125rem 0.625rem;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
-  font-size: 0.8125rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-body);
 }
 
 .all__muted {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -402,7 +402,7 @@ onMounted(async () => {
 .all__add {
   padding: 0.25rem 0.5rem;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
   font-weight: 600;
   white-space: nowrap;
@@ -419,7 +419,7 @@ onMounted(async () => {
 .all__forget {
   padding: 0.25rem 0.5rem;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
   white-space: nowrap;
   color: var(--color-muted);

@@ -123,9 +123,9 @@ defineExpose({ manage });
   min-width: 0;
   padding: 0.1875rem 0.5rem;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 600;
   color: var(--color-text);
   background: var(--color-chip);
@@ -145,8 +145,8 @@ defineExpose({ manage });
 
 .chip--compact {
   padding: 0.125rem 0.375rem;
-  font-size: 0.6875rem;
-  font-weight: 500;
+  font-size: var(--text-caption);
+  font-weight: 400;
   color: var(--color-muted);
 }
 
@@ -154,7 +154,7 @@ defineExpose({ manage });
   flex: none;
   width: 0.5rem;
   height: 0.5rem;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .chip__name {

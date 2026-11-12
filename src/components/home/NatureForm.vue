@@ -119,7 +119,7 @@ const origin = computed(() => {
   gap: 0.75rem;
   padding: 0.875rem 1rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 
@@ -130,7 +130,7 @@ const origin = computed(() => {
 }
 
 .nature-form__title {
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -152,12 +152,12 @@ const origin = computed(() => {
 }
 
 .nature-form__label {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
 .nature-form__hint {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
@@ -166,9 +166,9 @@ const origin = computed(() => {
   width: 100%;
   padding: 0.4375rem 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   background: var(--color-surface);
 }
@@ -186,7 +186,7 @@ const origin = computed(() => {
   margin: 0;
   padding-top: 0.625rem;
   border-top: 1px solid var(--color-border);
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
@@ -196,7 +196,7 @@ const origin = computed(() => {
   width: max-content;
   max-width: 100%;
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-surface);
 }
@@ -205,7 +205,7 @@ const origin = computed(() => {
   padding: 0.375rem 0.75rem;
   border: 0;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   background: none;
   cursor: pointer;

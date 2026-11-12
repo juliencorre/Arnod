@@ -80,8 +80,8 @@ async function onSelect(id: string): Promise<void> {
   width: 2rem;
   height: 2rem;
   border: 1px solid transparent;
-  border-radius: 6px;
-  font-size: 1.125rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-title);
   line-height: 1;
   color: var(--color-muted);
   background: none;

@@ -25,8 +25,9 @@ classés »), puis sélecteur de workspace et icônes des sections selon
 leur contrat selon `docs/plan-requetes-dans-contrats.md` (sections « Contrats de services » et
 « Barre latérale du projet »), puis fin du premier usage selon `docs/plan-fin-premier-usage.md`
 (section « Run et statuts »), puis suivi de la maquette selon `docs/plan-suivi-maquette.md`
-(section « Maquette et état des écrans »). Un nouveau lot commence par un plan rédigé à partir de
-`docs/modele-plan.md`.
+(section « Maquette et état des écrans »), puis qualité visuelle de l'interface selon
+`docs/plan-qualite-interface.md` (échelles du design system appliquées au code et à la maquette).
+Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
 ## Architecture
 
@@ -136,8 +137,8 @@ docs/                   Plans, modèle de plan, maquettes, captures du README, s
                         OpenCollection 1.0.0 (docs/opencollection/), design system
                         (docs/design-system/)
 scripts/                Mesure de taille, concordance des versions, tests de fumée (CI), état de
-                        la maquette (check-maquette.mjs, maquette-sync.py), design system
-                        (design-system.mjs)
+                        la maquette (check-maquette.mjs, maquette-sync.py, maquette-couleurs.py),
+                        design system (design-system.mjs)
 .github/                Modèles d'issue et de pull request, Dependabot
   workflows/            CI de build Windows et Linux, contrôle des titres de pull request
 ```
@@ -174,6 +175,12 @@ Linux : installer d'abord les dépendances système
   `ColorDot`, `SectionHeading` et `SectionIcon` pour les sections de la barre latérale) ;
   navigation par le store `navigation` (pas de routeur) ; notifications par le store `toasts`.
   Chaque composant interactif est testé au clavier.
+- Échelles (`docs/plan-qualite-interface.md`, R1 à R8) : tailles de texte, rayons et hauteurs de
+  contrôle viennent des variables `--text-*`, `--radius-*` et `--control-*` de `src/styles.css`,
+  jamais d'une valeur écrite dans un composant (sauf les glyphes ▾ ● ×). Texte à 13 px par
+  défaut, graisses 400 et 600, un seul bouton plein par vue (`BaseButton` `primary`). Une liste
+  déroulante ou une case à cocher garde l'habillage de `styles.css` ; un composant qui change le
+  fond d'une liste écrit `background-color`, pas `background`.
 - ESLint (`vueTsConfigs.strictTypeChecked`) et Prettier sans erreur. Imports de types
   avec `import type`. Alias `@/` pour `src/`.
 - Rust : `cargo fmt` et `cargo clippy -D warnings` sans avertissement. Pas de `unwrap()`
@@ -258,8 +265,9 @@ Référence : `docs/plan-suivi-maquette.md` (règles R1 à R9).
   visible gagne une capture e2e. La maquette est régénérée depuis le fichier après fusion
   (`scripts/maquette-sync.py`, toutes les pages ou celles dont on donne le code).
 - Design system « Arnod » (`docs/design-system/`, publié sur claude.ai) : référence des couleurs,
-  typographie, espacements, rayons et composants pour la maquette et le code. Couleurs : le code
-  fait foi ; tailles de texte et rayons : l'échelle du design system (11 à 24 px ; 2, 6, 10 px).
+  typographie, espacements, hauteurs, rayons et composants pour la maquette et le code. Les
+  couleurs et les échelles (texte, rayons, hauteurs) sont lues dans `src/styles.css`.
+  `scripts/maquette-couleurs.py` aligne le bouton principal et les teintes proches des écrans.
   `scripts/design-system.mjs` en génère les jetons, les styles des composants et les icônes
   depuis le code ; `npm run check` échoue s'il n'est pas à jour. README, guides et aperçus des
   composants s'écrivent à la main. La page 0.5 de la maquette est générée depuis ce dossier.

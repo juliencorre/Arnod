@@ -50,7 +50,7 @@ const labelId = useId();
   height: 1.25rem;
   padding: 0;
   border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-chip);
   cursor: inherit;
   transition: background-color 120ms ease;

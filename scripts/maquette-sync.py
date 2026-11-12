@@ -64,8 +64,8 @@ PILL = f"flex:none;font:600 11px {MONO};padding:2px 7px;border-radius:999px;whit
 STYLES = {
     "livré": ("Livré", "background:#e3f1e7;color:#2f7a4b"),
     "en partie": ("En partie", "background:#fbeedd;color:#9a5a0c"),
-    "à faire": ("À faire", "background:#efebe4;color:#6f695f"),
-    "variante": ("Variante", "background:#fff;color:#6f695f;border:1px dashed #a8a196;padding:1px 6px"),
+    "à faire": ("À faire", "background:#efebe4;color:#6b665e"),
+    "variante": ("Variante", "background:#fff;color:#6b665e;border:1px dashed #a8a196;padding:1px 6px"),
     "remplacé": ("Remplacé", "background:#f6e3df;color:#a03a2a"),
     "à décider": ("À décider", "background:#e4ecf7;color:#2b5a9a"),
     "référence": ("Référence", "background:#fff;color:#4a463f;border:1px solid #cfc9bf;padding:1px 6px"),
@@ -146,14 +146,14 @@ def cell(label: str, body: str, last: bool = False) -> str:
 def fiche(code: str, page) -> str:
     state = page_state(page)
     etat = (f'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">{pill(state)}'
-            f'<span style="font-size:12px;color:#6f695f">au {TODAY}</span></div>')
+            f'<span style="font-size:12px;color:#6b665e">au {TODAY}</span></div>')
     if page.get("reste") and state != "livré":
         etat += f'<div style="margin-top:4px;color:#9a5a0c"><b style="font-weight:600">Reste :</b> {esc(page["reste"])}</div>'
     dev = list(page.get("plans") or [])
     if page.get("developpement"):
         dev.append(page["developpement"])
     dev_html = (f'<span style="font:12px/1.5 {MONO};color:#4a463f">{esc(" · ".join(dev) or "—")}</span>'
-                f'<div style="margin-top:6px;font-size:12px;color:#6f695f">État tiré de docs/maquette-etat.yml ({esc(SOURCE)}).</div>')
+                f'<div style="margin-top:6px;font-size:12px;color:#6b665e">État tiré de docs/maquette-etat.yml ({esc(SOURCE)}).</div>')
     liees = " · ".join(f"{c} {name_of(c)}" for c in page.get("liees") or []) or "—"
     questions = page.get("questions") or []
     q_html = "<br>".join(esc(x) for x in questions) or "—"
@@ -182,7 +182,7 @@ def fiche(code: str, page) -> str:
     if not any(t.startswith("État et écarts tirés") for _, t in entries):
         entries.append(sync_entry)
     jl = "".join(
-        f'<li style="margin:0;padding:0"><span style="font:12px {MONO};color:#6f695f">{esc(d)}</span> — {esc(t)}</li>'
+        f'<li style="margin:0;padding:0"><span style="font:12px {MONO};color:#6b665e">{esc(d)}</span> — {esc(t)}</li>'
         for d, t in entries)
     return (
         f'<div aria-label="Fiche de la page {code}" style="max-width:1280px;margin:0 0 28px;border:1px solid #e2ddd4;'
@@ -225,7 +225,7 @@ def screen(block: str, code: str, letter: str, e: dict) -> str:
         imgs = "".join(
             f'<figure style="margin:0;display:flex;flex-direction:column;gap:4px"><img src="reel/{c}.png" '
             f'alt="Application réelle : {esc(c)}" style="display:block;width:100%;max-width:1280px;border:1px solid #d6d0c6;border-radius:8px">'
-            f'<figcaption style="font:12px {MONO};color:#6f695f">e2e/artifacts/{esc(c)}</figcaption></figure>' for c in caps)
+            f'<figcaption style="font:12px {MONO};color:#6b665e">e2e/artifacts/{esc(c)}</figcaption></figure>' for c in caps)
         det = (f'<details data-arnod="reel" style="max-width:1280px;font-size:13px;color:#4a463f">'
                f'<summary style="cursor:pointer;font-weight:600;color:#1c726d">Application réelle — '
                f'{len(caps)} capture{"s" if len(caps) > 1 else ""} e2e ({esc(SOURCE)})</summary>'
@@ -275,7 +275,7 @@ def index_option() -> str:
             f'<th scope="row" style="{TD};text-align:left;font-weight:600;color:#1d1b18">{esc(page["nom"])}</th>'
             f'<td style="{TD};white-space:nowrap">{" ".join(vpill(v) for v in versions(page))}</td>'
             f'<td style="{TD};white-space:nowrap">{pill(state)}</td>'
-            f'<td style="{TD};font-size:12px;color:#6f695f">{counts(page)}</td>'
+            f'<td style="{TD};font-size:12px;color:#6b665e">{counts(page)}</td>'
             f'<td style="{TD}"><div style="display:flex;flex-wrap:wrap;gap:4px">{gap_cell}</div></td>'
             f'<td style="{TD};font:12px/1.5 {MONO};color:#4a463f">{esc(" · ".join(page.get("plans") or []) or page.get("developpement") or "—")}</td></tr>')
     head = "".join(f'<th scope="col" style="{TH}">{h}</th>' for h in
@@ -283,7 +283,7 @@ def index_option() -> str:
     trans = doc.get("transverses") or []
     trans_html = "".join(
         f'<li style="display:flex;gap:8px;align-items:baseline">{gpill(t["aligner"])}<span>{esc(t["texte"])}</span></li>' for t in trans)
-    summary = (f'<p style="margin:0 0 14px;font-size:12px;color:#6f695f">{len(doc["pages"])} pages au {TODAY} : '
+    summary = (f'<p style="margin:0 0 14px;font-size:12px;color:#6b665e">{len(doc["pages"])} pages au {TODAY} : '
                f'{total.get("livré", 0)} livrées, {total.get("en partie", 0)} en partie, {total.get("à faire", 0)} à faire, '
                f'{total.get("référence", 0)} de référence ; {gaps_total} écarts d\'écran et {len(trans)} transverses. '
                f'Source : docs/maquette-etat.yml ({esc(SOURCE)}), vérifié par scripts/check-maquette.mjs.</p>')
@@ -458,15 +458,23 @@ def ds_space(tokens: dict) -> str:
         f'background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--{esc(t["name"])})"></span>'
         f'<span class="ds-name">{esc(t["name"])}</span><span class="ds-note">{esc(t.get("usage", ""))}</span></div>'
         for t in tokens.get("shadow", {}).get("tokens", []))
+    heights = "".join(
+        f'<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start"><span style="display:flex;align-items:center;'
+        f'box-sizing:border-box;height:var(--{esc(t["name"])});padding:0 10px;border:1px solid var(--color-border-strong);'
+        f'border-radius:var(--radius-md);background:var(--color-surface)">{esc(t["value"])}</span>'
+        f'<span class="ds-name">{esc(t["name"])}</span><span class="ds-note" style="max-width:180px">{esc(t.get("usage", ""))}</span></div>'
+        for t in tokens.get("hauteur", {}).get("tokens", []))
     focus = ('<div style="display:flex;flex-direction:column;gap:8px"><button type="button" class="button button--secondary" '
              'style="outline:2px solid var(--color-focus);outline-offset:2px">Annuler</button><span class="ds-name">color-focus</span>'
              '<span class="ds-note">Contour de focus : 2 px plein, décalé de 2 px.</span></div>')
     card = (f'<div class="dv-card ds-card"><div class="ds-cols"><div class="ds-panel" data-theme="light">'
             f'<div><p class="ds-label">ESPACEMENTS</p><div style="display:flex;flex-direction:column;gap:2px">{spacing}</div></div></div>'
-            f'<div class="ds-panel" data-theme="light"><div><p class="ds-label">RAYONS</p><div class="ds-row" style="gap:24px">{radius}</div></div>'
+            f'<div class="ds-panel" data-theme="light"><div><p class="ds-label">HAUTEUR DES CONTRÔLES</p>'
+            f'<div class="ds-row" style="gap:24px;align-items:flex-start">{heights}</div></div>'
+            f'<div><p class="ds-label">RAYONS</p><div class="ds-row" style="gap:24px">{radius}</div></div>'
             f'<div><p class="ds-label">OMBRES ET FOCUS</p><div class="ds-row" style="gap:32px;align-items:flex-start;padding:8px 0 16px">{shadows}{focus}</div></div>'
             f'</div></div></div>')
-    return ds_option("ds-espaces", "c", "Espacements, grille de la barre latérale, rayons, ombres et focus", card)
+    return ds_option("ds-espaces", "c", "Espacements, grille de la barre latérale, hauteurs, rayons, ombres et focus", card)
 
 
 SECTION_ICON = ('<svg class="section-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">'
@@ -478,7 +486,7 @@ def ds_components() -> str:
     def panel(theme: str, title: str) -> str:
         t = theme[0]
         return (
-            f'<div class="ds-panel" data-theme="{theme}" style="font-size:16px"><p class="ds-head">{title}</p>'
+            f'<div class="ds-panel" data-theme="{theme}"><p class="ds-head">{title}</p>'
             f'<div><p class="ds-label">BOUTONS</p><div class="ds-row">'
             f'<button type="button" class="button button--primary">Envoyer</button>'
             f'<button type="button" class="button button--secondary">Annuler</button>'
@@ -492,8 +500,11 @@ def ds_components() -> str:
             f'<label class="toggle" for="ds-{t}-t2"><button id="ds-{t}-t2" type="button" role="switch" class="toggle__switch" '
             f'aria-checked="false" aria-labelledby="ds-{t}-l2"><span class="toggle__thumb"></span></button>'
             f'<span id="ds-{t}-l2" class="toggle__label">Vérifier le TLS</span></label></div>'
-            f'<div style="margin-top:12px;max-width:320px"><input type="search" class="search" aria-label="Filtrer les requêtes" '
-            f'placeholder="Filtrer les requêtes"></div></div>'
+            f'<div class="ds-row" style="margin-top:12px"><input type="search" class="search" style="max-width:220px" '
+            f'aria-label="Filtrer les requêtes" placeholder="Filtrer les requêtes">'
+            f'<select aria-label="Couleur"><option>Gris</option><option>Orange</option></select>'
+            f'<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked="">Environnement protégé</label>'
+            f'<label style="display:flex;align-items:center;gap:8px"><input type="checkbox">Activer</label></div></div>'
             f'<div><p class="ds-label">BARRE LATÉRALE ET STATUTS</p>'
             f'<div style="background:var(--color-sidebar);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:6px 0;max-width:340px">'
             f'<div class="section-head"><span class="section-head__lead" aria-hidden="true">{SECTION_ICON}</span>'
@@ -520,7 +531,7 @@ def ds_components() -> str:
             f'<li role="separator" class="menu__separator"></li>'
             f'<li role="menuitem" class="menu__item menu__item--danger"><span class="menu__text"><span class="menu__label">Supprimer</span></span>'
             f'<kbd class="menu__shortcut">Suppr</kbd></li></ul></div>'
-            f'<div class="toast" style="font-size:14px"><span class="toast__message">Requête mise à la corbeille.</span>'
+            f'<div class="toast"><span class="toast__message">Requête mise à la corbeille.</span>'
             f'<button type="button" class="toast__action">Annuler</button></div></div></div>'
             f'<div><p class="ds-label">FENÊTRE MODALE</p><div style="padding:16px;background:var(--backdrop);border-radius:var(--radius-lg)">'
             f'<div class="dialog" role="dialog" aria-labelledby="ds-{t}-dlg" style="width:auto;margin:0 auto;max-width:420px">'
@@ -557,7 +568,7 @@ def ds_gaps(tokens: dict, page_texts: list) -> str:
     rows = []
     for h, n in sorted(counts.items(), key=lambda kv: -kv[1])[:24]:
         name, value, dist = nearest(h)
-        verdict = "jeton" if dist == 0 else ("remplacer d'office" if dist <= 6 else "à revoir")
+        verdict = "jeton" if dist == 0 else ("à remplacer" if dist <= 6 else "à revoir")
         rows.append(f'<tr><td><span class="ds-sw" style="display:inline-block;vertical-align:middle;background:{h}"></span> '
                     f'<span class="ds-name">{h}</span></td><td class="ds-val">{n}</td>'
                     f'<td><span class="ds-sw" style="display:inline-block;vertical-align:middle;background:var(--{name})"></span> '
@@ -573,7 +584,7 @@ def ds_gaps(tokens: dict, page_texts: list) -> str:
             f'<div><p class="ds-label">TEINTES ÉCRITES À LA MAIN DANS LA MAQUETTE</p>'
             f'<p class="ds-note" style="margin-bottom:10px">{len(counts)} teintes distinctes, {total} emplois dans les autres pages ; '
             f'{len(exact)} sont des jetons du thème clair ({pct} % des emplois). Les 24 plus employées, avec le jeton le plus proche '
-            f'(écart RVB) : jusqu\'à 6, la teinte se remplace d\'office par le jeton.</p>'
+            f'(écart RVB) : jusqu\'à 6, scripts/maquette-couleurs.py remplace la teinte par le jeton ; au-delà, elle est à revoir.</p>'
             f'<table class="ds-table"><thead><tr><th scope="col">TEINTE</th><th scope="col">EMPLOIS</th>'
             f'<th scope="col">JETON LE PLUS PROCHE</th><th scope="col">ÉCART</th><th scope="col">À FAIRE</th></tr></thead>'
             f'<tbody>{"".join(rows)}</tbody></table></div></div></div>')

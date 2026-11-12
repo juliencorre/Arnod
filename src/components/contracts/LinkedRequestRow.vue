@@ -104,7 +104,7 @@ const status = computed(() => workbench.statuses[props.projectId]?.[props.reques
   display: flex;
   align-items: center;
   padding-left: calc(var(--tree-pad) + var(--tree-indent) * var(--depth));
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .linked__row:hover,
@@ -123,7 +123,7 @@ const status = computed(() => workbench.statuses[props.projectId]?.[props.reques
   border: 0;
   background: none;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
@@ -133,7 +133,7 @@ const status = computed(() => workbench.statuses[props.projectId]?.[props.reques
 .linked__more:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -2px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .linked__lead {
@@ -149,7 +149,7 @@ const status = computed(() => workbench.statuses[props.projectId]?.[props.reques
 }
 
 .linked__method {
-  font: 700 0.6875rem var(--font-mono);
+  font: 700 var(--text-caption) var(--font-mono);
   color: var(--color-muted);
 }
 

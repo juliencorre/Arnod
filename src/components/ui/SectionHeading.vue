@@ -44,7 +44,7 @@ defineSlots<{ default?(): unknown }>();
 .section-head__title {
   margin: 0;
   overflow: hidden;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -53,7 +53,7 @@ defineSlots<{ default?(): unknown }>();
 
 .section-head__count {
   flex: none;
-  font: 500 0.6875rem var(--font-mono);
+  font: 400 var(--text-caption) var(--font-mono);
   color: var(--color-muted);
 }
 

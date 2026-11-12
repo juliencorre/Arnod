@@ -178,14 +178,14 @@ function removable(check: AssertionResult): boolean {
 .response__info,
 .response__timeline {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .response__error {
   margin: 0;
   padding: 0.625rem 0.75rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--color-danger);
   background: var(--color-danger-soft);
 }
@@ -195,7 +195,7 @@ function removable(check: AssertionResult): boolean {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .response__status {
@@ -214,8 +214,8 @@ function removable(check: AssertionResult): boolean {
 
 .response__slow {
   padding: 0 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
   background: var(--color-chip);
 }
 
@@ -231,7 +231,7 @@ function removable(check: AssertionResult): boolean {
   border-bottom: 2px solid transparent;
   background: none;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
   cursor: pointer;
 }
@@ -254,8 +254,8 @@ function removable(check: AssertionResult): boolean {
   padding: 0.75rem;
   overflow: auto;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font: 0.8125rem var(--font-mono);
+  border-radius: var(--radius-md);
+  font: var(--text-body) var(--font-mono);
   color: var(--color-text);
   background: var(--color-sidebar);
   white-space: pre-wrap;
@@ -267,7 +267,7 @@ function removable(check: AssertionResult): boolean {
   grid-template-columns: max-content 1fr;
   gap: 0.25rem 1rem;
   margin: 0;
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
 }
 
 .response__headers dt {
@@ -286,14 +286,14 @@ function removable(check: AssertionResult): boolean {
   margin: 0 0 0.5rem;
   padding: 0;
   list-style: none;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .response__checks li {
   display: flex;
   gap: 0.5rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .check--ok {
@@ -320,7 +320,7 @@ function removable(check: AssertionResult): boolean {
 .failure {
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--color-danger);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--color-danger-soft);
 }
 
@@ -332,13 +332,13 @@ function removable(check: AssertionResult): boolean {
 
 .failure__message {
   margin: 0.25rem 0 0;
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   color: var(--color-text);
 }
 
 .failure__actions {
   margin: 0.375rem 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 

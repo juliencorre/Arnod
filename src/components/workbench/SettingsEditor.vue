@@ -155,14 +155,14 @@ function choose(key: Key, value: number | boolean | null): void {
 }
 
 .setting__label {
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   font-weight: 600;
 }
 
 .setting__hint,
 .hint {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
@@ -170,7 +170,7 @@ function choose(key: Key, value: number | boolean | null): void {
   display: flex;
   flex-wrap: wrap;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -179,7 +179,7 @@ function choose(key: Key, value: number | boolean | null): void {
   border: 0;
   border-left: 1px solid var(--color-border);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
   background: var(--color-surface);
   cursor: pointer;

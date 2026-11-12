@@ -150,16 +150,16 @@ onMounted(() => {
 
 .catalog__title {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: var(--text-display);
   font-weight: 600;
 }
 
 .catalog__source {
   padding: 0.125rem 0.5rem;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
   background: var(--color-surface);
 }
@@ -167,7 +167,7 @@ onMounted(() => {
 .catalog__text {
   margin: 0;
   max-width: 52rem;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -187,11 +187,11 @@ onMounted(() => {
 .catalog__table {
   width: 100%;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border-collapse: separate;
   border-spacing: 0;
   overflow: hidden;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   background: var(--color-surface);
 }
 
@@ -205,7 +205,7 @@ onMounted(() => {
 
 .catalog__table thead th {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-caption);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -242,14 +242,14 @@ onMounted(() => {
 }
 
 .catalog__muted {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 400;
   color: var(--color-muted);
 }
 
 .catalog__mono {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
 }
 
 .catalog__state {
@@ -263,15 +263,15 @@ onMounted(() => {
   gap: 0.5rem;
   padding: 1rem 1.25rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
-  font-size: 0.875rem;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-body);
   background: var(--color-surface);
 }
 
 .detail__kicker {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-caption);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -280,14 +280,14 @@ onMounted(() => {
 
 .detail__title {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: var(--text-title);
   font-weight: 600;
 }
 
 .detail__meta,
 .detail__note {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -298,7 +298,7 @@ onMounted(() => {
 .detail__section {
   margin: 0.5rem 0 0;
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-caption);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;

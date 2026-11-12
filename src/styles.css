@@ -81,6 +81,27 @@
 
   --font-mono: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
 
+  /* Tailles de texte : six tailles, 13 px par défaut (design system, « Typographie ») */
+  --text-caption: 0.6875rem; /* Plus petite taille : compteurs, en-têtes de section, méthodes HTTP. */
+  --text-small: 0.75rem; /* Texte secondaire : pastilles, statuts, détails, légendes. */
+  --text-body: 0.8125rem; /* Texte courant de l'interface : arborescence, champs, boutons, menus, panneaux. */
+  --text-body-large: 0.9375rem; /* Champ principal (adresse d'une requête), titre d'un bloc. */
+  --text-title: 1.125rem; /* Titre d'un onglet (contrat, catalogue) ou d'une fenêtre modale. */
+  --text-display: 1.5rem; /* Titre d'une vue entière : Tous les projets, accueil, run. */
+
+  /* Rayons */
+  --radius-sm: 2px; /* Petites marques : pastille de couleur, nuancier d'un menu. */
+  --radius-md: 6px; /* Boutons, champs, listes, lignes de menu et d'arborescence. */
+  --radius-lg: 10px; /* Menus, notifications, cartes et fenêtres modales. */
+  --radius-pill: 999px; /* Formes rondes : interrupteur, pastilles de nature et d'état. */
+
+  /* Hauteur des contrôles */
+  --control-sm: 1.75rem; /* Compact : barres d'outils, lignes de tableau, pastilles d'action. */
+  --control-md: 2rem; /* Courant : boutons, champs et listes d'un formulaire. */
+  --control-lg: 2.5rem; /* Barre d'adresse d'une requête et son bouton « Envoyer ». */
+
+  accent-color: var(--color-accent);
+
   font-family:
     system-ui,
     -apple-system,
@@ -172,6 +193,83 @@ body {
   min-height: 100%;
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+/* La racine reste à 16 px (base des rem) ; le texte de l'interface est à 13 px. */
+body {
+  font-size: var(--text-body);
+}
+
+/*
+ * Liste déroulante : le style des champs, flèche dessinée en CSS (la CSP interdit les images
+ * distantes). Un composant qui change son fond utilise `background-color`, pas `background`.
+ */
+select {
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0 1.75rem 0 0.625rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-muted) 50%),
+    linear-gradient(135deg, var(--color-muted) 50%, transparent 50%);
+  background-repeat: no-repeat;
+  background-position:
+    right 0.875rem center,
+    right 0.5625rem center;
+  background-size:
+    0.3125rem 0.3125rem,
+    0.3125rem 0.3125rem;
+  appearance: none;
+  cursor: pointer;
+}
+
+/*
+ * Case à cocher : la couleur d'accent et une coche foncée (7:1), comme l'interrupteur ; la case
+ * native du système tirait sur le bleu.
+ */
+input[type="checkbox"] {
+  display: inline-grid;
+  flex: none;
+  place-content: center;
+  box-sizing: border-box;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="checkbox"]:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+input[type="checkbox"]:checked::after {
+  width: 0.25rem;
+  height: 0.5rem;
+  margin-top: -0.125rem;
+  border: solid var(--color-accent-text);
+  border-width: 0 2px 2px 0;
+  content: "";
+  transform: rotate(45deg);
+}
+
+input[type="checkbox"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[type="checkbox"]:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -1px;
 }
 
 /* Texte réservé aux lecteurs d'écran. */

@@ -87,65 +87,30 @@ const SHADOW_NOTES = {
   "shadow-dialog": "Fenêtres modales (BaseDialog).",
 };
 
-// Échelles retenues le 12 novembre 2026 (README, « Écarts à résorber ») : celles de la maquette,
-// où le code s'aligne. La taille de base de l'application reste 16 px (racine) ; ces tailles sont
-// celles que posent les composants.
-const TYPE_GROUPS = [
-  {
-    name: "Interface",
-    family: "sans",
-    styles: [
-      [
-        "text-display",
-        "24px",
-        600,
-        "Titre d'une vue entière : Tous les projets, accueil d'un projet, catalogue des étapes, run.",
-      ],
-      [
-        "text-title",
-        "18px",
-        600,
-        "Titre d'un onglet (contrat, catalogue) ou d'une fenêtre modale.",
-      ],
-      [
-        "text-body-large",
-        "15px",
-        400,
-        "Champ principal : adresse de la requête, entrée « Essayer une étape ».",
-      ],
-      [
-        "text-body",
-        "13px",
-        400,
-        "Texte courant de l'interface : arborescence, sections, menus, panneaux. Taille la plus employée.",
-      ],
-      ["text-small", "12px", 400, "Texte secondaire : pastilles, statuts, détails, légendes."],
-      [
-        "text-caption",
-        "11px",
-        600,
-        "Plus petite taille de texte : compteurs, en-têtes de section.",
-      ],
-    ],
-  },
-  {
-    name: "Données",
-    family: "mono",
-    styles: [
-      [
-        "mono-caption",
-        "11px",
-        700,
-        "Méthodes HTTP de l'arborescence, compteurs, en-têtes de menu (capitales, espacement 0,05em).",
-      ],
-      [
-        "mono-small",
-        "12px",
-        400,
-        "Raccourcis clavier et détails d'un menu, pastilles de nature, chemins et valeurs.",
-      ],
-    ],
-  },
+// Tailles de texte : les variables --text-* de styles.css, dans l'ordre de la plus grande à la plus
+// petite, avec la graisse d'emploi de chacune ; les styles de données reprennent deux d'entre elles
+// en police à chasse fixe.
+const TEXT_WEIGHTS = {
+  "text-display": 600,
+  "text-title": 600,
+  "text-body-large": 400,
+  "text-body": 400,
+  "text-small": 400,
+  "text-caption": 600,
+};
+const MONO_STYLES = [
+  [
+    "mono-caption",
+    "text-caption",
+    700,
+    "Méthodes HTTP de l'arborescence, compteurs, en-têtes de menu (capitales, espacement 0,05em).",
+  ],
+  [
+    "mono-small",
+    "text-small",
+    400,
+    "Raccourcis clavier et détails d'un menu, pastilles de nature, chemins et valeurs.",
+  ],
 ];
 
 const SPACING = [
@@ -178,17 +143,6 @@ const TREE_NOTES = {
   "tree-lead": "Barre latérale : colonne de tête (chevron, pastille ou icône), de largeur fixe.",
   "tree-gap": "Barre latérale : écart entre la colonne de tête et le libellé.",
 };
-
-const RADIUS = [
-  ["radius-sm", "2px", "Petites marques : nuancier d'un menu, coins d'une pastille compacte."],
-  [
-    "radius-md",
-    "6px",
-    "Lignes de menu, actions de notification, lignes de l'arborescence, boutons et champs.",
-  ],
-  ["radius-lg", "10px", "Menus, notifications, cartes et fenêtres modales."],
-  ["radius-pill", "999px", "Formes rondes : interrupteur, pastilles de nature et d'état."],
-];
 
 // Composants dont les styles sont recopiés dans components/bundle.css, dans cet ordre.
 const COMPONENTS = {
@@ -255,6 +209,46 @@ for (const [name, { value, comment }] of light) {
 }
 const mono = light.get("font-mono")?.value ?? "";
 
+/** Longueur en rem ou en px d'une variable, en px (la racine est à 16 px). */
+function px(name) {
+  const value = light.get(name)?.value ?? "";
+  const rem = /^([\d.]+)rem$/.exec(value);
+  if (rem) return `${String(Number(rem[1]) * 16)}px`;
+  if (!/^\d+px$/.test(value)) errors.push(`--${name} : longueur attendue dans src/styles.css`);
+  return value;
+}
+/** Jetons d'une famille de variables (`--radius-*`…), la note d'usage étant le commentaire. */
+function family(prefix) {
+  return [...light.keys()]
+    .filter((name) => name.startsWith(prefix))
+    .map((name) => {
+      const usage = light.get(name)?.comment ?? "";
+      if (usage === "") errors.push(`--${name} : commentaire d'usage manquant dans src/styles.css`);
+      return { name, value: px(name), usage };
+    });
+}
+const textStyles = Object.entries(TEXT_WEIGHTS).map(([name, fontWeight]) => ({
+  name,
+  fontSize: px(name),
+  lineHeight: 1.5,
+  fontWeight,
+  usage: light.get(name)?.comment ?? "",
+}));
+const monoStyles = MONO_STYLES.map(([name, size, fontWeight, usage]) => ({
+  name,
+  fontSize: px(size),
+  lineHeight: 1.5,
+  fontWeight,
+  usage,
+}));
+for (const name of light.keys()) {
+  if (name.startsWith("text-") && !(name in TEXT_WEIGHTS)) {
+    errors.push(`--${name} : graisse manquante dans TEXT_WEIGHTS (scripts/design-system.mjs)`);
+  }
+}
+const radius = family("radius-");
+const controls = family("control-");
+
 const sidebar = variables(read("src/components/layout/AppSidebar.vue"));
 const tree = Object.entries(TREE_NOTES).map(([name, usage]) => {
   const value = sidebar.get(name)?.value ?? "";
@@ -287,25 +281,22 @@ const tokens = {
   type: {
     fonts: [],
     families: { sans, mono },
-    groups: TYPE_GROUPS.map((group) => ({
-      name: group.name,
-      family: group.family,
-      styles: group.styles.map(([name, fontSize, fontWeight, usage]) => ({
-        name,
-        fontSize,
-        lineHeight: 1.5,
-        fontWeight,
-        usage,
-      })),
-    })),
+    groups: [
+      { name: "Interface", family: "sans", styles: textStyles },
+      { name: "Données", family: "mono", styles: monoStyles },
+    ],
   },
   spacing: {
     note: "Pas observés dans les composants, puis la grille des lignes de la barre latérale (AppSidebar.vue).",
     tokens: [...SPACING.map(([name, value, usage]) => ({ name, value, usage })), ...tree],
   },
   radius: {
-    note: "Échelle retenue : 2, 6 et 10 px, plus les formes rondes.",
-    tokens: RADIUS.map(([name, value, usage]) => ({ name, value, usage })),
+    note: "Variables --radius-* de src/styles.css : 2, 6 et 10 px, plus les formes rondes.",
+    tokens: radius,
+  },
+  hauteur: {
+    note: "Hauteur des contrôles : variables --control-* de src/styles.css.",
+    tokens: controls,
   },
   shadow: { tokens: shadows },
 };
@@ -325,6 +316,7 @@ const cssOut = [
   ":root {",
   ...tokens.spacing.tokens.map((t) => decl(t.name, t.value)),
   ...tokens.radius.tokens.map((t) => decl(t.name, t.value)),
+  ...tokens.hauteur.tokens.map((t) => decl(t.name, t.value)),
   decl("font-sans", sans),
   decl("font-mono", mono),
   "}",
@@ -337,12 +329,18 @@ const cssOut = [
   "",
 ].join("\n");
 
-// components/bundle.css : styles des composants, tels qu'écrits dans le code.
+// components/bundle.css : styles des composants, tels qu'écrits dans le code, précédés des règles
+// de base de styles.css (listes déroulantes, cases à cocher, texte réservé aux lecteurs d'écran).
+const baseStart = css.indexOf("/*\n * Liste déroulante");
+const baseRules = baseStart === -1 ? "" : css.slice(baseStart).trim();
+if (baseRules === "")
+  errors.push("règles de base introuvables dans src/styles.css (« Liste déroulante »)");
 const bundle = [
   "/* Styles des composants d'Arnod, recopiés du code par scripts/design-system.mjs (ne pas modifier). */",
   "",
-  "/* src/styles.css */",
-  /\.visually-hidden \{[^}]*\}/.exec(css)?.[0] ?? "",
+  "/* src/styles.css : tailles de texte, règles de base des contrôles natifs */",
+  `:root {\n${textStyles.map((t) => `  --${t.name}: ${light.get(t.name)?.value ?? ""};`).join("\n")}\n  accent-color: var(--color-accent);\n}`,
+  baseRules,
   ...Object.values(COMPONENTS).map((file) => {
     const style = /<style scoped>([\s\S]*?)<\/style>/.exec(read(file))?.[1].trim() ?? "";
     if (style === "") errors.push(`${file} : pas de bloc <style scoped>`);
@@ -404,5 +402,5 @@ if (stale.length > 0) {
 }
 console.log(
   `Design system : ${String(colors.length)} couleurs × 2 thèmes, ${String(tokens.spacing.tokens.length)} espacements, ` +
-    `${String(RADIUS.length)} rayons, ${String(Object.keys(COMPONENTS).length)} composants, ${String(icons.size)} icônes.`,
+    `${String(radius.length)} rayons, ${String(controls.length)} hauteurs, ${String(Object.keys(COMPONENTS).length)} composants, ${String(icons.size)} icônes.`,
 );

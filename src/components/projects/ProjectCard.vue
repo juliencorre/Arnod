@@ -40,7 +40,7 @@ const missing = computed(() => props.project.status === "missing");
   gap: 0.875rem;
   padding: 1.125rem 1.25rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 
@@ -54,8 +54,8 @@ const missing = computed(() => props.project.status === "missing");
   place-items: center;
   width: 2rem;
   height: 2rem;
-  border-radius: 6px;
-  font: 600 0.8125rem var(--font-mono);
+  border-radius: var(--radius-md);
+  font: 600 var(--text-body) var(--font-mono);
   color: var(--color-muted);
   background: var(--color-chip);
 }
@@ -70,19 +70,19 @@ const missing = computed(() => props.project.status === "missing");
 
 .card__name {
   margin: 0;
-  font-size: 1.0625rem;
+  font-size: var(--text-body-large);
   font-weight: 600;
 }
 
 .card__path {
   overflow-wrap: anywhere;
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   color: var(--color-muted);
 }
 
 .card__missing {
   margin: 0.375rem 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-danger);
 }
 

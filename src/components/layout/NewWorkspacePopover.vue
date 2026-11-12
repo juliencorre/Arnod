@@ -134,15 +134,15 @@ async function submit(): Promise<void> {
   width: min(20.5rem, calc(100vw - 1rem));
   padding: 0.875rem 0.875rem 0.75rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
 }
 
 .popover__title {
   margin: 0 0 0.625rem;
-  font-size: 0.875rem;
-  font-weight: 650;
+  font-size: var(--text-body);
+  font-weight: 600;
 }
 
 .popover__form {
@@ -154,11 +154,13 @@ async function submit(): Promise<void> {
 .popover__input {
   box-sizing: border-box;
   width: 100%;
-  padding: 0.5rem 0.625rem;
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   background: var(--color-surface);
 }
@@ -174,13 +176,13 @@ async function submit(): Promise<void> {
 
 .popover__error {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-danger);
 }
 
 .popover__hint {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   line-height: 1.45;
   color: var(--color-muted);
 }

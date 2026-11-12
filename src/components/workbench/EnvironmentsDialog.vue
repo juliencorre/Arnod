@@ -290,7 +290,7 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
   width: 100%;
   padding: 0.375rem 0.5rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: none;
   font: inherit;
   color: var(--color-text);
@@ -316,12 +316,13 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
 .envs__form select {
   box-sizing: border-box;
   min-width: 0;
-  padding: 0.375rem 0.5rem;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
   color: var(--color-text);
-  background: var(--color-surface);
+  background-color: var(--color-surface);
 }
 
 .envs__form :focus-visible,
@@ -331,23 +332,25 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
 }
 
 .envs__label {
-  font-weight: 600;
+  font-size: var(--text-small);
+  color: var(--color-muted);
 }
 
 .envs__check {
   display: flex;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .envs__title {
   margin: 0.5rem 0 0;
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
+  font-weight: 600;
 }
 
 .envs__hint {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -393,7 +396,7 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--color-link);
   cursor: pointer;
@@ -413,5 +416,10 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
 
 .envs__spacer {
   flex: 1;
+}
+
+/* La flèche de la liste déroulante garde sa place (styles.css). */
+.envs__form select {
+  padding-right: 1.75rem;
 }
 </style>

@@ -312,26 +312,26 @@ function onSourceKeydown(event: KeyboardEvent): void {
 
 .contract__name {
   margin: 0;
-  font-size: 1.125rem;
-  font-weight: 650;
+  font-size: var(--text-title);
+  font-weight: 600;
 }
 
 .contract__version {
   padding: 0.0625rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
   font-weight: 600;
   color: var(--color-link);
   background: var(--color-accent-soft);
 }
 
 .contract__kind {
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .contract__file {
-  font: 0.75rem var(--font-mono);
+  font: var(--text-small) var(--font-mono);
   color: var(--color-muted);
 }
 
@@ -340,7 +340,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
 .contract__hint,
 .contract__coverage {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -351,7 +351,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
 }
 
 .contract__servers code {
-  font: 0.75rem var(--font-mono);
+  font: var(--text-small) var(--font-mono);
   color: var(--color-text);
   overflow-wrap: anywhere;
 }
@@ -374,7 +374,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
   border: none;
   border-bottom: 2px solid transparent;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
   background: none;
   cursor: pointer;
@@ -390,18 +390,18 @@ function onSourceKeydown(event: KeyboardEvent): void {
 .contract__tab:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -2px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .contract__badge {
   margin-left: 0.25rem;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
 .contract__dirty,
 .contract__state {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-link);
 }
 
@@ -432,8 +432,8 @@ function onSourceKeydown(event: KeyboardEvent): void {
   min-height: 20rem;
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
-  font: 0.8125rem/1.5 var(--font-mono);
+  border-radius: var(--radius-md);
+  font: var(--text-body) / 1.5 var(--font-mono);
   color: var(--color-text);
   background: var(--color-surface);
   resize: vertical;
@@ -459,7 +459,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
 
 .group__title {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -470,7 +470,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
@@ -479,7 +479,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
   padding: 0;
   list-style: none;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .op {
@@ -488,7 +488,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
   align-items: center;
   gap: 0.25rem 0.625rem;
   padding: 0.4375rem 0.625rem;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .op + .op {
@@ -511,7 +511,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
 
 .op__method {
   min-width: 3.5rem;
-  font: 700 0.6875rem var(--font-mono);
+  font: 700 var(--text-caption) var(--font-mono);
   color: var(--color-muted);
 }
 
@@ -530,7 +530,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
 }
 
 .op__path {
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   overflow-wrap: anywhere;
 }
 
@@ -541,8 +541,8 @@ function onSourceKeydown(event: KeyboardEvent): void {
 .op__flag {
   padding: 0 0.375rem;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
-  font-size: 0.6875rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
   color: var(--color-muted);
 }
 
@@ -555,7 +555,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
   padding: 0.125rem 0.25rem;
   border: none;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--color-link);
   background: none;
@@ -565,6 +565,6 @@ function onSourceKeydown(event: KeyboardEvent): void {
 .op__open:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 </style>

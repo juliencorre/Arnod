@@ -290,13 +290,13 @@ function setStatus(text: string): void {
 }
 
 .expected__text {
-  font: 0.75rem var(--font-mono);
+  font: var(--text-small) var(--font-mono);
   color: var(--color-muted);
 }
 
 .expected__desc {
   flex-basis: 100%;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -306,8 +306,8 @@ function setStatus(text: string): void {
 
 .code {
   padding: 0.0625rem 0.375rem;
-  border-radius: 4px;
-  font: 600 0.8125rem var(--font-mono);
+  border-radius: var(--radius-sm);
+  font: 600 var(--text-body) var(--font-mono);
   color: var(--color-text);
   background: var(--color-chip);
 }
@@ -346,11 +346,12 @@ function setStatus(text: string): void {
 }
 
 .action {
-  padding: 0.375rem 0.75rem;
+  min-height: var(--control-sm);
+  padding: 0 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   background: var(--color-surface);
   cursor: pointer;
@@ -363,9 +364,6 @@ function setStatus(text: string): void {
 
 .action--strong {
   font-weight: 600;
-  color: var(--color-surface);
-  background: var(--color-text);
-  border-color: var(--color-text);
 }
 
 .action--danger {
@@ -392,19 +390,21 @@ function setStatus(text: string): void {
   flex-direction: column;
   gap: 0.25rem;
   min-width: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .input {
+  box-sizing: border-box;
   min-width: 0;
-  padding: 0.4375rem 0.625rem;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-text);
-  background: var(--color-surface);
+  background-color: var(--color-surface);
 }
 
 .input--mono {
@@ -420,25 +420,30 @@ function setStatus(text: string): void {
 
 .section {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--color-text);
 }
 
 .expected__body {
   min-height: 9rem;
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   resize: vertical;
 }
 
 .hint {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 :is(.expected__open, .icon, .action, .input):focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;
+}
+
+/* La flèche de la liste déroulante garde sa place (styles.css). */
+select.input {
+  padding-right: 1.75rem;
 }
 </style>

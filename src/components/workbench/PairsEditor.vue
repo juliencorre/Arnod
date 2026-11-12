@@ -116,7 +116,7 @@ function nameOf(pair: Pair, position: number): string {
 }
 
 .pairs__head {
-  font-size: 0.6875rem;
+  font-size: var(--text-caption);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -134,16 +134,18 @@ function nameOf(pair: Pair, position: number): string {
 
 .pairs__description {
   grid-column: 2 / 4;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
 }
 
 .pairs__input {
   min-width: 0;
-  padding: 0.375rem 0.5rem;
+  box-sizing: border-box;
+  min-height: var(--control-sm);
+  padding: 0.1875rem 0.5rem;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   background: var(--color-surface);
 }
@@ -163,7 +165,7 @@ function nameOf(pair: Pair, position: number): string {
 .pairs__remove {
   border: 0;
   background: none;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   line-height: 1;
   color: var(--color-muted);
   cursor: pointer;
@@ -171,12 +173,13 @@ function nameOf(pair: Pair, position: number): string {
 
 .pairs__add {
   align-self: flex-start;
-  padding: 0.3125rem 0.625rem;
+  min-height: var(--control-sm);
+  padding: 0 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   cursor: pointer;
 }

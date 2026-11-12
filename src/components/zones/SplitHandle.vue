@@ -225,8 +225,8 @@ const bubble = computed(() => {
   top: 50%;
   left: calc(100% + 0.5rem);
   padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  font: 0.75rem var(--font-mono);
+  border-radius: var(--radius-md);
+  font: var(--text-small) var(--font-mono);
   white-space: nowrap;
   color: var(--color-toast-text);
   background: var(--color-toast-bg);

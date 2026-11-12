@@ -52,8 +52,8 @@ const backLabel = computed(() =>
   margin: 0;
   padding: 0.625rem 0.25rem;
   border-bottom: 2px solid var(--color-accent);
-  font-size: 1rem;
-  font-weight: 650;
+  font-size: var(--text-body-large);
+  font-weight: 600;
 }
 
 .manage__panel {

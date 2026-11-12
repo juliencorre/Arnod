@@ -117,7 +117,7 @@ watch(
   gap: 0.375rem;
   min-width: 0;
   overflow: hidden;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   white-space: nowrap;
   color: var(--color-muted);
 }
@@ -134,9 +134,9 @@ watch(
 .content-window__follow {
   padding: 0.25rem 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font: inherit;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 600;
   color: var(--color-text);
   background: var(--color-surface);

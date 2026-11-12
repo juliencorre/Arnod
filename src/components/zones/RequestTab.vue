@@ -153,7 +153,7 @@ function place(target: "right" | "below"): void {
   width: 1.75rem;
   height: 1.625rem;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--color-muted);
   background: var(--color-surface);
   cursor: pointer;
@@ -196,7 +196,7 @@ function place(target: "right" | "below"): void {
 .placement {
   display: inline-flex;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -204,7 +204,7 @@ function place(target: "right" | "below"): void {
   padding: 0.1875rem 0.5rem;
   border: none;
   font: inherit;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
   background: var(--color-surface);
   cursor: pointer;

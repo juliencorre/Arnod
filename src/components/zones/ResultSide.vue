@@ -103,7 +103,7 @@ const expectedCount = computed(() => editor.value?.draft?.examples.length ?? 0);
   border: 0;
   border-bottom: 2px solid transparent;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
   background: none;
   cursor: pointer;
@@ -123,8 +123,8 @@ const expectedCount = computed(() => editor.value?.draft?.examples.length ?? 0);
 .side__badge {
   margin-left: 0.25rem;
   padding: 0 0.375rem;
-  border-radius: 999px;
-  font-size: 0.6875rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
   background: var(--color-chip);
 }
 </style>

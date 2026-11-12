@@ -22,9 +22,10 @@ withDefaults(
   align-items: center;
   justify-content: center;
   gap: 0.375rem;
-  padding: 0.5rem 1rem;
+  min-height: var(--control-md);
+  padding: 0 0.75rem;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   font-weight: 600;
   line-height: 1.25;
@@ -74,6 +75,7 @@ withDefaults(
 }
 
 .button--link {
+  min-height: 0;
   padding: 0.25rem 0;
   color: var(--color-link);
   background: none;

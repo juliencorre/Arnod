@@ -399,14 +399,14 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
   max-width: min(26rem, 90vw);
   padding: 0.375rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
 }
 
 .menu__heading {
   margin: 0.25rem 0.625rem 0.375rem;
-  font: 600 0.6875rem / 1.4 var(--font-mono);
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-muted);
@@ -426,7 +426,7 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
   max-width: min(26rem, 90vw);
   padding: 0.375rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
 }
@@ -436,8 +436,10 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  padding: 0.5rem 0.625rem;
-  border-radius: 6px;
+  min-height: var(--control-sm);
+  box-sizing: border-box;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-md);
   color: var(--color-text);
   cursor: pointer;
   outline: none;
@@ -474,13 +476,13 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
 }
 
 .menu__hint {
-  font-size: 0.8125rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
 .menu__shortcut,
 .menu__detail {
-  font: 0.75rem var(--font-mono);
+  font: var(--text-small) var(--font-mono);
   color: var(--color-muted);
 }
 
@@ -495,7 +497,7 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
   flex: none;
   width: 0.625rem;
   height: 0.625rem;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
 }
 
 /* L'espace avant la mention fait partie du nom accessible (« Recette protégé »). */
@@ -504,7 +506,7 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
 }
 
 .menu__tag {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 600;
   color: var(--color-link);
 }

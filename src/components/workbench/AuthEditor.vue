@@ -120,23 +120,25 @@ const note = computed(() => {
   grid-template-columns: 8rem minmax(0, 1fr);
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .field input,
 .field select {
   min-width: 0;
-  padding: 0.4375rem 0.625rem;
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   color: var(--color-text);
-  background: var(--color-surface);
+  background-color: var(--color-surface);
 }
 
 .field input {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
 }
 
 .field input:focus-visible,
@@ -148,14 +150,19 @@ const note = computed(() => {
 .note {
   margin: 0;
   padding: 0.5rem 0.625rem;
-  border-radius: 8px;
-  font-size: 0.8125rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
   background: var(--color-chip);
 }
 
 .hint {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
+}
+
+/* La flèche de la liste déroulante garde sa place (styles.css). */
+.field select {
+  padding-right: 1.75rem;
 }
 </style>
