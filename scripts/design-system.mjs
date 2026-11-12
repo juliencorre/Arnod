@@ -211,8 +211,11 @@ const errors = [];
 /** Variables `--nom: valeur;` d'un bloc CSS, avec leur commentaire de fin de ligne. */
 function variables(block) {
   const found = new Map();
-  for (const m of block.matchAll(/^\s*--([a-z0-9-]+):\s*([^;]+);(?:\s*\/\*\s*(.*?)\s*\*\/)?/gm)) {
-    found.set(m[1], { value: m[2].trim(), comment: m[3] ?? "" });
+  for (const line of block.split("\n")) {
+    const m = /^ *--([a-z0-9-]+):([^;]+);(.*)$/.exec(line);
+    if (!m) continue;
+    const comment = /\/\*(.*)\*\//.exec(m[3])?.[1].trim() ?? "";
+    found.set(m[1], { value: m[2].trim(), comment });
   }
   return found;
 }
@@ -228,7 +231,7 @@ const css = read("src/styles.css");
 const [lightPart, darkPart = ""] = css.split("@media (prefers-color-scheme: dark)");
 const light = variables(lightPart);
 const dark = variables(darkPart);
-const sans = /font-family:\s*([^;]+);/.exec(lightPart)?.[1].replace(/\s+/g, " ").trim() ?? "";
+const sans = /font-family:([^;]+);/.exec(lightPart)?.[1].replace(/\s+/g, " ").trim() ?? "";
 
 const colors = [];
 const shadows = [];
