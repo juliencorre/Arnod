@@ -284,3 +284,30 @@ describe("entre fenêtres (RC9)", () => {
     expect(testItems().some((t) => t.includes("Petstore"))).toBe(true);
   });
 });
+
+describe("statuts des requêtes liées (ST1, ST2)", () => {
+  it("montre ✓ / ✕ sur les requêtes et « réussies / exécutées » sur la ressource", async () => {
+    const { core } = await setup();
+    await core.emit(EVENTS.statuses, {
+      projectId: BOUTIQUE_TESTS,
+      statuses: {
+        "Petstore/animaux/a-lister.yml": { passed: true, at: 1 },
+        "Petstore/animaux/b-page-2.yml": { passed: false, at: 1 },
+      },
+    });
+    await flushPromises();
+    await expandPets();
+    const pets = wrapper()
+      .findAll(".crow__resource")
+      .find((r) => r.text().includes("/pets"));
+    expect(pets?.get(".crow__count [aria-hidden='true']").text()).toBe("1/2");
+    expect(wrapper().get('[aria-label="Ouvrir GET /pets"]').get(".crow__count").text()).toContain(
+      "1/2",
+    );
+    await press('[aria-label="Déplier GET /pets"]');
+    const marks = wrapper()
+      .findAll(".linked")
+      .map((l) => l.find(".linked__status").text());
+    expect(marks).toEqual(["✓, réussie", "✕, en échec"]);
+  });
+});

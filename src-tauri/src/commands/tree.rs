@@ -3,7 +3,7 @@
 //! Chaque modification est diffusée aux autres fenêtres (F11) ; un renommage,
 //! un déplacement ou une suppression met aussi à jour les onglets ouverts.
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::{Manager, State, WebviewWindow};
@@ -17,6 +17,7 @@ use crate::results::ResultBook;
 use crate::state::AppState;
 use crate::tree::{self, TreeNode};
 use crate::windows::{self, ProjectScope};
+use crate::workbench::Workbench;
 
 /// Arborescence d'un projet et dossiers repliés.
 #[derive(Debug, Clone, Serialize)]
@@ -80,6 +81,13 @@ fn follow_path(window: &WebviewWindow, project: Uuid, from: &str, to: &str) {
     // Le dernier résultat suit aussi la requête renommée.
     if let Ok(mut book) = window.app_handle().state::<Mutex<ResultBook>>().lock() {
         book.rename(project, from, to);
+    }
+    // Ses statuts aussi, et ceux des requêtes d'un dossier (R5 de la fin du premier usage).
+    if let Ok(ctx) = window.app_handle().state::<AppState>().project_ctx(project) {
+        window
+            .app_handle()
+            .state::<Arc<Workbench>>()
+            .rename_status(&ctx, from, to);
     }
 }
 
@@ -162,13 +170,16 @@ pub fn tree_duplicate(
 pub fn tree_delete(
     window: WebviewWindow,
     state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
     project: Uuid,
     path: String,
     permanent: bool,
 ) -> Result<(), CommandError> {
-    let result = state
-        .project_ctx(project)
-        .and_then(|ctx| tree::delete(&ctx.root, &path, permanent));
+    let result = state.project_ctx(project).and_then(|ctx| {
+        tree::delete(&ctx.root, &path, permanent)?;
+        bench.remove_status(&ctx, &path);
+        Ok(())
+    });
     if result.is_ok() {
         let _ = windows::apply(window.app_handle(), |w: &mut Windows| {
             w.close_path(project, &path);

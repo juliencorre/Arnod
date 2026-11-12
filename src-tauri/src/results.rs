@@ -10,6 +10,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::error::{CommandError, CommandErrorKind};
+use crate::request::assertions;
 use crate::workbench::SendOutcome;
 
 /// Nombre de résultats gardés : les corps de réponse pèsent jusqu'à 5 Mo (R5).
@@ -107,6 +108,33 @@ impl ResultBook {
         self.put(result)
     }
 
+    /// Ignore l'échec d'une vérification dans le dernier résultat d'une requête
+    /// (`docs/plan-fin-premier-usage.md`, R7) et recalcule son verdict.
+    pub fn ignore(
+        &mut self,
+        project_id: Uuid,
+        path: &str,
+        check: &str,
+    ) -> Result<RequestResult, CommandError> {
+        let missing = || {
+            CommandError::new(
+                CommandErrorKind::NotFound,
+                "Cette vérification n'est plus dans le dernier résultat : renvoyez la requête.",
+            )
+        };
+        let entry = self
+            .entries
+            .iter_mut()
+            .find(|e| e.project_id == project_id && e.path == path)
+            .ok_or_else(missing)?;
+        let outcome = entry.outcome.as_mut().ok_or_else(missing)?;
+        if !assertions::ignore(&mut outcome.assertions, check) {
+            return Err(missing());
+        }
+        outcome.passed = assertions::request_passed(&outcome.assertions, outcome.response.status);
+        Ok(entry.clone())
+    }
+
     /// Une requête renommée ou déplacée garde son résultat.
     pub fn rename(&mut self, project_id: Uuid, from: &str, to: &str) {
         for entry in &mut self.entries {
@@ -196,6 +224,54 @@ mod tests {
         assert!(book.get(P, "0.yml").is_none());
         assert!(book.get(P, &format!("{MAX_RESULTS}.yml")).is_some());
         assert_eq!(book.entries.len(), MAX_RESULTS);
+    }
+
+    #[test]
+    fn ignorer_un_echec_recalcule_le_verdict() {
+        let mut book = ResultBook::default();
+        let mut failed = outcome(201);
+        failed.passed = false;
+        failed.assertions = vec![
+            assertions::AssertionResult {
+                id: "a1".into(),
+                target: "headers.Location".into(),
+                passed: false,
+                message: Some("en-tête absent de la réponse".into()),
+                actual: None,
+                ignored: false,
+            },
+            assertions::AssertionResult {
+                id: "a2".into(),
+                target: "status".into(),
+                passed: true,
+                message: None,
+                actual: Some("201".into()),
+                ignored: false,
+            },
+        ];
+        book.finish(P, "a.yml", &Ok(failed), 1);
+
+        let after = book.ignore(P, "a.yml", "a1").unwrap();
+
+        let outcome = after.outcome.unwrap();
+        assert!(outcome.passed);
+        assert!(outcome.assertions[0].ignored);
+        assert!(
+            book.get(P, "a.yml")
+                .unwrap()
+                .outcome
+                .as_ref()
+                .unwrap()
+                .passed
+        );
+        assert_eq!(
+            book.ignore(P, "a.yml", "absente").unwrap_err().kind,
+            CommandErrorKind::NotFound
+        );
+        assert_eq!(
+            book.ignore(P, "b.yml", "a1").unwrap_err().kind,
+            CommandErrorKind::NotFound
+        );
     }
 
     #[test]

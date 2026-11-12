@@ -22,7 +22,8 @@ use crate::error::{CommandError, CommandErrorKind};
 use crate::layout::windows::{
     ActiveRequest, Bounds, MAIN, WindowKind, WindowState, Windows, WindowsFile,
 };
-use crate::workbench::RunView;
+use crate::statuses::Statuses;
+use crate::workbench::{Notifier, RunView};
 
 /// Fichier des fenêtres, dans les données locales (Z8).
 pub const WINDOWS_FILE: &str = "windows.json";
@@ -41,8 +42,54 @@ pub mod events {
     pub const ACTIVE_REQUEST: &str = "arnod://requete-active";
     /// Début ou fin d'un envoi (`ResultChange`).
     pub const RESULT: &str = "arnod://resultat";
-    /// Run démarré (`RunChange`) : toutes les fenêtres le suivent (R7).
+    /// Run démarré ou avancé (`RunChange`) : toutes les fenêtres le suivent (R7 ;
+    /// `docs/plan-fin-premier-usage.md`, R3).
     pub const RUN: &str = "arnod://run";
+    /// Statuts des requêtes d'un projet (`StatusesChange`, R4).
+    pub const STATUSES: &str = "arnod://statuts";
+}
+
+/// Statuts des requêtes d'un projet, diffusés à chaque changement (R4, R5).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusesChange {
+    pub project_id: Uuid,
+    pub statuses: Statuses,
+}
+
+/// Diffuse aux fenêtres les changements de l'établi : avancement des runs (R3)
+/// et statuts des requêtes (R4). L'origine vide dit que le cœur en est l'auteur.
+pub struct EventNotifier<R: Runtime> {
+    app: AppHandle<R>,
+}
+
+impl<R: Runtime> EventNotifier<R> {
+    pub fn new(app: AppHandle<R>) -> Self {
+        Self { app }
+    }
+}
+
+impl<R: Runtime> Notifier for EventNotifier<R> {
+    fn run_changed(&self, project_id: Uuid, run: &RunView) {
+        let _ = self.app.emit(
+            events::RUN,
+            RunChange {
+                project_id,
+                run: run.clone(),
+                origin: String::new(),
+            },
+        );
+    }
+
+    fn statuses_changed(&self, project_id: Uuid, statuses: &Statuses) {
+        let _ = self.app.emit(
+            events::STATUSES,
+            StatusesChange {
+                project_id,
+                statuses: statuses.clone(),
+            },
+        );
+    }
 }
 
 /// Run démarré dans une fenêtre, diffusé aux autres (R7).

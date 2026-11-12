@@ -443,3 +443,382 @@ async fn c8_c10_le_run_du_contrat_verifie_la_conformite() {
         item.assertions
     );
 }
+
+// ------------------------------------------------- fin du premier usage
+
+/// Notificateur qui garde ce qu'on lui diffuse.
+#[derive(Default)]
+struct Recorder {
+    runs: Mutex<Vec<RunView>>,
+    statuses: Mutex<Vec<Statuses>>,
+}
+
+impl Notifier for Recorder {
+    fn run_changed(&self, _project: Uuid, run: &RunView) {
+        self.runs.lock().unwrap().push(run.clone());
+    }
+
+    fn statuses_changed(&self, _project: Uuid, statuses: &Statuses) {
+        self.statuses.lock().unwrap().push(statuses.clone());
+    }
+}
+
+/// Serveur qui répond 200 sur `/ok` et 500 sur `/ko`.
+async fn ok_ko_server() -> MockServer {
+    let server = MockServer::start().await;
+    Mock::given(path("/ok"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{\"amount\":\"12.50\"}"))
+        .mount(&server)
+        .await;
+    Mock::given(path("/ko"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&server)
+        .await;
+    server
+}
+
+/// Requête qui vérifie que `body.amount` est un nombre (en échec contre `/ok`).
+fn add_number_check(f: &Fixture, path: &str) {
+    let full = tree::resolve(&f.ctx.root, path).unwrap();
+    let mut request = file::read(&full).unwrap();
+    request.assertions.push(Assertion {
+        id: "x".into(),
+        target: "body.amount".into(),
+        operator: crate::request::model::Operator::IsNumber,
+        value: None,
+        origin: crate::request::model::Origin::Manual,
+        enabled: true,
+    });
+    file::write(&full, &request).unwrap();
+}
+
+/// Requête qui exige le statut 200 (en échec contre `/ko`) : sans elle, seule la
+/// durée est vérifiée et un 500 réussit.
+fn add_status_check(f: &Fixture, path: &str) {
+    let full = tree::resolve(&f.ctx.root, path).unwrap();
+    let mut request = file::read(&full).unwrap();
+    request.assertions.push(Assertion {
+        id: "s".into(),
+        target: "status".into(),
+        operator: crate::request::model::Operator::Equals,
+        value: Some(crate::request::model::Scalar::Int(200)),
+        origin: crate::request::model::Origin::Manual,
+        enabled: true,
+    });
+    file::write(&full, &request).unwrap();
+}
+
+#[tokio::test]
+async fn r1_r2_un_run_porte_numero_duree_et_resultat_par_dossier() {
+    let server = ok_ko_server().await;
+    let f = fixture();
+    set_base_url(&f, &server.uri());
+    tree::create_folder(&f.ctx.root, "", "Boutique").unwrap();
+    tree::create_folder(&f.ctx.root, "Boutique", "Catalogue").unwrap();
+    tree::create_folder(&f.ctx.root, "Boutique", "Commandes").unwrap();
+    add_request(
+        &f,
+        "Boutique/Catalogue",
+        "Lister",
+        "{{baseUrl}}/ok",
+        Method::Get,
+    );
+    let create = add_request(
+        &f,
+        "Boutique/Commandes",
+        "Créer",
+        "{{baseUrl}}/ko",
+        Method::Post,
+    );
+    add_status_check(&f, &create);
+    add_request(
+        &f,
+        "Boutique/Commandes",
+        "Lire",
+        "{{baseUrl}}/ok",
+        Method::Get,
+    );
+    add_request(&f, "Boutique", "Santé", "{{baseUrl}}/ok", Method::Get);
+
+    let first = f
+        .bench
+        .start_run(&f.ctx, "Boutique", "Local", None, false)
+        .unwrap();
+    assert_eq!(first.number, 1);
+    assert_eq!(first.concurrency, RUN_CONCURRENCY);
+    assert!(first.finished_at.is_none());
+    let done = wait(&f.bench, first.id).await;
+    assert!(done.finished_at.is_some_and(|end| end >= done.started_at));
+    let groups: Vec<(&str, &str, usize, usize, usize)> = done
+        .groups
+        .iter()
+        .map(|g| {
+            (
+                g.name.as_str(),
+                g.path.as_str(),
+                g.passed,
+                g.failed,
+                g.total,
+            )
+        })
+        .collect();
+    assert_eq!(
+        groups,
+        [
+            ("Catalogue", "Boutique/Catalogue", 1, 0, 1),
+            ("Commandes", "Boutique/Commandes", 1, 1, 2),
+            ("Boutique", "Boutique", 1, 0, 1),
+        ]
+    );
+
+    // Le numéro suit celui du dernier run gardé, même après un redémarrage.
+    let restarted = Arc::new(Workbench::new(f.store.clone()));
+    let second = restarted
+        .start_run(&f.ctx, "", "Local", None, false)
+        .unwrap();
+    assert_eq!(second.number, 2);
+    let second = wait(&restarted, second.id).await;
+    assert_eq!(second.groups[0].name, "Boutique");
+    assert_eq!(second.groups[0].total, 4);
+}
+
+#[test]
+fn r2_groupes_a_la_racine_du_projet() {
+    let item = |path: &str, status| RunItem {
+        path: path.into(),
+        name: path.into(),
+        method: Method::Get,
+        status,
+        http_status: None,
+        duration_ms: None,
+        slow: false,
+        assertions: Vec::new(),
+        error: None,
+    };
+    let groups = run_groups(
+        "",
+        &[
+            item("a/x.yml", ItemStatus::Error),
+            item("sante.yml", ItemStatus::Passed),
+            item("a/b/y.yml", ItemStatus::Pending),
+        ],
+    );
+    assert_eq!(groups.len(), 2);
+    assert_eq!(
+        (groups[0].name.as_str(), groups[0].failed, groups[0].total),
+        ("a", 1, 2)
+    );
+    assert_eq!(
+        (groups[1].name.as_str(), groups[1].path.as_str()),
+        ("Projet", "")
+    );
+}
+
+#[test]
+fn un_dernier_run_d_une_version_precedente_se_relit() {
+    let f = fixture();
+    let dir = local::project_dir(&f.ctx.data_dir, f.ctx.id);
+    std::fs::create_dir_all(&dir).unwrap();
+    let old = serde_json::json!({
+        "id": Uuid::new_v4(),
+        "folder": "D",
+        "environment": "Local",
+        "startedAt": 5,
+        "finished": true,
+        "cancelled": false,
+        "items": [{
+            "path": "D/a.yml", "name": "a", "method": "GET", "status": "failed",
+            "httpStatus": 500, "durationMs": 3, "slow": false, "error": null,
+            "assertions": [{ "id": "x", "passed": false, "message": "m", "actual": null }]
+        }]
+    });
+    std::fs::write(dir.join("last-run.json"), old.to_string()).unwrap();
+    let run = Workbench::last_run(&f.ctx).unwrap();
+    assert_eq!(run.number, 0);
+    assert_eq!(run.concurrency, RUN_CONCURRENCY);
+    assert_eq!(run.groups.len(), 1);
+    assert_eq!(run.groups[0].failed, 1);
+    assert_eq!(run.items[0].assertions[0].target, "");
+    assert!(!run.items[0].assertions[0].ignored);
+}
+
+#[tokio::test]
+async fn r3_r4_l_avancement_et_les_statuts_sont_diffuses() {
+    let server = ok_ko_server().await;
+    let f = fixture();
+    let recorder = Arc::new(Recorder::default());
+    f.bench.set_notifier(recorder.clone());
+    set_base_url(&f, &server.uri());
+    tree::create_folder(&f.ctx.root, "", "D").unwrap();
+    let ok = add_request(&f, "D", "Bon", "{{baseUrl}}/ok", Method::Get);
+    let ko = add_request(&f, "D", "Mauvais", "{{baseUrl}}/ko", Method::Get);
+    add_status_check(&f, &ko);
+
+    let started = f
+        .bench
+        .start_run(&f.ctx, "D", "Local", None, false)
+        .unwrap();
+    let done = wait(&f.bench, started.id).await;
+
+    let runs = recorder.runs.lock().unwrap().clone();
+    // En cours puis terminée, pour chaque requête, puis la fin du run.
+    assert_eq!(runs.len(), 5);
+    assert!(runs.windows(2).all(|w| w[0].revision < w[1].revision));
+    assert!(runs.last().unwrap().finished);
+    assert_eq!(runs.last().unwrap().revision, done.revision);
+
+    let statuses = f.bench.statuses(&f.ctx);
+    assert!(statuses[&ok].passed);
+    assert!(!statuses[&ko].passed);
+    assert_eq!(recorder.statuses.lock().unwrap().len(), 2);
+    // Gardés sur disque (R5).
+    let restarted = Workbench::new(f.store.clone());
+    assert_eq!(restarted.statuses(&f.ctx), statuses);
+}
+
+#[test]
+fn r5_les_statuts_suivent_renommage_et_suppression() {
+    let f = fixture();
+    let recorder = Arc::new(Recorder::default());
+    f.bench.set_notifier(recorder.clone());
+    f.bench.record_status(&f.ctx, "D/a.yml", true);
+    f.bench.record_status(&f.ctx, "D/b.yml", false);
+    f.bench.rename_status(&f.ctx, "D", "E");
+    let statuses = f.bench.statuses(&f.ctx);
+    assert_eq!(
+        statuses.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["E/a.yml", "E/b.yml"]
+    );
+    f.bench.remove_status(&f.ctx, "E/b.yml");
+    assert_eq!(f.bench.statuses(&f.ctx).len(), 1);
+    // Rien ne change : rien n'est diffusé.
+    f.bench.rename_status(&f.ctx, "absent", "ailleurs");
+    assert_eq!(recorder.statuses.lock().unwrap().len(), 4);
+}
+
+#[tokio::test]
+async fn r7_ignorer_une_verification_dans_un_run() {
+    let server = ok_ko_server().await;
+    let f = fixture();
+    set_base_url(&f, &server.uri());
+    tree::create_folder(&f.ctx.root, "", "D").unwrap();
+    let path = add_request(&f, "D", "Montant", "{{baseUrl}}/ok", Method::Get);
+    add_number_check(&f, &path);
+    let started = f
+        .bench
+        .start_run(&f.ctx, "D", "Local", None, false)
+        .unwrap();
+    let done = wait(&f.bench, started.id).await;
+    let item = &done.items[0];
+    assert_eq!(item.status, ItemStatus::Failed);
+    let failed = item.assertions.iter().find(|a| !a.passed).unwrap();
+    assert_eq!(failed.target, "body.amount");
+    assert_eq!(
+        failed.message.as_deref(),
+        Some("attendu number, reçu \"12.50\"")
+    );
+    assert!(!f.bench.statuses(&f.ctx)[&path].passed);
+    let id = failed.id.clone();
+
+    let after = f
+        .bench
+        .ignore_in_run(&f.ctx, started.id, &path, &id)
+        .unwrap();
+
+    assert_eq!(after.items[0].status, ItemStatus::Passed);
+    assert!(after.revision > done.revision);
+    assert_eq!(after.groups[0].passed, 1);
+    assert!(f.bench.statuses(&f.ctx)[&path].passed);
+    // Gardé dans le dernier run, mais pas dans la requête.
+    assert_eq!(
+        Workbench::last_run(&f.ctx).unwrap().items[0].status,
+        ItemStatus::Passed
+    );
+    let request = file::read(&tree::resolve(&f.ctx.root, &path).unwrap()).unwrap();
+    assert!(request.assertions.iter().any(|a| a.target == "body.amount"));
+    // Un run oublié se relit sur disque ; une vérification absente est refusée.
+    let restarted = Workbench::new(f.store.clone());
+    let error = restarted
+        .ignore_in_run(&f.ctx, started.id, &path, "absente")
+        .unwrap_err();
+    assert_eq!(error.kind, CommandErrorKind::NotFound);
+    assert!(
+        restarted
+            .ignore_in_run(&f.ctx, started.id, &path, &id)
+            .is_ok()
+    );
+}
+
+#[test]
+fn forme_json_du_run_et_des_statuts() {
+    let mut run = RunView {
+        id: Uuid::nil(),
+        number: 3,
+        folder: "D".into(),
+        environment: "Recette".into(),
+        concurrency: 8,
+        started_at: 10,
+        finished_at: Some(4_110),
+        finished: true,
+        cancelled: false,
+        items: vec![RunItem {
+            path: "D/a.yml".into(),
+            name: "a".into(),
+            method: Method::Post,
+            status: ItemStatus::Failed,
+            http_status: Some(201),
+            duration_ms: Some(88),
+            slow: false,
+            assertions: vec![AssertionResult {
+                id: "x".into(),
+                target: "body.amount".into(),
+                passed: false,
+                message: Some("attendu number, reçu \"129.90\"".into()),
+                actual: Some("\"129.90\"".into()),
+                ignored: false,
+            }],
+            error: None,
+        }],
+        contract: None,
+        revision: 0,
+        groups: Vec::new(),
+    };
+    run.touch();
+    let json = serde_json::to_value(&run).unwrap();
+    assert_eq!(json["number"], 3);
+    assert_eq!(json["concurrency"], 8);
+    assert_eq!(json["finishedAt"], 4_110);
+    assert_eq!(json["revision"], 1);
+    assert_eq!(
+        json["groups"],
+        serde_json::json!([{ "name": "D", "path": "D", "passed": 0, "failed": 1, "total": 1 }])
+    );
+    assert_eq!(
+        json["items"][0]["assertions"][0],
+        serde_json::json!({
+            "id": "x",
+            "target": "body.amount",
+            "passed": false,
+            "message": "attendu number, reçu \"129.90\"",
+            "actual": "\"129.90\"",
+            "ignored": false
+        })
+    );
+    let change = crate::windows::StatusesChange {
+        project_id: Uuid::nil(),
+        statuses: Statuses::from([(
+            "D/a.yml".to_owned(),
+            crate::statuses::RequestStatus {
+                passed: false,
+                at: 7,
+            },
+        )]),
+    };
+    assert_eq!(
+        serde_json::to_value(change).unwrap(),
+        serde_json::json!({
+            "projectId": Uuid::nil().to_string(),
+            "statuses": { "D/a.yml": { "passed": false, "at": 7 } }
+        })
+    );
+}

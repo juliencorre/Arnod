@@ -1,10 +1,15 @@
 <script setup lang="ts">
-/** Réponse reçue (V1 à V6) : statut, durées, corps, en-têtes et résultat des vérifications. */
+/**
+ * Réponse reçue (V1 à V6) : statut, durées, corps, en-têtes et résultat des vérifications. Les
+ * vérifications en échec sont détaillées sous la réponse, ignorables pour ce résultat ou
+ * retirables de la requête (`docs/plan-fin-premier-usage.md`, VT1 à VT3).
+ */
 import { computed, ref } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useWorkbenchStore } from "@/stores/workbench";
+import type { AssertionResult } from "@/types/ipc";
 
 const props = defineProps<{ editorKey: string }>();
 
@@ -23,12 +28,30 @@ const prettyBody = computed(() => {
   }
 });
 
-const failed = computed(() => outcome.value?.assertions.filter((a) => !a.passed).length ?? 0);
+/** Identifiant du résultat de conformité au contrat lié (`CONTRACT_CHECK`, R8). */
+const CONTRACT_CHECK = "contrat";
+
+/** Vérifications en échec qui comptent : ni réussies, ni ignorées (R7). */
+const failures = computed(
+  () => outcome.value?.assertions.filter((a) => !a.passed && !a.ignored) ?? [],
+);
+const failed = computed(() => failures.value.length);
 
 /** Libellé d'un résultat : cible de la vérification, ou conformité au contrat lié (R8). */
-function messageFor(id: string): string | null {
-  if (id === "contrat") return "Conformité au contrat";
-  return editor.value?.draft?.assertions.find((a) => a.id === id)?.target ?? null;
+function labelOf(check: AssertionResult): string {
+  if (check.id === CONTRACT_CHECK) return "Conformité au contrat";
+  return (
+    check.target ||
+    (editor.value?.draft?.assertions.find((a) => a.id === check.id)?.target ?? check.id)
+  );
+}
+
+/** La vérification est encore dans la requête : elle peut en être retirée (R8). */
+function removable(check: AssertionResult): boolean {
+  return (
+    check.id !== CONTRACT_CHECK &&
+    (editor.value?.draft?.assertions.some((a) => a.id === check.id) ?? false)
+  );
 }
 </script>
 
@@ -101,17 +124,45 @@ function messageFor(id: string): string | null {
           <li
             v-for="check in outcome.assertions"
             :key="check.id"
-            :class="check.passed ? 'check--ok' : 'check--ko'"
+            :class="check.passed ? 'check--ok' : check.ignored ? 'check--ignored' : 'check--ko'"
           >
-            <span aria-hidden="true">{{ check.passed ? "✓" : "✕" }}</span>
-            <span class="check__target">{{ messageFor(check.id) ?? check.id }}</span>
+            <span aria-hidden="true">{{ check.passed ? "✓" : check.ignored ? "–" : "✕" }}</span>
+            <span class="check__target">{{ labelOf(check) }}</span>
             <span v-if="check.message" class="check__message">{{ check.message }}</span>
+            <span v-if="check.ignored" class="check__message">ignorée pour ce run</span>
           </li>
         </ul>
         <BaseButton @click="workbench.proposeAssertions(editorKey)">
           Proposer des vérifications
         </BaseButton>
       </div>
+      <ul v-if="failures.length > 0" class="failures" aria-label="Vérifications en échec">
+        <li v-for="check in failures" :key="check.id" class="failure">
+          <p class="failure__title"><span aria-hidden="true">✕</span> {{ labelOf(check) }}</p>
+          <p v-if="check.message" class="failure__message">{{ check.message }}</p>
+          <p class="failure__actions">
+            <button
+              type="button"
+              class="failure__link"
+              :aria-label="`Ignorer ${labelOf(check)} pour ce run`"
+              @click="workbench.ignoreCheck(editorKey, check.id)"
+            >
+              Ignorer pour ce run
+            </button>
+            <template v-if="removable(check)">
+              ·
+              <button
+                type="button"
+                class="failure__link"
+                :aria-label="`Retirer la vérification ${labelOf(check)}`"
+                @click="workbench.removeCheck(editorKey, check.id)"
+              >
+                Retirer la vérification
+              </button>
+            </template>
+          </p>
+        </li>
+      </ul>
     </template>
   </section>
 </template>
@@ -251,6 +302,59 @@ function messageFor(id: string): string | null {
 
 .check--ko {
   background: var(--color-danger-soft);
+}
+
+.check--ignored {
+  color: var(--color-muted);
+}
+
+.failures {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.failure {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+  background: var(--color-danger-soft);
+}
+
+.failure__title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.failure__message {
+  margin: 0.25rem 0 0;
+  font: 0.8125rem var(--font-mono);
+  color: var(--color-text);
+}
+
+.failure__actions {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.failure__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  color: var(--color-link);
+  cursor: pointer;
+}
+
+.failure__link:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .check__target {

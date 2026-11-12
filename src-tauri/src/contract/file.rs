@@ -736,8 +736,10 @@ pub fn conformance_result(
     };
     AssertionResult {
         id: id.to_owned(),
+        target: id.to_owned(),
         passed: outcome.is_ok(),
         message: outcome.err(),
         actual: Some(response.status.to_string()),
+        ignored: false,
     }
 }

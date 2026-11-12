@@ -21,6 +21,7 @@ pub mod request;
 pub mod results;
 pub mod secrets;
 pub mod state;
+pub mod statuses;
 pub mod steps;
 pub mod storage;
 pub mod tree;
@@ -52,7 +53,10 @@ pub fn run() {
             let data_dir = app.path().app_local_data_dir()?;
             let default_location = app.path().home_dir()?.join(DEFAULT_LOCATION_DIR);
             app.manage(AppState::load(data_dir.clone(), default_location));
-            app.manage(Arc::new(Workbench::new(Arc::new(SystemSecretStore))));
+            let bench = Arc::new(Workbench::new(Arc::new(SystemSecretStore)));
+            // Avancement des runs et statuts des requêtes diffusés aux fenêtres (R3, R4).
+            bench.set_notifier(Arc::new(windows::EventNotifier::new(app.handle().clone())));
+            app.manage(bench);
             app.manage(WindowsState::load(data_dir));
             app.manage(Mutex::new(ResultBook::default()));
             // Chaque modification du catalogue est diffusée à toutes les fenêtres (F11).
@@ -121,6 +125,8 @@ pub fn run() {
             commands::requests::request_send,
             commands::requests::request_cancel,
             commands::requests::request_result,
+            commands::requests::request_statuses,
+            commands::requests::result_ignore_check,
             commands::requests::request_propose_assertions,
             commands::requests::request_example_from_response,
             commands::environments::environments_load,
@@ -133,6 +139,7 @@ pub fn run() {
             commands::runs::run_status,
             commands::runs::run_cancel,
             commands::runs::run_retry_failures,
+            commands::runs::run_ignore_check,
             commands::runs::run_last,
             commands::runs::project_last_runs,
             commands::steps::steps_catalog,
