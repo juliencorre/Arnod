@@ -1,0 +1,143 @@
+/* Arnod — generated from tokens.json */
+:root, [data-theme="light"] {
+  --color-bg: #fbfaf8;
+  --color-surface: #ffffff;
+  --color-sidebar: #f4f2ee;
+  --color-chip: #efebe4;
+  --color-accent-soft: #fdf1e1;
+  --color-border: #e6e2db;
+  --color-border-strong: #cfc9bf;
+  --color-text: #1d1b18;
+  --color-muted: #6b665e;
+  --color-subtle: #8b857b;
+  --color-link: #9a5a0c;
+  --color-success: #2f7a4b;
+  --color-success-soft: #e7f4ec;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdeceb;
+  --color-accent: #e8962e;
+  --color-accent-hover: #d9822a;
+  --color-accent-text: #1d1b18;
+  --color-focus: #9a5a0c;
+  --color-toast-bg: #1d1b18;
+  --color-toast-text: #fbfaf8;
+  --color-toast-action: #f0a54a;
+  --color-ws-gray: #a39d93;
+  --color-ws-orange: #e8962e;
+  --color-ws-blue: #3f7fd6;
+  --color-ws-green: #3f9a5a;
+  --color-ws-purple: #8a63d2;
+  --color-ws-red: #d6564b;
+  --color-ws-yellow: #d4ad2a;
+  --color-ws-teal: #2f9c95;
+  --color-family-calls-bg: #ebf7ff;
+  --color-family-calls-border: #a7c8ea;
+  --color-family-calls-text: #194f81;
+  --color-family-data-bg: #e7faf9;
+  --color-family-data-border: #96d1d0;
+  --color-family-data-text: #005d5e;
+  --color-family-messages-bg: #f7f2ff;
+  --color-family-messages-border: #cabce6;
+  --color-family-messages-text: #563e7b;
+  --color-family-jobs-bg: #fef3e7;
+  --color-family-jobs-border: #debe9a;
+  --color-family-jobs-text: #6f4100;
+  --color-family-interface-bg: #fff0f9;
+  --color-family-interface-border: #e0b6d0;
+  --color-family-interface-text: #70355e;
+  --color-family-code-bg: #fff1ed;
+  --color-family-code-border: #e9b6ad;
+  --color-family-code-text: #7a342b;
+  --color-family-files-bg: #f6f7e7;
+  --color-family-files-border: #c6c89b;
+  --color-family-files-text: #515100;
+  --backdrop: rgba(29, 27, 24, 0.32);
+  --shadow-popover: 0 8px 24px rgba(29, 27, 24, 0.14), 0 1px 3px rgba(29, 27, 24, 0.1);
+  --shadow-dialog: 0 24px 64px rgba(29, 27, 24, 0.22);
+}
+[data-theme="dark"] {
+  --color-bg: #1a1917;
+  --color-surface: #23211e;
+  --color-sidebar: #201e1b;
+  --color-chip: #2e2b27;
+  --color-accent-soft: #3a2c1a;
+  --color-border: #36322d;
+  --color-border-strong: #4a453e;
+  --color-text: #ede9e3;
+  --color-muted: #b0a99e;
+  --color-subtle: #8a8378;
+  --color-link: #f0b46a;
+  --color-success: #6cc28b;
+  --color-success-soft: #1f3327;
+  --color-danger: #ff8a80;
+  --color-danger-soft: #3d2321;
+  --color-accent: #eda24c;
+  --color-accent-hover: #f3b46a;
+  --color-accent-text: #1d1b18;
+  --color-focus: #f0b46a;
+  --color-toast-bg: #3a3631;
+  --color-toast-text: #ede9e3;
+  --color-toast-action: #f0b46a;
+  --color-ws-gray: #8f887e;
+  --color-ws-orange: #eda24c;
+  --color-ws-blue: #6b9be6;
+  --color-ws-green: #5cb878;
+  --color-ws-purple: #a585e3;
+  --color-ws-red: #e8766c;
+  --color-ws-yellow: #e2c04a;
+  --color-ws-teal: #4bbab2;
+  --color-family-calls-bg: #1e2f41;
+  --color-family-calls-border: #3e6084;
+  --color-family-calls-text: #a9d6ff;
+  --color-family-data-bg: #113434;
+  --color-family-data-border: #216a6a;
+  --color-family-data-text: #90e2e1;
+  --color-family-messages-bg: #31293f;
+  --color-family-messages-border: #64547f;
+  --color-family-messages-text: #d9c6fe;
+  --color-family-jobs-bg: #3b2a17;
+  --color-family-jobs-border: #77562f;
+  --color-family-jobs-text: #f3c898;
+  --color-family-interface-bg: #3b2634;
+  --color-family-interface-border: #784e6a;
+  --color-family-interface-text: #f6bde2;
+  --color-family-code-bg: #402622;
+  --color-family-code-border: #814e46;
+  --color-family-code-text: #ffbeb2;
+  --color-family-files-bg: #2f3017;
+  --color-family-files-border: #606130;
+  --color-family-files-text: #d4d699;
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+:root {
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --tree-pad: 6px;
+  --tree-indent: 20px;
+  --tree-lead: 40px;
+  --tree-gap: 8px;
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+}
+.text-display { font-family: var(--font-sans); font-size: 24px; line-height: 1.5; font-weight: 600; }
+.text-title { font-family: var(--font-sans); font-size: 18px; line-height: 1.5; font-weight: 600; }
+.text-body-large { font-family: var(--font-sans); font-size: 15px; line-height: 1.5; font-weight: 400; }
+.text-body { font-family: var(--font-sans); font-size: 13px; line-height: 1.5; font-weight: 400; }
+.text-small { font-family: var(--font-sans); font-size: 12px; line-height: 1.5; font-weight: 400; }
+.text-caption { font-family: var(--font-sans); font-size: 11px; line-height: 1.5; font-weight: 600; }
+.mono-caption { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; font-weight: 700; }
+.mono-small { font-family: var(--font-mono); font-size: 12px; line-height: 1.5; font-weight: 400; }

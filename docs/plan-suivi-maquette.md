@@ -38,6 +38,7 @@ lettres. La page 0.1-d de la maquette donne la correspondance avec les anciens r
 | R6  | Une pull request qui livre, modifie ou écarte un écran met le fichier à jour (case du modèle de pull request) ; un plan cite ses écrans par repère.                                                                                                   |
 | R7  | `scripts/check-maquette.mjs` (`npm run check`, CI) vérifie la structure, les états, les plans, les captures, la traçabilité (R3), les écarts (R4) et que tout repère cité dans la documentation existe.                                               |
 | R8  | Après une fusion, une session Claude régénère la maquette depuis le fichier avec `scripts/maquette-sync.py` (pages lues sur claude.ai dans `.maquette/pages/`, captures e2e) ; sa fiche et son index disent de quel commit de `Develop` ils viennent. |
+| R9  | La page 0.5 (Design system) est générée en entier depuis `docs/design-system/` ; un écart transverse qui touche le design system porte `page: "0.5"` et s'affiche en 0.5-e.                                                                           |
 
 ## 4. Audit du 12 novembre 2026
 

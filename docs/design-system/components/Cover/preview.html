@@ -1,0 +1,90 @@
+<!-- @dsCard height=288 -->
+<div class="cover">
+  <style>
+    .cover {
+      position: relative;
+      width: 960px;
+      height: 288px;
+      overflow: hidden;
+      font-family: var(--font-sans);
+      background: var(--color-bg);
+    }
+    .cover__art {
+      position: absolute;
+      top: 0;
+      left: 480px;
+      width: 480px;
+      height: 288px;
+    }
+    .ink {
+      fill: var(--color-text);
+    }
+    .accent {
+      fill: var(--color-accent);
+    }
+    .tint {
+      fill: var(--color-border-strong);
+    }
+    .link {
+      fill: var(--color-link);
+    }
+    .block {
+      rx: var(--radius-lg);
+    }
+    .row {
+      rx: 4px;
+    }
+    .cover__text {
+      position: absolute;
+      bottom: 40px;
+      left: 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 440px;
+    }
+    .cover__name {
+      margin: 0;
+      font-size: 120px;
+      font-weight: 700;
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      color: var(--color-text);
+    }
+    .cover__tagline {
+      margin: 0;
+      font-size: 14px;
+      color: var(--color-muted);
+    }
+  </style>
+  <svg class="cover__art" viewBox="0 0 480 288" aria-hidden="true">
+    <!--
+      Blocs : color-text 284 × 188 (déborde en haut et à droite), color-accent 144 × 204 (déborde
+      en bas), color-border-strong 128 × 116, color-link 148 × 56 (déborde à droite).
+      Disposition : une dalle haute (l'accent) et ses satellites, le bloc d'encre en haut à droite.
+      Motif : lignes de l'arborescence (méthode puis nom), parce que la liste des requêtes rangées
+      est ce qu'Arnod montre en premier ; pas de space-24, retrait tree-indent, écart space-8.
+      Rayons : radius-lg pour les blocs, demi-hauteur pour les lignes.
+    -->
+    <rect class="ink block" x="208" y="-12" width="284" height="188" />
+    <rect class="accent block" x="48" y="96" width="144" height="204" />
+    <rect class="tint block" x="208" y="184" width="128" height="116" />
+    <rect class="link block" x="344" y="184" width="148" height="56" />
+    <rect class="accent row" x="232" y="28" width="24" height="8" />
+    <rect class="tint row" x="264" y="28" width="120" height="8" />
+    <rect class="accent row" x="252" y="52" width="24" height="8" />
+    <rect class="tint row" x="284" y="52" width="96" height="8" />
+    <rect class="accent row" x="272" y="76" width="24" height="8" />
+    <rect class="tint row" x="304" y="76" width="136" height="8" />
+    <rect class="accent row" x="272" y="100" width="24" height="8" />
+    <rect class="tint row" x="304" y="100" width="80" height="8" />
+    <rect class="accent row" x="252" y="124" width="24" height="8" />
+    <rect class="tint row" x="284" y="124" width="112" height="8" />
+    <rect class="accent row" x="272" y="148" width="24" height="8" />
+    <rect class="tint row" x="304" y="148" width="104" height="8" />
+  </svg>
+  <div class="cover__text">
+    <p class="cover__name">Arnod</p>
+    <p class="cover__tagline">Une application de bureau pour tester des API.</p>
+  </div>
+</div>

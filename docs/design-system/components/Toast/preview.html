@@ -1,0 +1,23 @@
+<!-- @dsCard group="Menus et fenêtres" height=150 subtitle="ToastHost" -->
+<div class="demo">
+  <style>
+    .demo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding: 16px;
+      font: 16px/1.5 var(--font-sans);
+      color: var(--color-text);
+      background: var(--color-bg);
+    }
+  </style>
+  <div class="toast" role="status">
+    <span class="toast__message">Requête « Créer une commande » mise à la corbeille.</span>
+    <button type="button" class="toast__action">Annuler</button>
+  </div>
+  <div class="toast toast--error" role="status">
+    <span class="toast__message">Impossible d'écrire le fichier : accès refusé.</span>
+    <button type="button" class="toast__action">Réessayer</button>
+  </div>
+</div>

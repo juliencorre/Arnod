@@ -1,0 +1,54 @@
+<!-- @dsCard group="Saisie" height=130 subtitle="ToggleSwitch" -->
+<div class="demo">
+  <style>
+    .demo {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px;
+      font: 16px/1.5 var(--font-sans);
+      color: var(--color-text);
+      background: var(--color-bg);
+    }
+  </style>
+  <label class="toggle" for="toggle-on">
+    <button
+      id="toggle-on"
+      type="button"
+      role="switch"
+      class="toggle__switch"
+      aria-checked="true"
+      aria-labelledby="toggle-on-label"
+    >
+      <span class="toggle__thumb"></span>
+    </button>
+    <span id="toggle-on-label" class="toggle__label">Suivre les redirections</span>
+  </label>
+  <label class="toggle" for="toggle-off">
+    <button
+      id="toggle-off"
+      type="button"
+      role="switch"
+      class="toggle__switch"
+      aria-checked="false"
+      aria-labelledby="toggle-off-label"
+    >
+      <span class="toggle__thumb"></span>
+    </button>
+    <span id="toggle-off-label" class="toggle__label">Vérifier le certificat TLS</span>
+  </label>
+  <label class="toggle toggle--disabled" for="toggle-disabled">
+    <button
+      id="toggle-disabled"
+      type="button"
+      role="switch"
+      class="toggle__switch"
+      aria-checked="true"
+      aria-labelledby="toggle-disabled-label"
+      disabled
+    >
+      <span class="toggle__thumb"></span>
+    </button>
+    <span id="toggle-disabled-label" class="toggle__label">Workspace par défaut</span>
+  </label>
+</div>

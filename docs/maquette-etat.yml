@@ -17,6 +17,18 @@ transverses:
     aligner: maquette
   - texte: "Environnement : l'application crée « Local » dans chaque projet et dans Non classés ; plusieurs écrans montrent « Aucun environnement » (1.2-d, 2.2-a)."
     aligner: maquette
+  - texte: "Bouton principal : orange (color-accent, #e8962e) et texte foncé dans le code et le design system, contraste 7,2:1 ; rouille #b4561d et texte blanc dans la maquette."
+    aligner: maquette
+    page: "0.5"
+  - texte: "Couleurs : la maquette écrit ses teintes à la main, la moitié seulement sur des valeurs de jetons ; elle passe aux jetons du design system (ds/arnod/tokens.css). 0.5-e compte les teintes et donne le jeton qui remplace chacune."
+    aligner: maquette
+    page: "0.5"
+  - texte: "Tailles de texte : échelle 11, 12, 13, 15, 18 et 24 px (design system, maquette) ; le code emploie aussi 10, 14 (49 fois), 16, 17, 20 et 28 px."
+    aligner: code
+    page: "0.5"
+  - texte: "Rayons : 2, 6 et 10 px et formes rondes (design system, maquette) ; le code emploie aussi 8 px (boutons et champs, 31 fois), 3, 4, 5, 12 et 14 px."
+    aligner: code
+    page: "0.5"
 pages:
   "0.1":
     nom: "Périmètre et feuille de route"
@@ -68,6 +80,20 @@ pages:
       a: { etat: livré, pr: [4, 27] }
       b: { etat: à faire }
       c: { etat: à faire }
+  "0.5":
+    nom: "Design system"
+    version: Cadre
+    etat: référence
+    developpement: "docs/design-system/ (README, guides, aperçus) · scripts/design-system.mjs (jetons, styles, icônes tirés du code) · design system « Arnod » sur claude.ai"
+    liees: ["0.4", "0.1"]
+    journal:
+      - "2026-11-12 : Design system « Arnod » tiré du code ; couleurs du code, échelles de texte et de rayons de la maquette ; page générée depuis docs/design-system/."
+    ecrans:
+      a: { etat: référence }
+      b: { etat: référence }
+      c: { etat: référence }
+      d: { etat: référence }
+      e: { etat: référence }
   "1.1":
     nom: "Workspaces"
     version: MVP
