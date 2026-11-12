@@ -24,7 +24,8 @@ classés »), puis sélecteur de workspace et icônes des sections selon
 `docs/plan-selecteur-workspace.md` (section « Projets et workspaces »), puis requêtes rangées dans
 leur contrat selon `docs/plan-requetes-dans-contrats.md` (sections « Contrats de services » et
 « Barre latérale du projet »), puis fin du premier usage selon `docs/plan-fin-premier-usage.md`
-(section « Run et statuts »). Un nouveau lot commence par un plan rédigé à partir de
+(section « Run et statuts »), puis suivi de la maquette selon `docs/plan-suivi-maquette.md`
+(section « Maquette et état des écrans »). Un nouveau lot commence par un plan rédigé à partir de
 `docs/modele-plan.md`.
 
 ## Architecture
@@ -238,6 +239,20 @@ R8), maquettes `docs/maquettes/1e-requete-assertions-reponse.png` et `1f-run.png
   s'ignore mais ne se retire pas.
 - Origine d'une vérification : de session, jamais écrite ; relue d'un fichier, elle est
   « manuelle », sauf la durée par défaut, reconnue « par défaut ».
+
+## Maquette et état des écrans
+
+Référence : `docs/plan-suivi-maquette.md` (règles R1 à R8).
+
+- La maquette (Claude Design) range ses pages par code (0 Cadre, 1 Espace de travail, 2 Démarrer,
+  3 Services, 4 Tests, 5 Exécution, 6 Recette, 7 Équipe) ; un écran a un repère `3.2-a2` (page,
+  lettre). Plans, commits et pull requests citent les écrans par repère.
+- `docs/maquette-etat.yml` tient l'état de chaque écran (livré, en partie, à faire…), sa pull
+  request ou son plan, ses captures e2e et ses écarts avec le code (`aligner` : maquette, code ou
+  à décider). Une pull request qui livre, modifie ou écarte un écran le met à jour ;
+  `scripts/check-maquette.mjs` le vérifie (`npm run check`, CI).
+- Une capture citée existe dans `e2e/arnod.e2e.ts` (`screenshot(browser, "…")`) : un écran livré
+  visible gagne une capture e2e. La maquette est régénérée depuis le fichier après fusion.
 
 ## Projets et workspaces
 

@@ -46,6 +46,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Versions concordantes
         run: node scripts/check-version.mjs
+      - name: Maquette et code
+        run: node scripts/check-maquette.mjs
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
