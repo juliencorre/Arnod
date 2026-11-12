@@ -38,7 +38,7 @@ keyring = { version = "3", default-features = false, features = ["windows-native
 # Corbeille du système pour la suppression des dossiers et requêtes.
 trash = "5"
 # En-tête Authorization Basic.
-base64 = "0.22"
+base64 = "0.23"
 # Encodage des paramètres d'adresse et des formulaires.
 percent-encoding = "2"
 
