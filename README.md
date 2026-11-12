@@ -183,7 +183,7 @@ sont dans [`CLAUDE.md`](CLAUDE.md).
 
 ## Prérequis
 
-- Node.js 22 ou plus récent.
+- Node.js 22.23.4 ou plus récent (24 : 24.22.1, 26 : 26.12.1), minimum exigé par webdriverio.
 - Rust stable 1.90 ou plus récent (`rustup`).
 - **Windows** : Microsoft C++ Build Tools et WebView2 (présent sur Windows 10 22H2 et 11).
 - **Linux** (Debian/Ubuntu) :

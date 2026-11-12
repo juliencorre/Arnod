@@ -134,7 +134,7 @@ scripts/                Mesure de taille, concordance des versions, tests de fum
 ## Commandes
 
 ```sh
-npm ci                      # dépendances frontend (Node 22+)
+npm ci                      # dépendances frontend (Node 22.23.4+, 24.22.1+ ou 26.12.1+)
 npm run tauri dev           # application en développement (Vite sur le port 1420)
 npm run tauri build         # build release : NSIS sous Windows, AppImage sous Linux
 
