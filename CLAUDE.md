@@ -134,7 +134,8 @@ src-tauri/              Cœur Rust
   src/commands/         Commandes, un fichier par domaine
 docs/                   Plans, modèle de plan, maquettes, captures du README, schéma
                         OpenCollection 1.0.0 (docs/opencollection/)
-scripts/                Mesure de taille, concordance des versions, tests de fumée (CI)
+scripts/                Mesure de taille, concordance des versions, tests de fumée (CI), état de
+                        la maquette (check-maquette.mjs, maquette-sync.py)
 .github/                Modèles d'issue et de pull request, Dependabot
   workflows/            CI de build Windows et Linux, contrôle des titres de pull request
 ```

@@ -37,7 +37,7 @@ lettres. La page 0.1-d de la maquette donne la correspondance avec les anciens r
 | R5  | `captures` nomme les captures e2e (`screenshot(browser, "…")`) qui montrent l'écran dans l'application réelle.                                                                                                                                     |
 | R6  | Une pull request qui livre, modifie ou écarte un écran met le fichier à jour (case du modèle de pull request) ; un plan cite ses écrans par repère.                                                                                                |
 | R7  | `scripts/check-maquette.mjs` (`npm run check`, CI) vérifie la structure, les états, les plans, les captures, la traçabilité (R3), les écarts (R4) et que tout repère cité dans la documentation existe.                                            |
-| R8  | Après une fusion, la maquette est régénérée depuis le fichier par une session Claude ; sa fiche et son index disent de quel commit de `Develop` ils viennent.                                                                                      |
+| R8  | Après une fusion, une session Claude régénère la maquette depuis le fichier avec `scripts/maquette-sync.py` (pages lues sur claude.ai, captures e2e) ; sa fiche et son index disent de quel commit de `Develop` ils viennent.                      |
 
 ## 4. Audit du 12 novembre 2026
 
@@ -61,8 +61,8 @@ partie (chronologie réduite à attente et réception).
 - [x] **T3** — Modèle de pull request (case « maquette-etat.yml à jour ») et modèle de plan (repères
       dans le tableau « Maquettes ») ; `CLAUDE.md`.
 - [x] **T4** — Audit des écrans livrés face aux captures e2e (§ 4).
-- [x] **T5** — Maquette régénérée depuis le fichier : pastilles, écarts, fiches, index, captures
-      de l'application réelle sous chaque écran (hors dépôt).
+- [x] **T5** — `scripts/maquette-sync.py` : maquette régénérée depuis le fichier (pastilles,
+      écarts, fiches, index, captures de l'application réelle sous chaque écran).
 
 ## 6. Hors périmètre
 
