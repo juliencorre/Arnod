@@ -3,14 +3,15 @@
 Pastilles d'état et d'écart des écrans, texte des écarts, fiche de chaque page, index et repères de
 la page 0.1, captures de l'application réelle (« Application réelle ») sous les écrans livrés.
 
-Usage (Python 3 et PyYAML) :
-    python3 -I scripts/maquette-sync.py docs/maquette-etat.yml <pages>/project <sortie>/project \
-        e2e/artifacts "Develop @<commit>"
+Usage (Python 3 et PyYAML), depuis n'importe où :
+    python3 -I scripts/maquette-sync.py "Develop @<commit>"
 
-- <pages>/project : les pages actuelles de la maquette (fichiers .dc.html et compat.json), lues sur
-  claude.ai ; <sortie>/project reçoit les pages régénérées et reel/<capture>.png, à republier.
-- e2e/artifacts : captures en thème clair des tests e2e (`npm run test:e2e`).
-- Le dernier argument dit d'où vient l'état ; il s'affiche dans les fiches et l'index.
+Chemins fixes, dans le dépôt (aucun chemin pris de la ligne de commande) :
+- .maquette/pages/ : les pages actuelles de la maquette (fichiers .dc.html et compat.json), lues sur
+  claude.ai ; .maquette/sortie/ reçoit les pages régénérées et reel/<capture>.png, à republier ;
+  .maquette/ est ignoré par Git.
+- e2e/artifacts/ : captures en thème clair des tests e2e (`npm run test:e2e`).
+- L'argument dit d'où vient l'état ; il s'affiche dans les fiches et l'index.
 
 Travail textuel et idempotent : relancer le script sur sa propre sortie donne le même résultat.
 """
@@ -25,12 +26,20 @@ from pathlib import Path
 
 import yaml
 
-ETAT, SRC, OUT, CAPS, SOURCE = sys.argv[1:6]
-SRC, OUT, CAPS = Path(SRC), Path(OUT), Path(CAPS)
+ROOT = Path(__file__).resolve().parent.parent
+ETAT = ROOT / "docs" / "maquette-etat.yml"
+SRC = ROOT / ".maquette" / "pages"
+OUT = ROOT / ".maquette" / "sortie"
+CAPS = ROOT / "e2e" / "artifacts"
+SOURCE = sys.argv[1] if len(sys.argv) > 1 else "état du dépôt"
 OUT.mkdir(parents=True, exist_ok=True)
-doc = yaml.safe_load(open(ETAT, encoding="utf-8"))
-compat = json.load(open(SRC / "compat.json", encoding="utf-8"))
+doc = yaml.safe_load(ETAT.read_text(encoding="utf-8"))
+compat = json.loads((SRC / "compat.json").read_text(encoding="utf-8"))
 FILE_OF = {p["name"].split(" · ")[0]: p["path"] for p in compat["pages"]}
+# Une page est un fichier du dossier ; une capture, un nom simple : jamais de chemin.
+for page_file in FILE_OF.values():
+    if not re.fullmatch(r"[^/\\]+\.dc\.html", page_file) or ".." in page_file:
+        raise SystemExit(f"Nom de page refusé : {page_file}")
 
 MONO = "ui-monospace,'Cascadia Mono',Consolas,'DejaVu Sans Mono',monospace"
 LABEL = f"font:600 11px {MONO};color:#9a5a0c;letter-spacing:.04em"
@@ -346,7 +355,10 @@ def main() -> None:
         text = sync_page(code, page, text)
         (OUT / f).write_text(text, encoding="utf-8")
         for e in (page.get("ecrans") or {}).values():
-            used.update(e.get("captures") or [])
+            for capture in e.get("captures") or []:
+                if not re.fullmatch(r"[0-9a-z-]+", capture):
+                    raise SystemExit(f"Nom de capture refusé : {capture}")
+                used.add(capture)
     (OUT / "reel").mkdir(exist_ok=True)
     for c in sorted(used):
         shutil.copy(CAPS / f"{c}-light.png", OUT / "reel" / f"{c}.png")

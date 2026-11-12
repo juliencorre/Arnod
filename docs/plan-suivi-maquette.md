@@ -28,16 +28,16 @@ lettres. La page 0.1-d de la maquette donne la correspondance avec les anciens r
 
 ## 3. Règles
 
-| ID  | Règle                                                                                                                                                                                                                                              |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1  | [`maquette-etat.yml`](maquette-etat.yml) est la source de vérité ; la maquette en est l'affichage (pastilles, écarts, fiches, index, captures).                                                                                                    |
-| R2  | États d'un écran : livré, en partie, à faire, variante, remplacé, à décider ; référence pour les pages de cadre. Un écran est jugé sur sa propre fonction : ce qu'il montre d'autres pages (mocks, catalogue, autres natures) relève de ces pages. |
-| R3  | Un écran livré ou en partie cite sa pull request (`pr`) ou le plan de sa page (`plans`).                                                                                                                                                           |
-| R4  | Un écart dit ce qui diffère (`texte`) et quoi aligner (`aligner`) : `maquette` (redessiner l'écran), `code` (tâche d'un plan) ou `à décider` (question à trancher). Un écart commun à plusieurs écrans va dans `transverses`.                      |
-| R5  | `captures` nomme les captures e2e (`screenshot(browser, "…")`) qui montrent l'écran dans l'application réelle.                                                                                                                                     |
-| R6  | Une pull request qui livre, modifie ou écarte un écran met le fichier à jour (case du modèle de pull request) ; un plan cite ses écrans par repère.                                                                                                |
-| R7  | `scripts/check-maquette.mjs` (`npm run check`, CI) vérifie la structure, les états, les plans, les captures, la traçabilité (R3), les écarts (R4) et que tout repère cité dans la documentation existe.                                            |
-| R8  | Après une fusion, une session Claude régénère la maquette depuis le fichier avec `scripts/maquette-sync.py` (pages lues sur claude.ai, captures e2e) ; sa fiche et son index disent de quel commit de `Develop` ils viennent.                      |
+| ID  | Règle                                                                                                                                                                                                                                                 |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | [`maquette-etat.yml`](maquette-etat.yml) est la source de vérité ; la maquette en est l'affichage (pastilles, écarts, fiches, index, captures).                                                                                                       |
+| R2  | États d'un écran : livré, en partie, à faire, variante, remplacé, à décider ; référence pour les pages de cadre. Un écran est jugé sur sa propre fonction : ce qu'il montre d'autres pages (mocks, catalogue, autres natures) relève de ces pages.    |
+| R3  | Un écran livré ou en partie cite sa pull request (`pr`) ou le plan de sa page (`plans`).                                                                                                                                                              |
+| R4  | Un écart dit ce qui diffère (`texte`) et quoi aligner (`aligner`) : `maquette` (redessiner l'écran), `code` (tâche d'un plan) ou `à décider` (question à trancher). Un écart commun à plusieurs écrans va dans `transverses`.                         |
+| R5  | `captures` nomme les captures e2e (`screenshot(browser, "…")`) qui montrent l'écran dans l'application réelle.                                                                                                                                        |
+| R6  | Une pull request qui livre, modifie ou écarte un écran met le fichier à jour (case du modèle de pull request) ; un plan cite ses écrans par repère.                                                                                                   |
+| R7  | `scripts/check-maquette.mjs` (`npm run check`, CI) vérifie la structure, les états, les plans, les captures, la traçabilité (R3), les écarts (R4) et que tout repère cité dans la documentation existe.                                               |
+| R8  | Après une fusion, une session Claude régénère la maquette depuis le fichier avec `scripts/maquette-sync.py` (pages lues sur claude.ai dans `.maquette/pages/`, captures e2e) ; sa fiche et son index disent de quel commit de `Develop` ils viennent. |
 
 ## 4. Audit du 12 novembre 2026
 
