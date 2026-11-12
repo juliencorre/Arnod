@@ -37,8 +37,10 @@ import type {
   RequestDoc,
   RequestResult,
   ResultChange,
+  RequestStatuses,
   RunChange,
   RunView,
+  StatusesChange,
   SendOutcome,
   StepCatalog,
   Detection,
@@ -356,6 +358,18 @@ export const ipc = {
   runLast: (project: string): Promise<RunView | null> =>
     call<RunView | null>("run_last", { project }),
 
+  /** Ignore l'échec d'une vérification dans une ligne d'un run (R7 de la fin du premier usage). */
+  runIgnoreCheck: (project: string, run: string, path: string, check: string): Promise<RunView> =>
+    call<RunView>("run_ignore_check", { project, run, path, check }),
+
+  /** Statut de la dernière exécution de chaque requête du projet (R5). */
+  requestStatuses: (project: string): Promise<RequestStatuses> =>
+    call<RequestStatuses>("request_statuses", { project }),
+
+  /** Ignore l'échec d'une vérification dans le dernier résultat d'une requête (R7). */
+  resultIgnoreCheck: (project: string, path: string, check: string): Promise<RequestResult> =>
+    call<RequestResult>("result_ignore_check", { project, path, check }),
+
   /** Dernier run de chaque projet qui en a un (O12). */
   projectLastRuns: (): Promise<ProjectLastRun[]> => call<ProjectLastRun[]>("project_last_runs"),
 
@@ -437,6 +451,7 @@ export const EVENTS = {
   activeRequest: "arnod://requete-active",
   result: "arnod://resultat",
   run: "arnod://run",
+  statuses: "arnod://statuts",
 } as const;
 
 /** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
@@ -471,9 +486,15 @@ export const events = {
       handler(event.payload);
     }),
 
-  /** Run démarré dans n'importe quelle fenêtre (R7). */
+  /** Run démarré dans n'importe quelle fenêtre (R7), ou avancé par le cœur (R3). */
   onRun: (handler: (change: RunChange) => void): Promise<UnlistenFn> =>
     listen<RunChange>(EVENTS.run, (event) => {
+      handler(event.payload);
+    }),
+
+  /** Statuts des requêtes d'un projet, après un envoi, un run ou un renommage (R4). */
+  onStatuses: (handler: (change: StatusesChange) => void): Promise<UnlistenFn> =>
+    listen<StatusesChange>(EVENTS.statuses, (event) => {
       handler(event.payload);
     }),
 

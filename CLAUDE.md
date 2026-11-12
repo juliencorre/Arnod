@@ -5,11 +5,12 @@ Ce dépôt part du **squelette technique** décrit dans `PRD-squelette.md` : Tau
 frontend Vue 3 + TypeScript + Vite + Pinia, cœur natif Rust. Toute nouvelle
 fonctionnalité part de cette base et respecte les règles ci-dessous.
 
-Travail en cours : premier usage (arborescence, requêtes, environnements, vérifications, run),
-selon `docs/plan-premier-usage.md` (cœur Rust et interface livrés ; restent les tests e2e, la mesure de
-l'installeur et les écarts listés en fin de plan). Livré : projets et
-workspaces, selon `docs/plan-projets-workspaces.md` (maquettes dans `docs/maquettes/`), puis
-workspaces en onglets selon `docs/plan-workspaces-onglets.md` ; voir la section « Projets et
+Premier usage (arborescence, requêtes, environnements, vérifications, run) selon
+`docs/plan-premier-usage.md`, terminé par `docs/plan-fin-premier-usage.md` (écran du run de la
+maquette 1f, statuts de la barre latérale, échecs ignorables, e2e) ; section « Run et statuts ».
+Restent la mesure de l'installeur et les écarts listés en fin de plan du premier usage.
+Livré : projets et workspaces, selon `docs/plan-projets-workspaces.md` (maquettes dans
+`docs/maquettes/`), puis workspaces en onglets selon `docs/plan-workspaces-onglets.md` ; voir la section « Projets et
 workspaces ». Livré ensuite : fenêtres et zones selon `docs/plan-fenetres-zones.md` ; voir la
 section « Fenêtres et zones ». Puis contrats de services selon `docs/plan-contrats-services.md`
 (section « Contrats de services ») et format OpenCollection strict selon
@@ -22,7 +23,8 @@ et l'étude `docs/etude-catalogue-etapes.md` (section « Accueil, catalogue des 
 classés »), puis sélecteur de workspace et icônes des sections selon
 `docs/plan-selecteur-workspace.md` (section « Projets et workspaces »), puis requêtes rangées dans
 leur contrat selon `docs/plan-requetes-dans-contrats.md` (sections « Contrats de services » et
-« Barre latérale du projet »). Un nouveau lot commence par un plan rédigé à partir de
+« Barre latérale du projet »), puis fin du premier usage selon `docs/plan-fin-premier-usage.md`
+(section « Run et statuts »). Un nouveau lot commence par un plan rédigé à partir de
 `docs/modele-plan.md`.
 
 ## Architecture
@@ -72,9 +74,11 @@ src/                    Frontend Vue
   lib/format.ts         Formatage d'affichage
   lib/url.ts            Paramètres de chemin d'une adresse, pour l'affichage
   lib/steps.ts          Libellés des natures d'étape (familles, moteurs, règles), pour l'affichage
+  lib/status.ts         Comptage d'affichage des statuts (✓ / ✕, « réussies / exécutées »)
   stores/               catalog (instantané), navigation (onglet, vue, titre), toasts (notifications),
                         windows (fenêtres, zones, onglets de contenu), workbench (par projet :
-                        arborescence, environnements, run ; par onglet : brouillon, réponse),
+                        arborescence, environnements, run, statuts ; par onglet : brouillon,
+                        réponse),
                         contracts (contrats par projet, contrats ouverts), steps (catalogue des
                         étapes, reconnaissance, essai)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions)
@@ -90,7 +94,8 @@ src/                    Frontend Vue
   components/home/      « Essayer une étape » (TryStep) et formulaire déclaratif d'une nature
   components/steps/     Catalogue des étapes, pastille de nature (couleur de sa famille)
   components/workspaces/ Vues des workspaces
-  components/workbench/ Arborescence, éditeur, réponse, environnements, run
+  components/workbench/ Arborescence, éditeur, réponse, environnements, run, statuts (StatusMark,
+                        StatusCount)
   types/ipc.ts          Types IPC documentés à la main
 tests/                  Tests Vitest (happy-dom, mockIPC, faux cœur fakeCore.ts), dont contrastes
 e2e/                    Tests e2e sur l'application réelle (tauri-driver, WebdriverIO)
@@ -108,8 +113,10 @@ src-tauri/              Cœur Rust
   src/local.rs          Données locales d'un projet (hors dépôt : local.json)
   src/secrets.rs        Coffre des secrets (trait SecretStore, keyring du système)
   src/http.rs           Envoi HTTP (reqwest), délai, annulation, troncature à 5 Mo
-  src/workbench.rs      Établi : envoi, variables, environnements actifs, runs
+  src/workbench.rs      Établi : envoi, variables, environnements actifs, runs (numéro, groupes,
+                        révision), statuts, notificateur des événements
   src/results.rs        Derniers résultats des envois, partagés entre fenêtres (pur)
+  src/statuses.rs       Statut de la dernière exécution de chaque requête (statuses.json)
   src/layout/           Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
   src/contract/         Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
                         file.rs range les contrats dans contracts/ du projet ; deduce.rs déduit
@@ -205,8 +212,32 @@ Linux : installer d'abord les dépendances système
   réveille que les envois déjà en attente et laisse partir celui qui commence juste après.
 - Le cœur ne garde en mémoire que les `MAX_FINISHED_RUNS` derniers runs terminés ; relancer les
   échecs d'un run oublié repart du dernier run du projet, gardé sur disque.
+- L'avancement d'un run arrive par `arnod://run` (révision croissante), jamais par interrogation :
+  le store n'applique pas une révision plus ancienne que celle qu'il montre.
 - Côté interface, l'état « modifié » d'une requête se lit par `workbench.isDirty` (brouillon
   sérialisé une fois par modification) : ne pas sérialiser un brouillon dans un composant.
+
+## Run et statuts
+
+Référence : `docs/plan-fin-premier-usage.md` (cas RU1 à RU6, ST1 à ST4, VT1 à VT4, règles R1 à
+R8), maquettes `docs/maquettes/1e-requete-assertions-reponse.png` et `1f-run.png`.
+
+- Le cœur calcule tout le run : numéro par projet, concurrence, fin, révision et résultat par
+  dossier (`run_groups`, premier segment sous le dossier exécuté). `RunPanel.vue` ne fait que
+  filtrer (Échecs, Tous, Lents, dossier choisi) et compter.
+- `Workbench` prévient un `Notifier` (trait, branché par `lib.rs` sur `windows::EventNotifier`,
+  remplacé par un enregistreur dans les tests) de chaque changement de run et de statuts.
+- Statut d'une requête : dernière exécution, envoi seul ou ligne de run, réussie ou en échec
+  (erreur comprise, annulation ignorée), gardé dans `projects/<id>/statuses.json` (poste, jamais le
+  projet) et diffusé par `arnod://statuts`. Il suit renommages, déplacements et suppressions.
+  Barre latérale : `StatusMark` (✓ / ✕, jamais la couleur seule) et `StatusCount`
+  (« réussies / exécutées », sinon le nombre de requêtes).
+- Une vérification ignorée (`AssertionResult.ignored`) ne vaut que pour le résultat affiché
+  (`result_ignore_check`, `run_ignore_check`) ; elle reste dans la requête. « Retirer la
+  vérification » la retire du brouillon (enregistrement automatique). La conformité au contrat
+  s'ignore mais ne se retire pas.
+- Origine d'une vérification : de session, jamais écrite ; relue d'un fichier, elle est
+  « manuelle », sauf la durée par défaut, reconnue « par défaut ».
 
 ## Projets et workspaces
 

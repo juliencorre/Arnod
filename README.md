@@ -126,6 +126,24 @@ Cas C1 à C12 de [`docs/plan-contrats-services.md`](docs/plan-contrats-services.
 | RC3, RC4 | Une opération sans requête est estompée : un clic crée sa requête et l'ouvre ; la requête active est révélée sous son contrat.                                                         |
 | RC6, RC7 | Le référentiel de tests ne garde que les requêtes sans contrat ; « Créer les requêtes » les range sous le contrat, qui se déplie.                                                      |
 
+### Run et statuts
+
+Cas RU1 à RU6, ST1 à ST4 et VT1 à VT4 de
+[`docs/plan-fin-premier-usage.md`](docs/plan-fin-premier-usage.md) (maquettes 1e et 1f).
+
+| Run d'un dossier                                                | Vérification en échec                                                         |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| ![Run d'un dossier, thème clair](docs/screenshot-run.png)       | ![Vérification en échec, thème clair](docs/screenshot-verification.png)       |
+| ![Run d'un dossier, thème sombre](docs/screenshot-run-dark.png) | ![Vérification en échec, thème sombre](docs/screenshot-verification-dark.png) |
+
+| ID        | Comportement                                                                                                                                          |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RU1       | « 56 réussis, 4 en échec », `run #3 · Recette · 8 en même temps · 4,1 s`, barre verte et rouge ; avancement suivi en direct dans toutes les fenêtres. |
+| RU2, RU3  | Onglets « Échecs », « Tous », « Lents » ; chaque échec donne la vérification, l'attendu et le reçu, et s'ignore pour ce run.                          |
+| RU4       | « Résultat par dossier » : barre et « 15/16 » par dossier ; un clic filtre la liste ; « Grouper par dossier » ou « À plat ».                          |
+| ST1 à ST4 | Dans la barre latérale, ✓ ou ✕ par requête et « réussies / exécutées » par dossier ou ressource de contrat, gardés d'une session à l'autre.           |
+| VT1 à VT3 | Sous la réponse, chaque vérification en échec : « Ignorer pour ce run » (la requête n'est pas modifiée) ou « Retirer la vérification ».               |
+
 ### Barre latérale du projet
 
 Cas B1 à B6 de [`docs/plan-barre-laterale-projet.md`](docs/plan-barre-laterale-projet.md).

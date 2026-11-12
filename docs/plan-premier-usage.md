@@ -407,8 +407,11 @@ commit ; chaque tâche est relue avant commit ; une tâche est cochée dès qu'e
 
 **Lot A - Fondations**
 
-- [ ] **T1** Mettre à jour `CLAUDE.md` (§ 7), remplacer les captures 1c à 1f par celles de la
-      maquette actuelle, reporter les décisions du § 11.
+- [x] **T1** Mettre à jour `CLAUDE.md` (§ 7), remplacer les captures 1c à 1f par celles de la
+      maquette actuelle, reporter les décisions du § 11. _(`CLAUDE.md` à jour ; les captures 1c à
+      1f restent celles de la première maquette, dont le contenu est suivi par
+      [`plan-fin-premier-usage.md`](plan-fin-premier-usage.md) et la disposition remplacée par les
+      maquettes 6a à 6c)_
 - [x] **T2** Jetons de couleur du § 6.5 (clair et sombre) et test de contraste.
 - [x] **T3** Nouvelles natures de `CommandErrorKind` (Rust, TypeScript, `COMMAND_ERROR_KINDS`) et test de concordance.
 - [ ] **T4** `arnod.json` version 2 : `lastEnvironment`, état replié ; migration et refus d'une version plus récente, tests.
@@ -434,7 +437,7 @@ commit ; chaque tâche est relue avant commit ; une tâche est cochée dès qu'e
 
 - [x] **T16** `run.rs` : ordre, concurrence, annulation, agrégats, lenteur (R13, R16) ; tests avec `wiremock`.
 - [x] **T17** `run_store.rs` et relance des échecs (R14, R15) ; tests sur dossier temporaire.
-- [ ] **T18** Commandes `run_*` et événements `run_event` ; ajout de `lastRun` à `ProjectView`. _(partiel : commandes `run_*` livrées, interrogation périodique au lieu d'événements, pas de `lastRun` dans `ProjectView`)_
+- [x] **T18** Commandes `run_*` et événements `run_event` ; ajout de `lastRun` à `ProjectView`. _(avancement diffusé par `arnod://run`, plan de la fin du premier usage ; le dernier run est servi par `project_last_runs` au lieu de `ProjectView`)_
 
 **Lot E - Frontend : socle**
 
@@ -447,14 +450,14 @@ commit ; chaque tâche est relue avant commit ; une tâche est cochée dès qu'e
 - [ ] **T22** Déplacement par glisser-déposer et « Déplacer vers… » (A6) ; duplication (A9). _(non livré : pas de glisser-déposer ; « Déplacer vers » et duplication livrés)_
 - [x] **T23** Éditeur : barre d'adresse, paramètres, en-têtes, corps, authentification, enregistrement automatique (B1 à B5, B7).
 - [x] **T24** Envoi et panneau de réponse : statut, corps, en-têtes, chronologie, annulation, erreurs (X1 à X3, X5).
-- [ ] **T25** Onglet Tests : vérifications proposées, ajout, résultat, échec détaillé, ignorer, retirer (V1 à V5). _(partiel : ajout, résultat et proposition ; pas de « ignorer »)_
+- [x] **T25** Onglet Tests : vérifications proposées, ajout, résultat, échec détaillé, ignorer, retirer (V1 à V5). _(ignorer et retirer : plan de la fin du premier usage, VT1 à VT4)_
 - [x] **T26** Environnements : pastille de la barre latérale et d'« Envoyer », menu, page de gestion, secrets, confirmation, variable manquante (N1 à N6, B6).
-- [ ] **T27** Écran Run : résumé, échecs, résultat par dossier, relance, run vide, dernier run dans le référentiel (L1 à L7). _(partiel : résumé, échecs et relance ; pas de résultat par dossier ni de dernier run dans le référentiel)_
+- [x] **T27** Écran Run : résumé, échecs, résultat par dossier, relance, run vide, dernier run dans le référentiel (L1 à L7). _(plan de la fin du premier usage, RU1 à RU6 ; statuts de la barre latérale, ST1 à ST4)_
 - [ ] **T28** Copie `curl` et enregistrement du corps (X3, X4) - Could.
 
 **Lot G - Qualité**
 
-- [ ] **T29** Tests e2e sur l'application réelle (§ 9), serveur HTTP local de test lancé par le test.
+- [x] **T29** Tests e2e sur l'application réelle (§ 9), serveur HTTP local de test lancé par le test. _(« Premier usage : vérifications, run et statuts » dans `e2e/arnod.e2e.ts`)_
 - [ ] **T30** `scripts/smoke-*`, README (tableau des fonctions, captures), `CLAUDE.md` finalisé, relecture d'ensemble.
 
 ## 9. Critères d'acceptation
@@ -513,16 +516,16 @@ Questions tranchées le 2026-11-08, sans validation préalable : à relire avant
 
 - **Données locales** : `projects/<id>/local.json` (dernier environnement, dossiers repliés, valeurs locales
   non secrètes) à la place d'un `arnod.json` en version 2 (T4 abandonné) : `arnod.json` reste inchangé.
-- **Événements** : `request_event` et `run_event` ne sont pas implémentés ; l'interface interroge `run_status`
-  toutes les 300 ms. Un envoi se suit par sa promesse, `request_cancel` l'interrompt.
+- **Événements** : `request_event` n'est pas implémenté : un envoi se suit par sa promesse, `request_cancel`
+  l'interrompt. L'avancement d'un run est diffusé par `arnod://run` (plan de la fin du premier usage).
 - **Établi** : `workbench.rs` (envoi, environnements, runs) remplace `run.rs` et `run_store.rs` ; le dernier
   run est écrit dans `projects/<id>/last-run.json`, secrets masqués.
 - **Suppression** : corbeille du système sans annulation par jeton (le système la restaure) ; notification
   d'information seulement.
-- **Enregistrement** : explicite (bouton « Enregistrer »), automatique au changement de requête et avant
-  un envoi ou un run ; pas d'enregistrement différé pendant la frappe.
+- **Enregistrement** : automatique, 600 ms après la dernière modification
+  ([`plan-configuration-endpoint.md`](plan-configuration-endpoint.md)), et avant un envoi ou un run.
 - **Réussite d'une requête** : avec au moins une vérification, seules les vérifications comptent (R11). La
   vérification par défaut ne porte que sur la durée : un statut 500 passe tant que l'on n'a pas ajouté de
   vérification de statut ; l'interface propose celles-ci après le premier envoi.
-- **À faire** : tests e2e (T29), mesure de l'installeur Windows (T15), glisser-déposer (T22), copie `curl` (T28),
+- **À faire** : mesure de l'installeur Windows (T15), glisser-déposer (T22), copie `curl` (T28),
   captures du README (T30).

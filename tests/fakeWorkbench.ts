@@ -12,6 +12,9 @@ import type {
   ProjectLastRun,
   RequestDoc,
   RequestResult,
+  RequestStatuses,
+  RunGroup,
+  RunItem,
   RunView,
   SendOutcome,
   TreeNode,
@@ -73,7 +76,16 @@ export function okOutcome(overrides: Partial<SendOutcome> = {}): SendOutcome {
       receiveMs: 5,
       totalMs: 45,
     },
-    assertions: [{ id: "duree", passed: true, message: null, actual: "45" }],
+    assertions: [
+      {
+        id: "duree",
+        target: "responseTime",
+        passed: true,
+        message: null,
+        actual: "45",
+        ignored: false,
+      },
+    ],
     passed: true,
     slow: false,
     ...overrides,
@@ -96,6 +108,12 @@ export interface FakeWorkbench {
   projectLastRuns: ProjectLastRun[];
   /** Derniers résultats gardés par le cœur, par chemin (`request_result`, R5). */
   results: Map<string, RequestResult>;
+  /** Statut de la dernière exécution de chaque requête (`request_statuses`). */
+  statuses: RequestStatuses;
+  /** Vérifications en échec des lignes d'un run, par chemin. */
+  runChecks: Map<string, RunItem["assertions"]>;
+  /** Numéro du dernier run. */
+  runNumber: number;
 }
 
 export function createFakeWorkbench(): FakeWorkbench {
@@ -117,6 +135,9 @@ export function createFakeWorkbench(): FakeWorkbench {
     lastRun: null,
     runStatus: new Map(),
     projectLastRuns: [],
+    statuses: {},
+    runChecks: new Map(),
+    runNumber: 0,
   };
 }
 
@@ -191,34 +212,69 @@ function envView(wb: FakeWorkbench): EnvironmentsView {
   return { environments, active: wb.active };
 }
 
+/** Résultat par dossier, comme `run_groups` du cœur (R2). */
+export function groupsOf(folder: string, items: RunItem[]): RunGroup[] {
+  const groups: RunGroup[] = [];
+  for (const item of items) {
+    const relative = folder === "" ? item.path : item.path.slice(folder.length + 1);
+    const slash = relative.indexOf("/");
+    const [name, path] =
+      slash >= 0
+        ? [
+            relative.slice(0, slash),
+            folder === "" ? relative.slice(0, slash) : `${folder}/${relative.slice(0, slash)}`,
+          ]
+        : folder === ""
+          ? ["Projet", ""]
+          : [folder.split("/").at(-1) ?? folder, folder];
+    let group = groups.find((g) => g.path === path);
+    if (!group) {
+      group = { name, path, passed: 0, failed: 0, total: 0 };
+      groups.push(group);
+    }
+    group.total += 1;
+    if (item.status === "passed") group.passed += 1;
+    if (item.status === "failed" || item.status === "error") group.failed += 1;
+  }
+  return groups;
+}
+
 export function runOf(wb: FakeWorkbench, folder: string, only?: string[]): RunView {
   const prefix = folder === "" ? "" : `${folder}/`;
   const paths = [...wb.requests.keys()].filter(
     (p) => p.startsWith(prefix) && (!only || only.includes(p)),
   );
+  wb.runNumber += 1;
+  const items: RunItem[] = paths.map((path) => {
+    const request = wb.requests.get(path) as RequestDoc;
+    const status = wb.runStatus.get(path) ?? "passed";
+    return {
+      path,
+      name: request.name,
+      method: request.method,
+      status,
+      httpStatus: status === "error" ? null : status === "failed" ? 500 : 200,
+      durationMs: 12,
+      slow: false,
+      assertions: structuredClone(wb.runChecks.get(path) ?? []),
+      error: status === "error" ? "Variable « x » absente de l'environnement Local." : null,
+    };
+  });
+  for (const item of items) wb.statuses[item.path] = { passed: item.status === "passed", at: 1 };
   return {
     id: `run-${paths.length}-${Math.random().toString(36).slice(2, 7)}`,
+    number: wb.runNumber,
     folder,
     environment: wb.active,
-    startedAt: 0,
+    concurrency: 8,
+    startedAt: wb.runNumber,
+    finishedAt: wb.runNumber + 4100,
     finished: true,
     cancelled: false,
     contract: null,
-    items: paths.map((path) => {
-      const request = wb.requests.get(path) as RequestDoc;
-      const status = wb.runStatus.get(path) ?? "passed";
-      return {
-        path,
-        name: request.name,
-        method: request.method,
-        status,
-        httpStatus: status === "error" ? null : status === "failed" ? 500 : 200,
-        durationMs: 12,
-        slow: false,
-        assertions: [],
-        error: status === "error" ? "Variable « x » absente de l'environnement Local." : null,
-      };
-    }),
+    items,
+    revision: 1,
+    groups: groupsOf(folder, items),
   };
 }
 
@@ -284,9 +340,39 @@ export function handleWorkbench(
     case "request_save":
       wb.requests.set(String(args.path), clone(args.request as RequestDoc));
       return null;
-    case "request_send":
-      if ("kind" in wb.nextSend) throw wb.nextSend;
-      return structuredClone(wb.nextSend);
+    case "request_send": {
+      const path = args.path as string | null;
+      if ("kind" in wb.nextSend) {
+        if (path !== null) wb.statuses[path] = { passed: false, at: 1 };
+        throw wb.nextSend;
+      }
+      const outcome = structuredClone(wb.nextSend);
+      if (path !== null) {
+        wb.statuses[path] = { passed: outcome.passed, at: 1 };
+        wb.results.set(path, {
+          projectId: String(args.project),
+          path,
+          sending: false,
+          outcome: structuredClone(outcome),
+          error: null,
+          receivedAt: 1,
+        });
+      }
+      return outcome;
+    }
+    case "request_statuses":
+      return structuredClone(wb.statuses);
+    case "result_ignore_check": {
+      const path = String(args.path);
+      const result = wb.results.get(path) ?? fail("notFound", "Aucun résultat.");
+      const outcome = result.outcome ?? fail("notFound", "Aucun résultat.");
+      const check =
+        outcome.assertions.find((a) => a.id === args.check) ?? fail("notFound", "Absente.");
+      check.ignored = true;
+      outcome.passed = outcome.assertions.every((a) => a.passed || a.ignored);
+      wb.statuses[path] = { passed: outcome.passed, at: 2 };
+      return structuredClone(result);
+    }
     case "request_cancel":
       return null;
     case "request_result":
@@ -342,10 +428,10 @@ export function handleWorkbench(
     case "run_start": {
       const run = runOf(wb, String(args.folder));
       wb.lastRun = run;
-      return run;
+      return structuredClone(run);
     }
     case "run_status":
-      return wb.lastRun;
+      return structuredClone(wb.lastRun);
     case "run_cancel":
       return null;
     case "run_retry_failures": {
@@ -355,10 +441,24 @@ export function handleWorkbench(
         .map((i) => i.path);
       wb.runStatus.clear();
       wb.lastRun = runOf(wb, previous?.folder ?? "", failed);
-      return wb.lastRun;
+      return structuredClone(wb.lastRun);
     }
     case "run_last":
-      return wb.lastRun;
+      return structuredClone(wb.lastRun);
+    case "run_ignore_check": {
+      const run = wb.lastRun ?? fail("notFound", "Ce run n'existe plus.");
+      const item = run.items.find((i) => i.path === args.path) ?? fail("notFound", "Absente.");
+      const check =
+        item.assertions.find((a) => a.id === args.check) ?? fail("notFound", "Absente.");
+      check.ignored = true;
+      if (item.status === "failed" && item.assertions.every((a) => a.passed || a.ignored)) {
+        item.status = "passed";
+      }
+      run.revision += 1;
+      run.groups = groupsOf(run.folder, run.items);
+      wb.statuses[item.path] = { passed: item.status === "passed", at: 2 };
+      return structuredClone(run);
+    }
     case "project_last_runs":
       return wb.projectLastRuns;
     default:

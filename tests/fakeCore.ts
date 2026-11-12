@@ -118,6 +118,15 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     return trimmed;
   }
 
+  /** Commandes après lesquelles le cœur diffuse les statuts des requêtes (R4). */
+  const STATUS_CHANGES = new Set([
+    "request_send",
+    "run_start",
+    "run_retry_failures",
+    "run_ignore_check",
+    "result_ignore_check",
+  ]);
+
   mockIPC(
     (cmd, rawArgs) => {
       const args = (rawArgs ?? {}) as Record<string, unknown>;
@@ -317,6 +326,13 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           const handled =
             contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);
           if (handled === undefined) throw new Error(`commande inattendue : ${cmd}`);
+          if (STATUS_CHANGES.has(cmd)) {
+            // Le cœur diffuse les statuts après chaque exécution (R4).
+            void core.emit("arnod://statuts", {
+              projectId: String(args.project),
+              statuses: structuredClone(core.workbench.statuses),
+            });
+          }
           if (cmd === "tree_delete" || cmd === "contract_delete") {
             // Le cœur ferme les onglets de ce qui est supprimé et le diffuse.
             closePath(core.windows, String(args.project), String(args.path));

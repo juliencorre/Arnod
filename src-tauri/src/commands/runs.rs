@@ -51,6 +51,21 @@ pub fn run_retry_failures(
     Ok(view)
 }
 
+/// Ignore l'échec d'une vérification dans une ligne d'un run
+/// (`docs/plan-fin-premier-usage.md`, R7).
+#[tauri::command]
+pub fn run_ignore_check(
+    state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
+    project: Uuid,
+    run: Uuid,
+    path: String,
+    check: String,
+) -> Result<RunView, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    bench.ignore_in_run(&ctx, run, &path, &check)
+}
+
 /// Dernier run de chaque projet qui en a un, pour « Tous les projets » (O12).
 #[tauri::command]
 pub fn project_last_runs(state: State<'_, AppState>) -> Result<Vec<ProjectLastRun>, CommandError> {

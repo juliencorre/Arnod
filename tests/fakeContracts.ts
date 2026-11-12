@@ -325,7 +325,7 @@ export function handleContracts(
       const paths = [...linked(wb, path).values()];
       const run = { ...runOf(wb, "", paths), contract: fc.files.get(path)?.name ?? path };
       wb.lastRun = run;
-      return run;
+      return structuredClone(run);
     }
     default:
       return undefined;

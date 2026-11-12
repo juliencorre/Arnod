@@ -9,6 +9,9 @@ import { computed } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
+import StatusCount from "@/components/workbench/StatusCount.vue";
+import StatusMark from "@/components/workbench/StatusMark.vue";
+import { countStatuses, requestPaths } from "@/lib/status";
 import { useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
@@ -36,6 +39,15 @@ const isSelected = computed(() => {
     content.path === props.node.path
   );
 });
+/** Dernière exécution de la requête, ou des requêtes du dossier (ST1, ST2). */
+const status = computed(() =>
+  props.node.kind === "request"
+    ? (workbench.statuses[props.projectId]?.[props.node.path] ?? null)
+    : null,
+);
+const folderCount = computed(() =>
+  countStatuses(requestPaths(props.node), workbench.statuses[props.projectId]),
+);
 const dirty = computed(
   () =>
     props.node.kind === "request" && workbench.isDirty(`${props.projectId}::${props.node.path}`),
@@ -108,15 +120,18 @@ function activate(): void {
             </svg>
           </span>
           <span class="row__name">{{ node.name }}</span>
-          <span class="row__count">{{ node.requestCount }}</span>
+          <StatusCount class="row__count" :count="folderCount" :fallback="node.requestCount" />
         </template>
         <template v-else>
           <span class="row__lead row__method" :class="`row__method--${node.method.toLowerCase()}`">
             {{ node.method }}
           </span>
           <span class="row__name">{{ node.name }}</span>
-          <span v-if="dirty" class="row__dirty" title="Modifiée, non enregistrée">●</span>
-          <span v-if="node.invalid" class="row__invalid" title="Fichier illisible">⚠</span>
+          <span class="row__end">
+            <span v-if="dirty" class="row__dirty" title="Modifiée, non enregistrée">●</span>
+            <span v-if="node.invalid" class="row__invalid" title="Fichier illisible">⚠</span>
+            <StatusMark v-if="status" class="row__status" :status="status" />
+          </span>
         </template>
       </button>
       <BaseMenu :items="items" :label="`Actions pour ${node.name}`" align="end" @select="onSelect">
@@ -240,8 +255,16 @@ function activate(): void {
   color: var(--color-danger);
 }
 
-.row__dirty {
+.row__end {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
   margin-left: auto;
+  padding-right: 0.25rem;
+}
+
+.row__dirty {
   font-size: 0.625rem;
   color: var(--color-accent);
 }

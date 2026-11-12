@@ -7,12 +7,13 @@ use serde::Deserialize;
 use tauri::{Emitter, Manager, State, WebviewWindow};
 use uuid::Uuid;
 
-use crate::error::CommandError;
+use crate::error::{CommandError, CommandErrorKind};
 use crate::request::assertions::{self, ResponseData};
 use crate::request::model::{Assertion, Example, Request};
 use crate::request::{example, file, inherit};
 use crate::results::{RequestResult, ResultBook, ResultChange};
 use crate::state::AppState;
+use crate::statuses::Statuses;
 use crate::tree;
 use crate::windows::{self, ProjectScope};
 use crate::workbench::{SendOutcome, Workbench};
@@ -95,8 +96,57 @@ pub async fn request_send(
         if let Ok(result) = finished {
             share(&window, result);
         }
+        // Statut de la requête dans la barre latérale ; un envoi annulé ne change rien (R4).
+        match &sent {
+            Ok(outcome) => bench.record_status(&ctx, path, outcome.passed),
+            Err(error) if error.kind != CommandErrorKind::Cancelled => {
+                bench.record_status(&ctx, path, false);
+            }
+            Err(_) => {}
+        }
     }
     sent
+}
+
+/// Statut de la dernière exécution de chaque requête du projet
+/// (`docs/plan-fin-premier-usage.md`, R5).
+#[tauri::command]
+pub fn request_statuses(
+    state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
+    project: Uuid,
+) -> Result<Statuses, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    Ok(bench.statuses(&ctx))
+}
+
+/// Ignore l'échec d'une vérification dans le dernier résultat d'une requête (R7) :
+/// le résultat est recalculé, diffusé à toutes les fenêtres, et le statut suit.
+#[tauri::command]
+pub fn result_ignore_check(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
+    results: State<'_, Mutex<ResultBook>>,
+    project: Uuid,
+    path: String,
+    check: String,
+) -> Result<RequestResult, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    let result = results
+        .lock()
+        .map_err(|_| {
+            CommandError::new(
+                CommandErrorKind::Io,
+                "Les résultats sont indisponibles : redémarrez l'application.",
+            )
+        })?
+        .ignore(project, &path, &check)?;
+    if let Some(outcome) = &result.outcome {
+        bench.record_status(&ctx, &path, outcome.passed);
+    }
+    share(&window, result.clone());
+    Ok(result)
 }
 
 /// Diffuse le résultat d'un envoi à toutes les fenêtres (R5).

@@ -9,14 +9,12 @@ import type {
   ProjectChange,
   RequestDoc,
   RequestResult,
+  RequestStatuses,
   RunView,
   SendOutcome,
   TreeNode,
   TreeView,
 } from "@/types/ipc";
-
-/** Intervalle de lecture de l'avancement d'un run. */
-export const RUN_POLL_MS = 300;
 
 /** Attente après la dernière modification avant l'enregistrement automatique (EP1). */
 export const AUTOSAVE_MS = 600;
@@ -81,30 +79,33 @@ export const useWorkbenchStore = defineStore("workbench", () => {
   const trees = ref<Record<string, TreeView>>({});
   const environments = ref<Record<string, EnvironmentsView>>({});
   const runs = ref<Record<string, RunView | null>>({});
+  /** Dernière exécution de chaque requête, par projet (`docs/plan-fin-premier-usage.md`, R5). */
+  const statuses = ref<Record<string, RequestStatuses>>({});
   const editors = reactive<Record<string, Editor>>({});
   /** Projets dépliés dans la barre latérale. */
   const expanded = ref<string[]>([]);
   const pending = ref<PendingConfirmation | null>(null);
   const loading = new Map<string, Promise<void>>();
-  const pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let subscribed = false;
 
   // --- Projets ---------------------------------------------------------------
 
-  /** Charge un projet une fois : arborescence, environnements, dernier run. */
+  /** Charge un projet une fois : arborescence, environnements, dernier run, statuts. */
   function loadProject(projectId: string): Promise<void> {
     if (trees.value[projectId]) return Promise.resolve();
     const existing = loading.get(projectId);
     if (existing) return existing;
     const load = (async () => {
-      const [tree, envs, last] = await Promise.all([
+      const [tree, envs, last, known] = await Promise.all([
         ipc.treeLoad(projectId),
         ipc.environmentsLoad(projectId),
         ipc.runLast(projectId),
+        ipc.requestStatuses(projectId),
       ]);
       trees.value[projectId] = tree;
       environments.value[projectId] = envs;
       if (!(projectId in runs.value)) runs.value[projectId] = last;
+      if (!(projectId in statuses.value)) statuses.value[projectId] = known;
     })().finally(() => loading.delete(projectId));
     loading.set(projectId, load);
     return load;
@@ -557,33 +558,43 @@ export const useWorkbenchStore = defineStore("workbench", () => {
 
   // --- Runs ------------------------------------------------------------------
 
-  function stopPolling(projectId: string): void {
-    const timer = pollTimers.get(projectId);
-    if (timer !== undefined) clearTimeout(timer);
-    pollTimers.delete(projectId);
-  }
-
-  function poll(projectId: string, runId: string): void {
-    stopPolling(projectId);
-    pollTimers.set(
-      projectId,
-      setTimeout(() => {
-        ipc
-          .runStatus(runId)
-          .then((view) => {
-            runs.value[projectId] = view;
-            if (!view.finished) poll(projectId, runId);
-          })
-          .catch(() => {
-            stopPolling(projectId);
-          });
-      }, RUN_POLL_MS),
-    );
-  }
-
+  /**
+   * Montre un run : démarré ici, diffusé par une autre fenêtre ou avancé par le cœur. Une
+   * révision antérieure du run montré, ou un run plus ancien, est ignoré (R3) : l'avancement
+   * peut arriver avant la réponse de la commande qui a lancé le run.
+   */
   function follow(projectId: string, view: RunView): void {
+    const current = runs.value[projectId];
+    if (current && current.id === view.id && current.revision >= view.revision) return;
+    if (current && current.id !== view.id && current.startedAt > view.startedAt) return;
     runs.value[projectId] = view;
-    if (!view.finished) poll(projectId, view.id);
+  }
+
+  /** Ignore l'échec d'une vérification dans une ligne du run montré (R7). */
+  async function ignoreInRun(projectId: string, path: string, check: string): Promise<void> {
+    const current = runs.value[projectId];
+    if (!current) return;
+    follow(projectId, await ipc.runIgnoreCheck(projectId, current.id, path, check));
+  }
+
+  // --- Vérifications en échec (VT1 à VT3) --------------------------------------
+
+  /** Ignore l'échec d'une vérification dans la dernière réponse de la requête (R7). */
+  async function ignoreCheck(key: string, check: string): Promise<void> {
+    const editor = editors[key];
+    if (!editor?.outcome) return;
+    applyResult(await ipc.resultIgnoreCheck(editor.projectId, editor.path, check));
+  }
+
+  /**
+   * Retire une vérification de la requête (enregistrée comme toute modification) et l'ignore
+   * dans la réponse affichée (R8).
+   */
+  async function removeCheck(key: string, check: string): Promise<void> {
+    const editor = editors[key];
+    if (!editor?.draft) return;
+    editor.draft.assertions = editor.draft.assertions.filter((a) => a.id !== check);
+    await ignoreCheck(key, check);
   }
 
   /** Exécute un dossier et ouvre l'onglet du run, là où suit la sélection. */
@@ -688,9 +699,13 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     await events.onResult((change) => {
       if (change.origin !== windows.label) applyResult(change.result);
     });
-    // Run démarré dans une autre fenêtre : son onglet le suit ici aussi (R7).
+    // Run démarré dans une autre fenêtre ou avancé par le cœur : suivi ici aussi (R7, R3).
     await events.onRun((change) => {
-      if (change.origin !== windows.label) follow(change.projectId, change.run);
+      follow(change.projectId, change.run);
+    });
+    // Statuts des requêtes, pour la barre latérale (R4).
+    await events.onStatuses((change) => {
+      statuses.value[change.projectId] = change.statuses;
     });
   }
 
@@ -698,6 +713,10 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     trees,
     environments,
     runs,
+    statuses,
+    ignoreInRun,
+    ignoreCheck,
+    removeCheck,
     editors,
     expanded,
     pending,

@@ -10,6 +10,7 @@ import { computed } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
+import StatusMark from "@/components/workbench/StatusMark.vue";
 import { useWindowsStore } from "@/stores/windows";
 import { requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type { LinkedView } from "@/types/ipc";
@@ -42,6 +43,8 @@ const selected = computed(() => {
   );
 });
 const dirty = computed(() => workbench.isDirty(requestKey(props.projectId, props.request.path)));
+/** Dernière exécution (`docs/plan-fin-premier-usage.md`, ST1). */
+const status = computed(() => workbench.statuses[props.projectId]?.[props.request.path] ?? null);
 </script>
 
 <template>
@@ -66,7 +69,10 @@ const dirty = computed(() => workbench.isDirty(requestKey(props.projectId, props
         </span>
         <span v-else class="linked__lead linked__link" aria-hidden="true">↳</span>
         <span class="linked__name">{{ request.name }}</span>
-        <span v-if="dirty" class="linked__dirty" title="Modifiée, non enregistrée">●</span>
+        <span class="linked__end">
+          <span v-if="dirty" class="linked__dirty" title="Modifiée, non enregistrée">●</span>
+          <StatusMark v-if="status" class="linked__status" :status="status" />
+        </span>
       </button>
       <BaseMenu
         :items="ITEMS"
@@ -167,8 +173,16 @@ const dirty = computed(() => workbench.isDirty(requestKey(props.projectId, props
   white-space: nowrap;
 }
 
-.linked__dirty {
+.linked__end {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
   margin-left: auto;
+  padding-right: 0.25rem;
+}
+
+.linked__dirty {
   font-size: 0.625rem;
   color: var(--color-accent);
 }

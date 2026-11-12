@@ -22,6 +22,7 @@ use crate::request::model::{Method, Request};
 use crate::request::resolve::{self, Variables};
 use crate::request::{file, inherit};
 use crate::secrets::{self, SecretStore};
+use crate::statuses::{self, StatusBook, Statuses};
 use crate::tree;
 
 /// Identifiant du résultat de conformité au contrat d'une requête liée.
@@ -107,20 +108,126 @@ pub struct RunItem {
     pub error: Option<String>,
 }
 
+/// Résultat d'un groupe de requêtes d'un run (`docs/plan-fin-premier-usage.md`, R2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunGroup {
+    /// Nom affiché : le dossier, ou « Projet » pour la racine.
+    pub name: String,
+    /// Chemin du dossier, relatif au projet (vide pour la racine).
+    pub path: String,
+    pub passed: usize,
+    /// Requêtes en échec ou en erreur.
+    pub failed: usize,
+    pub total: usize,
+}
+
 /// Run vu par l'interface.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunView {
     pub id: Uuid,
+    /// Numéro du run dans le projet (R1) ; 0 pour un run gardé par une version précédente.
+    #[serde(default)]
+    pub number: u32,
     pub folder: String,
     pub environment: String,
+    /// Requêtes envoyées en même temps (R1).
+    #[serde(default = "default_concurrency")]
+    pub concurrency: usize,
     pub started_at: u64,
+    /// Fin du run, une fois terminé (R1).
+    #[serde(default)]
+    pub finished_at: Option<u64>,
     pub finished: bool,
     pub cancelled: bool,
     pub items: Vec<RunItem>,
     /// Nom du contrat dont les requêtes sont exécutées (C10), sinon `None`.
     #[serde(default)]
     pub contract: Option<String>,
+    /// Révision, croissante à chaque changement (R3).
+    #[serde(default)]
+    pub revision: u64,
+    /// Résultat par dossier (R2), recalculé à chaque changement.
+    #[serde(default)]
+    pub groups: Vec<RunGroup>,
+}
+
+fn default_concurrency() -> usize {
+    RUN_CONCURRENCY
+}
+
+/// Groupe d'une requête du run : premier segment de son chemin sous le
+/// dossier exécuté, ou ce dossier lui-même (R2).
+fn group_of(folder: &str, path: &str) -> (String, String) {
+    let relative = if folder.is_empty() {
+        path
+    } else {
+        path.strip_prefix(folder)
+            .and_then(|rest| rest.strip_prefix('/'))
+            .unwrap_or(path)
+    };
+    match relative.split_once('/') {
+        Some((first, _)) => {
+            let path = if folder.is_empty() {
+                first.to_owned()
+            } else {
+                format!("{folder}/{first}")
+            };
+            (first.to_owned(), path)
+        }
+        None if folder.is_empty() => ("Projet".to_owned(), String::new()),
+        None => (
+            folder.rsplit('/').next().unwrap_or(folder).to_owned(),
+            folder.to_owned(),
+        ),
+    }
+}
+
+/// Résultat par dossier des requêtes d'un run, dans l'ordre de l'arborescence (R2).
+pub fn run_groups(folder: &str, items: &[RunItem]) -> Vec<RunGroup> {
+    let mut groups: Vec<RunGroup> = Vec::new();
+    for item in items {
+        let (name, path) = group_of(folder, &item.path);
+        let index = match groups.iter().position(|g| g.path == path) {
+            Some(index) => index,
+            None => {
+                groups.push(RunGroup {
+                    name,
+                    path,
+                    passed: 0,
+                    failed: 0,
+                    total: 0,
+                });
+                groups.len() - 1
+            }
+        };
+        if let Some(group) = groups.get_mut(index) {
+            group.total += 1;
+            match item.status {
+                ItemStatus::Passed => group.passed += 1,
+                ItemStatus::Failed | ItemStatus::Error => group.failed += 1,
+                _ => {}
+            }
+        }
+    }
+    groups
+}
+
+impl RunView {
+    /// Prend en compte un changement : révision suivante, groupes recalculés (R2, R3).
+    pub fn touch(&mut self) {
+        self.revision += 1;
+        self.groups = run_groups(&self.folder, &self.items);
+    }
+}
+
+/// Reçoit les changements de l'établi, pour les diffuser aux fenêtres (R3, R4).
+pub trait Notifier: Send + Sync {
+    /// Un run a changé (avancement, fin, vérification ignorée).
+    fn run_changed(&self, project: Uuid, run: &RunView);
+    /// Les statuts des requêtes d'un projet ont changé.
+    fn statuses_changed(&self, project: Uuid, statuses: &Statuses);
 }
 
 /// Résumé du dernier run d'un projet, pour « Tous les projets » (O12).
@@ -149,15 +256,19 @@ impl ProjectLastRun {
 }
 
 struct RunHandle {
+    project: Uuid,
     view: Mutex<RunView>,
     cancel: Cancel,
 }
 
-/// Exécutions en cours et coffre des secrets.
+/// Exécutions en cours, statuts des requêtes et coffre des secrets.
 pub struct Workbench {
     secrets: Arc<dyn SecretStore>,
     executions: Mutex<HashMap<Uuid, Arc<Cancel>>>,
     runs: Mutex<HashMap<Uuid, Arc<RunHandle>>>,
+    /// Statuts des projets déjà lus (R5), un seul verrou pour toutes les écritures.
+    statuses: Mutex<HashMap<Uuid, StatusBook>>,
+    notifier: Mutex<Option<Arc<dyn Notifier>>>,
 }
 
 fn now_ms() -> u64 {
@@ -187,7 +298,71 @@ impl Workbench {
             secrets,
             executions: Mutex::new(HashMap::new()),
             runs: Mutex::new(HashMap::new()),
+            statuses: Mutex::new(HashMap::new()),
+            notifier: Mutex::new(None),
         }
+    }
+
+    /// Branche la diffusion des changements (événements des fenêtres).
+    pub fn set_notifier(&self, notifier: Arc<dyn Notifier>) {
+        if let Ok(mut current) = self.notifier.lock() {
+            *current = Some(notifier);
+        }
+    }
+
+    fn notifier(&self) -> Option<Arc<dyn Notifier>> {
+        self.notifier.lock().ok().and_then(|n| n.clone())
+    }
+
+    // ---------------------------------------------------------------- statuts
+
+    /// Modifie les statuts d'un projet ; s'ils ont changé, les écrit et les diffuse (R4, R5).
+    fn with_statuses(&self, ctx: &ProjectCtx, change: impl FnOnce(&mut StatusBook) -> bool) {
+        let changed = {
+            let Ok(mut all) = self.statuses.lock() else {
+                return;
+            };
+            let book = all
+                .entry(ctx.id)
+                .or_insert_with(|| statuses::load(&ctx.data_dir, ctx.id));
+            if change(book) {
+                let _ = statuses::save(&ctx.data_dir, ctx.id, book);
+                Some(book.requests.clone())
+            } else {
+                None
+            }
+        };
+        if let (Some(statuses), Some(notifier)) = (changed, self.notifier()) {
+            notifier.statuses_changed(ctx.id, &statuses);
+        }
+    }
+
+    /// Statut de la dernière exécution de chaque requête du projet (R5).
+    pub fn statuses(&self, ctx: &ProjectCtx) -> Statuses {
+        let mut found = Statuses::new();
+        self.with_statuses(ctx, |book| {
+            found = book.requests.clone();
+            false
+        });
+        found
+    }
+
+    /// Fin de l'exécution d'une requête (R4).
+    pub fn record_status(&self, ctx: &ProjectCtx, path: &str, passed: bool) {
+        self.with_statuses(ctx, |book| {
+            book.record(path, passed, now_ms());
+            true
+        });
+    }
+
+    /// Requête ou dossier renommé ou déplacé (R5).
+    pub fn rename_status(&self, ctx: &ProjectCtx, from: &str, to: &str) {
+        self.with_statuses(ctx, |book| book.rename(from, to));
+    }
+
+    /// Requête ou dossier supprimé (R5).
+    pub fn remove_status(&self, ctx: &ProjectCtx, path: &str) {
+        self.with_statuses(ctx, |book| book.remove(path));
     }
 
     // ---------------------------------------------------------------- environnements
@@ -510,11 +685,16 @@ impl Workbench {
         local::project_dir(&ctx.data_dir, ctx.id).join("last-run.json")
     }
 
-    /// Dernier run terminé du projet (R14).
+    /// Dernier run terminé du projet (R14) ; un run gardé par une version
+    /// précédente retrouve ses groupes (R2).
     pub fn last_run(ctx: &ProjectCtx) -> Option<RunView> {
         std::fs::read_to_string(Self::last_run_file(ctx))
             .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
+            .and_then(|text| serde_json::from_str::<RunView>(&text).ok())
+            .map(|mut run| {
+                run.groups = run_groups(&run.folder, &run.items);
+                run
+            })
     }
 
     fn save_last_run(ctx: &ProjectCtx, view: &RunView) {
@@ -589,33 +769,50 @@ impl Workbench {
             });
         }
         Self::check_protected(&environment, &methods, confirmed)?;
-        let view = RunView {
+        let started_at = now_ms();
+        let mut view = RunView {
             id: Uuid::new_v4(),
+            number: 0,
             folder: folder.to_owned(),
             environment: environment.name.clone(),
-            started_at: now_ms(),
+            concurrency: RUN_CONCURRENCY,
+            started_at,
+            finished_at: items.is_empty().then_some(started_at),
             finished: items.is_empty(),
             cancelled: false,
             items,
             contract,
+            revision: 0,
+            groups: Vec::new(),
         };
-        let handle = Arc::new(RunHandle {
-            view: Mutex::new(view.clone()),
-            cancel: Cancel::new(),
-        });
-        {
+        view.groups = run_groups(&view.folder, &view.items);
+        let handle = {
             let mut runs = self.runs.lock().map_err(|_| busy())?;
+            // Numéro suivant celui du dernier run gardé ou en mémoire (R1).
+            let latest = runs
+                .values()
+                .filter(|h| h.project == ctx.id)
+                .filter_map(|h| h.view.lock().ok().map(|v| v.number))
+                .chain(Self::last_run(ctx).map(|run| run.number))
+                .max()
+                .unwrap_or(0);
+            view.number = latest + 1;
+            let handle = Arc::new(RunHandle {
+                project: ctx.id,
+                view: Mutex::new(view.clone()),
+                cancel: Cancel::new(),
+            });
             Self::forget_old_runs(&mut runs);
             runs.insert(view.id, handle.clone());
-        }
+            handle
+        };
         if view.finished {
             Self::save_last_run(ctx, &view);
             return Ok(view);
         }
-        let ctx = ctx.clone();
         // Runtime de Tauri : la commande qui lance le run n'est pas forcément
         // exécutée dans un contexte tokio (commande synchrone, fil principal).
-        tauri::async_runtime::spawn(Self::execute(ctx, handle, variables));
+        tauri::async_runtime::spawn(self.clone().execute(ctx.clone(), handle, variables));
         Ok(view)
     }
 
@@ -637,12 +834,18 @@ impl Workbench {
         }
     }
 
-    async fn execute(ctx: ProjectCtx, handle: Arc<RunHandle>, variables: Variables) {
+    async fn execute(
+        self: Arc<Self>,
+        ctx: ProjectCtx,
+        handle: Arc<RunHandle>,
+        variables: Variables,
+    ) {
         let semaphore = Arc::new(Semaphore::new(RUN_CONCURRENCY));
         let count = handle.view.lock().map_or(0, |v| v.items.len());
         let mut tasks = Vec::new();
         for index in 0..count {
-            let (ctx, handle, variables, semaphore) = (
+            let (bench, ctx, handle, variables, semaphore) = (
+                self.clone(),
                 ctx.clone(),
                 handle.clone(),
                 variables.clone(),
@@ -652,28 +855,62 @@ impl Workbench {
                 let Ok(_permit) = semaphore.acquire_owned().await else {
                     return;
                 };
-                Self::run_item(&ctx, &handle, &variables, index).await;
+                bench.run_item(&ctx, &handle, &variables, index).await;
             }));
         }
         for task in tasks {
             let _ = task.await;
         }
-        if let Ok(mut view) = handle.view.lock() {
+        let finished = handle.view.lock().ok().map(|mut view| {
             view.finished = true;
+            view.finished_at = Some(now_ms());
             view.cancelled = handle.cancel.is_cancelled();
+            view.touch();
             Self::save_last_run(&ctx, &view);
+            view.clone()
+        });
+        if let (Some(view), Some(notifier)) = (finished, self.notifier()) {
+            notifier.run_changed(ctx.id, &view);
         }
     }
 
-    fn update(handle: &RunHandle, index: usize, change: impl FnOnce(&mut RunItem)) {
-        if let Ok(mut view) = handle.view.lock()
-            && let Some(item) = view.items.get_mut(index)
-        {
+    /// Change une ligne du run et le diffuse (R3). Une ligne terminée met à jour
+    /// le statut de sa requête (R4).
+    fn update(
+        &self,
+        ctx: &ProjectCtx,
+        handle: &RunHandle,
+        index: usize,
+        change: impl FnOnce(&mut RunItem),
+    ) {
+        let changed = handle.view.lock().ok().and_then(|mut view| {
+            let item = view.items.get_mut(index)?;
             change(item);
+            let done = match item.status {
+                ItemStatus::Passed => Some(true),
+                ItemStatus::Failed | ItemStatus::Error => Some(false),
+                _ => None,
+            }
+            .map(|passed| (item.path.clone(), passed));
+            view.touch();
+            Some((view.clone(), done))
+        });
+        let Some((view, done)) = changed else { return };
+        if let Some((path, passed)) = done {
+            self.record_status(ctx, &path, passed);
+        }
+        if let Some(notifier) = self.notifier() {
+            notifier.run_changed(ctx.id, &view);
         }
     }
 
-    async fn run_item(ctx: &ProjectCtx, handle: &RunHandle, variables: &Variables, index: usize) {
+    async fn run_item(
+        &self,
+        ctx: &ProjectCtx,
+        handle: &RunHandle,
+        variables: &Variables,
+        index: usize,
+    ) {
         let path = handle
             .view
             .lock()
@@ -681,10 +918,10 @@ impl Workbench {
             .and_then(|v| v.items.get(index).map(|i| i.path.clone()))
             .unwrap_or_default();
         if handle.cancel.is_cancelled() {
-            Self::update(handle, index, |i| i.status = ItemStatus::Cancelled);
+            self.update(ctx, handle, index, |i| i.status = ItemStatus::Cancelled);
             return;
         }
-        Self::update(handle, index, |i| i.status = ItemStatus::Running);
+        self.update(ctx, handle, index, |i| i.status = ItemStatus::Running);
         let prepared = tree::resolve(&ctx.root, &path)
             .and_then(|p| file::read(&p))
             .and_then(|mut request| {
@@ -697,7 +934,7 @@ impl Workbench {
             Ok(ok) => ok,
             Err(error) => {
                 let message = variables.mask(&error.message);
-                Self::update(handle, index, |i| {
+                self.update(ctx, handle, index, |i| {
                     i.status = ItemStatus::Error;
                     i.error = Some(message);
                 });
@@ -712,7 +949,7 @@ impl Workbench {
                     &request,
                     Self::mask_response(variables, response),
                 );
-                Self::update(handle, index, |i| {
+                self.update(ctx, handle, index, |i| {
                     i.status = if outcome.passed {
                         ItemStatus::Passed
                     } else {
@@ -727,7 +964,7 @@ impl Workbench {
             Err(error) => {
                 let cancelled = error.kind == CommandErrorKind::Cancelled;
                 let message = variables.mask(&error.message);
-                Self::update(handle, index, |i| {
+                self.update(ctx, handle, index, |i| {
                     i.status = if cancelled {
                         ItemStatus::Cancelled
                     } else {
@@ -751,6 +988,66 @@ impl Workbench {
     pub fn run_status(&self, run_id: Uuid) -> Result<RunView, CommandError> {
         let handle = self.handle(run_id)?;
         let view = handle.view.lock().map_err(|_| busy())?.clone();
+        Ok(view)
+    }
+
+    /// Ignore l'échec d'une vérification dans une ligne d'un run
+    /// (`docs/plan-fin-premier-usage.md`, R7) ; la ligne réussit si plus rien n'échoue.
+    pub fn ignore_in_run(
+        &self,
+        ctx: &ProjectCtx,
+        run_id: Uuid,
+        path: &str,
+        check: &str,
+    ) -> Result<RunView, CommandError> {
+        let missing = || not_found("Cette vérification n'est plus dans le run.");
+        let apply = |view: &mut RunView| -> Result<Option<bool>, CommandError> {
+            let item = view
+                .items
+                .iter_mut()
+                .find(|i| i.path == path)
+                .ok_or_else(missing)?;
+            if !assertions::ignore(&mut item.assertions, check) {
+                return Err(missing());
+            }
+            if item.status == ItemStatus::Failed
+                && assertions::request_passed(&item.assertions, item.http_status.unwrap_or(0))
+            {
+                item.status = ItemStatus::Passed;
+            }
+            let passed = match item.status {
+                ItemStatus::Passed => Some(true),
+                ItemStatus::Failed | ItemStatus::Error => Some(false),
+                _ => None,
+            };
+            view.touch();
+            Ok(passed)
+        };
+        let (view, passed) = match self.handle(run_id) {
+            Ok(handle) => {
+                let mut view = handle.view.lock().map_err(|_| busy())?;
+                let passed = apply(&mut view)?;
+                if view.finished && Self::last_run(ctx).is_some_and(|last| last.id == run_id) {
+                    Self::save_last_run(ctx, &view);
+                }
+                (view.clone(), passed)
+            }
+            // Run oublié : seul le dernier run du projet, gardé sur disque, se relit.
+            Err(error) => {
+                let mut view = Self::last_run(ctx)
+                    .filter(|run| run.id == run_id)
+                    .ok_or(error)?;
+                let passed = apply(&mut view)?;
+                Self::save_last_run(ctx, &view);
+                (view, passed)
+            }
+        };
+        if let Some(passed) = passed {
+            self.record_status(ctx, path, passed);
+        }
+        if let Some(notifier) = self.notifier() {
+            notifier.run_changed(ctx.id, &view);
+        }
         Ok(view)
     }
 

@@ -57,6 +57,16 @@ const NO_VALUE: AssertionOperator[] = [
 /** Identifiant du résultat de conformité au contrat lié (`CONTRACT_CHECK`, R8). */
 const CONTRACT_CHECK = "contrat";
 
+/**
+ * Origine d'une vérification (VT4), connue pendant la session : une vérification relue d'un
+ * fichier est « manuelle » (Q2 de `docs/plan-fin-premier-usage.md`).
+ */
+const ORIGINS: Record<Assertion["origin"], string> = {
+  proposed: "proposée",
+  manual: "manuelle",
+  default: "par défaut",
+};
+
 function setOperator(index: number, operator: AssertionOperator): void {
   const assertion = assertions.value[index];
   if (!assertion) return;
@@ -100,9 +110,10 @@ function remove(index: number): void {
   assertions.value.splice(index, 1);
 }
 
+/** Résultat du dernier envoi ; une vérification ignorée pour ce run n'en a pas (R7). */
 function resultFor(id: string): boolean | null {
   const found = props.results?.find((a) => a.id === id);
-  return found ? found.passed : null;
+  return found && !found.ignored ? found.passed : null;
 }
 </script>
 
@@ -162,13 +173,7 @@ function resultFor(id: string): boolean | null {
           @input="setValue(index, ($event.target as HTMLInputElement).value)"
         />
         <span v-else />
-        <span class="assertion__origin">{{
-          assertion.origin === "proposed"
-            ? "proposée"
-            : assertion.origin === "default"
-              ? "par défaut"
-              : ""
-        }}</span>
+        <span class="assertion__origin">{{ ORIGINS[assertion.origin] }}</span>
         <button
           type="button"
           class="assertion__remove"

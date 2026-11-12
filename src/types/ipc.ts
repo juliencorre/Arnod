@@ -60,6 +60,8 @@ export type CommandName =
   | "request_send"
   | "request_cancel"
   | "request_result"
+  | "request_statuses"
+  | "result_ignore_check"
   | "request_propose_assertions"
   | "request_example_from_response"
   | "environments_load"
@@ -73,6 +75,7 @@ export type CommandName =
   | "run_cancel"
   | "run_retry_failures"
   | "run_last"
+  | "run_ignore_check"
   | "project_last_runs"
   | "contract_list"
   | "contract_read"
@@ -447,9 +450,13 @@ export interface ContractLink {
 /** Résultat d'une vérification (V3). */
 export interface AssertionResult {
   id: string;
+  /** Cible (`body.amount`), ou `contrat` pour la conformité au contrat lié. */
+  target: string;
   passed: boolean;
   message: string | null;
   actual: string | null;
+  /** Échec ignoré pour le résultat affiché (`docs/plan-fin-premier-usage.md`, R7). */
+  ignored: boolean;
 }
 
 /** Réponse HTTP reçue. */
@@ -522,16 +529,53 @@ export interface RunItem {
   error: string | null;
 }
 
+/** Résultat d'un groupe de requêtes d'un run (`RunGroup`, R2). */
+export interface RunGroup {
+  /** Dossier, ou « Projet » pour la racine. */
+  name: string;
+  /** Chemin du dossier (vide pour la racine). */
+  path: string;
+  passed: number;
+  /** En échec ou en erreur. */
+  failed: number;
+  total: number;
+}
+
 export interface RunView {
   id: string;
+  /** Numéro du run dans le projet (R1) ; 0 pour un run gardé par une version précédente. */
+  number: number;
   folder: string;
   environment: string;
+  /** Requêtes envoyées en même temps. */
+  concurrency: number;
   startedAt: number;
+  finishedAt: number | null;
   finished: boolean;
   cancelled: boolean;
   items: RunItem[];
   /** Nom du contrat exécuté (C10), sinon `null`. */
   contract: string | null;
+  /** Révision, croissante à chaque changement (R3). */
+  revision: number;
+  /** Résultat par dossier (R2). */
+  groups: RunGroup[];
+}
+
+/** Dernière exécution d'une requête (`RequestStatus`, R4). */
+export interface RequestStatus {
+  passed: boolean;
+  /** Fin de l'exécution, en millisecondes depuis l'époque Unix. */
+  at: number;
+}
+
+/** Statuts d'un projet, par chemin de requête (`Statuses`, R5). */
+export type RequestStatuses = Record<string, RequestStatus>;
+
+/** Statuts diffusés par `arnod://statuts` (`StatusesChange`). */
+export interface StatusesChange {
+  projectId: string;
+  statuses: RequestStatuses;
 }
 
 /** Réponse sur laquelle proposer des vérifications. */
@@ -671,7 +715,10 @@ export interface ResultChange {
   origin: string;
 }
 
-/** Run démarré diffusé par `arnod://run` (`RunChange`) : toutes les fenêtres le suivent (R7). */
+/**
+ * Run démarré ou avancé, diffusé par `arnod://run` (`RunChange`) : toutes les fenêtres le suivent
+ * (R7). `origin` vide : avancement diffusé par le cœur (R3 de la fin du premier usage).
+ */
 export interface RunChange {
   projectId: string;
   run: RunView;

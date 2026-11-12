@@ -20,11 +20,18 @@ pub struct ResponseData {
 #[serde(rename_all = "camelCase")]
 pub struct AssertionResult {
     pub id: String,
+    /// Cible de la vérification (`body.amount`), ou `contrat` pour la conformité
+    /// au contrat lié : de quoi détailler un échec sans relire la requête.
+    #[serde(default)]
+    pub target: String,
     pub passed: bool,
     /// Détail de l'échec, en français.
     pub message: Option<String>,
     /// Valeur reçue, en texte.
     pub actual: Option<String>,
+    /// Échec ignoré pour le résultat affiché (`docs/plan-fin-premier-usage.md`, R7).
+    #[serde(default)]
+    pub ignored: bool,
 }
 
 /// Valeur lue dans la réponse pour une cible.
@@ -391,9 +398,11 @@ pub fn evaluate(
     };
     AssertionResult {
         id: assertion.id.clone(),
+        target: assertion.target.clone(),
         passed,
         message,
         actual,
+        ignored: false,
     }
 }
 
@@ -409,12 +418,25 @@ pub fn evaluate_all(assertions: &[Assertion], response: &ResponseData) -> Vec<As
 }
 
 /// Une requête réussit si toutes ses vérifications réussissent ; sans aucune,
-/// si le statut est inférieur à 400 (R11).
+/// si le statut est inférieur à 400 (R11). Une vérification ignorée ne compte
+/// pas (`docs/plan-fin-premier-usage.md`, R7).
 pub fn request_passed(results: &[AssertionResult], status: u16) -> bool {
     if results.is_empty() {
         status < 400
     } else {
-        results.iter().all(|result| result.passed)
+        results.iter().all(|result| result.passed || result.ignored)
+    }
+}
+
+/// Ignore l'échec de la vérification `id` (R7) ; renvoie faux si elle n'est pas
+/// dans les résultats.
+pub fn ignore(results: &mut [AssertionResult], id: &str) -> bool {
+    match results.iter_mut().find(|result| result.id == id) {
+        Some(result) => {
+            result.ignored = true;
+            true
+        }
+        None => false,
     }
 }
 
@@ -642,6 +664,14 @@ mod tests {
         assert!(request_passed(&results, 200));
         assert!(request_passed(&[], 399));
         assert!(!request_passed(&[], 404));
+        // Ignorée : son échec ne compte plus (R7 de la fin du premier usage).
+        let wrong = assertion("status", Operator::Equals, Some(Scalar::Int(201)));
+        let mut failed = evaluate_all(std::slice::from_ref(&wrong), &r);
+        assert_eq!(failed[0].target, "status");
+        assert!(!request_passed(&failed, 200));
+        assert!(ignore(&mut failed, &wrong.id));
+        assert!(request_passed(&failed, 200));
+        assert!(!ignore(&mut failed, "absente"));
         // Désactivée : pas de résultat, et le statut décide.
         let mut off = a.clone();
         off.enabled = false;

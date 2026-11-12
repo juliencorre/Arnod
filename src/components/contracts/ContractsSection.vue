@@ -18,6 +18,9 @@ import BaseMenu from "@/components/ui/BaseMenu.vue";
 import SectionHeading from "@/components/ui/SectionHeading.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import NameDialog from "@/components/workbench/NameDialog.vue";
+import StatusCount from "@/components/workbench/StatusCount.vue";
+import StatusMark from "@/components/workbench/StatusMark.vue";
+import { countStatuses } from "@/lib/status";
 import { useCatalogStore } from "@/stores/catalog";
 import { type ContractDialogMode, type ContractNode, useContractsStore } from "@/stores/contracts";
 import { useToastStore } from "@/stores/toasts";
@@ -28,6 +31,7 @@ import type {
   ContractSummary,
   LinkedView,
   OperationNode,
+  RequestStatus,
   ResourceView,
 } from "@/types/ipc";
 
@@ -36,6 +40,12 @@ const props = defineProps<{ projectId: string }>();
 const contracts = useContractsStore();
 const windows = useWindowsStore();
 const workbench = useWorkbenchStore();
+
+/** Dernière exécution de la seule requête d'une opération (ST1). */
+function endpointStatus(operation: OperationNode): RequestStatus | null {
+  const only = operation.requests.length === 1 ? operation.requests[0] : undefined;
+  return only ? (workbench.statuses[props.projectId]?.[only.path] ?? null) : null;
+}
 const toasts = useToastStore();
 const projectName = computed(() => useCatalogStore().projectById(props.projectId)?.name ?? "");
 const list = computed(() => contracts.lists[props.projectId] ?? []);
@@ -322,7 +332,16 @@ async function rename(name: string): Promise<void> {
                   </svg>
                 </span>
                 <span class="crow__name">{{ resource.path }}</span>
-                <span class="crow__count">{{ resource.operations.length }}</span>
+                <StatusCount
+                  class="crow__count"
+                  :count="
+                    countStatuses(
+                      resource.operations.flatMap((o) => o.requests.map((r) => r.path)),
+                      workbench.statuses[projectId],
+                    )
+                  "
+                  :fallback="resource.operations.length"
+                />
               </button>
             </div>
             <ul v-if="isOpen(resourceNode(contract, resource))" class="contracts__group">
@@ -371,12 +390,24 @@ async function rename(name: string): Promise<void> {
                       aria-hidden="true"
                       >Créer</span
                     >
-                    <span
+                    <StatusCount
                       v-else-if="operation.requests.length > 1"
                       class="crow__count"
                       aria-hidden="true"
-                      >{{ operation.requests.length }}</span
-                    >
+                      :count="
+                        countStatuses(
+                          operation.requests.map((r) => r.path),
+                          workbench.statuses[projectId],
+                        )
+                      "
+                      :fallback="operation.requests.length"
+                    />
+                    <StatusMark
+                      v-else-if="operation.requests.length === 1"
+                      class="crow__mark"
+                      aria-hidden="true"
+                      :status="endpointStatus(operation)"
+                    />
                   </button>
                 </div>
                 <ul
@@ -423,7 +454,16 @@ async function rename(name: string): Promise<void> {
                   </svg>
                 </span>
                 <span class="crow__name">Hors contrat</span>
-                <span class="crow__count">{{ contract.unplaced.length }}</span>
+                <StatusCount
+                  class="crow__count"
+                  :count="
+                    countStatuses(
+                      contract.unplaced.map((r) => r.path),
+                      workbench.statuses[projectId],
+                    )
+                  "
+                  :fallback="contract.unplaced.length"
+                />
               </button>
             </div>
             <ul v-if="isOpen(unplacedNode(contract))" class="contracts__group">
@@ -707,6 +747,10 @@ async function rename(name: string): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.crow__mark {
+  margin-left: auto;
 }
 
 .crow__count {
