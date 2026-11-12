@@ -1,6 +1,6 @@
 # Plan - Fin du premier usage : run, statuts, vérifications
 
-**Version** 1.0 · **Date** 2026-11-12 · **Statut** En cours · **Base** version 0.0.2
+**Version** 1.0 · **Date** 2026-11-12 · **Statut** Livré · **Base** version 0.0.2
 
 Plan d'implémentation des écarts restants du premier usage
 ([`plan-premier-usage.md`](plan-premier-usage.md), tâches T1, T18, T25, T27 et T29) : écran du run
@@ -191,20 +191,20 @@ Une seule pull request (une seule branche de travail) : les lots A à C partagen
 
 **Lot D - Qualité et documentation**
 
-- [ ] **T8** Test e2e du parcours QA1 contre un serveur HTTP local.
-- [ ] **T9** `CLAUDE.md`, plan du premier usage (T1, T18, T25, T27, T29), relecture d'ensemble.
+- [x] **T8** Test e2e du parcours QA1 contre un serveur HTTP local.
+- [x] **T9** `CLAUDE.md`, plan du premier usage (T1, T18, T25, T27, T29), relecture d'ensemble.
 
 ## 9. Critères d'acceptation
 
-- [ ] Un dossier de requêtes dont une échoue s'exécute : « N réussis, 1 en échec », la ligne
+- [x] Un dossier de requêtes dont une échoue s'exécute : « N réussis, 1 en échec », la ligne
       d'échec donne la vérification, l'attendu et le reçu ; « Lents » et « Tous » comptent juste.
-- [ ] Le panneau « Résultat par dossier » montre un groupe par sous-dossier ; un clic filtre la
+- [x] Le panneau « Résultat par dossier » montre un groupe par sous-dossier ; un clic filtre la
       liste.
-- [ ] Pendant un run, la barre latérale de toutes les fenêtres se met à jour ligne par ligne.
-- [ ] Après redémarrage, les ✓ / ✕ et les compteurs des dossiers sont toujours là.
-- [ ] Ignorer l'échec d'une vérification rend la requête réussie sans modifier son fichier ;
+- [x] Pendant un run, la barre latérale de toutes les fenêtres se met à jour ligne par ligne.
+- [x] Après redémarrage, les ✓ / ✕ et les compteurs des dossiers sont toujours là.
+- [x] Ignorer l'échec d'une vérification rend la requête réussie sans modifier son fichier ;
       la retirer la retire du fichier.
-- [ ] `cargo test`, `npm run check` et le parcours e2e passent.
+- [x] `cargo test`, `npm run check` et le parcours e2e passent.
 
 ## 10. Risques
 
@@ -216,9 +216,9 @@ Une seule pull request (une seule branche de travail) : les lots A à C partagen
 
 ## 11. Décisions
 
-| ID  | Question                                                           | Décision (2026-11-12)                                                                                                              |
-| --- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Où garder les statuts : dans le projet ou sur le poste ?           | Sur le poste (`statuses.json`) : un résultat dépend de l'environnement et du poste, il ne se versionne pas.                        |
-| Q2  | Écrire l'origine des vérifications pour afficher « manuelle » ?    | Non (aucun champ inventé dans OpenCollection) : l'origine reste de session ; une vérification relue d'un fichier est « manuelle ». |
-| Q3  | Compteur d'un dossier : réussies / total ou réussies / exécutées ? | Réussies / exécutées : une requête jamais exécutée n'est pas un échec ; le total figure dans le titre.                             |
-| Q4  | Que veut dire « Ignorer pour ce run » hors d'un run ?              | Le dernier résultat affiché de la requête (R7) ; le prochain envoi la réévalue.                                                    |
+| ID  | Question                                                           | Décision (2026-11-12)                                                                                                                                                                                                      |
+| --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Où garder les statuts : dans le projet ou sur le poste ?           | Sur le poste (`statuses.json`) : un résultat dépend de l'environnement et du poste, il ne se versionne pas.                                                                                                                |
+| Q2  | Écrire l'origine des vérifications pour afficher « manuelle » ?    | Non (aucun champ inventé dans OpenCollection) : l'origine reste de session ; relue d'un fichier, une vérification est « manuelle », sauf la durée par défaut (`responseTime` inférieur à 500 ms), reconnue « par défaut ». |
+| Q3  | Compteur d'un dossier : réussies / total ou réussies / exécutées ? | Réussies / exécutées : une requête jamais exécutée n'est pas un échec ; le total figure dans le titre.                                                                                                                     |
+| Q4  | Que veut dire « Ignorer pour ce run » hors d'un run ?              | Le dernier résultat affiché de la requête (R7) ; le prochain envoi la réévalue.                                                                                                                                            |

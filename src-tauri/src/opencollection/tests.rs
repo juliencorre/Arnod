@@ -17,7 +17,7 @@ use super::{ROOT_FILE, yaml};
 use crate::contract::file as contract_file;
 use crate::environment::{self, Environment, Variable};
 use crate::request::file;
-use crate::request::model::{Method, Operator, ParamKind, Scalar};
+use crate::request::model::{Method, Operator, Origin, ParamKind, Scalar};
 use crate::request::resolve::{Variables, prepare};
 use crate::tree::{self, TreeNode};
 
@@ -108,6 +108,13 @@ fn r1_requete_neuve_valide() {
     assert_eq!(value.pointer("/info/type"), Some(&json!("http")));
     assert_eq!(value.pointer("/info/name"), Some(&json!("Lire")));
     assert_eq!(value.pointer("/http/method"), Some(&json!("GET")));
+    // La durée par défaut se reconnaît à la relecture ; une autre limite est « manuelle » (VT4).
+    let mut request = file::read(&full).unwrap();
+    assert_eq!(request.assertions[0].origin, Origin::Default);
+    request.assertions[0].value = Some(Scalar::Int(800));
+    file::write(&full, &request).unwrap();
+    let request = file::read(&full).unwrap();
+    assert_eq!(request.assertions[0].origin, Origin::Manual);
 }
 
 #[test]

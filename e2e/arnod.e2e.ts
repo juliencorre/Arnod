@@ -11,7 +11,9 @@
  * ajoutent un contrat de service et exécutent ses requêtes contre un serveur
  * HTTP local (docs/plan-contrats-services.md). Les dernières essaient une étape
  * REST depuis « Tous les projets » : l'essai est gardé dans « Non classés », sous
- * le contrat déduit de son serveur (docs/plan-accueil-non-classes.md).
+ * le contrat déduit de son serveur (docs/plan-accueil-non-classes.md). Les toutes dernières suivent
+ * le premier usage jusqu'au run d'un dossier : vérifications en échec, résultat par dossier et
+ * statuts de la barre latérale gardés au redémarrage (docs/plan-fin-premier-usage.md).
  */
 import type { ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
@@ -1250,5 +1252,277 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
     expect(rows[0]).toContain("Non classés");
     expect(rows[0]).toContain("Hors workspaces");
     await screenshot(browser, "18-tous-les-projets-non-classes");
+  });
+});
+
+describe("Premier usage : vérifications, run et statuts", () => {
+  let server: Server;
+  let url = "";
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      const json = (status: number, body: unknown): void => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      // Pas d'en-tête Location sur la création : la vérification ajoutée échoue (1e).
+      if (request.method === "GET" && request.url === "/commandes") {
+        json(200, [{ id: 1, amount: "129.90" }]);
+      } else if (request.method === "POST" && request.url === "/commandes") {
+        json(201, { id: 2, status: "pending" });
+      } else json(404, { message: "absent" });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  /** Ligne de l'arborescence (référentiel de tests) dont le nom est `name`. */
+  async function treeRow(name: string): Promise<{ status: string; count: string } | null> {
+    return browser.execute((label) => {
+      const item = Array.from(document.querySelectorAll('aside [role="treeitem"]')).find(
+        (row) => row.querySelector(".row__name")?.textContent.trim() === label,
+      );
+      if (!item) return null;
+      return {
+        status: item.querySelector(".row__status")?.textContent.trim() ?? "",
+        count: item.querySelector(".row__count")?.getAttribute("title") ?? "",
+      };
+    }, name);
+  }
+
+  /** Ouvre le menu « ⋯ » d'une ligne de l'arborescence et choisit `action`. */
+  async function rowAction(name: string, action: string): Promise<void> {
+    await browser.execute((label) => {
+      const row = Array.from(document.querySelectorAll('aside li[role="presentation"]')).find(
+        (li) => li.querySelector(".row__name")?.textContent.trim() === label,
+      );
+      const more = row?.querySelector<HTMLElement>(".row__more");
+      if (!more) throw new Error(`ligne « ${label} » introuvable`);
+      more.click();
+    }, name);
+    await clickText('aside [role="menuitem"]', action);
+  }
+
+  /** Saisit `name` dans la fenêtre de nom ouverte et valide. */
+  async function nameIt(name: string): Promise<void> {
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForDisplayed();
+    await dialog.$("input").setValue(name);
+    await browser.keys("Enter");
+    await dialog.waitForExist({ reverse: true, timeout: 10_000 });
+  }
+
+  type Step =
+    | { kind: "url"; value: string }
+    | { kind: "method"; value: string }
+    | { kind: "click"; value: string }
+    | { kind: "addCheck"; target: string; operator: string }
+    | { kind: "editorChecks" }
+    | { kind: "state" };
+
+  /**
+   * Agit dans l'onglet de la requête `name` (d'autres zones en montrent d'autres) et renvoie son
+   * état : statut de la réponse, verdict, encadrés d'échec, vérifications de l'éditeur.
+   */
+  function inRequest(name: string, step: Step) {
+    return browser.execute(
+      (label, action) => {
+        const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find(
+          (t) => t.querySelector<HTMLInputElement>(".meta__input")?.value === label,
+        );
+        if (!tab) throw new Error(`onglet « ${label} » introuvable`);
+        const input = (el: HTMLInputElement | HTMLSelectElement | null, value: string): void => {
+          if (!el) throw new Error("champ introuvable");
+          el.value = value;
+          el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? "change" : "input"));
+        };
+        const button = (text: string): HTMLButtonElement | undefined =>
+          Array.from(tab.querySelectorAll<HTMLButtonElement>("button")).find((b) =>
+            b.textContent.trim().startsWith(text),
+          );
+        if (action.kind === "url") input(tab.querySelector(".editor__url"), action.value);
+        if (action.kind === "method") input(tab.querySelector(".editor__method"), action.value);
+        if (action.kind === "click") {
+          const found = button(action.value);
+          if (!found) throw new Error(`bouton « ${action.value} » introuvable`);
+          found.click();
+        }
+        // Onglet « Vérifications » de l'éditeur (celui de la réponse a son propre onglet).
+        const editorChecks = (): void => {
+          Array.from(tab.querySelectorAll<HTMLButtonElement>('.editor [role="tab"]'))
+            .find((b) => b.textContent.includes("Vérifications"))
+            ?.click();
+        };
+        if (action.kind === "editorChecks") editorChecks();
+        if (action.kind === "addCheck") {
+          editorChecks();
+          const rows = tab.querySelectorAll(".assertions .assertion").length;
+          button("+ Ajouter une vérification")?.click();
+          const n = String(rows + 1);
+          setTimeout(() => {
+            input(tab.querySelector(`[aria-label="Cible de la vérification ${n}"]`), action.target);
+            input(
+              tab.querySelector(`[aria-label="Opérateur de la vérification ${n}"]`),
+              action.operator,
+            );
+          }, 50);
+        }
+        return {
+          status: tab.querySelector(".response__status")?.textContent.trim() ?? "",
+          verdict: tab.querySelector(".response__verdict")?.textContent.trim() ?? "",
+          failures: Array.from(tab.querySelectorAll(".failure__title")).map((f) =>
+            f.textContent.trim(),
+          ),
+          checks: Array.from(
+            tab.querySelectorAll<HTMLInputElement>('.assertion input[aria-label^="Cible"]'),
+          ).map((i) => i.value),
+          saved: tab.querySelector(".editor__saved")?.textContent.trim() ?? "",
+        };
+      },
+      name,
+      step,
+    );
+  }
+
+  async function createRequest(name: string): Promise<void> {
+    await rowAction("Commandes", "Nouvelle requête");
+    await nameIt(name);
+    await browser.waitUntil(async () => (await zoneTabs()).flat().includes(name), {
+      timeout: 10_000,
+      timeoutMsg: `onglet « ${name} » attendu`,
+    });
+  }
+
+  async function sendAndWait(name: string, status: string): Promise<void> {
+    await inRequest(name, { kind: "click", value: "Envoyer" });
+    await browser.waitUntil(
+      async () => (await inRequest(name, { kind: "state" })).status.startsWith(status),
+      { timeout: 15_000, timeoutMsg: `réponse ${status} attendue pour « ${name} »` },
+    );
+  }
+
+  it("crée un dossier et une requête, l'envoie et accepte les vérifications proposées (B1, X1, V1)", async () => {
+    // La notification de l'essai précédent ne doit pas masquer les captures.
+    await dismissToast();
+    await browser.$(".toast").waitForExist({ reverse: true, timeout: 15_000 });
+    await chooseWorkspace("E-commerce");
+    // Les onglets ouverts restent dans la zone principale : le projet se déplie dans la barre.
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    // « + » n'apparaît qu'au survol ou sur le projet ouvert.
+    await clickHidden('aside button[aria-label="Ajouter au projet boutique-tests"]');
+    await browser.$('[role="menuitem"]*=Nouveau dossier').click();
+    await nameIt("Commandes");
+    await browser.waitUntil(async () => (await treeRow("Commandes")) !== null, {
+      timeoutMsg: "dossier « Commandes » attendu",
+    });
+    expect(existsSync(path.join(project(), "Commandes"))).toBe(true);
+
+    await createRequest("Lister les commandes");
+    await inRequest("Lister les commandes", { kind: "url", value: `${url}/commandes` });
+    await sendAndWait("Lister les commandes", "200");
+    await inRequest("Lister les commandes", { kind: "click", value: "Vérifications (" });
+    await inRequest("Lister les commandes", { kind: "click", value: "Proposer des vérifications" });
+    await inRequest("Lister les commandes", { kind: "editorChecks" });
+    await browser.waitUntil(
+      async () =>
+        (await inRequest("Lister les commandes", { kind: "state" })).checks.includes("status"),
+      { timeoutMsg: "vérification de statut proposée attendue" },
+    );
+    expect((await treeRow("Lister les commandes"))?.status).toBe("✓, réussie");
+  });
+
+  it("une vérification en échec se détaille, s'ignore pour ce run et reste dans la requête (VT1, VT2)", async () => {
+    await createRequest("Créer une commande");
+    await inRequest("Créer une commande", { kind: "method", value: "POST" });
+    await inRequest("Créer une commande", { kind: "url", value: `${url}/commandes` });
+    await inRequest("Créer une commande", {
+      kind: "addCheck",
+      target: "headers.Location",
+      operator: "exists",
+    });
+    await browser.waitUntil(
+      async () =>
+        (await inRequest("Créer une commande", { kind: "state" })).checks.includes(
+          "headers.Location",
+        ),
+      { timeoutMsg: "vérification ajoutée attendue" },
+    );
+    await sendAndWait("Créer une commande", "201");
+    const failed = await inRequest("Créer une commande", { kind: "state" });
+    expect(failed.failures).toEqual(["✕ headers.Location"]);
+    expect(failed.verdict).toBe("Échec · 1 vérification(s)");
+    expect((await treeRow("Créer une commande"))?.status).toBe("✕, en échec");
+    await screenshot(browser, "19-verification-en-echec");
+
+    await inRequest("Créer une commande", { kind: "click", value: "Ignorer pour ce run" });
+    await browser.waitUntil(
+      async () => (await inRequest("Créer une commande", { kind: "state" })).verdict === "Réussie",
+      { timeoutMsg: "verdict recalculé attendu" },
+    );
+    expect((await treeRow("Créer une commande"))?.status).toBe("✓, réussie");
+    // La vérification reste dans le fichier : elle sera de nouveau évaluée (R7).
+    const file = readFileSync(path.join(project(), "Commandes", "creer-une-commande.yml"), "utf8");
+    // OpenCollection écrit le nom de l'en-tête en minuscules.
+    expect(file).toContain('res.headers["location"]');
+  });
+
+  it("exécute le dossier : résumé, échecs détaillés, résultat par dossier (RU1 à RU4)", async () => {
+    await rowAction("Commandes", "Exécuter le dossier");
+    const progress = browser.$(".run__progress");
+    await browser.waitUntil(async () => (await progress.getText()).includes("1 en échec"), {
+      timeout: 15_000,
+      timeoutMsg: "run du dossier attendu",
+    });
+    expect(await progress.getText()).toBe("1 réussi, 1 en échec");
+    expect(await browser.$(".run__meta").getText()).toMatch(
+      /^run #\d+ · Local · 8 en même temps · \d/,
+    );
+    expect(await browser.$('.run__tab[aria-selected="true"]').getText()).toContain("Échecs");
+    const failures = await browser.$$(".run__item").map((item) => item.getText());
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain("Créer une commande");
+    expect(await browser.$(".run__failure .run__error").getText()).toBe(
+      "headers.location : en-tête absent de la réponse",
+    );
+    // Texte du DOM : `getText` de WebKitWebDriver rend vide un libellé tronqué par ellipse.
+    const group = await browser.execute(
+      () => document.querySelector(".run__group-name")?.textContent.trim() ?? "",
+    );
+    expect(group).toBe("Commandes");
+    expect(await browser.$(".run__group-count").getText()).toBe("1/2");
+    // La barre latérale suit le run (R4, R6).
+    expect((await treeRow("Commandes"))?.count).toBe("1 réussie sur 2 exécutées (2 requêtes)");
+    expect((await treeRow("Créer une commande"))?.status).toBe("✕, en échec");
+    await screenshot(browser, "20-run-dossier");
+
+    await browser.$(".run__link=Ignorer pour ce run").click();
+    await browser.waitUntil(async () => (await progress.getText()).includes("tout est réussi"), {
+      timeoutMsg: "échec ignoré attendu",
+    });
+    expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
+  });
+
+  it("au redémarrage, les statuts et le dernier run sont relus (ST4)", async () => {
+    await restart();
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await browser.waitUntil(async () => (await treeRow("Créer une commande"))?.status !== "", {
+      timeout: 15_000,
+      timeoutMsg: "statut relu attendu",
+    });
+    expect((await treeRow("Créer une commande"))?.status).toBe("✓, réussie");
+    expect((await treeRow("Lister les commandes"))?.status).toBe("✓, réussie");
+    expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
   });
 });

@@ -35,8 +35,10 @@ ailleurs : `ARNOD_E2E_TAURI_DRIVER=/chemin/vers/tauri-driver`.
   (W2), dossier supprimé hors d'Arnod (P10), dossier projet existant (P12), projet oublié puis
   rétabli (P11) ; puis zones et fenêtres : onglets, division, séparation au clavier, zone ouverte
   dans sa fenêtre puis rattachée, barre latérale détachée qui pilote la fenêtre principale,
-  restauration au redémarrage ; contrats de services contre un serveur HTTP local ; enfin catalogue
-  des étapes et essais REST gardés dans « Non classés » sous leur contrat déduit. Chaque étape
+  restauration au redémarrage ; contrats de services contre un serveur HTTP local ; catalogue
+  des étapes et essais REST gardés dans « Non classés » sous leur contrat déduit ; enfin le premier
+  usage jusqu'au run d'un dossier : vérification en échec ignorée, résultat par dossier, statuts de
+  la barre latérale relus au redémarrage. Chaque étape
   vérifie aussi le disque (`opencollection.yml`, `arnod.json`,
   `windows.json`).
 - Plusieurs fenêtres : `getWindowHandles()` les liste et `switchToWindow()` passe de l'une à

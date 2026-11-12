@@ -9,9 +9,9 @@ use serde_json::{Map, Value, json};
 
 use crate::opencollection::schema::{self, Part};
 use crate::request::model::{
-    ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, BodyVariant, ContractLink, Example,
-    ExampleBodyKind, Method, Operator, Origin, Pair, ParamKind, Request, ResponseHeader, Scalar,
-    Settings,
+    ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, BodyVariant, ContractLink,
+    DEFAULT_MAX_DURATION_MS, Example, ExampleBodyKind, Method, Operator, Origin, Pair, ParamKind,
+    Request, ResponseHeader, Scalar, Settings,
 };
 
 /// Préfixe de l'étiquette qui lie une requête à une opération de contrat (S7).
@@ -511,12 +511,22 @@ pub fn from_value(value: &Value, fallback: &str) -> Result<Request, String> {
                 .and_then(Value::as_str)
                 .filter(|_| takes_value(operator))
                 .map(scalar_from);
+            let target = target_from(&text(item.get("expression")));
+            // L'origine n'est pas écrite : seule la durée par défaut se reconnaît (V5).
+            let origin = if target == "responseTime"
+                && operator == Operator::LessThan
+                && value == Some(Scalar::Int(DEFAULT_MAX_DURATION_MS))
+            {
+                Origin::Default
+            } else {
+                Origin::Manual
+            };
             assertions.push(Assertion {
                 id: format!("a{index}"),
-                target: target_from(&text(item.get("expression"))),
+                target,
                 operator,
                 value,
-                origin: Origin::Manual,
+                origin,
                 enabled: !disabled(item),
             });
         }

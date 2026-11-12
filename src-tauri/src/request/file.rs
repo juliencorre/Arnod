@@ -134,11 +134,14 @@ mod tests {
         request
     }
 
-    /// Identifiants et origines sont de session : recalculés à la lecture (Q2).
+    /// Identifiants et origines sont de session : recalculés à la lecture (Q2) ;
+    /// seule la durée par défaut se reconnaît.
     fn session_free(mut request: Request) -> Request {
         for (index, assertion) in request.assertions.iter_mut().enumerate() {
             assertion.id = format!("a{index}");
-            assertion.origin = Origin::Manual;
+            if assertion.origin != Origin::Default {
+                assertion.origin = Origin::Manual;
+            }
         }
         request
     }
