@@ -465,7 +465,7 @@ def ds_space(tokens: dict) -> str:
         f'<span class="ds-name">{esc(t["name"])}</span><span class="ds-note" style="max-width:180px">{esc(t.get("usage", ""))}</span></div>'
         for t in tokens.get("hauteur", {}).get("tokens", []))
     focus = ('<div style="display:flex;flex-direction:column;gap:8px"><button type="button" class="button button--secondary" '
-             'style="outline:2px solid var(--color-focus);outline-offset:2px">Annuler</button><span class="ds-name">color-focus</span>'
+             'style="align-self:flex-start;outline:2px solid var(--color-focus);outline-offset:2px">Annuler</button><span class="ds-name">color-focus</span>'
              '<span class="ds-note">Contour de focus : 2 px plein, décalé de 2 px.</span></div>')
     card = (f'<div class="dv-card ds-card"><div class="ds-cols"><div class="ds-panel" data-theme="light">'
             f'<div><p class="ds-label">ESPACEMENTS</p><div style="display:flex;flex-direction:column;gap:2px">{spacing}</div></div></div>'
@@ -492,7 +492,7 @@ def ds_components() -> str:
             f'<button type="button" class="button button--secondary">Annuler</button>'
             f'<button type="button" class="button button--danger">Supprimer</button>'
             f'<button type="button" class="button button--link">+ Ajouter un projet</button>'
-            f'<button type="button" class="button button--primary" disabled="">Envoyer</button></div></div>'
+            f'<button type="button" class="button button--primary" disabled="true">Envoyer</button></div></div>'
             f'<div><p class="ds-label">SAISIE</p><div class="ds-row" style="align-items:center">'
             f'<label class="toggle" for="ds-{t}-t1"><button id="ds-{t}-t1" type="button" role="switch" class="toggle__switch" '
             f'aria-checked="true" aria-labelledby="ds-{t}-l1"><span class="toggle__thumb"></span></button>'
@@ -503,7 +503,7 @@ def ds_components() -> str:
             f'<div class="ds-row" style="margin-top:12px"><input type="search" class="search" style="max-width:220px" '
             f'aria-label="Filtrer les requêtes" placeholder="Filtrer les requêtes">'
             f'<select aria-label="Couleur"><option>Gris</option><option>Orange</option></select>'
-            f'<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked="">Environnement protégé</label>'
+            f'<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked="true">Environnement protégé</label>'
             f'<label style="display:flex;align-items:center;gap:8px"><input type="checkbox">Activer</label></div></div>'
             f'<div><p class="ds-label">BARRE LATÉRALE ET STATUTS</p>'
             f'<div style="background:var(--color-sidebar);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:6px 0;max-width:340px">'
