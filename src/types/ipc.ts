@@ -113,7 +113,17 @@ export type CommandName =
   // Lot F : onglets et clavier (docs/plan-mvp-f-onglets-clavier.md).
   | "layout_pin"
   | "layout_close_tabs"
-  | "layout_set_sidebar_hidden";
+  | "layout_set_sidebar_hidden"
+  // Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md).
+  | "request_conflict"
+  | "request_conflict_resolve"
+  // Lot G - Démarrage et erreurs.
+  | "startup_status"
+  | "startup_retry"
+  | "startup_start_empty"
+  | "startup_open"
+  | "startup_quit"
+  | "window_ready";
 
 /**
  * Nature d'une erreur de commande.
@@ -139,7 +149,8 @@ export type CommandErrorKind =
   | "timeout" // Délai dépassé.
   | "cancelled" // Exécution annulée par l'utilisateur.
   | "secretStore" // Le coffre du système est indisponible.
-  | "protectedEnvironment"; // Envoi sur un environnement protégé sans confirmation.
+  | "protectedEnvironment" // Envoi sur un environnement protégé sans confirmation.
+  | "changedOnDisk"; // Fichier modifié hors d'Arnod depuis sa lecture, rien n'est écrasé (lot I).
 
 /**
  * Erreur renvoyée par une commande Rust qui échoue : la promesse d'`invoke` est
@@ -1389,3 +1400,109 @@ export interface VariableUser {
 
 /** Raccourci choisi dans le menu natif Fenêtre (`Shortcut`), reçu par `arnod://raccourci`. */
 export type MenuShortcut = "placement" | "sidebar";
+// --- Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md) ---
+
+/** Requête renommée ou déplacée hors d'Arnod (`Renamed`, R5). */
+export interface RenamedFile {
+  from: string;
+  to: string;
+}
+
+/** Changements d'un projet faits hors d'Arnod, diffusés par `arnod://fichiers` (`FilesChange`). */
+export interface FilesChange {
+  projectId: string;
+  /** Requêtes ajoutées, modifiées, supprimées (chemins relatifs au projet). */
+  added: string[];
+  modified: string[];
+  removed: string[];
+  renamed: RenamedFile[];
+  tree: boolean;
+  environments: boolean;
+  contracts: boolean;
+}
+
+/** Version gardée pour un élément en conflit (`ConflictSide`). */
+export type ConflictSide = "disk" | "draft";
+
+/** Élément d'une requête en conflit avec le disque (`ConflictItem`, R9, R10). */
+export interface ConflictItem {
+  /** Clé stable (`url`, `headers:x-request-id#0`). */
+  key: string;
+  /** Libellé en français (« En-tête X-Request-Id »). */
+  label: string;
+  /** Valeur sur le disque, prête à afficher ; `null` : absent sur le disque. */
+  disk: string | null;
+  /** Valeur du brouillon ; `null` : absent du brouillon. */
+  draft: string | null;
+  /** Même valeur des deux côtés, changée de la même façon. */
+  identical: boolean;
+  /** Version proposée : celle qui seule a changé. */
+  suggested: ConflictSide | null;
+}
+
+/** Conflit d'une requête ouverte (`RequestConflict`). */
+export interface RequestConflict {
+  items: ConflictItem[];
+  /** Date de modification du fichier (ms depuis l'époque Unix). */
+  modifiedAt: number | null;
+}
+
+// Lot G - Démarrage et erreurs (docs/plan-mvp-g-demarrage-erreurs.md).
+
+/** Nature d'une erreur bloquante au démarrage (`startup::ProblemNature`). */
+export type ProblemNature = "newerVersion" | "corruptState" | "locked" | "inaccessible";
+
+/** Issue proposée par l'écran d'erreur (`startup::StartupAction`). */
+export type StartupAction = "openReleases" | "startEmpty" | "retry" | "openFolder";
+
+/** Ce que `startup_open` ouvre avec le programme du système (`startup::StartupTarget`). */
+export type StartupTarget = "folder" | "releases" | "issue";
+
+/** Une issue et ses conséquences (`startup::StartupOption`). */
+export interface StartupOption {
+  action: StartupAction;
+  title: string;
+  description: string;
+  button: string;
+  /** La recommandée, toujours en premier. */
+  recommended: boolean;
+  /** Ligne de plus : essais automatiques épuisés. */
+  note: string | null;
+}
+
+/** Prochain essai automatique d'un fichier verrouillé (`startup::RetryPlan`). */
+export interface RetryPlan {
+  attempt: number;
+  maxAttempts: number;
+  delaySeconds: number;
+}
+
+/** Ligne des détails pour le support (`startup::DetailRow`). */
+export interface DetailRow {
+  label: string;
+  value: string;
+}
+
+/** Erreur bloquante décrite par le cœur (`startup::StartupProblem`). */
+export interface StartupProblem {
+  nature: ProblemNature;
+  /** `arnod.json` ou `windows.json`. */
+  file: string;
+  title: string;
+  /** La cause en clair. */
+  message: string;
+  /** Ce qui est intact : début en gras, puis la suite. */
+  intactLead: string;
+  intactText: string;
+  /** Deux issues, la recommandée en premier. */
+  options: StartupOption[];
+  pathLabel: string;
+  path: string;
+  retry: RetryPlan | null;
+  details: DetailRow[];
+  /** Détails en texte, pour « Copier le détail ». */
+  supportText: string;
+  /** Issue GitHub préremplie : rien n'est envoyé sans l'utilisateur. */
+  issueUrl: string;
+  footer: string;
+}

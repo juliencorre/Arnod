@@ -217,7 +217,7 @@ describe("fenêtres interconnectées (F11)", () => {
     expect(app.findAll('[role="treeitem"]').map((i) => i.text())).toContain("GETPing");
   });
 
-  it("recharge une requête enregistrée ailleurs, ou le signale si elle est modifiée ici", async () => {
+  it("recharge une requête enregistrée ailleurs, ou montre le conflit si elle est modifiée ici", async () => {
     let core;
     ({ app, core } = await openProject());
     await click(app, '[role="treeitem"]', "Lister");
@@ -233,12 +233,12 @@ describe("fenêtres interconnectées (F11)", () => {
     if (stored) stored.url = "{{baseUrl}}/v3/clients";
     await core.emit(EVENTS.project, change({ scope: "request", path: "Clients/lister.yml" }));
     await flushPromises();
-    expect(url.element.value).toBe("{{baseUrl}}/ici");
-    expect(app.get(".editor__elsewhere").text()).toContain("Modifiée dans une autre fenêtre.");
-
-    await click(app, ".editor__elsewhere button", "Recharger");
-    expect(url.element.value).toBe("{{baseUrl}}/v3/clients");
-    expect(app.find(".editor__elsewhere").exists()).toBe(false);
+    // Lot I : le brouillon n'est pas écrasé, le conflit se règle élément par élément.
+    expect(app.get(".conflict__title").text()).toContain("a changé sur le disque");
+    await click(app, ".conflict__actions button", "Tout prendre du disque");
+    await click(app, ".conflict__actions button", "Appliquer et enregistrer");
+    expect(app.find(".conflict").exists()).toBe(false);
+    expect(app.get<HTMLInputElement>(".editor__url").element.value).toBe("{{baseUrl}}/v3/clients");
   });
 
   it("suit le catalogue modifié dans une autre fenêtre", async () => {

@@ -20,10 +20,14 @@ use uuid::Uuid;
 use crate::catalog::snapshot::CatalogSnapshot;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::layout::windows::{
-    ActiveRequest, Bounds, MAIN, WindowKind, WindowState, Windows, WindowsFile,
+    ActiveRequest, Bounds, MAIN, WINDOWS_VERSION, WindowKind, WindowState, Windows, WindowsFile,
 };
+use crate::startup::{Cause, Failure, StateFile};
 use crate::statuses::Statuses;
 use crate::workbench::{Notifier, RunView};
+
+/// Étiquette de la fenêtre principale.
+pub const MAIN_LABEL: &str = MAIN;
 
 /// Fichier des fenêtres, dans les données locales (Z8).
 pub const WINDOWS_FILE: &str = "windows.json";
@@ -132,10 +136,51 @@ pub struct ProjectChange {
 pub struct WindowsState {
     data_dir: PathBuf,
     inner: Mutex<Windows>,
+    /// Échec de lecture de `windows.json` au démarrage : rien n'est lu ni écrit tant que
+    /// l'utilisateur ne l'a pas réglé (lot G).
+    failure: Mutex<Option<Failure>>,
 }
 
 fn file(data_dir: &Path) -> PathBuf {
     data_dir.join(WINDOWS_FILE)
+}
+
+/// Lit `windows.json` : absent, la disposition par défaut.
+fn read_file(data_dir: &Path) -> Result<Windows, Failure> {
+    let path = file(data_dir);
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Windows::default()),
+        Err(error) => return Err(Failure::io(StateFile::Windows, &path, &error)),
+    };
+    let failure = |cause| Failure {
+        file: StateFile::Windows,
+        path: path.clone(),
+        cause,
+    };
+    let corrupt = |error: serde_json::Error| {
+        failure(Cause::Corrupt {
+            reason: format!("JSON invalide : {error}"),
+        })
+    };
+    let value: serde_json::Value = serde_json::from_str(&text).map_err(corrupt)?;
+    if let Some(format) = value
+        .get("version")
+        .and_then(serde_json::Value::as_u64)
+        .filter(|v| *v > u64::from(WINDOWS_VERSION))
+    {
+        return Err(failure(Cause::Newer {
+            format,
+            written_by: None,
+            modified: crate::storage::modified_secs(&path),
+        }));
+    }
+    let file: WindowsFile = serde_json::from_value(value).map_err(|error| {
+        failure(Cause::Corrupt {
+            reason: format!("contenu invalide : {error}"),
+        })
+    })?;
+    Ok(Windows::from_file(file))
 }
 
 fn busy() -> CommandError {
@@ -146,20 +191,45 @@ fn busy() -> CommandError {
 }
 
 impl WindowsState {
-    /// Charge `windows.json` ; absent ou illisible : une seule fenêtre, une zone vide.
+    /// Charge `windows.json` ; absent : une seule fenêtre, une zone vide. Illisible, plus
+    /// récent ou verrouillé : l'échec est gardé pour l'écran de démarrage, le fichier intact.
     pub fn load(data_dir: PathBuf) -> Self {
-        let windows = fs::read_to_string(file(&data_dir))
-            .ok()
-            .and_then(|text| serde_json::from_str::<WindowsFile>(&text).ok())
-            .map(Windows::from_file)
-            .unwrap_or_default();
+        let (windows, failure) = match read_file(&data_dir) {
+            Ok(windows) => (windows, None),
+            Err(failure) => (Windows::default(), Some(failure)),
+        };
         Self {
             data_dir,
             inner: Mutex::new(windows),
+            failure: Mutex::new(failure),
         }
     }
 
+    /// Échec de lecture au démarrage, s'il n'est pas réglé.
+    pub fn failure(&self) -> Option<Failure> {
+        self.failure.lock().map_or(None, |failure| failure.clone())
+    }
+
+    /// Relit `windows.json` après un échec ; renvoie l'échec restant. Sans échec, ne relit rien.
+    pub fn reload(&self) -> Option<Failure> {
+        let mut failure = self.failure.lock().ok()?;
+        failure.as_ref()?;
+        match read_file(&self.data_dir) {
+            Ok(windows) => {
+                if let Ok(mut inner) = self.inner.lock() {
+                    *inner = windows;
+                }
+                *failure = None;
+            }
+            Err(next) => *failure = Some(next),
+        }
+        failure.clone()
+    }
+
     fn lock(&self) -> Result<MutexGuard<'_, Windows>, CommandError> {
+        if let Some(failure) = self.failure() {
+            return Err(failure.to_command_error());
+        }
         self.inner.lock().map_err(|_| busy())
     }
 
@@ -204,7 +274,8 @@ impl WindowsState {
         fs::rename(&tmp, &target)
     }
 
-    /// Enregistre l'état courant (positions comprises), à la sortie.
+    /// Enregistre l'état courant (positions comprises), à la sortie. Un fichier qui n'a pas
+    /// pu être lu n'est jamais écrasé : `snapshot` échoue alors.
     pub fn flush(&self) {
         if let Ok(file) = self.snapshot() {
             let _ = self.save(&file);
@@ -274,7 +345,9 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>, window: WindowState) {
                 .inner_size(width, height)
                 .min_inner_size(min_width, 360.0)
                 // Glisser-déposer HTML (onglets, projets), comme la fenêtre principale.
-                .disable_drag_drop_handler();
+                .disable_drag_drop_handler()
+                // Montrée prête (`window_ready`), ou au plus tard après 300 ms (lot G, 0.3-a).
+                .visible(false);
         if let Some(bounds) = window.bounds {
             builder = builder
                 .position(f64::from(bounds.x), f64::from(bounds.y))
@@ -284,6 +357,26 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>, window: WindowState) {
         if builder.build().is_err() {
             let label = window.label.clone();
             let _ = apply(&app, |windows| windows.reattach(&label));
+        } else {
+            show_later(&app, &window.label);
+        }
+    });
+}
+
+/// Délai au-delà duquel une fenêtre encore cachée est montrée avec son squelette (0.3-a).
+pub const SHOW_AFTER: std::time::Duration = std::time::Duration::from_millis(300);
+
+/// Montre la fenêtre `label` après [`SHOW_AFTER`] si l'interface ne l'a pas déjà fait
+/// (`window_ready`) : un démarrage lent montre le squelette de l'écran attendu (lot G, 0.3-a).
+pub fn show_later<R: Runtime>(app: &AppHandle<R>, label: &str) {
+    let app = app.clone();
+    let label = label.to_owned();
+    std::thread::spawn(move || {
+        std::thread::sleep(SHOW_AFTER);
+        if let Some(window) = app.get_webview_window(&label)
+            && !window.is_visible().unwrap_or(true)
+        {
+            let _ = window.show();
         }
     });
 }
@@ -453,13 +546,42 @@ mod tests {
     }
 
     #[test]
-    fn fichier_illisible_donne_une_seule_fenetre() {
+    fn fichier_illisible_garde_intact_jusqu_au_choix() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(file(dir.path()), "{").unwrap();
 
         let state = WindowsState::load(dir.path().to_path_buf());
 
+        let failure = state.failure().unwrap();
+        assert!(
+            matches!(failure.cause, Cause::Corrupt { .. }),
+            "{failure:?}"
+        );
+        assert_eq!(
+            state.snapshot().unwrap_err().kind,
+            CommandErrorKind::CorruptState
+        );
+        state.flush();
+        assert_eq!(fs::read_to_string(file(dir.path())).unwrap(), "{");
+        assert_eq!(state.reload(), Some(failure));
+
+        crate::startup::set_aside(&file(dir.path()), "illisible").unwrap();
+        assert_eq!(state.reload(), None);
         assert_eq!(state.read(Windows::labels).unwrap(), [MAIN]);
+    }
+
+    #[test]
+    fn format_plus_recent_ni_lu_ni_reecrit() {
+        let dir = tempfile::tempdir().unwrap();
+        let content = r#"{ "version": 9, "windows": [] }"#;
+        fs::write(file(dir.path()), content).unwrap();
+
+        let state = WindowsState::load(dir.path().to_path_buf());
+        state.flush();
+
+        let failure = state.failure().unwrap();
+        assert!(matches!(failure.cause, Cause::Newer { format: 9, .. }));
+        assert_eq!(fs::read_to_string(file(dir.path())).unwrap(), content);
     }
 
     #[test]

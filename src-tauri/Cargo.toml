@@ -45,6 +45,11 @@ percent-encoding = "2"
 # déjà tiré par Tauri ; écrire un sous-ensemble à la main perdrait les filtres `?()` et les
 # fonctions de la norme (docs/plan-mvp-a-reponse.md).
 serde_json_path = "0.7"
+# Surveillance du dossier des projets ouverts (lot I, docs/plan-mvp-i-fichiers-externes.md) :
+# inotify, ReadDirectoryChangesW et FSEvents derrière une seule interface ; les écrire à la main
+# pour trois systèmes serait bien plus long et moins sûr. Le regroupement (300 ms) est fait par
+# Arnod, sans crate de « debounce ».
+notify = "8"
 
 [dev-dependencies]
 tempfile = "3"

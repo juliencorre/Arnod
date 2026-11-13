@@ -55,16 +55,36 @@ pages:
   "0.3":
     nom: "Démarrage et erreurs"
     version: MVP
-    developpement: "Écran d'erreur minimal du socle (App.vue : « Arnod ne peut pas démarrer ») ; pas de plan."
+    etat: livré
+    plans:
+      - "plan-mvp-g-demarrage-erreurs (DL1, ER1–ER3, VR1, SU1, SU2)"
+    developpement: "Lot G : startup.rs (erreur classée et décrite par le cœur), StartupProblemScreen.vue, StartupSkeleton.vue, fenêtre créée cachée puis montrée prête (window_ready, 300 ms au plus)."
     liees: ["2.1"]
-    reste: "squelette au démarrage lent (a), issues proposées (b), fichier verrouillé (b bis), détails pour le support (b ter)."
     journal:
       - "2026-11-12 : Écrans repris de « Premier usage » (Démarrage → a, Erreur → b, Erreur bis → b bis, Erreur ter → b ter)."
+      - "2026-11-13 : Lot G livré (docs/plan-mvp-g-demarrage-erreurs.md) : squelette, erreur expliquée avec deux issues, verrou réessayé seul, détails pour le support et issue préremplie."
     ecrans:
-      a: { etat: à faire }
-      b: { etat: en partie, pr: [7] }
-      "b bis": { etat: à faire }
-      "b ter": { etat: à faire }
+      a:
+        etat: livré
+        pr: [53]
+        ecart:
+          texte: "La légende « Ouverture de « … »… » n'apparaît qu'une fois le catalogue lu ; avant, le squelette seul."
+          aligner: maquette
+      b:
+        etat: livré
+        pr: [7, 53]
+        captures: [0.3-b-illisible]
+        ecart:
+          texte: "La cause est un texte simple du cœur, sans gras sur la version ; le pied donne le système sans numéro (« Windows »)."
+          aligner: maquette
+      "b bis": { etat: livré, pr: [53] }
+      "b ter":
+        etat: livré
+        pr: [53]
+        captures: [0.3-b-ter-details]
+        ecart:
+          texte: "Pas de ligne « Journal » : Arnod n'écrit pas de journal."
+          aligner: maquette
   "0.4":
     nom: "Thème sombre"
     version: MVP
@@ -534,13 +554,15 @@ pages:
       - "plan-requetes-dans-contrats (R5)"
       - "plan-fin-premier-usage (ST1–ST4)"
       - "plan-mvp-e-tests-etapes (NT1, NT2)"
+      - "plan-mvp-i-fichiers-externes (FE1–FE7)"
     liees: ["4.2", "3.1"]
-    reste: "fichiers modifiés hors d'Arnod (e), glisser-déposer, copier et déplacer une requête (f, g), sélection multiple (a quater)."
+    reste: "glisser-déposer, copier et déplacer une requête (f, g), sélection multiple (a quater)."
     journal:
       - "2026-11-09 : Arborescence livrée avec le premier usage."
       - "2026-11-11 : Devient le référentiel : les requêtes liées à un contrat sont rangées sous lui (PR #40)."
       - "2026-11-12 : Écrans du test (c, c bis, d) → 4.2."
       - "2026-11-13 : « Nouveau test » crée le dossier et son étape 1, ouverte, curseur dans l'adresse ; « + Étape » ajoute la suivante (b, plan-mvp-e-tests-etapes, PR #51)."
+      - "2026-11-13 : Fichiers modifiés hors d'Arnod : dossier surveillé, arborescence et onglets rechargés, brouillon en conflit réglé élément par élément (e, plan-mvp-i-fichiers-externes, PR #54)."
     ecrans:
       a: { etat: livré, pr: [27, 40, 42], captures: [19-verification-en-echec] }
       "a bis": { etat: livré, pr: [27] }
@@ -557,7 +579,17 @@ pages:
               aligner: à décider,
             },
         }
-      e: { etat: à faire, version: MVP }
+      e:
+        {
+          etat: livré,
+          pr: [54],
+          captures: [25-recharge-depuis-le-disque, 26-conflit],
+          ecart:
+            {
+              texte: "Dit « Cette requête a changé » au lieu de « Ce test » (vocabulaire, lot K) ; pas de fil d'Ariane au-dessus du conflit ni de colonne « Sans conflit, rien à faire » (note de conception) ; un fichier illisible n'est pas ouvert en lecture avec sa ligne fautive : il est listé illisible et l'erreur du cœur la cite.",
+              aligner: maquette,
+            },
+        }
       f: { etat: à faire, version: MVP }
       g: { etat: à faire, version: MVP }
   "4.2":

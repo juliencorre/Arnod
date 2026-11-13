@@ -2387,3 +2387,160 @@ describe("Lot F - onglets et clavier", () => {
     await browser.waitUntil(async () => (await below()) === before);
   });
 });
+
+describe("Lot I - Fichiers modifiés hors d'Arnod (4.1-e)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const file = () => path.join(project(), "surveille.yml");
+
+  /** Écrit la requête comme un éditeur ou un `git pull`, application lancée. */
+  function writeOutside(url: string): void {
+    writeFileSync(
+      file(),
+      `info:\n  name: Fichier surveillé\n  type: http\nhttp:\n  method: GET\n  url: ${url}\n`,
+    );
+  }
+
+  /** Adresse de l'onglet de la requête surveillée, s'il est affiché. */
+  function shownUrl(): Promise<string> {
+    return browser.execute(() => {
+      const fields = Array.from(document.querySelectorAll<HTMLInputElement>(".editor__url"));
+      return fields.find((f) => f.offsetParent !== null)?.value ?? "";
+    });
+  }
+
+  it("une requête ajoutée sur disque apparaît, puis son onglet suit le fichier (R3)", async () => {
+    writeOutside("http://localhost/v1");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll('aside [role="treeitem"]')).some((i) =>
+            i.textContent.includes("Fichier surveillé"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "requête ajoutée hors d'Arnod attendue dans l'arborescence" },
+    );
+    await clickText('aside [role="treeitem"]', "Fichier surveillé");
+    await browser.waitUntil(async () => (await shownUrl()) === "http://localhost/v1", {
+      timeoutMsg: "onglet de la requête attendu",
+    });
+
+    writeOutside("http://localhost/v2");
+    await browser.waitUntil(async () => (await shownUrl()) === "http://localhost/v2", {
+      timeout: 10_000,
+      timeoutMsg: "onglet relu après la modification sur disque attendu",
+    });
+    expect(await shownUrl()).toBe("http://localhost/v2");
+    await screenshot(browser, "25-recharge-depuis-le-disque");
+  });
+
+  it("un brouillon en conflit n'est pas écrasé et se règle élément par élément (R9 à R11)", async () => {
+    await browser.execute(() => {
+      const field = Array.from(document.querySelectorAll<HTMLInputElement>(".editor__url")).find(
+        (f) => f.offsetParent !== null,
+      );
+      if (!field) throw new Error("adresse introuvable");
+      field.value = "http://localhost/brouillon";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    // Écrit avant l'enregistrement automatique (600 ms) : le brouillon est en conflit.
+    writeOutside("http://localhost/v3");
+    await browser.$(".conflict").waitForDisplayed({ timeout: 10_000 });
+    expect(readFileSync(file(), "utf8")).toContain("http://localhost/v3");
+    await screenshot(browser, "26-conflit");
+
+    await clickText(".conflict__actions button", "Tout garder de mon brouillon");
+    await clickText(".conflict__actions button", "Appliquer et enregistrer");
+    await browser.waitUntil(
+      () => readFileSync(file(), "utf8").includes("http://localhost/brouillon"),
+      { timeout: 10_000, timeoutMsg: "brouillon écrit une seule fois après le choix" },
+    );
+    expect(await browser.$(".conflict").isExisting()).toBe(false);
+  });
+
+  it("une requête supprimée sur disque ferme son onglet (R4)", async () => {
+    rmSync(file());
+    await browser.waitUntil(async () => (await shownUrl()) !== "http://localhost/brouillon", {
+      timeout: 10_000,
+      timeoutMsg: "onglet fermé attendu",
+    });
+    expect(
+      await browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab-button")).some((t) =>
+          t.textContent.includes("Fichier surveillé"),
+        ),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("Lot G - Démarrage et erreurs (0.3)", () => {
+  const statePath = () => path.join(sandbox.dataDir, "arnod.json");
+
+  /** Texte d'un élément du DOM (WebKitGTK peut perdre les blancs entre éléments). */
+  function textOf(selector: string): Promise<string> {
+    return browser.execute(
+      (s) => document.querySelector(s)?.textContent.replace(/\s+/g, " ").trim() ?? "",
+      selector,
+    );
+  }
+
+  it("un arnod.json illisible s'explique, intact, avec deux issues (0.3-b, 0.3-b ter)", async () => {
+    const original = readFileSync(statePath(), "utf8");
+    await browser.deleteSession();
+    writeFileSync(statePath(), "{ pas du JSON");
+    browser = await launchApp();
+
+    await browser.$(".startup-problem").waitForDisplayed({ timeout: 10_000 });
+    expect(await heading(browser)).toBe("L'état d'Arnod est illisible");
+    expect(await textOf(".startup-problem__intact")).toContain("Rien n'a été modifié.");
+    const buttons = await browser.execute(() =>
+      Array.from(document.querySelectorAll(".startup-problem__option-button")).map((b) =>
+        b.textContent.trim(),
+      ),
+    );
+    expect(buttons).toEqual(["Repartir d'un état vide", "Réessayer"]);
+    // Rien n'est écrit tant que l'utilisateur n'a pas choisi.
+    expect(readFileSync(statePath(), "utf8")).toBe("{ pas du JSON");
+    await screenshot(browser, "0.3-b-illisible");
+
+    await browser.$(".startup-problem__toggle").click();
+    await browser.$("#startup-problem-details").waitForDisplayed();
+    expect(await textOf("#startup-problem-details")).toContain("corruptState");
+    await screenshot(browser, "0.3-b-ter-details");
+
+    await browser.$(".startup-problem__option-button*=Repartir").click();
+    await browser.$(".startup-problem").waitForExist({ reverse: true, timeout: 10_000 });
+    expect(await toastText(browser)).toContain("arnod.json.illisible");
+    expect(readFileSync(path.join(sandbox.dataDir, "arnod.json.illisible"), "utf8")).toBe(
+      "{ pas du JSON",
+    );
+    expect(readState(sandbox).projects).toEqual([]);
+
+    // L'état d'origine remis en place, les projets reviennent.
+    await browser.deleteSession();
+    writeFileSync(statePath(), original);
+    browser = await launchApp();
+    expect(await browser.$(".startup-problem").isExisting()).toBe(false);
+    expect(readState(sandbox).projects.length).toBeGreaterThan(0);
+  });
+
+  it("un état d'une version plus récente n'est ni lu ni réécrit (0.3-b)", async () => {
+    const original = readFileSync(statePath(), "utf8");
+    const newer = JSON.stringify({ version: 99, writtenBy: "9.0.0" });
+    await browser.deleteSession();
+    writeFileSync(statePath(), newer);
+    browser = await launchApp();
+
+    await browser.$(".startup-problem").waitForDisplayed({ timeout: 10_000 });
+    expect(await heading(browser)).toBe("Cet état vient d'une version plus récente d'Arnod");
+    expect(await textOf(".startup-problem__option--recommended h3")).toContain(
+      "Installer Arnod 9.0.0 ou plus récent",
+    );
+
+    await browser.deleteSession();
+    expect(readFileSync(statePath(), "utf8")).toBe(newer);
+    writeFileSync(statePath(), original);
+    browser = await launchApp();
+    expect(await browser.$(".startup-problem").isExisting()).toBe(false);
+  });
+});

@@ -347,6 +347,7 @@ pub fn create_folder(root: &Path, parent: &str, name: &str) -> Result<String, Co
     let path = parent_dir.join(&name);
     fs::create_dir(&path)
         .map_err(|error| CommandError::io("Création du dossier impossible", &path, &error))?;
+    crate::watch::settle(&path);
     Ok(relative_path(root, &path))
 }
 
@@ -408,6 +409,8 @@ pub fn rename(root: &Path, path: &str, name: &str) -> Result<String, CommandErro
                 .map_err(|e| CommandError::io("Renommage impossible", &source, &e))?;
             fs::rename(&tmp, &target)
                 .map_err(|e| CommandError::io("Renommage impossible", &target, &e))?;
+            crate::watch::settle(&source);
+            crate::watch::settle(&target);
         }
         rename_folder_settings(&target, &name);
         return Ok(relative_path(root, &target));
@@ -434,6 +437,8 @@ pub fn rename(root: &Path, path: &str, name: &str) -> Result<String, CommandErro
             let target = parent.join(free_file_name(&parent, &new_base));
             fs::rename(&source, &target)
                 .map_err(|e| CommandError::io("Renommage impossible", &target, &e))?;
+            crate::watch::settle(&source);
+            crate::watch::settle(&target);
             return Ok(relative_path(root, &target));
         }
     }
@@ -474,6 +479,8 @@ pub fn move_to(root: &Path, path: &str, target_folder: &str) -> Result<String, C
     }
     fs::rename(&source, &target)
         .map_err(|e| CommandError::io("Déplacement impossible", &target, &e))?;
+    crate::watch::settle(&source);
+    crate::watch::settle(&target);
     Ok(relative_path(root, &target))
 }
 
@@ -525,20 +532,23 @@ pub fn delete(root: &Path, path: &str, permanent: bool) -> Result<(), CommandErr
     if !target.exists() {
         return Ok(());
     }
-    if permanent {
-        let result = if target.is_dir() {
+    let result = if permanent {
+        let removed = if target.is_dir() {
             fs::remove_dir_all(&target)
         } else {
             fs::remove_file(&target)
         };
-        return result.map_err(|e| CommandError::io("Suppression impossible", &target, &e));
-    }
-    trash::delete(&target).map_err(|error| {
-        CommandError::new(
-            CommandErrorKind::Io,
-            format!("La corbeille du système n'est pas disponible ({error}). Vous pouvez supprimer définitivement."),
-        )
-    })
+        removed.map_err(|e| CommandError::io("Suppression impossible", &target, &e))
+    } else {
+        trash::delete(&target).map_err(|error| {
+            CommandError::new(
+                CommandErrorKind::Io,
+                format!("La corbeille du système n'est pas disponible ({error}). Vous pouvez supprimer définitivement."),
+            )
+        })
+    };
+    crate::watch::settle(&target);
+    result
 }
 
 /// Requêtes d'un dossier (sous-dossiers compris), dans l'ordre de l'arborescence (R13).

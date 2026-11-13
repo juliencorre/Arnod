@@ -9,6 +9,9 @@ import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
+  ConflictSide,
+  FilesChange,
+  RequestConflict,
   ActiveRequest,
   CatalogLoad,
   CatalogSnapshot,
@@ -70,6 +73,8 @@ import type {
   TestView,
   VariableUser,
   MenuShortcut,
+  StartupProblem,
+  StartupTarget,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -91,6 +96,7 @@ const COMMAND_ERROR_KINDS: Record<CommandErrorKind, true> = {
   cancelled: true,
   secretStore: true,
   protectedEnvironment: true,
+  changedOnDisk: true,
 };
 
 /** Indique si la cause d'un rejet est une `CommandError` renvoyée par le cœur natif. */
@@ -574,6 +580,47 @@ export const ipc = {
   /** Masque ou affiche la barre latérale de la fenêtre principale (Ctrl+\, 1.4-j). */
   layoutSetSidebarHidden: (hidden: boolean): Promise<WindowsSnapshot> =>
     call<WindowsSnapshot>("layout_set_sidebar_hidden", { hidden }),
+  // --- Lot I - Fichiers modifiés hors d'Arnod ---
+
+  /** Éléments où le fichier et le brouillon diffèrent ; `base` : version de départ (R9). */
+  requestConflict: (
+    project: string,
+    path: string,
+    base: RequestDoc,
+    draft: RequestDoc,
+  ): Promise<RequestConflict> =>
+    call<RequestConflict>("request_conflict", { project, path, base, draft }),
+
+  /** Règle le conflit selon les choix et écrit le fichier une seule fois (R11). */
+  requestConflictResolve: (
+    project: string,
+    path: string,
+    draft: RequestDoc,
+    choices: Record<string, ConflictSide>,
+  ): Promise<RequestDoc> =>
+    call<RequestDoc>("request_conflict_resolve", { project, path, draft, choices }),
+  // Lot G - Démarrage et erreurs.
+
+  /** Erreur bloquante du démarrage, décrite ; `null` si Arnod peut démarrer. */
+  startupStatus: (): Promise<StartupProblem | null> =>
+    call<StartupProblem | null>("startup_status"),
+
+  /** Relit le fichier en échec ; `automatic` pour un essai automatique (R4). */
+  startupRetry: (automatic: boolean): Promise<StartupProblem | null> =>
+    call<StartupProblem | null>("startup_retry", { automatic }),
+
+  /** Met le fichier en échec de côté (renommé, intact) et repart d'un état vide (R3). */
+  startupStartEmpty: (): Promise<StartupProblem | null> =>
+    call<StartupProblem | null>("startup_start_empty"),
+
+  /** Ouvre le dossier de données, la page des versions ou l'issue préremplie (R6). */
+  startupOpen: (target: StartupTarget): Promise<null> => call<null>("startup_open", { target }),
+
+  /** Quitte Arnod sans rien écrire. */
+  startupQuit: (): Promise<null> => call<null>("startup_quit"),
+
+  /** L'interface est prête : la fenêtre, créée cachée, apparaît (0.3-a). */
+  windowReady: (): Promise<null> => call<null>("window_ready"),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
@@ -588,6 +635,8 @@ export const EVENTS = {
   statuses: "arnod://statuts",
   // Lot F : raccourci choisi dans le menu natif Fenêtre.
   shortcut: "arnod://raccourci",
+  // Lot I : fichiers modifiés hors d'Arnod.
+  files: "arnod://fichiers",
 } as const;
 
 /** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
@@ -643,6 +692,11 @@ export const events = {
   /** Raccourci choisi dans le menu natif Fenêtre, pour cette fenêtre (lot F, 1.4-j). */
   onShortcut: (handler: (shortcut: MenuShortcut) => void): Promise<UnlistenFn> =>
     listen<MenuShortcut>(EVENTS.shortcut, (event) => {
+      handler(event.payload);
+    }),
+  /** Fichiers d'un projet modifiés hors d'Arnod : renommés, supprimés… (lot I, R6). */
+  onFiles: (handler: (change: FilesChange) => void): Promise<UnlistenFn> =>
+    listen<FilesChange>(EVENTS.files, (event) => {
       handler(event.payload);
     }),
 };
