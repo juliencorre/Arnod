@@ -325,6 +325,7 @@ pages:
         {
           etat: livré,
           version: MVP,
+          pr: [60],
           captures: [29-ranger-dans-un-projet],
           ecart:
             {
