@@ -1877,8 +1877,20 @@ describe("Lot B : saisie, texte et cURL", () => {
         (await zoneTabs()).flat().some((t) => /^Essai \d+$/.test(t) && !before.includes(t)),
       { timeout: 15_000, timeoutMsg: "onglet de l'essai attendu" },
     );
-    essai =
-      (await zoneTabs()).flat().find((t) => /^Essai \d+$/.test(t) && !before.includes(t)) ?? "";
+    // L'essai envoyé est l'onglet de requête affiché (son numéro dépend des essais précédents).
+    await browser.waitUntil(
+      async () =>
+        /^Essai \d+$/.test(
+          await browser.execute(
+            () =>
+              document.querySelector<HTMLInputElement>(".request-tab .meta__input")?.value ?? "",
+          ),
+        ),
+      { timeout: 15_000, timeoutMsg: "onglet de l'essai envoyé attendu" },
+    );
+    essai = await browser.execute(
+      () => document.querySelector<HTMLInputElement>(".request-tab .meta__input")?.value ?? "",
+    );
     // Le serveur a reçu les en-têtes de la commande.
     await browser.waitUntil(
       async () =>
