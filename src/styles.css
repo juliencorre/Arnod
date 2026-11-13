@@ -299,3 +299,28 @@ select:focus-visible {
   white-space: nowrap;
   border: 0;
 }
+
+/*
+ * Variable inconnue d'un champ (directive v-variables, src/lib/variables.ts) : calque posé sur
+ * le champ, texte transparent, seul le soulignement ondulé se voit.
+ */
+.variable-marks {
+  position: absolute;
+  z-index: 1;
+  margin: 0;
+  overflow: hidden;
+  border-style: solid;
+  border-color: transparent;
+  color: transparent;
+  background: none;
+  pointer-events: none;
+}
+
+.variable-marks mark {
+  color: transparent;
+  background: none;
+  text-decoration: underline wavy var(--color-danger);
+  text-decoration-skip-ink: none;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.25em;
+}

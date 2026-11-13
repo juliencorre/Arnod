@@ -496,3 +496,27 @@ R1 à R6), écrans 1.2-e, 1.2-d, 1.2-a ter, 3.2-a3 et 1.1-a.
   d'un contrat passe par `useContractAdd`, partagé avec `ContractsSection`.
 - Menu « + » du projet : Nouvelle requête (Ctrl+N), Nouveau dossier (Ctrl+Maj+N), Ajouter un
   contrat ▸, Nouvel environnement… ; une création déplie la section concernée.
+
+## Saisie, texte et cURL
+
+Référence : `docs/plan-mvp-b-saisie-curl.md` (cas SA1 à SA6, TX1 à TX4, CU1 à CU4, règles R1 à
+R13), écrans `5.1-b ter`, `5.1-b quater`, `2.1-a sexies`.
+
+- Le cœur décide : `input/` (pur) calcule variables connues et inconnues, en-têtes ajoutés à l'envoi
+  et listes en texte ; `curl/` (pur) lit une commande cURL (syntaxe bash) et écrit celle d'une
+  requête. L'interface ne fait que souligner (`lib/variables.ts`, directive `v-variables`, calque
+  transparent sur le champ) et compter.
+- `request_input` est appelée 250 ms après une frappe : elle lit environnements et `local.json`,
+  jamais le coffre. `request_curl` lit le coffre pour remplacer chaque secret par une variable du
+  shell (`$TOKEN`, `$API_KEY`, `-u "user:$PASSWORD"`) : aucun secret dans une commande copiée.
+- Une valeur dynamique `{{$…}}` n'est jamais inconnue. Les variables de dossier et de collection
+  sont connues ; leur remplacement à l'envoi relève de `request/resolve.rs`.
+- Les variables connues passent de `RequestEditor` aux éditeurs par `provide(KNOWN_VARIABLES)` ; un
+  nouveau champ de requête qui accepte `{{…}}` lit `useKnownVariables()` et prend `v-variables`.
+- `PairsEditor` avec `text-format` (`header`, `query`) offre « Éditer en texte » : lecture et écriture
+  par `pairs_from_text` / `pairs_to_text`, descriptions gardées par nom, une ligne illisible bloque
+  le retour au tableau.
+- Une commande cURL collée est reconnue par la règle `curl` de la définition REST (champs `method`,
+  `headers`, `bodyType`, `body`) : le jeton sort du texte (`{{token}}`), reste en mémoire dans
+  l'interface et ne va au coffre (variable locale secrète de « Local » de « Non classés ») qu'à
+  l'envoi de l'essai (`trial_send`, `secrets`), réponse masquée.

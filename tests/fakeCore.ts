@@ -16,6 +16,7 @@ import {
   snapshotOf,
   type FakeWindows,
 } from "./fakeWindows";
+import { handleInput } from "./fakeInput";
 import { STEP_CATALOG, detect } from "./fakeSteps";
 import {
   createFakeWorkbench,
@@ -328,6 +329,9 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           if (windows !== undefined) return windows;
           const response = handleResponse(core.response, core.workbench, cmd, args);
           if (response !== undefined) return response;
+          // Lot B : saisie et cURL.
+          const input = handleInput(core.workbench, cmd, args);
+          if (input !== undefined) return input;
           const contracts = handleContracts(core.contracts, core.workbench, cmd, args);
           const handled =
             contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);

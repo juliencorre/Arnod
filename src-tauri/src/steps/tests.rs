@@ -150,7 +150,8 @@ fn forme_json_d_une_nature() {
     assert_eq!(nature["family"], "calls");
     assert_eq!(nature["engine"]["kind"], "builtin");
     assert_eq!(nature["subject"]["key"], "url");
-    assert_eq!(nature["form"][1]["visibleWhen"]["in"][0], "POST");
+    assert_eq!(nature["form"][2]["visibleWhen"]["in"][0], "POST");
+    assert_eq!(nature["detect"][1]["kind"], "curl");
     assert_eq!(json["source"]["name"], "arnod-steps");
 }
 
@@ -220,7 +221,7 @@ fn r2_la_regle_la_plus_precise_l_emporte() {
 #[test]
 fn r3_defauts_appliques_et_champs_masques_ignores() {
     let values = values::normalize(&rest(), &map(&[("body", "{}"), ("other", "x")])).unwrap();
-    assert_eq!(values, map(&[("method", "GET")]));
+    assert_eq!(values, map(&[("method", "GET"), ("headers", "")]));
 }
 
 #[test]
@@ -234,6 +235,7 @@ fn r3_champs_visibles_pour_un_post() {
         values,
         map(&[
             ("method", "POST"),
+            ("headers", ""),
             ("bodyType", "JSON"),
             ("body", "{\"a\":1}")
         ])
@@ -266,4 +268,85 @@ fn r3_adresse_invalide_refusee() {
     let values = values::normalize(&rest(), &BTreeMap::new()).unwrap();
     assert!(http::request("Essai 1", "api.local", &values).is_err());
     assert!(http::request("Essai 1", "ftp://api.local", &values).is_err());
+}
+
+// ------------------------------------------------------------------ cURL collée
+// (docs/plan-mvp-b-saisie-curl.md, R4 à R6)
+
+#[test]
+fn r4_une_commande_curl_est_une_requete_rest() {
+    let detection = detect(
+        "curl -X POST https://api.boutique.dev/orders -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJ.x' -d '{\"a\":1}' --compressed",
+    )
+    .unwrap();
+    assert_eq!(detection.nature, "rest");
+    assert_eq!(detection.subject, "https://api.boutique.dev/orders");
+    assert_eq!(
+        detection.values,
+        map(&[
+            ("method", "POST"),
+            (
+                "headers",
+                "Content-Type: application/json\nAuthorization: Bearer {{token}}"
+            ),
+            ("bodyType", "JSON"),
+            ("body", "{\"a\":1}"),
+        ])
+    );
+    let curl = detection.curl.unwrap();
+    assert_eq!(curl.secrets.len(), 1);
+    assert_eq!(curl.secrets[0].name, "token");
+    assert_eq!(curl.secrets[0].value, "eyJ.x");
+    assert_eq!(curl.ignored[0].option, "--compressed");
+}
+
+#[test]
+fn r4_curl_sans_corps_et_forme_json() {
+    let detection = detect("curl https://api.local/x").unwrap();
+    assert_eq!(detection.values, map(&[("method", "GET")]));
+    let json = serde_json::to_value(&detection).unwrap();
+    assert_eq!(
+        json["curl"],
+        serde_json::json!({ "secrets": [], "ignored": [] })
+    );
+    // Une adresse seule n'a pas de champ `curl`.
+    let url = serde_json::to_value(detect("https://api.local/x").unwrap()).unwrap();
+    assert!(url.get("curl").is_none());
+    // Un texte qui ressemble mais n'est pas une commande lisible : rien de reconnu.
+    assert!(detect("curl 'https://api.local").is_none());
+}
+
+#[test]
+fn r4_regle_curl_verifiee() {
+    let missing = with(rest(), |d| d.form.retain(|f| f.key != "headers"));
+    assert!(missing.unwrap_err().contains("curl"));
+}
+
+#[test]
+fn r4_en_tetes_du_formulaire() {
+    let values = values::normalize(
+        &rest(),
+        &map(&[("headers", "Accept: text/plain\n# X-Off: 1\n")]),
+    )
+    .unwrap();
+    let request = http::request("Essai 1", "https://api.local", &values).unwrap();
+    assert_eq!(request.headers.len(), 2);
+    assert_eq!(request.headers[0].name, "Accept");
+    assert!(!request.headers[1].enabled);
+    let bad = values::normalize(&rest(), &map(&[("headers", "Accept text/plain")])).unwrap();
+    let error = http::request("Essai 1", "https://api.local", &bad).unwrap_err();
+    assert!(error.starts_with("en-têtes, ligne 1 :"), "{error}");
+}
+
+#[test]
+fn r5_secrets_remplaces_a_l_envoi_seulement() {
+    let values = values::normalize(
+        &rest(),
+        &map(&[("headers", "Authorization: Bearer {{token}}")]),
+    )
+    .unwrap();
+    let request = http::request("Essai 1", "https://api.local", &values).unwrap();
+    let sent = http::with_secrets(&request, &map(&[("token", "s3cret")]));
+    assert_eq!(sent.headers[0].value, "Bearer s3cret");
+    assert_eq!(request.headers[0].value, "Bearer {{token}}");
 }

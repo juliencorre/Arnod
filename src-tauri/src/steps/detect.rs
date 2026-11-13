@@ -6,6 +6,21 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 
 use super::definition::{Definition, Rule};
+use crate::curl::parse::{self as curl, Ignored, Secret};
+use crate::input::{PairsFormat, to_text};
+use crate::request::model::Pair;
+
+/// Ce qu'une commande cURL collée a donné en plus des valeurs du formulaire
+/// (`docs/plan-mvp-b-saisie-curl.md`, R5, R6).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurlImport {
+    /// Secrets retirés des en-têtes, remplacés par `{{nom}}` : gardés au coffre
+    /// à l'envoi de l'essai, jamais écrits dans le projet.
+    pub secrets: Vec<Secret>,
+    /// Options sans équivalent, signalées.
+    pub ignored: Vec<Ignored>,
+}
 
 /// Nature reconnue, avec le champ principal et les valeurs lues au passage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -14,6 +29,9 @@ pub struct Detection {
     pub nature: String,
     pub subject: String,
     pub values: BTreeMap<String, String>,
+    /// Commande cURL reconnue (règle « curl »).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub curl: Option<CurlImport>,
 }
 
 /// Une règle satisfaite et sa précision : la plus précise l'emporte.
@@ -21,6 +39,57 @@ struct Hit {
     rank: u8,
     subject: String,
     values: BTreeMap<String, String>,
+    curl: Option<CurlImport>,
+}
+
+/// Type du corps du formulaire REST d'après le `Content-Type`.
+fn body_type(headers: &[(String, String)]) -> &'static str {
+    let content_type = headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("Content-Type"))
+        .map(|(_, value)| value.to_ascii_lowercase())
+        .unwrap_or_default();
+    if content_type.contains("json") {
+        "JSON"
+    } else if content_type.contains("xml") {
+        "XML"
+    } else {
+        "Texte"
+    }
+}
+
+/// Règle « curl » : la commande lue par le cœur, ses secrets retirés (R4, R5).
+fn curl_hit(input: &str) -> Option<Hit> {
+    if !curl::is_curl(input) {
+        return None;
+    }
+    let mut request = curl::parse(input).ok()?;
+    let secrets = curl::take_secrets(&mut request.headers);
+    let pairs: Vec<Pair> = request
+        .headers
+        .iter()
+        .map(|(name, value)| Pair::new(name.clone(), value.clone()))
+        .collect();
+    let mut values = BTreeMap::from([("method".to_owned(), request.method.clone())]);
+    if !pairs.is_empty() {
+        values.insert("headers".to_owned(), to_text(&pairs, PairsFormat::Header));
+    }
+    if let Some(body) = request.body {
+        values.insert(
+            "bodyType".to_owned(),
+            body_type(&request.headers).to_owned(),
+        );
+        values.insert("body".to_owned(), body);
+    }
+    Some(Hit {
+        rank: 4,
+        subject: request.url,
+        values,
+        curl: Some(CurlImport {
+            secrets,
+            ignored: request.ignored,
+        }),
+    })
 }
 
 /// Adresse `scheme://hôte…` avec un hôte.
@@ -60,6 +129,7 @@ fn evaluate(definition: &Definition, rule: &Rule, input: &str) -> Option<Hit> {
                 rank: 1,
                 subject: subject.to_owned(),
                 values,
+                curl: None,
             })
         }
         Rule::Keywords { words } => {
@@ -71,6 +141,7 @@ fn evaluate(definition: &Definition, rule: &Rule, input: &str) -> Option<Hit> {
                     rank: 3,
                     subject: input.to_owned(),
                     values: BTreeMap::new(),
+                    curl: None,
                 })
         }
         Rule::Prefix { text } => {
@@ -81,6 +152,7 @@ fn evaluate(definition: &Definition, rule: &Rule, input: &str) -> Option<Hit> {
                     rank: 2,
                     subject: input.to_owned(),
                     values: BTreeMap::new(),
+                    curl: None,
                 })
         }
         Rule::Suffix { text } => input
@@ -90,7 +162,9 @@ fn evaluate(definition: &Definition, rule: &Rule, input: &str) -> Option<Hit> {
                 rank: 2,
                 subject: input.to_owned(),
                 values: BTreeMap::new(),
+                curl: None,
             }),
+        Rule::Curl => curl_hit(input),
     }
 }
 
@@ -114,6 +188,7 @@ pub fn detect(definitions: &[Definition], input: &str) -> Option<Detection> {
                         nature: definition.id.clone(),
                         subject: hit.subject,
                         values: hit.values,
+                        curl: hit.curl,
                     },
                 ));
             }

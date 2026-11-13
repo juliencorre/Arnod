@@ -162,6 +162,71 @@ async function ouvrirProjet(g: Gestes): Promise<void> {
   await g.cliquer("main article button", "Ouvrir");
 }
 
+// --- Lot B : saisie, texte et cURL (docs/plan-mvp-b-saisie-curl.md) -----------------
+
+/** « Créer une commande » de la maquette : une variable inconnue de Recette fonctionnelle. */
+function commande(): FakeCore {
+  const core = boutique();
+  const wb = core.workbench;
+  wb.envs = [
+    {
+      name: "Recette fonctionnelle",
+      color: "orange",
+      variables: [{ name: "baseUrl", value: "https://recette.boutique.dev" }],
+      locals: ["token"],
+    },
+    {
+      name: "Local",
+      color: "gray",
+      variables: [
+        { name: "baseUrl", value: "http://localhost:8080" },
+        { name: "apiVersion", value: "v2" },
+      ],
+      locals: [],
+    },
+  ];
+  wb.active = "Recette fonctionnelle";
+  wb.folders.add("commandes");
+  const ligne = (name: string, value: string) => ({
+    name,
+    value,
+    enabled: true,
+    kind: "query" as const,
+    description: "",
+  });
+  const request = newRequest("Créer une commande", {
+    method: "POST",
+    url: "{{baseUrl}}/{{apiVersion}}/orders",
+    headers: [ligne("Content-Type", "application/json"), ligne("X-Client", "arnod-tests")],
+    body: {
+      kind: "json",
+      variants: [
+        {
+          title: "",
+          content: '{"customerId":"cus_31","items":[{"sku":"TSH-BLU-M","qty":2}]}',
+          form: [],
+        },
+      ],
+      selected: 0,
+      other: "",
+    },
+  });
+  request.inherited.headers = [
+    { name: "Authorization", value: "Bearer {{token}}", source: "projet" },
+  ];
+  wb.requests.set("commandes/creer.yml", request);
+  return core;
+}
+
+async function ouvrirCommande(g: Gestes): Promise<void> {
+  await ouvrirProjet(g);
+  await g.cliquer('[role="treeitem"]', "Créer une commande");
+  await g.attendre(400);
+}
+
+const CURL_COLLEE =
+  'curl -X POST https://api.boutique.dev/orders -H \'Content-Type: application/json\' -H \'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOi\' -d \'{"customerId":"cus_31","items":[{"sku":"TSH-BLU-M","qty":2}]}\' --compressed';
+
 export const SCENARIOS: Record<string, Scenario> = {
   accueil: {
     description: "Premier lancement (2.1-a)",
@@ -353,6 +418,39 @@ Object.assign(SCENARIOS, {
       await envoyerCommande(g);
       await g.cliquer(".body__bar [role='switch']");
       await g.attendre(100);
+    },
+  },
+  // Lot B : saisie, texte et cURL.
+  "5.1-b-ter": {
+    description: "Variable inconnue soulignée, compteurs d'onglets, en-têtes ajoutés (5.1-b ter)",
+    setup: commande,
+    play: async (g) => {
+      await ouvrirCommande(g);
+      await g.cliquer('[role="tab"]', "En-têtes");
+      await g.attendre(400);
+    },
+  },
+  "5.1-b-quater": {
+    description: "En-têtes édités en texte et copie en cURL (5.1-b quater)",
+    setup: commande,
+    play: async (g) => {
+      await ouvrirCommande(g);
+      await g.cliquer('[role="tab"]', "En-têtes");
+      await g.cliquer(".pairs__mode", "Éditer en texte");
+      await g.saisir(
+        ".pairs__textarea",
+        "Content-Type: application/json\nX-Client: arnod-tests\n# X-Debug: true\nAccept-Language: fr-FR\nCache-Control no-cache",
+      );
+      await g.cliquer(".editor__curl-button");
+      await g.attendre(200);
+    },
+  },
+  "2.1-a-sexies": {
+    description: "Une commande cURL collée dans « Essayer une étape » (2.1-a sexies)",
+    setup: () => installFakeCore(firstRunSnapshot()),
+    play: async (g) => {
+      await g.saisir(".try__input", CURL_COLLEE);
+      await g.attendre(200);
     },
   },
 } satisfies Record<string, Scenario>);
