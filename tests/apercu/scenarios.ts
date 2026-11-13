@@ -165,7 +165,7 @@ async function ouvrirProjet(g: Gestes): Promise<void> {
 
 // --- Lot B : saisie, texte et cURL (docs/plan-mvp-b-saisie-curl.md) -----------------
 
-/** « Créer une commandeSaisie » de la maquette : une variable inconnue de Recette fonctionnelle. */
+/** « Créer une commande » de la maquette : une variable inconnue de Recette fonctionnelle. */
 function commandeSaisie(): FakeCore {
   const core = boutique();
   const wb = core.workbench;
@@ -195,7 +195,7 @@ function commandeSaisie(): FakeCore {
     kind: "query" as const,
     description: "",
   });
-  const request = newRequest("Créer une commandeSaisie", {
+  const request = newRequest("Créer une commande", {
     method: "POST",
     url: "{{baseUrl}}/{{apiVersion}}/orders",
     headers: [ligne("Content-Type", "application/json"), ligne("X-Client", "arnod-tests")],
@@ -221,7 +221,7 @@ function commandeSaisie(): FakeCore {
 
 async function ouvrirCommande(g: Gestes): Promise<void> {
   await ouvrirProjet(g);
-  await g.cliquer('[role="treeitem"]', "Créer une commandeSaisie");
+  await g.cliquer('[role="treeitem"]', "Créer une commande");
   await g.attendre(400);
 }
 
@@ -558,7 +558,7 @@ export const SCENARIOS: Record<string, Scenario> = {
     },
   },
   "2.1-a-sexies": {
-    description: "Une commandeSaisie cURL collée dans « Essayer une étape » (2.1-a sexies)",
+    description: "Une commande cURL collée dans « Essayer une étape » (2.1-a sexies)",
     setup: () => installFakeCore(firstRunSnapshot()),
     play: async (g) => {
       await g.saisir(".try__input", CURL_COLLEE);
