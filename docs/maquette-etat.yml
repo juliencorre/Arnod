@@ -66,19 +66,21 @@ pages:
     ecrans:
       a:
         etat: livré
+        pr: [53]
         ecart:
           texte: "La légende « Ouverture de « … »… » n'apparaît qu'une fois le catalogue lu ; avant, le squelette seul."
           aligner: maquette
       b:
         etat: livré
-        pr: [7]
+        pr: [7, 53]
         captures: [0.3-b-illisible]
         ecart:
           texte: "La cause est un texte simple du cœur, sans gras sur la version ; le pied donne le système sans numéro (« Windows »)."
           aligner: maquette
-      "b bis": { etat: livré }
+      "b bis": { etat: livré, pr: [53], captures: [0.3-b-illisible] }
       "b ter":
         etat: livré
+        pr: [53]
         captures: [0.3-b-ter-details]
         ecart:
           texte: "Pas de ligne « Journal » : Arnod n'écrit pas de journal."
