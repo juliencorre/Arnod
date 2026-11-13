@@ -141,3 +141,33 @@ describe("transfert au référentiel de tests (2.2-b)", () => {
     }).toEqual({ error: "« Clients » existe déjà à cet endroit.", kept: true });
   });
 });
+
+describe("ranger les essais dans un projet (2.2-d)", () => {
+  it("le menu d'un contrat déduit range ses essais ; la notification propose « Annuler »", async () => {
+    let core: FakeCore;
+    ({ app, core } = await openTrial());
+    await click(app, 'button[aria-label="Actions pour le contrat api.boutique.dev"]');
+    await click(app, '[role="menuitem"]', "Ranger dans un projet…");
+    const dialog = app.get(".filing");
+    const options = dialog
+      .findAll("select")[0]
+      ?.findAll("option")
+      .map((o) => o.text());
+    await dialog.trigger("submit");
+    await flushPromises();
+    const call = core.calls.find((c) => c.cmd === "trial_file")?.args;
+    const toast = app.get(".toast").text();
+    await click(app, ".toast button", "Annuler");
+    expect({
+      options,
+      call,
+      toast: toast.includes("1 essai rangé dans auth-sso › api.boutique.dev"),
+      undone: core.workbench.requests.has(PATH),
+    }).toEqual({
+      options: ["auth-sso"],
+      call: { project: BOUTIQUE_TESTS, contract: FILE, target: "p-auth-sso", into: null },
+      toast: true,
+      undone: true,
+    });
+  });
+});

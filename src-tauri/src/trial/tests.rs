@@ -1,6 +1,7 @@
 //! Essai enregistré dans « Non classés » (docs/plan-accueil-non-classes.md, R6 à R11).
 
 use std::fs;
+use std::path::Path;
 
 use tempfile::TempDir;
 
@@ -311,4 +312,96 @@ fn b_transferer_un_essai_au_referentiel_de_tests() {
     .unwrap();
     assert!(transfer(root, &other.path, "lister les produits", "").is_err());
     assert!(root.join(&other.path).exists());
+}
+
+fn target_project(dir: &Path, contract: Option<&str>) -> std::path::PathBuf {
+    let root = dir.join("boutique-tests");
+    std::fs::create_dir_all(&root).unwrap();
+    let _created = manifest::create_project_folder(
+        &root,
+        &Manifest::new(uuid::Uuid::from_u128(2), "boutique-tests"),
+    )
+    .unwrap();
+    if let Some(text) = contract {
+        std::fs::create_dir_all(root.join("contracts")).unwrap();
+        std::fs::write(root.join("contracts/commandes.yaml"), text).unwrap();
+    }
+    root
+}
+
+const COMMANDES: &str = "openapi: 3.0.3\ninfo:\n  title: API Commandes\n  version: 2.4.0\nservers:\n  - url: https://api.boutique.dev\npaths:\n  /orders:\n    get:\n      responses:\n        '200':\n          description: OK\n  /orders/{id}/tracking:\n    get:\n      parameters:\n        - name: id\n          in: path\n          required: true\n          schema:\n            type: integer\n      responses:\n        '200':\n          description: OK\n";
+
+#[test]
+fn d_ranger_les_essais_avec_une_copie_du_contrat() {
+    let inbox = project();
+    let other = tempfile::tempdir().unwrap();
+    let target = target_project(other.path(), None);
+    let recorded = record(
+        inbox.path(),
+        trial(Method::Get, "https://api.boutique.dev/products"),
+        &response(200, "[]"),
+    )
+    .unwrap();
+    let (filed, undo) = filing::file_into(inbox.path(), &recorded.contract, &target, None).unwrap();
+    assert_eq!(filed.contract, "contracts/api-boutique-dev.yaml");
+    assert_eq!(
+        filed.moved,
+        [(
+            recorded.path.clone(),
+            "api.boutique.dev/essai-1.yml".to_owned()
+        )]
+    );
+    let moved = request_file::read(&target.join("api.boutique.dev/essai-1.yml")).unwrap();
+    assert_eq!(moved.url, "https://api.boutique.dev/products");
+    assert_eq!(moved.contract.unwrap().file, filed.contract);
+    // La boîte est vide de cet essai et de son contrat.
+    assert!(!inbox.path().join(&recorded.path).exists());
+    assert!(!inbox.path().join(&recorded.contract).exists());
+    // « Annuler » remet tout.
+    undo.apply().unwrap();
+    assert!(inbox.path().join(&recorded.path).exists());
+    assert!(inbox.path().join(&recorded.contract).exists());
+    assert!(!target.join("api.boutique.dev/essai-1.yml").exists());
+    assert!(!target.join(&filed.contract).exists());
+}
+
+#[test]
+fn d_ranger_les_essais_sous_un_contrat_du_projet() {
+    let inbox = project();
+    let other = tempfile::tempdir().unwrap();
+    let target = target_project(other.path(), Some(COMMANDES));
+    let tracking = record(
+        inbox.path(),
+        trial(Method::Get, "https://api.boutique.dev/orders/42/tracking"),
+        &response(200, "{}"),
+    )
+    .unwrap();
+    let products = record(
+        inbox.path(),
+        trial(Method::Get, "https://api.boutique.dev/products"),
+        &response(200, "[]"),
+    )
+    .unwrap();
+    let (filed, _undo) = filing::file_into(
+        inbox.path(),
+        &tracking.contract,
+        &target,
+        Some("contracts/commandes.yaml"),
+    )
+    .unwrap();
+    assert_eq!(filed.contract_name, "API Commandes");
+    assert_eq!(filed.left, std::slice::from_ref(&products.path));
+    let (_, to) = &filed.moved[0];
+    let moved = request_file::read(&target.join(to)).unwrap();
+    assert_eq!(moved.url, "{{baseUrl}}/orders/42/tracking");
+    assert_eq!(
+        moved.contract.unwrap().operation,
+        "GET /orders/{id}/tracking"
+    );
+    // Un essai reste : le contrat déduit reste avec lui ; le contrat du projet n'est pas touché.
+    assert!(inbox.path().join(&tracking.contract).exists());
+    assert_eq!(
+        std::fs::read_to_string(target.join("contracts/commandes.yaml")).unwrap(),
+        COMMANDES
+    );
 }

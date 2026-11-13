@@ -115,6 +115,9 @@ export type CommandName =
   | "trial_generalize"
   | "trial_keep_path"
   | "trial_transfer"
+  // Essais rangés dans un projet (2.2-d).
+  | "trial_file"
+  | "trial_file_undo"
   // Valeurs dynamiques proposées à la saisie (5.1-h).
   | "dynamic_values"
   // Lot H - Réseau et authentification.
@@ -1461,6 +1464,19 @@ export interface TransferredTrial {
   test: string;
   /** Son étape 1 : la requête de l'essai. */
   step: string;
+}
+
+/** Essais rangés dans un projet (`FiledTrials`, `trial_file`, 2.2-d). */
+export interface FiledTrials {
+  /** Chemins des essais déplacés : [dans « Non classés », dans le projet]. */
+  moved: [string, string][];
+  /** Essais restés dans « Non classés » : aucune opération du contrat choisi ne les sert. */
+  left: string[];
+  /** Contrat du projet qui les reçoit (`contracts/…`). */
+  contract: string;
+  contractName: string;
+  /** Jeton de « Annuler » (`trial_file_undo`). */
+  undoToken: string;
 }
 
 /** Valeur dynamique proposée à la frappe de `{{$` (`DynamicValue`, 5.1-h). */

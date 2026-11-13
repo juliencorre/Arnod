@@ -19,6 +19,7 @@ use crate::request::file as request_file;
 use crate::request::model::{ContractLink, Request};
 use crate::tree::{self, TreeNode};
 
+pub mod filing;
 pub mod generalize;
 
 /// Préfixe du nom des essais : « Essai 1 », « Essai 2 »…

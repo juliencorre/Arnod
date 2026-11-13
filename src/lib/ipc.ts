@@ -74,6 +74,7 @@ import type {
   VariableUser,
   PathGeneralization,
   TransferredTrial,
+  FiledTrials,
   DynamicValue,
   Auth,
   CertificateInfo,
@@ -596,6 +597,16 @@ export const ipc = {
     parent: string,
   ): Promise<TransferredTrial> =>
     call<TransferredTrial>("trial_transfer", { project, path, name, parent }),
+  /** « Ranger dans un projet » les essais d'un contrat déduit de « Non classés » (2.2-d). */
+  trialFile: (
+    project: string,
+    contract: string,
+    target: string,
+    into: string | null,
+  ): Promise<FiledTrials> => call<FiledTrials>("trial_file", { project, contract, target, into }),
+  /** « Annuler » un rangement d'essais (2.2-d). */
+  trialFileUndo: (undoToken: string): Promise<void> =>
+    call<null>("trial_file_undo", { undoToken }).then(() => undefined),
   /** Valeurs dynamiques proposées à la frappe de `{{$`, avec un exemple (5.1-h). */
   dynamicValues: (): Promise<DynamicValue[]> => call<DynamicValue[]>("dynamic_values"),
 
