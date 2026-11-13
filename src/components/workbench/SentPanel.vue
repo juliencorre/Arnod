@@ -39,7 +39,7 @@ function keep(drawn: DrawnValue): void {
 </script>
 
 <template>
-  <div v-if="sent" class="sent" role="tabpanel" aria-label="Requête envoyée">
+  <div v-if="sent" class="sent" role="tabpanel" aria-label="Requête envoyée" tabindex="0">
     <p class="sent__line">
       <span class="sent__method">{{ sent.method }}</span>
       <code class="sent__url">{{ sent.url }}</code>
@@ -47,8 +47,7 @@ function keep(drawn: DrawnValue): void {
 
     <template v-if="body !== null">
       <h3 class="sent__title">Corps envoyé</h3>
-      <!-- Zone défilante focalisable au clavier : une région nommée (Web:S6845). -->
-      <pre class="sent__body" role="region" aria-label="Corps envoyé" tabindex="0">{{ body }}</pre>
+      <pre class="sent__body">{{ body }}</pre>
     </template>
 
     <template v-if="sent.drawn.length > 0">
@@ -218,7 +217,7 @@ function keep(drawn: DrawnValue): void {
 }
 
 .sent__keep:focus-visible,
-.sent__body:focus-visible {
+.sent:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;
 }

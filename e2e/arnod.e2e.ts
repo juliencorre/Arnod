@@ -1691,6 +1691,9 @@ describe("Lot E - tests et étapes", () => {
         browser.execute(() => document.activeElement?.classList.contains("editor__url") ?? false),
       { timeout: 10_000, timeoutMsg: "curseur dans l'adresse attendu" },
     );
+    expect(
+      await browser.execute(() => document.activeElement?.classList.contains("editor__url")),
+    ).toBe(true);
     await screenshot(browser, "24-nouveau-test");
   });
 });
