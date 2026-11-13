@@ -1619,9 +1619,11 @@ describe("Lot D - Barre latérale", () => {
   it("les cartes de projet disent leur nombre de contrats (1.1-a)", async () => {
     await chooseWorkspace("E-commerce");
     await waitForHeading(browser, "E-commerce");
-    const stats = browser.$("main article .card__stats");
-    await stats.waitForExist({ timeout: 10_000 });
-    expect(await stats.getText()).toMatch(/contrats? de service/);
+    // Une carte par projet du workspace : chacune dit son nombre de contrats.
+    await browser.$("main article .card__stats").waitForExist({ timeout: 10_000 });
+    const stats = await browser.$$("main article .card__stats").map((s) => s.getText());
+    expect(stats.length).toBeGreaterThan(0);
+    for (const text of stats) expect(text).toMatch(/contrats? de service/);
     await screenshot(browser, "24-cartes-contrats");
   });
 });
