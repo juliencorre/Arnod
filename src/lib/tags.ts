@@ -37,9 +37,15 @@ export function tagCounts(nodes: readonly TreeNode[]): TagCount[] {
   visit(nodes);
   return [...byKey.values()]
     .map(({ count, spellings }) => {
-      const [tag] = [...spellings.entries()].reduce((best, next) =>
-        next[1] > best[1] ? next : best,
-      );
+      // L'orthographe la plus utilisée est montrée.
+      let tag = "";
+      let uses = 0;
+      for (const [spelling, n] of spellings) {
+        if (n > uses) {
+          tag = spelling;
+          uses = n;
+        }
+      }
       return { tag, count };
     })
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, "fr"));
