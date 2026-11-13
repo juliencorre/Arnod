@@ -17,6 +17,7 @@ import type {
   TreeNode,
   TreeView,
   VariableUser,
+  NetworkFailure,
 } from "@/types/ipc";
 
 /** Attente après la dernière modification avant l'enregistrement automatique (EP1). */
@@ -37,6 +38,8 @@ export interface Editor {
   receivedAt: Date | null;
   sending: boolean;
   sendError: string | null;
+  /** Lot H : échec réseau classé du dernier envoi (5.1-i). */
+  sendFailure?: NetworkFailure | null;
   /** Lecture impossible (fichier supprimé, illisible). */
   loadError: string | null;
   /** Modifiée dans une autre fenêtre alors qu'elle l'était aussi ici (F11). */
@@ -220,6 +223,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     editor.sending = result.sending;
     editor.outcome = result.outcome;
     editor.sendError = result.error;
+    editor.sendFailure = result.failure ?? null;
     editor.receivedAt = result.receivedAt === null ? null : new Date(result.receivedAt);
     if (result.request !== null) editor.sent = canonical(result.request);
   }
@@ -401,6 +405,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     // Marqué dès maintenant : un second envoi demandé pendant l'enregistrement ne part pas.
     editor.sending = true;
     editor.sendError = null;
+    editor.sendFailure = null;
     try {
       // L'envoi part du brouillon (E1) : un enregistrement impossible, signalé par l'éditeur
       // (« Non enregistré · Réessayer »), ne le bloque pas.
@@ -423,6 +428,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       } else if (!(caught instanceof IpcError && caught.kind === "cancelled")) {
         editor.outcome = null;
         editor.sendError = caught instanceof Error ? caught.message : String(caught);
+        editor.sendFailure = caught instanceof IpcError ? caught.failure : null;
       }
     } finally {
       editor.sending = false;

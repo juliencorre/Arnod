@@ -27,6 +27,8 @@ pub mod input;
 pub mod import;
 // Lot E : tests et étapes.
 pub mod test_steps;
+// Lot H - Réseau et authentification.
+pub mod network;
 
 #[cfg(test)]
 mod tests {

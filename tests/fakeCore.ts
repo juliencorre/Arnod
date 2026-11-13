@@ -28,6 +28,8 @@ import {
   type FakeWorkbench,
 } from "./fakeWorkbench";
 import { createFakeResponse, handleResponse, type FakeResponse } from "./fakeResponse";
+// Lot H - Réseau et authentification.
+import { createFakeNetwork, handleNetwork, type FakeNetwork } from "./fakeNetwork";
 
 export const HOME = "/home/julien";
 export const DEFAULT_LOCATION = `${HOME}/arnod`;
@@ -58,6 +60,8 @@ export interface FakeCore {
   response: FakeResponse;
   /** Lot C - Import Bruno : sources reconnues, rapports. */
   imports: FakeImports;
+  /** Lot H - Réseau et authentification : préférences, authentification du projet, cookies. */
+  network: FakeNetwork;
 }
 
 const COLORS: WorkspaceColor[] = [
@@ -96,6 +100,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     emitWindows: () => emit("arnod://fenetres", snapshotOf(core.windows)),
     response: createFakeResponse(),
     imports: createFakeImports(),
+    network: createFakeNetwork(),
   };
 
   const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -360,6 +365,9 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
             DEFAULT_LOCATION,
           );
           if (imported !== undefined) return imported;
+          // Lot H - Réseau et authentification.
+          const network = handleNetwork(core.network, cmd, args);
+          if (network !== undefined) return network;
           const contracts = handleContracts(core.contracts, core.workbench, cmd, args);
           const handled =
             contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);

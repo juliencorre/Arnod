@@ -19,7 +19,9 @@ pub mod input;
 pub mod layout;
 pub mod local;
 pub mod manifest;
+// Lot H - Réseau et authentification.
 mod menu;
+pub mod network;
 pub mod opencollection;
 pub mod request;
 pub mod response;
@@ -59,6 +61,8 @@ pub fn run() {
             let default_location = app.path().home_dir()?.join(DEFAULT_LOCATION_DIR);
             app.manage(AppState::load(data_dir.clone(), default_location));
             let bench = Arc::new(Workbench::new(Arc::new(SystemSecretStore)));
+            // Lot H : préférences réseau du poste et cookies persistants (network.json).
+            bench.network().attach(&data_dir);
             // Avancement des runs et statuts des requêtes diffusés aux fenêtres (R3, R4).
             bench.set_notifier(Arc::new(windows::EventNotifier::new(app.handle().clone())));
             app.manage(bench);
@@ -172,6 +176,19 @@ pub fn run() {
             commands::test_steps::tree_create_test,
             commands::test_steps::tree_add_step,
             commands::test_steps::request_variable_users,
+            // Lot H - Réseau et authentification.
+            commands::network::network_load,
+            commands::network::network_save,
+            commands::network::network_pick_authority,
+            commands::network::network_add_authority,
+            commands::network::network_remove_authority,
+            commands::network::project_auth_load,
+            commands::network::project_auth_save,
+            commands::network::oauth2_token_renew,
+            commands::network::oauth2_token_forget,
+            commands::network::cookies_list,
+            commands::network::cookies_clear,
+            commands::network::cookies_set_sending,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

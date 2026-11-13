@@ -29,6 +29,9 @@ pub struct RequestResult {
     pub outcome: Option<SendOutcome>,
     /// Message du dernier échec (réseau, délai, variable inconnue…).
     pub error: Option<String>,
+    /// Lot H : échec réseau classé du dernier envoi (5.1-i), absent du JSON sinon.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failure: Option<Box<crate::network::failure::NetworkFailure>>,
     /// Réception de la réponse, en millisecondes depuis l'époque Unix.
     pub received_at: Option<u64>,
     /// Requête telle qu'envoyée, pour « modifié, pas encore envoyé » et « Revenir à
@@ -79,11 +82,13 @@ impl ResultBook {
             sending: false,
             outcome: None,
             error: None,
+            failure: None,
             received_at: None,
             request: None,
         });
         result.sending = true;
         result.error = None;
+        result.failure = None;
         self.put(result)
     }
 
@@ -107,6 +112,7 @@ impl ResultBook {
                 result.outcome = None;
                 result.received_at = None;
                 result.error = Some(error.message.clone());
+                result.failure.clone_from(&error.failure);
             }
         }
         self.take(project_id, path);
@@ -150,6 +156,7 @@ impl ResultBook {
             sending,
             outcome: None,
             error: None,
+            failure: None,
             received_at: None,
             request: None,
         };

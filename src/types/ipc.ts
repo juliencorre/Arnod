@@ -109,7 +109,20 @@ export type CommandName =
   | "test_read"
   | "tree_create_test"
   | "tree_add_step"
-  | "request_variable_users";
+  | "request_variable_users"
+  // Lot H - Réseau et authentification.
+  | "network_load"
+  | "network_save"
+  | "network_pick_authority"
+  | "network_add_authority"
+  | "network_remove_authority"
+  | "project_auth_load"
+  | "project_auth_save"
+  | "oauth2_token_renew"
+  | "oauth2_token_forget"
+  | "cookies_list"
+  | "cookies_clear"
+  | "cookies_set_sending";
 
 /**
  * Nature d'une erreur de commande.
@@ -148,6 +161,8 @@ export interface CommandError {
   kind: CommandErrorKind;
   /** Message en français, prêt à afficher. */
   message: string;
+  /** Lot H : échec réseau classé (absent sinon). */
+  failure?: NetworkFailure;
 }
 
 /**
@@ -320,7 +335,7 @@ export interface Pair {
  * Type d'authentification. `inherit` (héritée du dossier) et `other` (digest, OAuth…)
  * sont conservés dans le fichier mais rien n'est envoyé.
  */
-export type AuthKind = "none" | "basic" | "bearer" | "apiKey" | "inherit" | "other";
+export type AuthKind = "none" | "basic" | "bearer" | "apiKey" | "inherit" | "other" | "oauth2";
 export type ApiKeyLocation = "header" | "query";
 
 /** Authentification (`Auth` en Rust, structure plate). */
@@ -334,6 +349,26 @@ export interface Auth {
   location: ApiKeyLocation;
   /** Type OpenCollection d'une authentification `other` (`oauth2`…). */
   other: string;
+  /** Lot H : OAuth 2 par identifiants client (`type: oauth2`). */
+  oauth2: OAuth2;
+}
+
+/** Lot H : où le client présente ses identifiants au serveur de jetons. */
+export type CredentialsPlacement = "basicAuthHeader" | "body";
+/** Lot H : où part le jeton OAuth 2. */
+export type TokenPlacement = "header" | "query";
+
+/** Lot H : OAuth 2 par identifiants client (`OAuth2` en Rust, R8). */
+export interface OAuth2 {
+  accessTokenUrl: string;
+  clientId: string;
+  /** Référence `{{oauth2ClientSecret}}` : la valeur est au coffre (R10). */
+  clientSecret: string;
+  scope: string;
+  credentials: CredentialsPlacement;
+  tokenPlacement: TokenPlacement;
+  /** Nom de l'en-tête ou du paramètre. */
+  tokenName: string;
 }
 
 /** Type de corps, commun aux variantes ; `other` (multipart, fichier…) est conservé mais pas envoyé. */
@@ -764,6 +799,8 @@ export interface RequestResult {
   sending: boolean;
   outcome: SendOutcome | null;
   error: string | null;
+  /** Lot H : échec réseau classé (5.1-i). */
+  failure?: NetworkFailure;
   /** Réception de la réponse, en millisecondes depuis l'époque Unix. */
   receivedAt: number | null;
   /** Requête telle qu'envoyée (lot E, R12), `null` avant le premier envoi réussi. */
@@ -1373,4 +1410,154 @@ export interface VariableUser {
   method: HttpMethod;
   url: string;
   variables: string[];
+}
+
+/*
+ * Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md).
+ * Équivalents Rust dans `src-tauri/src/network/` et `src-tauri/src/commands/network.rs`.
+ */
+
+/** Mode de proxy (`ProxyMode`). */
+export type ProxyMode = "system" | "none" | "manual";
+/** Origine du proxy du système (`ProxySource`). */
+export type ProxySource = "environment" | "windows";
+
+export interface ManualProxy {
+  url: string;
+  noProxy: string;
+  username: string;
+}
+
+export interface ProxyPrefs {
+  mode: ProxyMode;
+  manual: ManualProxy;
+}
+
+/** Proxy du système détecté (`SystemProxy`). */
+export interface SystemProxy {
+  http: string | null;
+  https: string | null;
+  noProxy: string;
+  source: ProxySource | null;
+  /** Script de configuration automatique, non pris en charge. */
+  autoConfig: string | null;
+}
+
+/** Certificat montré à l'utilisateur (`CertificateInfo`). */
+export interface CertificateInfo {
+  subject: string;
+  issuer: string;
+  notBefore: string;
+  notAfter: string;
+  fingerprint: string;
+  names: string[];
+  authority: boolean;
+  selfSigned: boolean;
+  pem: string;
+}
+
+/** Autorité interne ajoutée (`AuthorityView`). */
+export interface AuthorityView extends CertificateInfo {
+  addedAt: number;
+}
+
+/** Préférences réseau (`NetworkView`, 1.6-e). */
+export interface NetworkView {
+  proxy: ProxyPrefs;
+  hasProxyPassword: boolean;
+  system: SystemProxy;
+  connectTimeoutMs: number;
+  systemAuthorities: number;
+  authorities: AuthorityView[];
+}
+
+/** Préférences modifiées (`NetworkPrefsInput`). */
+export interface NetworkPrefsInput {
+  proxy: ProxyPrefs;
+  /** `null` : inchangé ; vide : retiré du coffre. */
+  proxyPassword: string | null;
+  connectTimeoutMs: number;
+}
+
+/** Cause d'un échec réseau (`FailureCause`, R5). */
+export type FailureCause =
+  "certificate" | "proxy" | "proxyAuth" | "dns" | "unreachable" | "timeout" | "tls" | "other";
+
+/** Problème d'un certificat refusé (`CertificateProblem`). */
+export type CertificateProblem =
+  "unknownIssuer" | "expired" | "notYetValid" | "wrongName" | "revoked" | "other";
+
+export interface CertificateFailure {
+  problem: CertificateProblem;
+  server: CertificateInfo;
+  /** Autorité à laquelle « Faire confiance » (R7). */
+  authority: CertificateInfo | null;
+}
+
+/** Échec réseau expliqué (`NetworkFailure`, 5.1-i). */
+export interface NetworkFailure {
+  cause: FailureCause;
+  title: string;
+  explanation: string;
+  notSent: boolean;
+  host: string;
+  port: number;
+  proxy: string | null;
+  connectTimeoutMs: number;
+  elapsedMs: number;
+  certificate: CertificateFailure | null;
+}
+
+/** État d'un jeton OAuth 2, sans sa valeur (`TokenStatus`). */
+export interface TokenStatus {
+  obtainedAt: number;
+  expiresAt: number | null;
+}
+
+/** Ce qui remplace l'authentification du projet (`AuthOverride`, OA4). */
+export interface AuthOverride {
+  /** Vide : requêtes sans authentification. */
+  label: string;
+  path: string;
+  type: AuthKind;
+  other: string;
+  count: number;
+}
+
+export interface AuthUsage {
+  inheriting: number;
+  overrides: AuthOverride[];
+}
+
+/** Authentification du projet (`ProjectAuthView`, 3.4-a). */
+export interface ProjectAuthView {
+  auth: Auth;
+  environment: string;
+  token: TokenStatus | null;
+  hasClientSecret: boolean;
+  usage: AuthUsage;
+}
+
+/** Cookie gardé, valeur masquée ou abrégée (`CookieView`, R14). */
+export interface CookieView {
+  name: string;
+  value: string;
+  path: string;
+  expiresAt: number | null;
+  httpOnly: boolean;
+  secure: boolean;
+  receivedFrom: string;
+}
+
+export interface CookieDomain {
+  domain: string;
+  sending: boolean;
+  cookies: CookieView[];
+}
+
+/** Cookies gardés d'un environnement (`CookieJarView`, 3.4-g). */
+export interface CookieJarView {
+  environment: string;
+  host: string | null;
+  domains: CookieDomain[];
 }

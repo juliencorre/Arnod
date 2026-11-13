@@ -21,6 +21,7 @@ import {
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import AssertionsEditor from "@/components/workbench/AssertionsEditor.vue";
+import CookiesSection from "@/components/workbench/CookiesSection.vue";
 import AuthEditor from "@/components/workbench/AuthEditor.vue";
 import BodyEditor from "@/components/workbench/BodyEditor.vue";
 import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
@@ -608,6 +609,8 @@ watch(
             Auth. « Envoyé » montre les valeurs réellement parties.
           </p>
         </template>
+        <!-- Lot H (3.4-g) : cookies gardés de l'environnement pour cet hôte. -->
+        <CookiesSection :editor-key="editorKey" />
       </div>
 
       <AuthEditor

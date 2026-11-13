@@ -577,3 +577,36 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
   inconnues. Une valeur `$…` fournie par l'appelant (copie cURL) n'est pas tirée.
 - « Extraire dans une variable » du filtre JSONPath (`ResponseFilter.vue`, store `response`)
   ajoute l'extraction de la correspondance courante (`workbench.addExtraction`).
+
+## Lot H - Réseau et authentification
+
+Référence : `docs/plan-mvp-h-reseau-auth.md` (cas PR1 à PR6, EC1 à EC6, OA1 à OA5, CK1 à CK4,
+règles R1 à R15), écrans 1.6-e, 5.1-i, 3.4-a, 3.4-g.
+
+- Tout envoi (requête, run, essai, jeton) passe par `network::Network` (tenu par
+  `Workbench::network`) : client reqwest construit une fois pour les préférences du poste et
+  reconstruit quand elles changent (`network.json` dans le dossier de données, écriture atomique,
+  mot de passe du proxy au coffre). `http::send` sans préférences ne sert qu'aux tests.
+- Proxy : du système (variables `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY`, puis registre Windows lu par
+  `windows-registry` derrière le trait `SystemProxySource`), aucun ou manuel ; exceptions `*`,
+  `<local>`, `.domaine`.
+- TLS : autorités du système (`rustls-native-certs`, repli sur les racines Mozilla) plus les
+  autorités internes ; le vérificateur délègue à webpki et garde le certificat refusé pour
+  l'expliquer. **La vérification n'est jamais coupée** : aucune option, aucun bouton ; une autorité
+  s'ajoute après avoir montré sujet, validité et empreinte (`CertificateCard`).
+- Un échec réseau est classé par `network::failure::classify` et voyage dans
+  `CommandError.failure` (absent du JSON sinon) et `RequestResult.failure` ; `IpcError.failure` le
+  rend à l'interface, `NetworkFailurePanel` l'affiche. Une nouvelle cause s'ajoute à `FailureCause`
+  (Rust et `src/types/ipc.ts`) avec un test sur un serveur local (`network/tests.rs`, certificats
+  construits par `network/testcert.rs`, sans clé versionnée).
+- OAuth 2 : seul le flux `client_credentials` du schéma est géré (`AuthKind::OAuth2`, `type: oauth2`
+  écrit tel quel, champs non gérés conservés) ; jeton en mémoire par projet, environnement, URL,
+  client et portée, redemandé 60 s avant expiration et masqué partout (`Prepared.hidden`). Le
+  secret client du projet va au coffre (variable locale secrète `oauth2ClientSecret`), jamais en
+  clair dans `opencollection.yml`.
+- Cookies : magasin par projet et environnement (`network::cookies`), persistants dans
+  `projects/<id>/cookies.json` (poste), de session en mémoire ; jamais ajoutés si la requête a son
+  propre en-tête `Cookie` ; valeurs `HttpOnly` masquées.
+- Préférences : `PreferencesDialog` (Ctrl+, et `arnod://preferences` du menu Fichier, adressé à
+  une fenêtre) ; une section de plus s'ajoute à `SECTIONS` et au type `PreferencesSection` du
+  store `network`.

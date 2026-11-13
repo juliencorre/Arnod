@@ -115,6 +115,7 @@ describe("barre latérale du projet", () => {
     expect(menuTexts(app)).toEqual([
       "Ouvrir le projet",
       "Gérer les environnements…Ctrl+Maj+E",
+      "Réglages du projet…",
       "Afficher dans « Tous les projets »",
       "Retirer de « Boutique »Le projet reste dans « Tous les projets ».",
     ]);

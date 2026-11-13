@@ -338,6 +338,8 @@ fn prepared(method: Method, body: Option<&str>) -> Prepared {
         max_redirects: 5,
         drawn: Vec::new(),
         used: Vec::new(),
+        oauth2: None,
+        hidden: Vec::new(),
     }
 }
 
