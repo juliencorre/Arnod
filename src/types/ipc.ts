@@ -110,6 +110,10 @@ export type CommandName =
   | "tree_create_test"
   | "tree_add_step"
   | "request_variable_users"
+  // Lot F : onglets et clavier (docs/plan-mvp-f-onglets-clavier.md).
+  | "layout_pin"
+  | "layout_close_tabs"
+  | "layout_set_sidebar_hidden"
   // Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md).
   | "request_conflict"
   | "request_conflict_resolve"
@@ -681,6 +685,8 @@ export type ContentRef =
 export interface ContentTab {
   id: string;
   content: ContentRef;
+  /** Onglet d'aperçu (1.3-a) : ouvert d'un simple clic, remplacé par le prochain aperçu. */
+  preview: boolean;
 }
 
 /** Place du résultat d'une requête dans sa zone (F6). */
@@ -701,6 +707,8 @@ export interface ZoneView {
   tabs: ContentTab[];
   activeTab: string | null;
   placement: Placement;
+  /** Onglets dans l'ordre d'utilisation, le plus récent d'abord (Ctrl+Tab, 1.3-c). */
+  recent: string[];
 }
 
 /** Nœud de la disposition : une zone ou une séparation (`Node`). */
@@ -746,6 +754,8 @@ export interface WindowView {
   /** Fenêtre principale : barre latérale détachée. */
   sidebarDetached: boolean;
   bounds: WindowBounds | null;
+  /** Fenêtre principale : barre latérale masquée (Ctrl+\, 1.4-j). */
+  sidebarHidden: boolean;
 }
 
 /** Toutes les fenêtres (`WindowsFile`), aussi diffusé par `arnod://fenetres`. */
@@ -1386,6 +1396,10 @@ export interface VariableUser {
   variables: string[];
 }
 
+// Lot F : onglets et clavier (docs/plan-mvp-f-onglets-clavier.md).
+
+/** Raccourci choisi dans le menu natif Fenêtre (`Shortcut`), reçu par `arnod://raccourci`. */
+export type MenuShortcut = "placement" | "sidebar";
 // --- Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md) ---
 
 /** Requête renommée ou déplacée hors d'Arnod (`Renamed`, R5). */

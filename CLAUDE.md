@@ -578,6 +578,28 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
 - « Extraire dans une variable » du filtre JSONPath (`ResponseFilter.vue`, store `response`)
   ajoute l'extraction de la correspondance courante (`workbench.addExtraction`).
 
+## Onglets et clavier
+
+Référence : `docs/plan-mvp-f-onglets-clavier.md` (lot F : cas AP1 à AP4, TO1, TO2, CT1, CT2, CL1 à
+CL3 ; règles R1 à R8), écrans 1.3-a, 1.3-b, 1.3-c et 1.4-j.
+
+- Le cœur tient l'aperçu et l'ordre d'utilisation (`layout/`) : `Tab.preview` (au plus un par zone,
+  remplacé sur place par le prochain aperçu, `Layout::open_tab`), `Zone.recent` (le plus récent
+  d'abord, toujours complet, réparé à la lecture de `windows.json`). Un onglet déplacé, divisé,
+  détaché, rattaché, ouvert sans aperçu ou modifié devient permanent (`layout_pin`).
+- Seul un simple clic dans la barre latérale ouvre en aperçu (`openSelection(content, true)`) ;
+  le double-clic ouvre sans aperçu. Toute ouverture par une action (créer, essayer, ouvrir la
+  requête d'origine) reste permanente : n'y passez pas `preview`.
+- Affichage seulement dans l'interface (`lib/tabs.ts`, pur) : onglets qui tiennent dans la barre
+  (`fitTabs`, les autres sous « +N »), ◐ d'une exécution (`isRunning`), ordre de Ctrl+Tab
+  (`byUse`). Fermer plusieurs onglets passe par `useTabActions().closeMany` (enregistre d'abord).
+- Raccourcis par le code de la touche : Ctrl+Tab / Ctrl+Maj+Tab et Ctrl+J dans `ZoneArea`, Ctrl+\
+  dans `AppShell`. Le menu natif « Fenêtre » porte leurs entrées sans accélérateur (il les ferait
+  deux fois) et émet `arnod://raccourci` (`MenuShortcut`) vers la fenêtre visée.
+- Place du résultat : l'icône de l'en-tête du résultat et Ctrl+J passent de l'autre côté, ou
+  reviennent à l'automatique (`nextPlacement`) ; barre latérale masquée :
+  `WindowState.sidebarHidden` de la fenêtre principale, gardé dans `windows.json`.
+
 ## Fichiers modifiés hors d'Arnod
 
 Référence : `docs/plan-mvp-i-fichiers-externes.md` (lot I : cas FE1 à FE7, règles R1 à R12), écran

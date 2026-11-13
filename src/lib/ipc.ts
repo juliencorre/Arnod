@@ -72,6 +72,7 @@ import type {
   CreatedTest,
   TestView,
   VariableUser,
+  MenuShortcut,
   StartupProblem,
   StartupTarget,
 } from "@/types/ipc";
@@ -421,9 +422,16 @@ export const ipc = {
   layoutOpen: (content: ContentRef, zone: string | null): Promise<WindowsSnapshot> =>
     call<WindowsSnapshot>("layout_open", { content, zone }),
 
-  /** Ouvre la sélection de la barre latérale dans la fenêtre qui la suit (Z5). */
-  layoutOpenSelection: (content: ContentRef): Promise<WindowsSnapshot> =>
-    call<WindowsSnapshot>("layout_open_selection", { content }),
+  /**
+   * Ouvre la sélection de la barre latérale dans la fenêtre qui la suit (Z5) ; en aperçu si
+   * `preview` (simple clic, 1.3-a).
+   */
+  layoutOpenSelection: (content: ContentRef, preview = false): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>(
+      "layout_open_selection",
+      // Sans aperçu, l'argument est omis : le cœur le prend à `false`.
+      preview ? { content, preview } : { content },
+    ),
 
   layoutActivate: (zone: string, tab: string): Promise<WindowsSnapshot> =>
     call<WindowsSnapshot>("layout_activate", { zone, tab }),
@@ -559,6 +567,19 @@ export const ipc = {
   requestVariableUsers: (project: string, path: string, names: string[]): Promise<VariableUser[]> =>
     call<VariableUser[]>("request_variable_users", { project, path, names }),
 
+  // --- Lot F : onglets et clavier ---------------------------------------------
+
+  /** L'onglet d'aperçu devient permanent : double-clic, modification, glisser (1.3-a). */
+  layoutPin: (tab: string): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_pin", { tab }),
+
+  /** Ferme plusieurs onglets de cette fenêtre : « Fermer les autres », « Fermer tout » (1.3-b). */
+  layoutCloseTabs: (tabs: string[]): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_close_tabs", { tabs }),
+
+  /** Masque ou affiche la barre latérale de la fenêtre principale (Ctrl+\, 1.4-j). */
+  layoutSetSidebarHidden: (hidden: boolean): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_set_sidebar_hidden", { hidden }),
   // --- Lot I - Fichiers modifiés hors d'Arnod ---
 
   /** Éléments où le fichier et le brouillon diffèrent ; `base` : version de départ (R9). */
@@ -612,6 +633,8 @@ export const EVENTS = {
   result: "arnod://resultat",
   run: "arnod://run",
   statuses: "arnod://statuts",
+  // Lot F : raccourci choisi dans le menu natif Fenêtre.
+  shortcut: "arnod://raccourci",
   // Lot I : fichiers modifiés hors d'Arnod.
   files: "arnod://fichiers",
 } as const;
@@ -666,6 +689,11 @@ export const events = {
       handler();
     }),
 
+  /** Raccourci choisi dans le menu natif Fenêtre, pour cette fenêtre (lot F, 1.4-j). */
+  onShortcut: (handler: (shortcut: MenuShortcut) => void): Promise<UnlistenFn> =>
+    listen<MenuShortcut>(EVENTS.shortcut, (event) => {
+      handler(event.payload);
+    }),
   /** Fichiers d'un projet modifiés hors d'Arnod : renommés, supprimés… (lot I, R6). */
   onFiles: (handler: (change: FilesChange) => void): Promise<UnlistenFn> =>
     listen<FilesChange>(EVENTS.files, (event) => {

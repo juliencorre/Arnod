@@ -195,6 +195,10 @@ pub fn run() {
             commands::test_steps::tree_create_test,
             commands::test_steps::tree_add_step,
             commands::test_steps::request_variable_users,
+            // Lot F : onglets et clavier.
+            commands::window::layout_pin,
+            commands::window::layout_close_tabs,
+            commands::window::layout_set_sidebar_hidden,
             // Lot I - Fichiers modifiés hors d'Arnod.
             commands::files::request_conflict,
             commands::files::request_conflict_resolve,

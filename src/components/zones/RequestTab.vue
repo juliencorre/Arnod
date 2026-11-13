@@ -4,6 +4,10 @@
  * l'autre (F6). En automatique, le résultat passe dessous quand la zone fait
  * moins de 860 px de large. Quand le résultat a sa fenêtre, l'onglet ne montre
  * que l'éditeur (docs/plan-resultat-detachable.md, R3).
+ *
+ * L'icône de l'en-tête du résultat, Ctrl+J et le menu Fenêtre le mettent dessous
+ * ou à côté (lot F, 1.4-j) ; revenir au côté que donnerait l'automatique rend la
+ * place automatique.
  */
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue";
 
@@ -13,7 +17,7 @@ import StepBar from "@/components/workbench/StepBar.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import ResultSide from "@/components/zones/ResultSide.vue";
 import { useTabActions } from "@/composables/useTabActions";
-import { useWindowsStore } from "@/stores/windows";
+import { type ShownPlacement, useWindowsStore } from "@/stores/windows";
 import { requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type { Placement } from "@/types/ipc";
 
@@ -58,16 +62,33 @@ watch(
   { immediate: true },
 );
 
-/** Clic sur la place active : retour à l'automatique ; sur l'autre : choix explicite. */
+/** Place montrée et place automatique, pour Ctrl+J et le menu Fenêtre (1.4-j). */
+const shown = computed<ShownPlacement>(() => ({
+  shown: below.value ? "below" : "right",
+  auto: width.value < NARROW ? "below" : "right",
+}));
+watch(
+  shown,
+  (view) => {
+    windows.reportPlacement(props.zoneId, view);
+  },
+  { immediate: true },
+);
+onBeforeUnmount(() => {
+  windows.reportPlacement(props.zoneId, null);
+});
+
+const placementLabel = computed(() =>
+  below.value ? "Mettre le résultat à côté" : "Mettre le résultat dessous",
+);
+const placementTitle = computed(
+  () =>
+    `Résultat ${below.value ? "dessous" : "à côté"}${props.placement === "auto" ? " · auto" : ""} — ${placementLabel.value.toLowerCase()} (Ctrl+J)`,
+);
+
 /** Lot I : « Fermer l'onglet » d'une requête supprimée hors d'Arnod, brouillon abandonné. */
 async function closeRemoved(): Promise<void> {
   if (await windows.close(props.tabId)) workbench.discardRemoved(key.value);
-}
-
-function place(target: "right" | "below"): void {
-  const effective = below.value ? "below" : "right";
-  const next: Placement = target === effective && props.placement !== "auto" ? "auto" : target;
-  void windows.setPlacement(props.zoneId, next);
 }
 </script>
 
@@ -96,24 +117,21 @@ function place(target: "right" | "below"): void {
       <div v-if="!windows.resultDetached" class="request-tab__response">
         <ResultSide :editor-key="key">
           <template #tools>
-            <div class="placement" role="group" aria-label="Place du résultat">
-              <button
-                type="button"
-                class="placement__option"
-                :aria-pressed="!below"
-                @click="place('right')"
-              >
-                À droite{{ !below && placement === "auto" ? " · auto" : "" }}
-              </button>
-              <button
-                type="button"
-                class="placement__option"
-                :aria-pressed="below"
-                @click="place('below')"
-              >
-                Dessous{{ below && placement === "auto" ? " · auto" : "" }}
-              </button>
-            </div>
+            <button
+              type="button"
+              class="placement"
+              :class="{ 'placement--below': below }"
+              :aria-label="placementLabel"
+              :title="placementTitle"
+              aria-keyshortcuts="Control+J"
+              @click="windows.togglePlacement(zoneId)"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                <rect x="1.5" y="2" width="11" height="10" rx="1.5" />
+                <path v-if="below" d="M1.5 7.5h11" />
+                <path v-else d="M7.5 2v10" />
+              </svg>
+            </button>
             <button
               type="button"
               class="detach"
@@ -210,31 +228,32 @@ function place(target: "right" | "below"): void {
   color: var(--color-muted);
 }
 
+/* Place du résultat (1.4-j) : l'icône montre la disposition, un clic la change. */
 .placement {
-  display: inline-flex;
-  border: 1px solid var(--color-border);
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.625rem;
+  border: 1px solid var(--color-accent-soft);
   border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.placement__option {
-  padding: 0.1875rem 0.5rem;
-  border: none;
-  font: inherit;
-  font-size: var(--text-small);
-  color: var(--color-muted);
-  background: var(--color-surface);
+  color: var(--color-link);
+  background: var(--color-accent-soft);
   cursor: pointer;
 }
 
-.placement__option[aria-pressed="true"] {
-  font-weight: 600;
-  color: var(--color-text);
-  background: var(--color-chip);
+.placement svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
 }
 
-.placement__option:focus-visible {
+.placement:hover {
+  border-color: var(--color-border-strong);
+}
+
+.placement:focus-visible {
   outline: 2px solid var(--color-focus);
-  outline-offset: -2px;
+  outline-offset: 1px;
 }
 </style>

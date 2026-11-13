@@ -2209,6 +2209,185 @@ describe("Lot E - tests et étapes", () => {
   });
 });
 
+describe("Lot F - onglets et clavier", () => {
+  /** Onglets de la zone active : nom et aperçu (titre en italique). */
+  async function activeZoneTabs(): Promise<{ name: string; preview: boolean }[]> {
+    return browser.execute(() =>
+      Array.from(document.querySelectorAll(".zone__tab:not(.zone__tab--hidden)")).map((tab) => ({
+        name: tab.querySelector(".zone__name")?.textContent.trim() ?? "",
+        preview: tab.classList.contains("zone__tab--preview"),
+      })),
+    );
+  }
+
+  async function waitForTabs(expected: { name: string; preview: boolean }[]): Promise<void> {
+    const norm = (tabs: { name: string; preview: boolean }[]) =>
+      JSON.stringify(
+        tabs.map((t) => ({
+          name: t.name.normalize("NFC").replace(/\s+/g, " "),
+          preview: t.preview,
+        })),
+      );
+    let last: unknown = null;
+    try {
+      await browser.waitUntil(
+        async () => {
+          const tabs = await activeZoneTabs();
+          last = tabs;
+          return norm(tabs) === norm(expected);
+        },
+        { timeout: 10_000 },
+      );
+    } catch (error) {
+      console.error("activeZoneTabs", JSON.stringify(last), String(error));
+      // Diagnostic : tous les onglets du DOM (cachés compris) et les zones enregistrées.
+      const dom = await browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab")).map(
+          (tab) => `${tab.className}:${tab.querySelector(".zone__name")?.textContent ?? ""}`,
+        ),
+      );
+      const saved = readWindows(sandbox).windows.map((w) =>
+        w.layout ? zonesOf(w.layout.root).map((z) => z.tabs) : w.kind,
+      );
+      throw new Error(
+        `onglets ${JSON.stringify(expected)} attendus, lus ${JSON.stringify(last)} ; DOM ${JSON.stringify(dom)} ; windows.json ${JSON.stringify(saved)}`,
+      );
+    }
+  }
+
+  /** Raccourci émis dans la WebView, par le code de la touche (AZERTY compris). */
+  async function shortcut(code: string, type = "keydown", shift = false): Promise<void> {
+    await browser.execute(
+      (keyCode, eventType, withShift) => {
+        const key = keyCode === "Tab" ? "Tab" : keyCode === "ControlLeft" ? "Control" : keyCode;
+        window.dispatchEvent(
+          new KeyboardEvent(eventType, {
+            code: keyCode,
+            key,
+            ctrlKey: eventType === "keydown",
+            shiftKey: withShift,
+            bubbles: true,
+          }),
+        );
+      },
+      code,
+      type,
+      shift,
+    );
+  }
+
+  /** Texte du DOM : WebKitGTK peut perdre les blancs entre éléments avec `getText`. */
+  async function textOf(selector: string): Promise<string> {
+    return browser.execute((css) => document.querySelector(css)?.textContent ?? "", selector);
+  }
+
+  async function dblclickRow(name: string): Promise<void> {
+    await browser.execute((label) => {
+      const row = Array.from(
+        document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'),
+      ).find((r) => r.textContent.includes(label));
+      if (!row) throw new Error(`« ${label} » introuvable`);
+      row.click();
+      row.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    }, name);
+  }
+
+  it("ferme tout, puis un simple clic ouvre en aperçu, remplacé au suivant (1.3-a, 1.3-b)", async () => {
+    if ((await activeZoneTabs()).length > 0) {
+      await browser.execute(() => {
+        document
+          .querySelector('.zone__tab-button[aria-selected="true"]')
+          ?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+      });
+      await browser.$('[role="menu"]').waitForDisplayed();
+      await clickText('[role="menuitem"]', "Fermer tout");
+    }
+    await waitForTabs([]);
+
+    await clickText('aside [role="treeitem"]', "Créer le client");
+    await waitForTabs([{ name: "Créer le client", preview: true }]);
+    await clickText('aside [role="treeitem"]', "Lire le client");
+    await waitForTabs([{ name: "Lire le client", preview: true }]);
+    await dblclickRow("Supprimer le client");
+    await waitForTabs([{ name: "Supprimer le client", preview: false }]);
+    await clickText('aside [role="treeitem"]', "Lire le client");
+    await waitForTabs([
+      { name: "Supprimer le client", preview: false },
+      { name: "Lire le client", preview: true },
+    ]);
+    expect(await activeZoneTabs()).toHaveLength(2);
+    await screenshot(browser, "25-onglet-apercu");
+  });
+
+  it("« +N » liste les onglets en trop et ferme les autres (1.3-b)", async () => {
+    const requests: string[] = await browser.execute(() =>
+      Array.from(document.querySelectorAll('aside [role="treeitem"]:not([aria-expanded])')).map(
+        (r) => r.querySelector(".row__name")?.textContent.trim() ?? "",
+      ),
+    );
+    for (const name of requests) {
+      if (await browser.$(".zone__more").isExisting()) break;
+      if (name !== "") await dblclickRow(name);
+    }
+    const more = browser.$(".zone__more");
+    await more.waitForExist({ timeout: 10_000, timeoutMsg: "bouton « +N » attendu" });
+    await more.click();
+    const menu = browser.$('[role="menu"][aria-label^="Autres onglets"]');
+    await menu.waitForDisplayed();
+    expect(await menu.getText()).toContain("Fermer les autres onglets");
+    await screenshot(browser, "26-onglets-en-trop");
+
+    await clickText('[role="menuitem"]', "Fermer les autres onglets");
+    await browser.waitUntil(async () => (await activeZoneTabs()).length === 1, {
+      timeoutMsg: "un seul onglet attendu",
+    });
+    expect(await browser.$(".zone__more").isExisting()).toBe(false);
+  });
+
+  it("Ctrl+Tab passe à l'onglet utilisé juste avant (1.3-c)", async () => {
+    const [first] = (await activeZoneTabs()).map((t) => t.name);
+    await dblclickRow(first === "Lire le client" ? "Créer le client" : "Lire le client");
+    await browser.waitUntil(async () => (await activeZoneTabs()).length === 2);
+
+    await shortcut("Tab");
+    const list = browser.$(".zone__switcher");
+    await list.waitForDisplayed();
+    expect(await textOf('.zone__switcher [aria-selected="true"]')).toContain(first ?? "");
+    await screenshot(browser, "27-ctrl-tab");
+    await shortcut("ControlLeft", "keyup");
+    await browser.waitUntil(async () => !(await list.isExisting()));
+    expect(await textOf('.zone__tab-button[aria-selected="true"]')).toContain(first ?? "");
+  });
+
+  it("Ctrl+J met le résultat dessous, Ctrl+\\ masque la barre latérale (1.4-j)", async () => {
+    await dblclickRow("Lire le client");
+    await browser.$(".request-tab").waitForDisplayed();
+    const below = () => browser.$(".request-tab--below").isExisting();
+    const before = await below();
+    await shortcut("KeyJ");
+    await browser.waitUntil(async () => (await below()) !== before, {
+      timeoutMsg: "place du résultat changée attendue",
+    });
+
+    await shortcut("Backslash");
+    await browser.waitUntil(async () => !(await browser.$("aside").isExisting()), {
+      timeoutMsg: "barre latérale masquée attendue",
+    });
+    await browser.waitUntil(() => readWindows(sandbox).windows[0]?.sidebarHidden === true);
+    expect(readWindows(sandbox).windows[0]?.sidebarHidden).toBe(true);
+    await screenshot(browser, "28-clavier");
+
+    // Gardé par la fenêtre : rouvert après un redémarrage, masqué.
+    await restart();
+    await browser.$('[aria-label="Afficher la barre latérale"]').waitForDisplayed();
+    await browser.$('[aria-label="Afficher la barre latérale"]').click();
+    await browser.$("aside").waitForDisplayed();
+    expect(readWindows(sandbox).windows[0]?.sidebarHidden).toBe(false);
+    await shortcut("KeyJ");
+    await browser.waitUntil(async () => (await below()) === before);
+  });
+});
+
 describe("Lot I - Fichiers modifiés hors d'Arnod (4.1-e)", () => {
   const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
   const file = () => path.join(project(), "surveille.yml");

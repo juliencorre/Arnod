@@ -47,6 +47,10 @@ const gestes: Gestes = {
     await attendre();
   },
   attendre,
+  doubleCliquer: async (selecteur, texte) => {
+    trouver(selecteur, texte).dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    await attendre();
+  },
 };
 
 async function demarrer(): Promise<void> {
