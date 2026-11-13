@@ -378,6 +378,27 @@ select:focus-visible {
   white-space: nowrap;
 }
 
+.menu__badge {
+  flex: none;
+  min-width: 2.25rem;
+  font: 600 var(--text-caption) var(--font-mono);
+  color: var(--color-muted);
+}
+
+.menu__badge--get {
+  color: var(--color-success);
+}
+
+.menu__badge--post,
+.menu__badge--put,
+.menu__badge--patch {
+  color: var(--color-link);
+}
+
+.menu__badge--delete {
+  color: var(--color-danger);
+}
+
 .menu__swatch {
   flex: none;
   width: 0.625rem;

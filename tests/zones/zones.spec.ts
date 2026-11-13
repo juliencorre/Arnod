@@ -26,8 +26,14 @@ function zoneTabs(wrapper: AppWrapper): string[][] {
     .map((zone) => zone.findAll(".zone__tab-button .zone__name").map((name) => name.text()));
 }
 
+/** Ouvre des requêtes en onglets permanents (double-clic : lot F, 1.3-a). */
 async function openRequests(wrapper: AppWrapper, ...names: string[]): Promise<void> {
-  for (const name of names) await click(wrapper, '[role="treeitem"]', name);
+  for (const name of names) {
+    const row = wrapper.findAll('[role="treeitem"]').find((e) => e.text().includes(name));
+    if (!row) throw new Error(`requête introuvable : ${name}`);
+    await row.trigger("dblclick");
+    await flushPromises();
+  }
 }
 
 /** Fausse géométrie : happy-dom ne calcule aucune mise en page. */
@@ -262,23 +268,30 @@ describe("zones (F2 à F5, F14, Z1)", () => {
     expect(zoneTabs(app)).toEqual([["Lister"], ["Santé"]]);
   });
 
-  it("place le résultat dessous ou à droite (F6)", async () => {
+  it("place le résultat dessous ou à droite, puis revient à l'automatique (F6, 1.4-j)", async () => {
     let core;
     ({ app, core } = await openProject());
-    await openRequests(app, "Lister");
-    const options = app.findAll(".placement__option");
-    expect(options.map((o) => [o.text(), o.attributes("aria-pressed")])).toEqual([
-      ["À droite · auto", "true"],
-      ["Dessous", "false"],
-    ]);
+    const view = app;
+    await openRequests(view, "Lister");
+    const button = () => view.get(".placement");
+    expect(button().attributes("aria-label")).toBe("Mettre le résultat dessous");
+    expect(button().attributes("title")).toContain("à côté · auto");
 
-    await options[1]?.trigger("click");
+    await button().trigger("click");
     await flushPromises();
     expect(core.calls.find((c) => c.cmd === "layout_set_placement")?.args).toMatchObject({
       placement: "below",
     });
-    expect(app.findAll(".placement__option").map((o) => o.text())).toEqual(["À droite", "Dessous"]);
     expect(app.find(".request-tab--below").exists()).toBe(true);
+    expect(button().attributes("aria-label")).toBe("Mettre le résultat à côté");
+
+    // Revenir au côté que donne l'automatique rend la place automatique.
+    await button().trigger("click");
+    await flushPromises();
+    expect(core.calls.filter((c) => c.cmd === "layout_set_placement").at(-1)?.args).toMatchObject({
+      placement: "auto",
+    });
+    expect(app.find(".request-tab--below").exists()).toBe(false);
   });
 });
 
@@ -300,6 +313,7 @@ describe("fenêtres détachées (F8, F9)", () => {
         tabs: [],
         activeTab: null,
         placement: "auto",
+        recent: [],
       },
     )
       .flatMap((z) => z.tabs)

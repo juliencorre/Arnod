@@ -1,4 +1,5 @@
 import { clearMocks } from "@tauri-apps/api/mocks";
+import { emptyOAuth2 } from "@/lib/auth";
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -265,6 +266,7 @@ describe("la requête en texte (5.1-b quater)", () => {
             value: "",
             location: "header",
             other: "",
+            oauth2: emptyOAuth2(),
           },
         }),
       );

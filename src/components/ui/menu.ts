@@ -20,6 +20,8 @@ export interface MenuItem {
   tag?: string;
   /** Détail à droite, en police à chasse fixe (« localhost:8080 »). */
   detail?: string;
+  /** Pastille en tête, en police à chasse fixe (« POST », « TEST »), colorée par sa valeur. */
+  badge?: string;
   /** Trait de séparation avant l'entrée. */
   separatorBefore?: boolean;
   /** Sous-menu (un seul niveau). */

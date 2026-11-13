@@ -594,3 +594,119 @@ Référence : écrans `2.2-c` et `2.2-b`.
   test (`tree::is_test`).
 - Interface : `TrialGeneralize.vue` sous l'adresse de toute requête liée à un contrat déduit,
   `TrialTransfer.vue` (« Requête au point ? ») sous l'éditeur d'un essai de « Non classés ».
+
+## Étiquettes proposées à la saisie
+
+Référence : écran `4.9-a`.
+
+- `TagsEditor.vue` (pastilles et champ d'ajout de `RequestEditor`) propose les étiquettes du projet
+  avec leur nombre de requêtes, puis « + Créer « … » » : comptage d'affichage dans `lib/tags.ts`
+  (pur, testé) sur les `TreeNode.tags` fournis par le cœur, sans casse ni accents.
+- Motif combobox : ↑ ↓, Entrée ajoute la proposition choisie (sinon le texte), Échap annule.
+
+## Valeurs dynamiques à la saisie
+
+Référence : écran `5.1-h` (liste ouverte à la frappe de `{{$`).
+
+- Le cœur fournit noms, descriptions et un exemple tiré (`dynamic_values`, `request::dynamic::catalog`,
+  ordre de `NAMES`) ; le store `input` les lit une fois (`loadDynamicValues`).
+- `DynamicValuesMenu.vue` (monté par `RequestEditor`) écoute les champs marqués par `v-variables`
+  (`data-variables`) : `lib/dynamicValues.ts` (pur, testé) repère la saisie au curseur, filtre et
+  insère `{{$nom}}`. Motif combobox : le champ garde le focus, ↑ ↓, Entrée ou Tab, Échap.
+
+## Lot H - Réseau et authentification
+
+Référence : `docs/plan-mvp-h-reseau-auth.md` (cas PR1 à PR6, EC1 à EC6, OA1 à OA5, CK1 à CK4,
+règles R1 à R15), écrans 1.6-e, 5.1-i, 3.4-a, 3.4-g.
+
+- Tout envoi (requête, run, essai, jeton) passe par `network::Network` (tenu par
+  `Workbench::network`) : client reqwest construit une fois pour les préférences du poste et
+  reconstruit quand elles changent (`network.json` dans le dossier de données, écriture atomique,
+  mot de passe du proxy au coffre). `http::send` sans préférences ne sert qu'aux tests.
+- Proxy : du système (variables `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY`, puis registre Windows lu par
+  `windows-registry` derrière le trait `SystemProxySource`), aucun ou manuel ; exceptions `*`,
+  `<local>`, `.domaine`.
+- TLS : autorités du système (`rustls-native-certs`, repli sur les racines Mozilla) plus les
+  autorités internes ; le vérificateur délègue à webpki et garde le certificat refusé pour
+  l'expliquer. **La vérification n'est jamais coupée** : aucune option, aucun bouton ; une autorité
+  s'ajoute après avoir montré sujet, validité et empreinte (`CertificateCard`).
+- Un échec réseau est classé par `network::failure::classify` et voyage dans
+  `CommandError.failure` (absent du JSON sinon) et `RequestResult.failure` ; `IpcError.failure` le
+  rend à l'interface, `NetworkFailurePanel` l'affiche. Une nouvelle cause s'ajoute à `FailureCause`
+  (Rust et `src/types/ipc.ts`) avec un test sur un serveur local (`network/tests.rs`, certificats
+  construits par `network/testcert.rs`, sans clé versionnée).
+- OAuth 2 : seul le flux `client_credentials` du schéma est géré (`AuthKind::OAuth2`, `type: oauth2`
+  écrit tel quel, champs non gérés conservés) ; jeton en mémoire par projet, environnement, URL,
+  client et portée, redemandé 60 s avant expiration et masqué partout (`Prepared.hidden`). Le
+  secret client du projet va au coffre (variable locale secrète `oauth2ClientSecret`), jamais en
+  clair dans `opencollection.yml`.
+- Cookies : magasin par projet et environnement (`network::cookies`), persistants dans
+  `projects/<id>/cookies.json` (poste), de session en mémoire ; jamais ajoutés si la requête a son
+  propre en-tête `Cookie` ; valeurs `HttpOnly` masquées.
+- Préférences : `PreferencesDialog` (Ctrl+, et `arnod://preferences` du menu Fichier, adressé à
+  une fenêtre) ; une section de plus s'ajoute à `SECTIONS` et au type `PreferencesSection` du
+  store `network`.
+
+## Onglets et clavier
+
+Référence : `docs/plan-mvp-f-onglets-clavier.md` (lot F : cas AP1 à AP4, TO1, TO2, CT1, CT2, CL1 à
+CL3 ; règles R1 à R8), écrans 1.3-a, 1.3-b, 1.3-c et 1.4-j.
+
+- Le cœur tient l'aperçu et l'ordre d'utilisation (`layout/`) : `Tab.preview` (au plus un par zone,
+  remplacé sur place par le prochain aperçu, `Layout::open_tab`), `Zone.recent` (le plus récent
+  d'abord, toujours complet, réparé à la lecture de `windows.json`). Un onglet déplacé, divisé,
+  détaché, rattaché, ouvert sans aperçu ou modifié devient permanent (`layout_pin`).
+- Seul un simple clic dans la barre latérale ouvre en aperçu (`openSelection(content, true)`) ;
+  le double-clic ouvre sans aperçu. Toute ouverture par une action (créer, essayer, ouvrir la
+  requête d'origine) reste permanente : n'y passez pas `preview`.
+- Affichage seulement dans l'interface (`lib/tabs.ts`, pur) : onglets qui tiennent dans la barre
+  (`fitTabs`, les autres sous « +N »), ◐ d'une exécution (`isRunning`), ordre de Ctrl+Tab
+  (`byUse`). Fermer plusieurs onglets passe par `useTabActions().closeMany` (enregistre d'abord).
+- Raccourcis par le code de la touche : Ctrl+Tab / Ctrl+Maj+Tab et Ctrl+J dans `ZoneArea`, Ctrl+\
+  dans `AppShell`. Le menu natif « Fenêtre » porte leurs entrées sans accélérateur (il les ferait
+  deux fois) et émet `arnod://raccourci` (`MenuShortcut`) vers la fenêtre visée.
+- Place du résultat : l'icône de l'en-tête du résultat et Ctrl+J passent de l'autre côté, ou
+  reviennent à l'automatique (`nextPlacement`) ; barre latérale masquée :
+  `WindowState.sidebarHidden` de la fenêtre principale, gardé dans `windows.json`.
+
+## Fichiers modifiés hors d'Arnod
+
+Référence : `docs/plan-mvp-i-fichiers-externes.md` (lot I : cas FE1 à FE7, règles R1 à R12), écran
+`4.1-e`.
+
+- `src-tauri/src/watch/` : un observateur `notify` par projet ouvert (`Watchers`, démarré par
+  `tree_load`, arrêté quand le projet est oublié ou introuvable), un fil qui regroupe les événements
+  300 ms, un registre de l'état connu (empreinte de chaque YAML / JSON, dossiers). `.git/`, éléments
+  cachés, `*.tmp` et `*~` sont ignorés.
+- Toute écriture d'Arnod dans un projet passe par `opencollection::yaml::write` ou
+  `contract::file::write_text` (qui appellent `watch::record_write`) ; une suppression ou un
+  renommage appelle `watch::settle`. Une nouvelle écriture directe (`fs::write`, `fs::rename`) dans
+  un projet doit faire de même, sinon son écho est pris pour une modification externe.
+- Un lot est diffusé par `arnod://fichiers` (`FilesChange` : renommés, supprimés…), puis par
+  `arnod://projet` (origine vide) pour chaque portée et chaque requête modifiée. Un renommage est
+  reconnu à l'empreinte (un supprimé, un ajouté identique).
+- `request_read` retient la version lue (`watch::acknowledge`) ; `request_save` refuse
+  (`changedOnDisk`) d'écrire sur une version plus récente. Le store passe alors l'onglet en conflit
+  (`Editor.conflict`, `ConflictPanel.vue`) : l'enregistrement automatique est suspendu, le cœur
+  compare (`request_conflict`, `watch::conflict::compare`, pur) et fusionne
+  (`request_conflict_resolve`). L'ancien bandeau « Modifiée dans une autre fenêtre » n'existe plus.
+- Un fichier de requête illisible n'est jamais réécrit (`request::file::write` le refuse).
+
+## Démarrage et erreurs
+
+Référence : `docs/plan-mvp-g-demarrage-erreurs.md` (lot G : cas DL1, ER1 à ER3, VR1, SU1, SU2 ;
+règles R1 à R8), écrans 0.3-a, 0.3-b, 0.3-b bis, 0.3-b ter.
+
+- Un fichier d'état (`arnod.json`, `windows.json`) illisible, plus récent, verrouillé ou un dossier
+  de données inaccessible donne un `startup::Failure` : rien n'est lu ni écrit (pas même
+  `windows.json` à la sortie) tant que l'utilisateur n'a pas choisi. Le cœur décrit l'écran
+  (`startup::describe`, pur : cause, ce qui est intact, deux issues dont la recommandée en premier,
+  détails, adresse de l'issue) ; `StartupProblemScreen.vue` affiche tel quel.
+- « Repartir d'un état vide » renomme le fichier (`.format-N`, `.illisible`, puis `-2`…), jamais ne
+  le supprime ; un verrou est réessayé seul (2, 4, 8 s, `startup_retry` automatique) puis à la main.
+- Navigateur et explorateur : programme du système par chemin absolu (`startup::open_external`),
+  sans plugin ni permission ; à défaut, l'adresse de l'issue est copiée. Rien n'est envoyé seul.
+- `arnod.json` porte `writtenBy` (version d'Arnod qui l'a écrit), cité par une version plus ancienne.
+- Fenêtres créées cachées (`visible: false`, `.visible(false)` des détachées) : `App.vue` appelle
+  `window_ready` après le premier rendu ; `windows::show_later` les montre après 300 ms sinon, avec
+  le squelette (`StartupSkeleton`), jamais un écran « Chargement… ».

@@ -176,22 +176,28 @@ fn trim_cut_character(bytes: &mut Vec<u8>) {
     }
 }
 
-/// Envoie la requête ; `cancel` l'interrompt (E5), même demandé avant l'envoi.
-pub async fn send(prepared: &Prepared, cancel: &Cancel) -> Result<HttpResponse, CommandError> {
-    tokio::select! {
-        biased;
-        () = cancel.cancelled() => Err(error(CommandErrorKind::Cancelled, "Envoi annulé.")),
-        result = run(prepared) => result,
+/// Échec d'un échange : erreur du client HTTP (à expliquer), ou erreur déjà prête.
+#[derive(Debug)]
+pub enum Failed {
+    /// Erreur du client, avec la durée jusqu'à l'échec (ms).
+    Http(reqwest::Error, u64),
+    Command(CommandError),
+}
+
+impl From<CommandError> for Failed {
+    fn from(error: CommandError) -> Self {
+        Self::Command(error)
     }
 }
 
-async fn run(prepared: &Prepared) -> Result<HttpResponse, CommandError> {
+/// Client par défaut, sans les préférences du poste (tests et repli).
+pub fn default_client(max_redirects: u32) -> Result<reqwest::Client, CommandError> {
     // Redirections suivies au plus (R3) ; 0 : aucune.
-    let policy = match prepared.max_redirects {
+    let policy = match max_redirects {
         0 => Policy::none(),
         max => Policy::limited(max as usize),
     };
-    let client = reqwest::Client::builder()
+    reqwest::Client::builder()
         .redirect(policy)
         .user_agent(USER_AGENT)
         .build()
@@ -200,7 +206,35 @@ async fn run(prepared: &Prepared) -> Result<HttpResponse, CommandError> {
                 CommandErrorKind::Network,
                 format!("Client HTTP indisponible : {e}."),
             )
-        })?;
+        })
+}
+
+/// Envoie la requête ; `cancel` l'interrompt (E5), même demandé avant l'envoi.
+pub async fn send(prepared: &Prepared, cancel: &Cancel) -> Result<HttpResponse, CommandError> {
+    let client = default_client(prepared.max_redirects)?;
+    send_with(&client, prepared, cancel)
+        .await
+        .map_err(|failed| match failed {
+            Failed::Http(e, _) => network(&e, &prepared.url),
+            Failed::Command(e) => e,
+        })
+}
+
+/// Lot H : envoie la requête avec `client` (proxy, autorités, redirections du poste) ; une
+/// erreur du client est rendue telle quelle, pour être expliquée (`network::failure`).
+pub async fn send_with(
+    client: &reqwest::Client,
+    prepared: &Prepared,
+    cancel: &Cancel,
+) -> Result<HttpResponse, Failed> {
+    tokio::select! {
+        biased;
+        () = cancel.cancelled() => Err(Failed::Command(error(CommandErrorKind::Cancelled, "Envoi annulé."))),
+        result = run(client, prepared) => result,
+    }
+}
+
+async fn run(client: &reqwest::Client, prepared: &Prepared) -> Result<HttpResponse, Failed> {
     let method = reqwest::Method::from_bytes(prepared.method.as_str().as_bytes())
         .map_err(|_| error(CommandErrorKind::InvalidRequest, "Méthode invalide."))?;
     let headers = checked_headers(&prepared.headers)?;
@@ -215,10 +249,11 @@ async fn run(prepared: &Prepared) -> Result<HttpResponse, CommandError> {
         builder = builder.body(body.clone());
     }
     let started = Instant::now();
+    let millis = |d: Duration| u64::try_from(d.as_millis()).unwrap_or(u64::MAX);
     let mut response = builder
         .send()
         .await
-        .map_err(|e| network(&e, &prepared.url))?;
+        .map_err(|e| Failed::Http(e, millis(started.elapsed())))?;
     let wait = started.elapsed();
     let status = response.status();
     let headers = response
@@ -237,7 +272,7 @@ async fn run(prepared: &Prepared) -> Result<HttpResponse, CommandError> {
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|e| network(&e, &prepared.url))?
+        .map_err(|e| Failed::Http(e, millis(started.elapsed())))?
     {
         size += chunk.len();
         if bytes.len() < MAX_BODY_BYTES {
@@ -252,7 +287,6 @@ async fn run(prepared: &Prepared) -> Result<HttpResponse, CommandError> {
         trim_cut_character(&mut bytes);
     }
     let total = started.elapsed();
-    let millis = |d: Duration| u64::try_from(d.as_millis()).unwrap_or(u64::MAX);
     Ok(HttpResponse {
         status: status.as_u16(),
         status_text: status.canonical_reason().unwrap_or("").to_owned(),
@@ -283,6 +317,8 @@ mod tests {
             max_redirects: 5,
             drawn: Vec::new(),
             used: Vec::new(),
+            oauth2: None,
+            hidden: Vec::new(),
         }
     }
 

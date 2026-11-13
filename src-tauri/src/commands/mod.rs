@@ -27,6 +27,12 @@ pub mod input;
 pub mod import;
 // Lot E : tests et étapes.
 pub mod test_steps;
+// Lot H - Réseau et authentification.
+pub mod network;
+// Lot I - Fichiers modifiés hors d'Arnod.
+pub mod files;
+// Lot G - Démarrage et erreurs.
+pub mod startup;
 
 #[cfg(test)]
 mod tests {

@@ -2,6 +2,7 @@
  * Faux cœur pour l'arborescence, les requêtes, les environnements et les runs :
  * en mémoire, sans les règles métier (testées côté Rust).
  */
+import { emptyOAuth2 } from "@/lib/auth";
 import type {
   Assertion,
   Example,
@@ -42,6 +43,7 @@ export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): R
       value: "",
       location: "header",
       other: "",
+      oauth2: emptyOAuth2(),
     },
     body: { kind: "none", variants: [], selected: 0, other: "" },
     settings: { timeoutMs: null, followRedirects: null, maxRedirects: null, encodeUrl: null },

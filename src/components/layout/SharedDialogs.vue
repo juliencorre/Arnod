@@ -6,6 +6,9 @@ import ConfirmProtectedDialog from "@/components/workbench/ConfirmProtectedDialo
 import AddProjectsDialog from "@/components/workspaces/AddProjectsDialog.vue";
 // Lot C - Import Bruno.
 import ImportDialog from "@/components/import/ImportDialog.vue";
+// Lot H - Réseau et authentification.
+import PreferencesDialog from "@/components/preferences/PreferencesDialog.vue";
+import ProjectSettingsDialog from "@/components/projects/ProjectSettingsDialog.vue";
 </script>
 
 <template>
@@ -14,4 +17,6 @@ import ImportDialog from "@/components/import/ImportDialog.vue";
   <AddProjectsDialog />
   <ConfirmProtectedDialog />
   <ImportDialog />
+  <PreferencesDialog />
+  <ProjectSettingsDialog />
 </template>

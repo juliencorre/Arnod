@@ -129,3 +129,9 @@ pub fn pairs_to_text(pairs: Vec<Pair>, format: PairsFormat) -> String {
 pub fn pairs_from_text(text: String, format: PairsFormat, previous: Vec<Pair>) -> PairsText {
     input::from_text(&text, format, &previous)
 }
+
+/// Valeurs dynamiques proposées à la frappe de `{{$` (5.1-h), chacune avec un exemple tiré.
+#[tauri::command]
+pub fn dynamic_values() -> Vec<crate::request::dynamic::DynamicValue> {
+    crate::request::dynamic::catalog(&mut crate::request::dynamic::Dice::new())
+}

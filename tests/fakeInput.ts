@@ -6,6 +6,7 @@
 import type {
   AddedHeader,
   CurlCopy,
+  DynamicValue,
   Pair,
   PairsFormat,
   PairsText,
@@ -157,7 +158,30 @@ export function handleInput(
       return toText(args.pairs as Pair[], args.format as PairsFormat);
     case "pairs_from_text":
       return fromText(String(args.text), args.format as PairsFormat, args.previous as Pair[]);
+    case "dynamic_values":
+      return FAKE_DYNAMIC_VALUES;
     default:
       return undefined;
   }
 }
+
+/** Valeurs dynamiques du faux cœur (`dynamic_values`, 5.1-h), dans l'ordre du cœur. */
+export const FAKE_DYNAMIC_VALUES: DynamicValue[] = [
+  {
+    name: "$isoTimestamp",
+    description: "Date et heure, ISO 8601",
+    example: "2026-11-12T15:02:11Z",
+  },
+  { name: "$timestamp", description: "Secondes depuis 1970", example: "1794495731" },
+  {
+    name: "$randomUUID",
+    description: "Identifiant unique",
+    example: "7c1e2b04-5d3a-4f6e-9b21-0c8d4e7a91f3",
+  },
+  { name: "$date", description: "Date du jour", example: "2026-11-12" },
+  { name: "$date:+3d", description: "Date décalée : +3d, -1d, +2h, +30m", example: "2026-11-15" },
+  { name: "$randomInt", description: "Nombre de 0 à 1 000", example: "482" },
+  { name: "$randomEmail", description: "Adresse e-mail", example: "lea.martin42@example.com" },
+  { name: "$randomFirstName", description: "Prénom", example: "Léa" },
+  { name: "$randomLastName", description: "Nom de famille", example: "Martin" },
+];

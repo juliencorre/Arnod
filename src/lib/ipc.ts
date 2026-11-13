@@ -9,6 +9,9 @@ import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
+  ConflictSide,
+  FilesChange,
+  RequestConflict,
   ActiveRequest,
   CatalogLoad,
   CatalogSnapshot,
@@ -71,6 +74,17 @@ import type {
   VariableUser,
   PathGeneralization,
   TransferredTrial,
+  DynamicValue,
+  Auth,
+  CertificateInfo,
+  CookieJarView,
+  NetworkPrefsInput,
+  NetworkView,
+  ProjectAuthView,
+  NetworkFailure,
+  MenuShortcut,
+  StartupProblem,
+  StartupTarget,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -92,6 +106,7 @@ const COMMAND_ERROR_KINDS: Record<CommandErrorKind, true> = {
   cancelled: true,
   secretStore: true,
   protectedEnvironment: true,
+  changedOnDisk: true,
 };
 
 /** Indique si la cause d'un rejet est une `CommandError` renvoyée par le cœur natif. */
@@ -116,6 +131,8 @@ function isCommandError(cause: unknown): cause is CommandError {
 export class IpcError extends Error {
   readonly command: CommandName;
   readonly kind: CommandErrorKind | null;
+  /** Lot H : échec réseau classé, s'il y en a un (5.1-i). */
+  readonly failure: NetworkFailure | null;
 
   constructor(command: CommandName, cause: unknown) {
     const commandError = isCommandError(cause) ? cause : null;
@@ -125,6 +142,7 @@ export class IpcError extends Error {
     this.name = "IpcError";
     this.command = command;
     this.kind = commandError?.kind ?? null;
+    this.failure = commandError?.failure ?? null;
   }
 }
 
@@ -417,9 +435,16 @@ export const ipc = {
   layoutOpen: (content: ContentRef, zone: string | null): Promise<WindowsSnapshot> =>
     call<WindowsSnapshot>("layout_open", { content, zone }),
 
-  /** Ouvre la sélection de la barre latérale dans la fenêtre qui la suit (Z5). */
-  layoutOpenSelection: (content: ContentRef): Promise<WindowsSnapshot> =>
-    call<WindowsSnapshot>("layout_open_selection", { content }),
+  /**
+   * Ouvre la sélection de la barre latérale dans la fenêtre qui la suit (Z5) ; en aperçu si
+   * `preview` (simple clic, 1.3-a).
+   */
+  layoutOpenSelection: (content: ContentRef, preview = false): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>(
+      "layout_open_selection",
+      // Sans aperçu, l'argument est omis : le cœur le prend à `false`.
+      preview ? { content, preview } : { content },
+    ),
 
   layoutActivate: (zone: string, tab: string): Promise<WindowsSnapshot> =>
     call<WindowsSnapshot>("layout_activate", { zone, tab }),
@@ -571,6 +596,107 @@ export const ipc = {
     parent: string,
   ): Promise<TransferredTrial> =>
     call<TransferredTrial>("trial_transfer", { project, path, name, parent }),
+  /** Valeurs dynamiques proposées à la frappe de `{{$`, avec un exemple (5.1-h). */
+  dynamicValues: (): Promise<DynamicValue[]> => call<DynamicValue[]>("dynamic_values"),
+
+  // --- Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md) ----
+  /** Préférences réseau du poste (1.6-e). */
+  networkLoad: (): Promise<NetworkView> => call<NetworkView>("network_load"),
+  networkSave: (prefs: NetworkPrefsInput): Promise<NetworkView> =>
+    call<NetworkView>("network_save", { prefs }),
+  /** Choisit un certificat et le lit, sans l'ajouter ; `null` : choix annulé (R4). */
+  networkPickAuthority: (): Promise<CertificateInfo | null> =>
+    call<CertificateInfo | null>("network_pick_authority"),
+  networkAddAuthority: (pem: string): Promise<NetworkView> =>
+    call<NetworkView>("network_add_authority", { pem }),
+  networkRemoveAuthority: (fingerprint: string): Promise<NetworkView> =>
+    call<NetworkView>("network_remove_authority", { fingerprint }),
+  /** Authentification du projet, jeton et usage (3.4-a). */
+  projectAuthLoad: (project: string, environment: string): Promise<ProjectAuthView> =>
+    call<ProjectAuthView>("project_auth_load", { project, environment }),
+  projectAuthSave: (
+    project: string,
+    environment: string,
+    auth: Auth,
+    clientSecret: string | null,
+  ): Promise<ProjectAuthView> =>
+    call<ProjectAuthView>("project_auth_save", { project, environment, auth, clientSecret }),
+  oauth2TokenRenew: (project: string, environment: string): Promise<ProjectAuthView> =>
+    call<ProjectAuthView>("oauth2_token_renew", { project, environment }),
+  oauth2TokenForget: (project: string, environment: string): Promise<ProjectAuthView> =>
+    call<ProjectAuthView>("oauth2_token_forget", { project, environment }),
+  /** Cookies gardés de l'environnement ; avec `url`, ceux de son hôte (3.4-g). */
+  cookiesList: (project: string, environment: string, url: string | null): Promise<CookieJarView> =>
+    call<CookieJarView>("cookies_list", { project, environment, url }),
+  cookiesClear: (
+    project: string,
+    environment: string,
+    domain: string | null,
+    url: string | null,
+  ): Promise<CookieJarView> =>
+    call<CookieJarView>("cookies_clear", { project, environment, domain, url }),
+  cookiesSetSending: (
+    project: string,
+    environment: string,
+    domain: string,
+    enabled: boolean,
+    url: string | null,
+  ): Promise<CookieJarView> =>
+    call<CookieJarView>("cookies_set_sending", { project, environment, domain, enabled, url }),
+  // --- Lot F : onglets et clavier ---------------------------------------------
+
+  /** L'onglet d'aperçu devient permanent : double-clic, modification, glisser (1.3-a). */
+  layoutPin: (tab: string): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_pin", { tab }),
+
+  /** Ferme plusieurs onglets de cette fenêtre : « Fermer les autres », « Fermer tout » (1.3-b). */
+  layoutCloseTabs: (tabs: string[]): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_close_tabs", { tabs }),
+
+  /** Masque ou affiche la barre latérale de la fenêtre principale (Ctrl+\, 1.4-j). */
+  layoutSetSidebarHidden: (hidden: boolean): Promise<WindowsSnapshot> =>
+    call<WindowsSnapshot>("layout_set_sidebar_hidden", { hidden }),
+  // --- Lot I - Fichiers modifiés hors d'Arnod ---
+
+  /** Éléments où le fichier et le brouillon diffèrent ; `base` : version de départ (R9). */
+  requestConflict: (
+    project: string,
+    path: string,
+    base: RequestDoc,
+    draft: RequestDoc,
+  ): Promise<RequestConflict> =>
+    call<RequestConflict>("request_conflict", { project, path, base, draft }),
+
+  /** Règle le conflit selon les choix et écrit le fichier une seule fois (R11). */
+  requestConflictResolve: (
+    project: string,
+    path: string,
+    draft: RequestDoc,
+    choices: Record<string, ConflictSide>,
+  ): Promise<RequestDoc> =>
+    call<RequestDoc>("request_conflict_resolve", { project, path, draft, choices }),
+  // Lot G - Démarrage et erreurs.
+
+  /** Erreur bloquante du démarrage, décrite ; `null` si Arnod peut démarrer. */
+  startupStatus: (): Promise<StartupProblem | null> =>
+    call<StartupProblem | null>("startup_status"),
+
+  /** Relit le fichier en échec ; `automatic` pour un essai automatique (R4). */
+  startupRetry: (automatic: boolean): Promise<StartupProblem | null> =>
+    call<StartupProblem | null>("startup_retry", { automatic }),
+
+  /** Met le fichier en échec de côté (renommé, intact) et repart d'un état vide (R3). */
+  startupStartEmpty: (): Promise<StartupProblem | null> =>
+    call<StartupProblem | null>("startup_start_empty"),
+
+  /** Ouvre le dossier de données, la page des versions ou l'issue préremplie (R6). */
+  startupOpen: (target: StartupTarget): Promise<null> => call<null>("startup_open", { target }),
+
+  /** Quitte Arnod sans rien écrire. */
+  startupQuit: (): Promise<null> => call<null>("startup_quit"),
+
+  /** L'interface est prête : la fenêtre, créée cachée, apparaît (0.3-a). */
+  windowReady: (): Promise<null> => call<null>("window_ready"),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
@@ -583,6 +709,12 @@ export const EVENTS = {
   result: "arnod://resultat",
   run: "arnod://run",
   statuses: "arnod://statuts",
+  // Lot H : « Préférences… » du menu natif.
+  preferences: "arnod://preferences",
+  // Lot F : raccourci choisi dans le menu natif Fenêtre.
+  shortcut: "arnod://raccourci",
+  // Lot I : fichiers modifiés hors d'Arnod.
+  files: "arnod://fichiers",
 } as const;
 
 /** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
@@ -629,9 +761,26 @@ export const events = {
       handler(event.payload);
     }),
 
+  /** Lot H : « Préférences… » du menu, pour la fenêtre nommée. */
+  onPreferences: (handler: (window: string) => void): Promise<UnlistenFn> =>
+    listen<{ window: string }>(EVENTS.preferences, (event) => {
+      handler(event.payload.window);
+    }),
+
   /** Fermeture demandée pour cette fenêtre détachée : enregistrer puis se rattacher. */
   onClose: (handler: () => void): Promise<UnlistenFn> =>
     listen(EVENTS.close, () => {
       handler();
+    }),
+
+  /** Raccourci choisi dans le menu natif Fenêtre, pour cette fenêtre (lot F, 1.4-j). */
+  onShortcut: (handler: (shortcut: MenuShortcut) => void): Promise<UnlistenFn> =>
+    listen<MenuShortcut>(EVENTS.shortcut, (event) => {
+      handler(event.payload);
+    }),
+  /** Fichiers d'un projet modifiés hors d'Arnod : renommés, supprimés… (lot I, R6). */
+  onFiles: (handler: (change: FilesChange) => void): Promise<UnlistenFn> =>
+    listen<FilesChange>(EVENTS.files, (event) => {
+      handler(event.payload);
     }),
 };

@@ -109,6 +109,69 @@ pub enum AuthKind {
     Inherit,
     /// Autre authentification OpenCollection (digest, OAuth…) : conservée, non envoyée.
     Other,
+    /// Lot H : OAuth 2 par identifiants client (`docs/plan-mvp-h-reseau-auth.md`, R8).
+    #[serde(rename = "oauth2")]
+    OAuth2,
+}
+
+/// Où le client présente ses identifiants au serveur de jetons (OAuth 2).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CredentialsPlacement {
+    /// En-tête `Authorization: Basic`.
+    #[default]
+    BasicAuthHeader,
+    /// Champs `client_id` et `client_secret` du formulaire.
+    Body,
+}
+
+/// Où le jeton OAuth 2 part avec la requête (R11).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TokenPlacement {
+    #[default]
+    Header,
+    Query,
+}
+
+/// OAuth 2 par identifiants client (flux `client_credentials` du schéma OpenCollection, R8) ;
+/// les valeurs acceptent `{{variable}}`, le secret n'est jamais écrit en clair (R10).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuth2 {
+    #[serde(default)]
+    pub access_token_url: String,
+    #[serde(default)]
+    pub client_id: String,
+    #[serde(default)]
+    pub client_secret: String,
+    #[serde(default)]
+    pub scope: String,
+    #[serde(default)]
+    pub credentials: CredentialsPlacement,
+    #[serde(default)]
+    pub token_placement: TokenPlacement,
+    /// Nom de l'en-tête (`Authorization`) ou du paramètre (`access_token`).
+    #[serde(default = "default_token_name")]
+    pub token_name: String,
+}
+
+fn default_token_name() -> String {
+    "Authorization".to_owned()
+}
+
+impl Default for OAuth2 {
+    fn default() -> Self {
+        Self {
+            access_token_url: String::new(),
+            client_id: String::new(),
+            client_secret: String::new(),
+            scope: String::new(),
+            credentials: CredentialsPlacement::default(),
+            token_placement: TokenPlacement::default(),
+            token_name: default_token_name(),
+        }
+    }
 }
 
 /// Emplacement d'une clé d'API.
@@ -142,6 +205,9 @@ pub struct Auth {
     /// Type d'une authentification `other` (`digest`, `oauth2`…).
     #[serde(default)]
     pub other: String,
+    /// Lot H : réglages OAuth 2 (`type: oauth2`).
+    #[serde(default)]
+    pub oauth2: OAuth2,
 }
 
 /// Type de corps (B4) ; commun à toutes les variantes (Q3).

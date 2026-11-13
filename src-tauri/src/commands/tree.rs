@@ -16,6 +16,7 @@ use crate::local;
 use crate::results::ResultBook;
 use crate::state::AppState;
 use crate::tree::{self, TreeNode};
+use crate::watch::service::Watchers;
 use crate::windows::{self, ProjectScope};
 use crate::workbench::Workbench;
 
@@ -31,8 +32,15 @@ pub struct TreeView {
 }
 
 #[tauri::command]
-pub fn tree_load(state: State<'_, AppState>, project: Uuid) -> Result<TreeView, CommandError> {
+pub fn tree_load(
+    state: State<'_, AppState>,
+    watchers: State<'_, Watchers>,
+    project: Uuid,
+) -> Result<TreeView, CommandError> {
     let ctx = state.project_ctx(project)?;
+    // Projet ouvert : son dossier est surveillé (lot I, R7). Une surveillance impossible
+    // n'empêche pas d'ouvrir le projet.
+    let _ = watchers.watch(project, &ctx.root);
     let nodes = tree::read(&ctx.root)?;
     let tests = tree::tests_view(&nodes, &contract::file::paths(&ctx.root));
     Ok(TreeView {

@@ -15,6 +15,7 @@ use crate::results::{RequestResult, ResultBook, ResultChange};
 use crate::state::AppState;
 use crate::statuses::Statuses;
 use crate::tree;
+use crate::watch;
 use crate::windows::{self, ProjectScope};
 use crate::workbench::{SendOutcome, Workbench};
 
@@ -25,7 +26,11 @@ pub fn request_read(
     path: String,
 ) -> Result<Request, CommandError> {
     let root = state.project_ctx(project)?.root;
-    let mut request = file::read(&tree::resolve(&root, &path)?)?;
+    let absolute = tree::resolve(&root, &path)?;
+    let mut request = file::read(&absolute)?;
+    // Version que l'éditeur va modifier : un enregistrement sur une version plus récente est
+    // refusé (lot I, R8).
+    watch::acknowledge(&absolute);
     // Héritage des dossiers et de la collection, pour l'éditeur (R3, R4).
     request.inherited = inherit::resolve(&root, &path);
     Ok(request)
@@ -41,7 +46,9 @@ pub fn request_save(
 ) -> Result<(), CommandError> {
     let run = || {
         let root = state.project_ctx(project)?.root;
-        file::write(&tree::resolve(&root, &path)?, &request)
+        let absolute = tree::resolve(&root, &path)?;
+        watch::check_unchanged(&absolute)?;
+        file::write(&absolute, &request)
     };
     let result = run();
     if result.is_ok() {
