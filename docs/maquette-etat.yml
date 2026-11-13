@@ -35,6 +35,7 @@ pages:
       - "Tests de sécurité et de charge : les dessiner ou les sortir du périmètre ?"
     journal:
       - "2026-11-12 : Devient l'index de la maquette : état au 12 novembre, index des pages (b), repères (c), correspondance des anciens repères (d)."
+      - "2026-11-13 : Vague 1 de la finalisation du MVP fusionnée (PR #46 à #51, docs/plan-finalisation-mvp.md) : réponse, saisie et cURL, import Bruno, barre latérale, tests et étapes ; carte MVP à 11 livrés · 4 en partie · 4 à faire."
     ecrans:
       a: { etat: référence }
       b: { etat: référence }
