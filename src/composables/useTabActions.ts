@@ -1,6 +1,7 @@
 /**
  * Actions sur les onglets de contenu partagées par les zones : fermer (en
- * enregistrant), diviser, déplacer, détacher dans une fenêtre (F1 à F8).
+ * enregistrant), diviser, déplacer, détacher dans une fenêtre (F1 à F8) ; fermer les
+ * autres ou tout (lot F, 1.3-b).
  */
 import { useContractsStore } from "@/stores/contracts";
 import { useToastStore } from "@/stores/toasts";
@@ -75,5 +76,19 @@ export function useTabActions() {
     await windows.detachZone(zone, null);
   }
 
-  return { tab, close, split, detach, detachZone, saveTab };
+  /**
+   * Ferme plusieurs onglets (« Fermer les autres », « Fermer tout », 1.3-b) après avoir
+   * enregistré leurs requêtes et contrats ; un contrat illisible garde tout ouvert.
+   */
+  async function closeMany(ids: string[]): Promise<void> {
+    const found = ids.map((id) => tab(id)).filter((t): t is ContentTab => t !== null);
+    for (const t of found) if (!(await saveTab(t.id))) return;
+    if (found.length === 0 || !(await windows.closeTabs(found.map((t) => t.id)))) return;
+    for (const t of found) {
+      if (t.content.kind === "request") workbench.release(contentKey(t.content));
+      if (t.content.kind === "contract") contracts.release(contentKey(t.content));
+    }
+  }
+
+  return { tab, close, closeMany, split, detach, detachZone, saveTab };
 }

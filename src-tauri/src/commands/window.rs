@@ -77,13 +77,18 @@ pub fn layout_open(
     windows::apply(&app, |w| w.layout_mut(&label)?.open(content, zone)).map(|(_, file)| file)
 }
 
-/// Ouvre la sélection de la barre latérale dans la fenêtre qui la suit (Z5).
+/// Ouvre la sélection de la barre latérale dans la fenêtre qui la suit (Z5) ; en
+/// aperçu si `preview` (simple clic, 1.3-a).
 #[tauri::command]
 pub fn layout_open_selection(
     app: AppHandle,
     content: Content,
+    preview: Option<bool>,
 ) -> Result<WindowsFile, CommandError> {
-    windows::apply(&app, |w| w.open_selection(content)).map(|(_, file)| file)
+    windows::apply(&app, |w| {
+        w.open_selection(content, preview.unwrap_or(false))
+    })
+    .map(|(_, file)| file)
 }
 
 #[tauri::command]
@@ -252,6 +257,41 @@ pub fn window_reattach(app: AppHandle, window: WebviewWindow) -> Result<WindowsF
 #[tauri::command]
 pub fn window_reattach_all(app: AppHandle) -> Result<WindowsFile, CommandError> {
     windows::apply(&app, Windows::reattach_all).map(|(_, file)| file)
+}
+
+// Lot F - Onglets et clavier (docs/plan-mvp-f-onglets-clavier.md).
+
+/// L'onglet d'aperçu devient permanent : double-clic, modification, glisser (1.3-a, R3).
+#[tauri::command]
+pub fn layout_pin(
+    app: AppHandle,
+    window: WebviewWindow,
+    tab: Uuid,
+) -> Result<WindowsFile, CommandError> {
+    let label = window.label().to_owned();
+    windows::apply(&app, |w| w.layout_mut(&label)?.pin(tab)).map(|(_, file)| file)
+}
+
+/// Ferme plusieurs onglets : « Fermer les autres », « Fermer tout » (1.3-b, R6).
+#[tauri::command]
+pub fn layout_close_tabs(
+    app: AppHandle,
+    window: WebviewWindow,
+    tabs: Vec<Uuid>,
+) -> Result<WindowsFile, CommandError> {
+    let label = window.label().to_owned();
+    windows::apply(&app, |w| w.close_tabs(&label, &tabs)).map(|(_, file)| file)
+}
+
+/// Masque ou affiche la barre latérale de la fenêtre principale (Ctrl+\, 1.4-j, R8).
+#[tauri::command]
+pub fn layout_set_sidebar_hidden(
+    app: AppHandle,
+    window: WebviewWindow,
+    hidden: bool,
+) -> Result<WindowsFile, CommandError> {
+    let label = window.label().to_owned();
+    windows::apply(&app, |w| w.set_sidebar_hidden(&label, hidden)).map(|(_, file)| file)
 }
 
 #[cfg(test)]

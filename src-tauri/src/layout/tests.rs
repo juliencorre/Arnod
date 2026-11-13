@@ -263,9 +263,11 @@ fn format_json_d_une_disposition() {
             content: Content::Run {
                 project_id: Uuid::from_u128(1),
             },
+            preview: true,
         }],
         active_tab: Some(Uuid::from_u128(3)),
         placement: Placement::Right,
+        recent: vec![Uuid::from_u128(3)],
     };
     let layout = Layout {
         active_zone: zone.id,
@@ -279,9 +281,14 @@ fn format_json_d_une_disposition() {
             "root": {
                 "kind": "zone",
                 "id": id(2),
-                "tabs": [{ "id": id(3), "content": { "kind": "run", "projectId": id(1) } }],
+                "tabs": [{
+                    "id": id(3),
+                    "content": { "kind": "run", "projectId": id(1) },
+                    "preview": true
+                }],
                 "activeTab": id(3),
-                "placement": "right"
+                "placement": "right",
+                "recent": [id(3)]
             },
             "activeZone": id(2)
         })
@@ -314,7 +321,7 @@ fn d1_le_resultat_s_ouvre_dans_sa_fenetre_qui_ne_prend_pas_la_selection() {
     assert!(!window.follow);
     // R2 : la sélection de la barre latérale va dans la principale.
     windows.focus(&label);
-    assert_eq!(windows.open_selection(request("b")).unwrap(), MAIN);
+    assert_eq!(windows.open_selection(request("b"), false).unwrap(), MAIN);
     assert_eq!(tab_names(&windows, MAIN), [["a", "b"]]);
 }
 
@@ -530,13 +537,13 @@ fn z5_la_selection_va_a_la_derniere_fenetre_qui_la_suit() {
     assert_eq!(windows.selection_target(), following);
     assert_eq!(windows.followers(), 2);
 
-    let target = windows.open_selection(request("c")).unwrap();
+    let target = windows.open_selection(request("c"), false).unwrap();
     assert_eq!(target, following);
     assert_eq!(tab_names(&windows, &following), [["b", "c"]]);
     assert_eq!(tab_names(&windows, &pinned), [["a"]]);
 
     windows.focus(MAIN);
-    assert_eq!(windows.open_selection(request("d")).unwrap(), MAIN);
+    assert_eq!(windows.open_selection(request("d"), false).unwrap(), MAIN);
     assert_eq!(
         kind(windows.set_follow(MAIN, false)),
         CommandErrorKind::InvalidRequest
@@ -761,6 +768,7 @@ fn z8_fichier_incoherent_repare() {
         sidebar_width: 260,
         sidebar_detached: false,
         bounds: None,
+        sidebar_hidden: false,
     };
     let foreign = WindowState {
         label: "autre".to_owned(),
@@ -864,4 +872,202 @@ fn lot_e_un_onglet_de_test_suit_renommage_et_suppression() {
     );
     layout.close_path(project, "Comptes");
     assert!(layout.zones()[0].tabs.is_empty());
+}
+
+// Lot F - Onglets et clavier : docs/plan-mvp-f-onglets-clavier.md (R1 à R8)
+
+fn preview_of(layout: &Layout) -> Vec<bool> {
+    layout.tabs().iter().map(|tab| tab.preview).collect()
+}
+
+#[test]
+fn r1_un_apercu_remplace_l_apercu_de_la_zone_sur_place() {
+    let (mut layout, _) = layout_with(&["a"]);
+    let b = layout.open_tab(request("b"), None, true).unwrap();
+    layout.open(request("c"), None).unwrap();
+
+    let d = layout.open_tab(request("d"), None, true).unwrap();
+
+    assert_ne!(b, d);
+    assert_eq!(names(&layout), vec![vec!["a", "d", "c"]]);
+    assert_eq!(preview_of(&layout), [false, true, false]);
+    assert_eq!(layout.zones()[0].active_tab, Some(d));
+    assert!(!layout.zones()[0].recent.contains(&b));
+}
+
+#[test]
+fn r1_un_apercu_deja_ouvert_est_seulement_active() {
+    let (mut layout, tabs) = layout_with(&["a", "b"]);
+
+    let again = layout.open_tab(request("a"), None, true).unwrap();
+
+    assert_eq!(again, tabs[0]);
+    assert_eq!(names(&layout), vec![vec!["a", "b"]]);
+    assert_eq!(preview_of(&layout), [false, false]);
+}
+
+#[test]
+fn r2_un_seul_apercu_par_zone_apres_une_fusion() {
+    let (mut layout, tabs) = layout_with(&["a", "b"]);
+    layout
+        .split(first_zone(&layout), tabs[1], Side::Right)
+        .unwrap();
+    let left = first_zone(&layout);
+    let right = layout.zones()[1].id;
+    layout.open_tab(request("c"), Some(left), true).unwrap();
+    layout.open_tab(request("d"), Some(right), true).unwrap();
+    assert_eq!(preview_of(&layout), [false, true, false, true]);
+
+    layout.apply_preset(Preset::One);
+
+    assert_eq!(preview_of(&layout).iter().filter(|p| **p).count(), 1);
+}
+
+#[test]
+fn r3_double_clic_glisser_ou_modification_rendent_l_onglet_permanent() {
+    let mut layout = Layout::single(Vec::new());
+    let a = layout.open_tab(request("a"), None, true).unwrap();
+    // Double-clic : le même contenu, ouvert sans aperçu.
+    layout.open_tab(request("a"), None, false).unwrap();
+    assert_eq!(preview_of(&layout), [false]);
+
+    let b = layout.open_tab(request("b"), None, true).unwrap();
+    layout.pin(b).unwrap();
+    layout.open_tab(request("c"), None, true).unwrap();
+    assert_eq!(names(&layout), vec![vec!["a", "b", "c"]]);
+    assert_eq!(
+        kind(layout.pin(Uuid::from_u128(99))),
+        CommandErrorKind::NotFound
+    );
+
+    // Glisser : un onglet déplacé ou divisé devient permanent.
+    let c = layout.tabs()[2].id;
+    layout.split(first_zone(&layout), c, Side::Bottom).unwrap();
+    assert_eq!(preview_of(&layout), [false, false, false]);
+    let d = layout.open_tab(request("d"), None, true).unwrap();
+    layout.move_tab(d, first_zone(&layout), None).unwrap();
+    assert!(layout.tabs().iter().all(|tab| !tab.preview));
+    assert_ne!(a, d);
+}
+
+#[test]
+fn r3_un_onglet_detache_ou_rattache_devient_permanent() {
+    let mut windows = Windows::default();
+    windows
+        .layout_mut(MAIN)
+        .unwrap()
+        .open(request("a"), None)
+        .unwrap();
+    let b = windows
+        .layout_mut(MAIN)
+        .unwrap()
+        .open_tab(request("b"), None, true)
+        .unwrap();
+
+    let label = windows.detach_tab(MAIN, b, None).unwrap();
+
+    let detached = windows.get(&label).unwrap().layout.as_ref().unwrap();
+    assert!(!detached.tabs()[0].preview);
+}
+
+#[test]
+fn r4_l_apercu_suit_la_selection_dans_la_fenetre_qui_la_suit() {
+    let mut windows = Windows::default();
+    windows.open_selection(request("a"), true).unwrap();
+    windows.open_selection(request("b"), true).unwrap();
+
+    let main = windows.get(MAIN).unwrap().layout.as_ref().unwrap();
+    assert_eq!(names(main), vec![vec!["b"]]);
+    assert_eq!(preview_of(main), [true]);
+}
+
+#[test]
+fn r5_ordre_d_utilisation_de_la_zone() {
+    let (mut layout, tabs) = layout_with(&["a", "b", "c"]);
+    let zone = first_zone(&layout);
+    assert_eq!(layout.zones()[0].recent, [tabs[2], tabs[1], tabs[0]]);
+
+    layout.activate(zone, tabs[0]).unwrap();
+    assert_eq!(layout.zones()[0].recent, [tabs[0], tabs[2], tabs[1]]);
+
+    // Fermer l'onglet actif : le nouvel actif passe en tête, l'ordre reste complet.
+    layout.close(tabs[0]).unwrap();
+    let after = &layout.zones()[0];
+    assert_eq!(after.recent.len(), 2);
+    assert_eq!(after.recent.first().copied(), after.active_tab);
+}
+
+#[test]
+fn r5_ordre_d_utilisation_repare_a_la_lecture() {
+    let (mut layout, tabs) = layout_with(&["a", "b"]);
+    if let Node::Zone(zone) = &mut layout.root {
+        zone.recent = vec![Uuid::from_u128(42), tabs[1], tabs[1]];
+        for tab in &mut zone.tabs {
+            tab.preview = true;
+        }
+    }
+    let mut file = Windows::default().to_file();
+    file.windows[0].layout = Some(layout);
+
+    let windows = Windows::from_file(file);
+
+    let zone = windows.get(MAIN).unwrap().layout.as_ref().unwrap().zones()[0].clone();
+    assert_eq!(zone.recent, [tabs[1], tabs[0]]);
+    assert_eq!(zone.tabs.iter().filter(|t| t.preview).count(), 1);
+}
+
+#[test]
+fn r6_fermer_les_autres_et_fermer_tout() {
+    let mut windows = Windows::default();
+    let tabs: Vec<Uuid> = ["a", "b", "c"]
+        .iter()
+        .map(|n| {
+            windows
+                .layout_mut(MAIN)
+                .unwrap()
+                .open(request(n), None)
+                .unwrap()
+        })
+        .collect();
+
+    windows.close_tabs(MAIN, &[tabs[0], tabs[2]]).unwrap();
+    assert_eq!(
+        names(windows.get(MAIN).unwrap().layout.as_ref().unwrap()),
+        vec![vec!["b"]]
+    );
+
+    let error = windows.close_tabs(MAIN, &[tabs[1], Uuid::from_u128(7)]);
+    assert_eq!(kind(error), CommandErrorKind::NotFound);
+
+    // Fermer tout dans une fenêtre de contenu la ferme.
+    let label = windows.detach_tab(MAIN, tabs[1], None).unwrap();
+    windows.close_tabs(&label, &[tabs[1]]).unwrap();
+    assert_eq!(windows.labels(), [MAIN]);
+}
+
+#[test]
+fn r8_barre_laterale_masquee_gardee_par_la_fenetre_principale() {
+    let mut windows = Windows::default();
+    let a = windows
+        .layout_mut(MAIN)
+        .unwrap()
+        .open(request("a"), None)
+        .unwrap();
+    let label = windows.detach_tab(MAIN, a, None).unwrap();
+
+    windows.set_sidebar_hidden(MAIN, true).unwrap();
+    assert_eq!(
+        kind(windows.set_sidebar_hidden(&label, true)),
+        CommandErrorKind::InvalidRequest
+    );
+
+    let restored = Windows::from_file(windows.to_file());
+    assert!(restored.get(MAIN).unwrap().sidebar_hidden);
+    let json = serde_json::to_value(restored.get(MAIN).unwrap()).unwrap();
+    assert_eq!(json["sidebarHidden"], serde_json::json!(true));
+    // Un fichier d'une version précédente : barre latérale affichée.
+    let mut old = json;
+    old.as_object_mut().unwrap().remove("sidebarHidden");
+    let read: WindowState = serde_json::from_value(old).unwrap();
+    assert!(!read.sidebar_hidden);
 }

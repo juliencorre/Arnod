@@ -3,13 +3,20 @@
 //! « Fichier » avec « Quitter » (F4) et « Fenêtre » (F7, F8, F9, F12) : ses
 //! accélérateurs (Ctrl+Maj+O, Ctrl+Maj+D) valent dans toutes les fenêtres et
 //! agissent sur la dernière fenêtre à zones utilisée.
+//!
+//! « Résultat dessous ou à côté » (Ctrl+J) et « Masquer la barre latérale »
+//! (Ctrl+\) (lot F, 1.4-j) ne portent pas d'accélérateur : l'interface lit ces
+//! touches par leur code (AZERTY compris), et un accélérateur natif les
+//! traiterait une seconde fois. Le menu émet `arnod://raccourci` vers la
+//! fenêtre visée, qui agit comme au clavier (R7).
 
+use serde::Serialize;
 use tauri::menu::{Menu, MenuBuilder, MenuEvent, MenuItemBuilder, SubmenuBuilder};
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use crate::layout::Preset;
 use crate::layout::windows::{MAIN, Windows};
-use crate::windows::{self, WindowsState};
+use crate::windows::{self, WindowsState, events};
 
 /// Identifiant de l'entrée « Quitter ».
 pub const QUIT_ID: &str = "quit";
@@ -21,6 +28,30 @@ pub const DETACH_SIDEBAR_ID: &str = "barre-detacher";
 pub const REATTACH_ALL_ID: &str = "rattacher-tout";
 /// Préfixe des dispositions (F7).
 pub const PRESET_PREFIX: &str = "disposition-";
+/// « Résultat dessous ou à côté » (Ctrl+J, 1.4-j).
+pub const PLACEMENT_ID: &str = "resultat-place";
+/// « Masquer ou afficher la barre latérale » (Ctrl+\, 1.4-j).
+pub const SIDEBAR_ID: &str = "barre-masquer";
+
+/// Raccourci choisi dans le menu, transmis à la fenêtre qui l'exécute (`arnod://raccourci`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Shortcut {
+    /// Résultat sous la requête ou à côté (Ctrl+J).
+    Placement,
+    /// Barre latérale masquée ou affichée (Ctrl+\).
+    Sidebar,
+}
+
+/// Libellé d'une entrée suivi de son raccourci, sans accélérateur natif : colonne
+/// de droite sous Windows (tabulation), entre parenthèses ailleurs.
+pub fn with_hint(label: &str, hint: &str) -> String {
+    if cfg!(windows) {
+        format!("{label}\t{hint}")
+    } else {
+        format!("{label} ({hint})")
+    }
+}
 
 /// Dispositions du menu, avec leur identifiant et leur libellé.
 const PRESETS: [(Preset, &str, &str); 5] = [
@@ -61,6 +92,15 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&detach_zone)
         .item(&detach_sidebar)
         .text(REATTACH_ALL_ID, "&Rattacher toutes les fenêtres")
+        .separator()
+        .text(
+            PLACEMENT_ID,
+            with_hint("Résultat dessous ou à &côté", "Ctrl+J"),
+        )
+        .text(
+            SIDEBAR_ID,
+            with_hint("&Masquer ou afficher la barre latérale", "Ctrl+\\"),
+        )
         .build()?;
     MenuBuilder::new(app).item(&file).item(&window).build()
 }
@@ -82,6 +122,16 @@ pub fn handle_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         .state::<WindowsState>()
         .read(Windows::last_with_layout)
         .unwrap_or_else(|_| MAIN.to_owned());
+    // La fenêtre visée agit comme au clavier (R7) : la place du résultat dépend de
+    // la largeur de sa zone, que seule l'interface connaît.
+    if id == PLACEMENT_ID {
+        let _ = app.emit_to(target.as_str(), events::SHORTCUT, Shortcut::Placement);
+        return;
+    }
+    if id == SIDEBAR_ID {
+        let _ = app.emit_to(MAIN, events::SHORTCUT, Shortcut::Sidebar);
+        return;
+    }
     // Les erreurs (zone vide à détacher…) n'ont pas de fenêtre où s'afficher :
     // le menu reste sans effet.
     let result = match id {
@@ -123,4 +173,26 @@ fn open_preferences<R: Runtime>(app: &AppHandle<R>) {
         .find(|(_, w)| w.is_focused().unwrap_or(false))
         .map_or_else(|| MAIN.to_owned(), |(label, _)| label);
     let _ = app.emit(PREFERENCES_EVENT, serde_json::json!({ "window": label }));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn libelle_avec_son_raccourci() {
+        let text = with_hint("Résultat dessous ou à côté", "Ctrl+J");
+        assert!(text.starts_with("Résultat dessous ou à côté"));
+        assert!(text.ends_with("Ctrl+J") || text.ends_with("(Ctrl+J)"));
+    }
+
+    #[test]
+    fn raccourcis_concordants_avec_typescript() {
+        use crate::ts_contract::{serialized_name, union_members};
+        let names: std::collections::BTreeSet<String> = [Shortcut::Placement, Shortcut::Sidebar]
+            .into_iter()
+            .map(serialized_name)
+            .collect();
+        assert_eq!(union_members("MenuShortcut"), names);
+    }
 }

@@ -331,6 +331,13 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
               {{ item.checked ? "✓" : "" }}
             </span>
             <span
+              v-if="item.badge"
+              class="menu__badge"
+              :class="`menu__badge--${item.badge.toLowerCase()}`"
+              aria-hidden="true"
+              >{{ item.badge }}</span
+            >
+            <span
               v-if="item.swatch"
               class="menu__swatch"
               :style="{ background: item.swatch }"
@@ -491,6 +498,27 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.menu__badge {
+  flex: none;
+  min-width: 2.25rem;
+  font: 600 var(--text-caption) var(--font-mono);
+  color: var(--color-muted);
+}
+
+.menu__badge--get {
+  color: var(--color-success);
+}
+
+.menu__badge--post,
+.menu__badge--put,
+.menu__badge--patch {
+  color: var(--color-link);
+}
+
+.menu__badge--delete {
+  color: var(--color-danger);
 }
 
 .menu__swatch {

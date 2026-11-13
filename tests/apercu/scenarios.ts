@@ -13,6 +13,8 @@ import type { Example } from "@/types/ipc";
 import { brunoSource } from "../fakeImports";
 // Lot H - Réseau et authentification.
 import { certificateFailureLotH, certificateLotH } from "../fakeNetwork";
+import { fichierVerrouilleLotG, versionPlusRecenteLotG } from "../fakeStartup";
+import type { StartupProblem } from "@/types/ipc";
 
 /** Gestes dans la page, par sélecteur CSS et texte visible. */
 export interface Gestes {
@@ -24,6 +26,8 @@ export interface Gestes {
   touche: (cle: string, options?: KeyboardEventInit & { selecteur?: string }) => Promise<void>;
   /** Attend que les promesses et le rendu se terminent. */
   attendre: (ms?: number) => Promise<void>;
+  /** Lot F : double-clique le premier élément qui correspond (et contient `texte`). */
+  doubleCliquer?: (selecteur: string, texte?: string) => Promise<void>;
 }
 
 export interface Scenario {
@@ -708,7 +712,106 @@ Object.assign(SCENARIOS, {
       await g.attendre(100);
     },
   },
+  // --- Lot F - Onglets et clavier (docs/plan-mvp-f-onglets-clavier.md) --------------
+  "1.3-a": {
+    description: "Onglets : aperçu en italique et ◐ pendant un envoi (1.3-a)",
+    setup: ongletsLotF,
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, ["Créer un client", "Santé", "Lire une commande"]);
+      await g.cliquer('[role="treeitem"]', "Lister les commandes");
+      await g.attendre(150);
+    },
+  },
+  "1.3-b": {
+    description: "Trop d'onglets : le menu « +N » ouvert (1.3-b)",
+    setup: ongletsLotF,
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, [
+        "Créer un client",
+        "Santé",
+        "Lire une commande",
+        "Changer le statut",
+        "Annuler une commande",
+        "Lister les clients",
+      ]);
+      await g.cliquer('[role="treeitem"]', "Lister les commandes");
+      await g.attendre(150);
+      await g.cliquer(".zone__more");
+      await g.attendre(100);
+    },
+  },
+  "1.3-c": {
+    description: "Ctrl+Tab : les onglets dans l'ordre d'utilisation (1.3-c)",
+    setup: ongletsLotF,
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, ["Lire une commande", "Santé", "Changer le statut"]);
+      await g.cliquer('[role="treeitem"]', "Créer un client");
+      await g.touche("Tab", { code: "Tab", ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
+  "1.4-j": {
+    description: "Ctrl+J : résultat dessous, Ctrl+\\ : barre latérale masquée (1.4-j)",
+    setup: () => {
+      const core = ongletsLotF();
+      core.workbench.nextSend = okOutcome();
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, ["Lire une commande", "Changer le statut", "Créer un client"]);
+      await g.cliquer(".editor__line button[type='submit']");
+      await g.attendre(100);
+      await g.touche("j", { code: "KeyJ", ctrlKey: true });
+      await g.touche("\\", { code: "Backslash", ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
+  // Lot G - Démarrage et erreurs (0.3).
+  "0.3-a": {
+    description: "Démarrage lent : squelette de l'écran attendu (0.3-a)",
+    setup: () => {
+      const core = installFakeCore(boutiqueSnapshot());
+      core.startup.slow = true;
+      return core;
+    },
+  },
+  "0.3-b": {
+    description: "Erreur au démarrage, deux issues dont la recommandée (0.3-b)",
+    setup: () => erreurLotG(versionPlusRecenteLotG()),
+  },
+  "0.3-b-bis": {
+    description: "Fichier d'état verrouillé, essai automatique (0.3-b bis)",
+    setup: () => erreurLotG(fichierVerrouilleLotG()),
+  },
+  "0.3-b-ter": {
+    description: "Détails pour le support dépliés (0.3-b ter)",
+    setup: () => erreurLotG(versionPlusRecenteLotG()),
+    play: async (g: Gestes) => {
+      await g.cliquer(".startup-problem__toggle");
+    },
+  },
 } satisfies Record<string, Scenario>);
+
+/** Lot F : référentiel « commandes/v2 », et un envoi de « Santé » en cours (◐). */
+function ongletsLotF(): FakeCore {
+  const core = largeur(commandes(), 320);
+  core.workbench.results.set("sante.yml", {
+    projectId: BOUTIQUE_TESTS,
+    path: "sante.yml",
+    sending: true,
+    outcome: null,
+    error: null,
+    receivedAt: null,
+    request: null,
+  });
+  return core;
+}
+
+/** Lot F : ouvre le projet puis ces requêtes en onglets permanents (double-clic). */
+async function ouvrirOngletsLotF(g: Gestes, noms: string[]): Promise<void> {
+  await ouvrirProjet(g);
+  for (const nom of noms) await g.doubleCliquer?.('[role="treeitem"]', nom);
+}
 
 /** Collection Bruno des scénarios d'import. */
 const BRUNO_DIR = "/home/julien/bruno/boutique-api";
@@ -906,3 +1009,116 @@ Object.assign(SCENARIOS, {
     },
   },
 } satisfies Record<string, Scenario>);
+// --- Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md) ------------
+
+/** Lot I : « commandes/v2/Créer une commande » de l'écran 4.1-e. */
+function commandesLotI(): FakeCore {
+  const core = largeur(commandes(), 320);
+  core.workbench.requests.set(
+    "commandes/v2/creer-une-commande.yml",
+    newRequest("Créer une commande", {
+      method: "POST",
+      url: "{{baseUrl}}/orders",
+      body: {
+        kind: "json",
+        variants: [{ title: "", content: '{ "coupon": "BIENVENUE" }', form: [] }],
+        selected: 0,
+        other: "",
+      },
+      assertions: [
+        {
+          id: "statut",
+          target: "status",
+          operator: "equals",
+          value: 200,
+          origin: "manual",
+          enabled: true,
+        },
+        {
+          id: "total",
+          target: "body.total",
+          operator: "equals",
+          value: 59.8,
+          origin: "manual",
+          enabled: true,
+        },
+      ],
+    }),
+  );
+  return core;
+}
+
+/**
+ * Lot I : brouillon commencé ici (coupon, statut 201), puis le fichier change sur le disque (en-tête
+ * ajouté, vérification retirée, même statut) : l'onglet montre le conflit.
+ */
+async function conflitLotI(g: Gestes, core: FakeCore): Promise<void> {
+  await ouvrirProjet(g);
+  await g.cliquer('[role="treeitem"]', "Créer une commande");
+  await g.attendre(100);
+  const { useWorkbenchStore } = await import("@/stores/workbench");
+  const editor = Object.values(useWorkbenchStore().editors).find((e) =>
+    e.path.endsWith("creer-une-commande.yml"),
+  );
+  const draft = editor?.draft;
+  if (!draft) throw new Error("brouillon introuvable");
+  const variant = draft.body.variants[0];
+  if (variant) variant.content = '{ "coupon": "NOEL26" }';
+  const status = draft.assertions.find((a) => a.target === "status");
+  if (status) status.value = 201;
+  const disk = core.workbench.requests.get("commandes/v2/creer-une-commande.yml");
+  if (disk) {
+    disk.headers.push({
+      name: "X-Request-Id",
+      value: "{{$randomUUID}}",
+      enabled: true,
+      kind: "query",
+      description: "",
+    });
+    disk.assertions = disk.assertions
+      .filter((a) => a.target !== "body.total")
+      .map((a) => (a.target === "status" ? { ...a, value: 201 } : a));
+  }
+  await core.emit("arnod://projet", {
+    projectId: BOUTIQUE_TESTS,
+    scope: "request",
+    path: "commandes/v2/creer-une-commande.yml",
+    origin: "",
+  });
+  await g.attendre(200);
+}
+
+Object.assign(SCENARIOS, {
+  "4.1-e": {
+    description: "Brouillon en conflit avec le disque, réglé élément par élément (4.1-e)",
+    setup: commandesLotI,
+    play: conflitLotI,
+  },
+  "4.1-e-supprime": {
+    description: "Requête supprimée hors d'Arnod avec un brouillon : Restaurer ou Fermer (4.1-e)",
+    setup: commandesLotI,
+    play: async (g: Gestes, core: FakeCore) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Créer une commande");
+      await g.saisir(".editor__url", "{{baseUrl}}/v2/orders");
+      core.workbench.requests.delete("commandes/v2/creer-une-commande.yml");
+      await core.emit("arnod://fichiers", {
+        projectId: BOUTIQUE_TESTS,
+        added: [],
+        modified: [],
+        removed: ["commandes/v2/creer-une-commande.yml"],
+        renamed: [],
+        tree: true,
+        environments: false,
+        contracts: false,
+      });
+      await g.attendre(200);
+    },
+  },
+} satisfies Record<string, Scenario>);
+/** Lot G : erreur bloquante servie par le faux cœur au démarrage. */
+function erreurLotG(problem: StartupProblem): FakeCore {
+  const core = installFakeCore(firstRunSnapshot());
+  core.startup.problem = problem;
+  return core;
+}
