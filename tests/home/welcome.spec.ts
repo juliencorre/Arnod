@@ -65,7 +65,8 @@ describe("accueil (A1 à A5)", () => {
     expect(app.get('.try [aria-live="polite"]').text()).toBe("Reconnu : REST (Une requête HTTP).");
     const method = app.get('[role="radiogroup"]');
     expect(method.get('[aria-checked="true"]').text()).toBe("GET");
-    expect(app.find("textarea").exists()).toBe(false);
+    // Un GET n'a que ses en-têtes en plusieurs lignes, sans corps.
+    expect(app.findAll("textarea")).toHaveLength(1);
     expect(app.find(".first-run__card").exists()).toBe(false);
     expect(app.get(".first-run__compact").text()).toContain("Pas encore de projet ?");
     expect(app.get('.try__row button[type="submit"]').text()).toBe("Envoyer");
@@ -81,6 +82,7 @@ describe("accueil (A1 à A5)", () => {
     expect(app.get('[role="radio"][aria-checked="true"]').text()).toBe("POST");
     expect(app.findAll(".nature-form__label").map((l) => l.text())).toEqual([
       "Méthode",
+      "En-têtes",
       "Type du corps",
       "Corps",
     ]);

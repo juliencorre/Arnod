@@ -263,7 +263,7 @@ describe("Arnod, de bout en bout", () => {
     expect(await browser.$("main .try__form").$("button=Envoyer").isDisplayed()).toBe(true);
     // POST montre le type et le corps (champs conditionnels de la définition).
     await form.$("button=POST").click();
-    await form.$("textarea").waitForDisplayed();
+    await form.$("textarea[id$='-body']").waitForDisplayed();
     await screenshot(browser, "01b-accueil-rest");
 
     // Échap ferme le formulaire : les cartes reviennent.
@@ -1238,7 +1238,7 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
     });
     expect(await checked()).toEqual(["POST", "JSON"]);
     expect(await browser.$("main .try__input").getValue()).toBe(`${url}/commandes`);
-    await form.$("textarea").setValue('{"article":"T-shirt"}');
+    await form.$("textarea[id$='-body']").setValue('{"article":"T-shirt"}');
     await sendTrial("Essai 2");
 
     const contract = readFileSync(contractFile(), "utf8");
@@ -1524,6 +1524,213 @@ describe("Premier usage : vérifications, run et statuts", () => {
     expect((await treeRow("Créer une commande"))?.status).toBe("✓, réussie");
     expect((await treeRow("Lister les commandes"))?.status).toBe("✓, réussie");
     expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
+  });
+});
+
+describe("Lot B : saisie, texte et cURL", () => {
+  // docs/plan-mvp-b-saisie-curl.md : 2.1-a sexies, 5.1-b ter, 5.1-b quater.
+  let server: Server;
+  let url = "";
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      response.writeHead(request.method === "POST" ? 201 : 200, {
+        "Content-Type": "application/json",
+      });
+      response.end(JSON.stringify({ id: 7, recu: request.headers["x-client"] ?? null }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /** Colle `text` d'un bloc dans l'entrée « Essayer une étape », comme un Ctrl+V. */
+  async function paste(text: string): Promise<void> {
+    await browser.execute((value) => {
+      const input = document.querySelector<HTMLInputElement>("main .try__input");
+      if (!input) throw new Error("entrée « Essayer une étape » introuvable");
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, text);
+  }
+
+  /** Agit dans l'onglet de la requête dont le nom est `name` et renvoie ce qu'il montre. */
+  function inEditor(
+    name: string,
+    action:
+      | { kind: "url"; value: string }
+      | { kind: "click"; value: string }
+      | { kind: "text"; value: string }
+      | { kind: "state" },
+  ) {
+    return browser.execute(
+      (label, step) => {
+        const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find(
+          (t) => t.querySelector<HTMLInputElement>(".meta__input")?.value === label,
+        );
+        if (!tab) throw new Error(`onglet « ${label} » introuvable`);
+        const set = (field: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
+          field.value = value;
+          field.dispatchEvent(new Event("input", { bubbles: true }));
+        };
+        if (step.kind === "url") {
+          const field = tab.querySelector<HTMLInputElement>(".editor__url");
+          if (field) set(field, step.value);
+        } else if (step.kind === "text") {
+          const field = tab.querySelector<HTMLTextAreaElement>(".pairs__textarea");
+          if (field) set(field, step.value);
+        } else if (step.kind === "click") {
+          const button = Array.from(tab.querySelectorAll<HTMLElement>("button")).find(
+            (b) =>
+              b.textContent.trim().startsWith(step.value) ||
+              b.getAttribute("aria-label") === step.value,
+          );
+          if (!button) throw new Error(`bouton « ${step.value} » introuvable`);
+          button.click();
+        }
+        return {
+          unknown: tab.querySelector(".unknown")?.textContent.replace(/\s+/g, " ").trim() ?? "",
+          marked: tab.querySelector(".editor__url")?.getAttribute("data-unknown-variables") ?? "",
+          tabs: Array.from(tab.querySelectorAll('[role="tab"]')).map((t) =>
+            t.textContent.replace(/\s+/g, " ").trim(),
+          ),
+          added: Array.from(tab.querySelectorAll(".sent--added .sent__name")).map((n) =>
+            n.textContent.trim(),
+          ),
+          text: tab.querySelector<HTMLTextAreaElement>(".pairs__textarea")?.value ?? null,
+          rows: tab.querySelectorAll(".pairs__row").length,
+          curl: document.querySelector(".curl__command")?.textContent ?? "",
+        };
+      },
+      name,
+      action,
+    );
+  }
+
+  let essai = "";
+
+  it("une commande cURL collée devient une requête REST ; l'option sans équivalent est signalée (2.1-a sexies)", async () => {
+    await chooseWorkspace("Tous les projets");
+    // Un jeton collé ne reste pas dans le texte (le coffre n'est rempli qu'à l'envoi).
+    await paste(`curl ${url}/moi -H 'Authorization: Bearer eyJ.e2e'`);
+    await browser.waitUntil(
+      async () =>
+        (
+          await browser
+            .$("main .try__import")
+            .getText()
+            .catch(() => "")
+        ).includes("{{token}}"),
+      { timeoutMsg: "jeton retiré attendu" },
+    );
+    const headers = await browser.$("main .try__form textarea").getValue();
+    expect(headers).toBe("Authorization: Bearer {{token}}");
+    await browser.keys("Escape");
+
+    const before = (await zoneTabs()).flat();
+    await paste(
+      `curl -X POST ${url}/orders \\\n  -H 'Content-Type: application/json' \\\n  -H 'X-Client: arnod-tests' \\\n  --data '{"sku":"TSH-BLU-M"}' --compressed`,
+    );
+    const note = browser.$("main .try__import");
+    await note.waitForDisplayed({ timeoutMsg: "commande cURL non reconnue" });
+    expect(await browser.$("main .try__input").getValue()).toBe(`${url}/orders`);
+    expect(await browser.$("main .try__note").getText()).toBe("Reconnu : une commande cURL.");
+    expect(await note.getText()).toContain("--compressed est ignorée");
+    await screenshot(browser, "21-curl-collee");
+
+    await browser.$("main .try__form").$("button=Envoyer").click();
+    await browser.waitUntil(
+      async () =>
+        (await zoneTabs()).flat().some((t) => /^Essai \d+$/.test(t) && !before.includes(t)),
+      { timeout: 15_000, timeoutMsg: "onglet de l'essai attendu" },
+    );
+    // L'essai envoyé est l'onglet de requête affiché (son numéro dépend des essais précédents).
+    await browser.waitUntil(
+      async () =>
+        /^Essai \d+$/.test(
+          await browser.execute(
+            () =>
+              document.querySelector<HTMLInputElement>(".request-tab .meta__input")?.value ?? "",
+          ),
+        ),
+      { timeout: 15_000, timeoutMsg: "onglet de l'essai envoyé attendu" },
+    );
+    essai = await browser.execute(
+      () => document.querySelector<HTMLInputElement>(".request-tab .meta__input")?.value ?? "",
+    );
+    // Le serveur a reçu les en-têtes de la commande.
+    await browser.waitUntil(
+      async () =>
+        (
+          await browser.execute(() => document.querySelector(".response")?.textContent ?? "")
+        ).includes("arnod-tests"),
+      { timeout: 10_000, timeoutMsg: "réponse avec l'en-tête X-Client attendue" },
+    );
+  });
+
+  it("une variable inconnue est soulignée et signalée ; compteurs et en-têtes ajoutés (5.1-b ter)", async () => {
+    await inEditor(essai, { kind: "url", value: `${url}/{{apiVersion}}/orders` });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).unknown !== "", {
+      timeoutMsg: "variable inconnue signalée attendue",
+    });
+    const state = await inEditor(essai, { kind: "state" });
+    expect(state.unknown).toContain("apiVersion est inconnue dans Local");
+    expect(state.marked).toBe("{{apiVersion}}");
+    expect(state.tabs).toContain("En-têtes 2");
+    expect(state.tabs.some((t) => t.startsWith("Corps ●"))).toBe(true);
+
+    await inEditor(essai, { kind: "click", value: "En-têtes" });
+    await browser.waitUntil(
+      async () => (await inEditor(essai, { kind: "state" })).added.length > 0,
+      {
+        timeoutMsg: "en-têtes ajoutés attendus",
+      },
+    );
+    expect((await inEditor(essai, { kind: "state" })).added).toEqual([
+      "User-Agent",
+      "Accept",
+      "Content-Length",
+      "Host",
+    ]);
+    await screenshot(browser, "22-variable-inconnue");
+  });
+
+  it("les en-têtes s'éditent en texte ; </> copie la requête en cURL (5.1-b quater)", async () => {
+    await inEditor(essai, { kind: "click", value: "Éditer en texte" });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).text !== null, {
+      timeoutMsg: "zone de texte attendue",
+    });
+    expect((await inEditor(essai, { kind: "state" })).text).toBe(
+      "Content-Type: application/json\nX-Client: arnod-tests",
+    );
+    await inEditor(essai, {
+      kind: "text",
+      value:
+        "Content-Type: application/json\nX-Client: arnod-tests\n# X-Debug: true\nAccept-Language: fr-FR",
+    });
+    await screenshot(browser, "23-en-tetes-en-texte");
+    await inEditor(essai, { kind: "click", value: "Revenir au tableau" });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).rows === 4, {
+      timeoutMsg: "quatre lignes attendues",
+    });
+
+    await inEditor(essai, { kind: "url", value: `${url}/orders` });
+    await inEditor(essai, { kind: "click", value: "Copier la requête en cURL" });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).curl !== "", {
+      timeoutMsg: "commande cURL attendue",
+    });
+    const command = (await inEditor(essai, { kind: "state" })).curl;
+    expect(command).toContain(`curl -X POST '${url}/orders'`);
+    expect(command).toContain("-H 'X-Client: arnod-tests'");
+    expect(command).not.toContain("X-Debug");
+    await browser.keys("Escape");
   });
 });
 

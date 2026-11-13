@@ -10,7 +10,10 @@
   "engine": { "kind": "builtin", "id": "http", "abi": 1 },
   "action": "Envoyer",
   "subject": { "key": "url", "label": "Adresse", "placeholder": "https://…" },
-  "detect": [{ "kind": "url", "schemes": ["http", "https"], "methodField": "method" }],
+  "detect": [
+    { "kind": "url", "schemes": ["http", "https"], "methodField": "method" },
+    { "kind": "curl" }
+  ],
   "form": [
     {
       "key": "method",
@@ -18,6 +21,12 @@
       "kind": "choice",
       "default": "GET",
       "options": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+    },
+    {
+      "key": "headers",
+      "label": "En-têtes",
+      "kind": "multiline",
+      "placeholder": "Nom: valeur, une ligne par en-tête"
     },
     {
       "key": "bodyType",

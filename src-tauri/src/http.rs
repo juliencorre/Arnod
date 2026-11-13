@@ -16,6 +16,10 @@ use crate::request::resolve::Prepared;
 /// Taille maximale du corps conservé (5 Mo) ; au-delà il est tronqué.
 pub const MAX_BODY_BYTES: usize = 5 * 1024 * 1024;
 
+/// En-tête `User-Agent` des envois, remplacé par un en-tête du même nom saisi
+/// dans la requête (`docs/plan-mvp-b-saisie-curl.md`, R3).
+pub const USER_AGENT: &str = concat!("Arnod/", env!("CARGO_PKG_VERSION"));
+
 /// Réponse reçue, prête à être affichée.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -189,6 +193,7 @@ async fn run(prepared: &Prepared) -> Result<HttpResponse, CommandError> {
     };
     let client = reqwest::Client::builder()
         .redirect(policy)
+        .user_agent(USER_AGENT)
         .build()
         .map_err(|e| {
             error(

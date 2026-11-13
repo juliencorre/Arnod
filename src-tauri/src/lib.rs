@@ -9,9 +9,11 @@
 pub mod catalog;
 pub mod commands;
 pub mod contract;
+pub mod curl;
 pub mod environment;
 pub mod error;
 pub mod http;
+pub mod input;
 pub mod layout;
 pub mod local;
 pub mod manifest;
@@ -146,6 +148,11 @@ pub fn run() {
             commands::steps::steps_catalog,
             commands::steps::steps_detect,
             commands::trial::trial_send,
+            // Lot B : saisie et cURL (docs/plan-mvp-b-saisie-curl.md)
+            commands::input::request_input,
+            commands::input::request_curl,
+            commands::input::pairs_to_text,
+            commands::input::pairs_from_text,
             // Lot D - Barre latérale
             commands::contracts::contract_count,
             commands::response::response_render,

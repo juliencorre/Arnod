@@ -29,16 +29,20 @@ export const useStepsStore = defineStore("steps", () => {
     return ipc.stepsDetect(input);
   }
 
-  /** Envoie l'essai ; enregistré dans « Non classés » seulement s'il reçoit une réponse (R12). */
+  /**
+   * Envoie l'essai ; enregistré dans « Non classés » seulement s'il reçoit une réponse (R12).
+   * `secrets` : ceux d'une commande cURL collée, gardés au coffre par le cœur.
+   */
   async function send(
     natureId: string,
     subject: string,
     values: Record<string, string>,
+    secrets: Record<string, string> = {},
   ): Promise<TrialResult> {
     const execId = crypto.randomUUID();
     sendingId.value = execId;
     try {
-      return await ipc.trialSend(execId, natureId, subject, values);
+      return await ipc.trialSend(execId, natureId, subject, values, secrets);
     } finally {
       sendingId.value = null;
     }

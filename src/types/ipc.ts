@@ -88,13 +88,17 @@ export type CommandName =
   | "steps_catalog"
   | "steps_detect"
   | "trial_send"
-  // Lot D - Barre latérale
-  | "contract_count"
+  // Lot B : saisie et cURL
+  | "request_input"
+  | "request_curl"
+  | "pairs_to_text"
+  | "pairs_from_text"
   | "response_render"
   | "response_preview"
   | "response_filter"
   | "response_save"
-  | "response_clear";
+  | "response_clear"
+  | "contract_count";
 
 /**
  * Nature d'une erreur de commande.
@@ -921,7 +925,8 @@ export type StepRule =
   | { kind: "url"; schemes: string[]; methodField: string | null }
   | { kind: "keywords"; words: string[] }
   | { kind: "prefix"; text: string }
-  | { kind: "suffix"; text: string };
+  | { kind: "suffix"; text: string }
+  | { kind: "curl" };
 
 /** Nature d'étape disponible (`StepNature`). */
 export interface StepNature {
@@ -963,6 +968,8 @@ export interface Detection {
   nature: string;
   subject: string;
   values: Record<string, string>;
+  /** Commande cURL reconnue : secrets retirés des en-têtes, options signalées. */
+  curl?: CurlImport;
 }
 
 /** Réponse de `trial_send` : l'essai enregistré dans « Non classés ». */
@@ -974,6 +981,88 @@ export interface TrialResult {
   /** Contrat déduit (`contracts/…`). */
   contract: string;
   outcome: SendOutcome;
+}
+
+// --- Lot B : saisie, texte et cURL (docs/plan-mvp-b-saisie-curl.md) ------------
+
+/** Environnement qui définit une variable inconnue de l'environnement actif (`VariableSource`). */
+export interface VariableSource {
+  environment: string;
+  /** Valeur d'une variable partagée ; `null` pour une variable locale. */
+  value: string | null;
+}
+
+/** Variable utilisée par la requête et absente de l'environnement actif (R2). */
+export interface UnknownVariable {
+  name: string;
+  definedIn: VariableSource[];
+}
+
+/** D'où vient un en-tête ajouté à l'envoi (`AddedOrigin`). */
+export type AddedOrigin = "auth" | "body" | "client";
+
+/** En-tête ajouté par Arnod à l'envoi (R3), montré grisé. */
+export interface AddedHeader {
+  name: string;
+  /** Valeur, secret masqué, ou ce qui la donne (« calculé à l'envoi »). */
+  value: string;
+  origin: AddedOrigin;
+  /** Dossier ou collection d'une authentification héritée. */
+  source: string | null;
+}
+
+/** Réponse de `request_input` : variables connues et inconnues, en-têtes ajoutés. */
+export interface RequestInput {
+  environment: string;
+  /** Variables connues : environnement actif, dossiers et collection (R1). */
+  known: string[];
+  /** Variables utilisées et inconnues, valeurs dynamiques `$…` exclues (R2). */
+  unknown: UnknownVariable[];
+  added: AddedHeader[];
+}
+
+/** Réponse de `request_curl` : la requête en commande cURL (R8 à R10). */
+export interface CurlCopy {
+  command: string;
+  /** Environnement dont les variables sont résolues. */
+  environment: string;
+}
+
+/** Écriture d'une liste en texte (`PairsFormat`) : `Nom: valeur` ou `nom=valeur`. */
+export type PairsFormat = "header" | "query";
+
+/** Ligne illisible d'une liste en texte. */
+export interface TextError {
+  /** Numéro de la ligne, à partir de 1. */
+  line: number;
+  message: string;
+}
+
+/** Réponse de `pairs_from_text` (R12, R13). */
+export interface PairsText {
+  pairs: Pair[];
+  errors: TextError[];
+}
+
+/** Secret retiré d'une commande cURL collée (`Secret`), gardé au coffre à l'envoi. */
+export interface CurlSecret {
+  /** Variable locale qui le remplace (`token`). */
+  name: string;
+  value: string;
+  /** En-tête d'où il vient. */
+  header: string;
+}
+
+/** Option cURL sans équivalent (`Ignored`), signalée (R6). */
+export interface CurlIgnored {
+  option: string;
+  reason: string;
+}
+
+/** Ce qu'une commande cURL collée a donné en plus des valeurs (`CurlImport`). */
+export interface CurlImport {
+  secrets: CurlSecret[];
+  ignored: CurlIgnored[];
 }
 
 // --- Lot A - Réponse (docs/plan-mvp-a-reponse.md, écran 5.1-b bis) -------------------------
