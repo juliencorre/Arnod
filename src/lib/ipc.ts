@@ -69,6 +69,8 @@ import type {
   CreatedTest,
   TestView,
   VariableUser,
+  PathGeneralization,
+  TransferredTrial,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -552,6 +554,23 @@ export const ipc = {
   /** Requêtes du projet, hors `path`, qui lisent l'une des variables `names` (EX5). */
   requestVariableUsers: (project: string, path: string, names: string[]): Promise<VariableUser[]> =>
     call<VariableUser[]>("request_variable_users", { project, path, names }),
+  /** Chemin généralisé proposé pour un essai, s'il y en a un (2.2-c). */
+  trialGeneralization: (project: string, path: string): Promise<PathGeneralization | null> =>
+    call<PathGeneralization | null>("trial_generalization", { project, path }),
+  /** « Généraliser » le chemin d'un essai ; renvoie les requêtes modifiées (2.2-c). */
+  trialGeneralize: (project: string, path: string): Promise<string[]> =>
+    call<string[]>("trial_generalize", { project, path }),
+  /** « Garder tel quel » le chemin d'un essai (2.2-c). */
+  trialKeepPath: (project: string, path: string): Promise<void> =>
+    call<null>("trial_keep_path", { project, path }).then(() => undefined),
+  /** « Transférer au référentiel de tests » : l'essai devient l'étape 1 d'un test (2.2-b). */
+  trialTransfer: (
+    project: string,
+    path: string,
+    name: string,
+    parent: string,
+  ): Promise<TransferredTrial> =>
+    call<TransferredTrial>("trial_transfer", { project, path, name, parent }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

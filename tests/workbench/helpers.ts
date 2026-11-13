@@ -8,8 +8,9 @@ import { type AppWrapper, mountApp } from "../mountApp";
 /** Monte l'application sur « boutique-tests » avec un petit projet, et l'ouvre. */
 export async function openProject(
   setup?: (core: FakeCore) => void,
+  snapshot = boutiqueSnapshot(),
 ): Promise<{ app: AppWrapper; core: FakeCore }> {
-  const core = installFakeCore(boutiqueSnapshot());
+  const core = installFakeCore(snapshot);
   const wb = core.workbench;
   wb.folders.add("Clients");
   wb.requests.set("Clients/lister.yml", newRequest("Lister", { url: "{{baseUrl}}/clients" }));

@@ -710,3 +710,68 @@ Object.assign(SCENARIOS, {
 
 /** Collection Bruno des scénarios d'import. */
 const BRUNO_DIR = "/home/julien/bruno/boutique-api";
+
+/** « Non classés » et l'essai 3 `GET /orders/42/tracking` de son contrat déduit (2.2-b, 2.2-c). */
+function essaisNonClasses(): FakeCore {
+  const snapshot = boutiqueSnapshot();
+  // Le projet ouvert tient lieu de « Non classés » : ses essais montrent « Requête au point ? ».
+  snapshot.inboxProjectId = BOUTIQUE_TESTS;
+  const core = installFakeCore(snapshot);
+  const file = "contracts/api-boutique-dev.yaml";
+  const op = (path: string) => ({
+    key: `GET ${path}`,
+    method: "GET",
+    path,
+    summary: null,
+    tag: null,
+  });
+  core.contracts.files.set(file, {
+    name: "api.boutique.dev",
+    version: "0.0.0",
+    deduced: true,
+    source: "openapi: 3.1.0\n",
+    operations: [op("/products"), op("/orders"), op("/orders/42/tracking")],
+  });
+  const wb = core.workbench;
+  wb.folders.add("api.boutique.dev");
+  wb.folders.add("commandes");
+  wb.requests.set("commandes/lister.yml", newRequest("Lister les commandes", { seq: 1 }));
+  const essai = (n: number, path: string) =>
+    wb.requests.set(
+      `api.boutique.dev/essai-${String(n)}.yml`,
+      newRequest(`Essai ${String(n)}`, {
+        url: `https://api.boutique.dev${path}`,
+        contract: { file, operation: `GET ${path}` },
+      }),
+    );
+  essai(1, "/products");
+  essai(2, "/orders");
+  essai(3, "/orders/42/tracking");
+  return core;
+}
+
+async function ouvrirEssai3(g: Gestes): Promise<void> {
+  await ouvrirProjet(g);
+  await g.cliquer('[aria-label="Déplier le contrat api.boutique.dev"]');
+  await g.cliquer(".crow__main", "/orders");
+  await g.cliquer(".crow__main", "/orders/42/tracking");
+  await g.attendre(150);
+}
+
+Object.assign(SCENARIOS, {
+  "2.2-c": {
+    description: "Essai dont le chemin ressemble à /orders/{id}/tracking : proposition (2.2-c)",
+    setup: essaisNonClasses,
+    play: ouvrirEssai3,
+  },
+  "2.2-b": {
+    description: "Fenêtre « Transférer au référentiel de tests » d'un essai (2.2-b)",
+    setup: essaisNonClasses,
+    play: async (g: Gestes) => {
+      await ouvrirEssai3(g);
+      await g.cliquer(".trial-transfer button", "Transférer au référentiel de tests");
+      await g.saisir(".transfer input", "Suivre une commande");
+      await g.attendre(100);
+    },
+  },
+} satisfies Record<string, Scenario>);

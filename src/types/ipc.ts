@@ -109,7 +109,12 @@ export type CommandName =
   | "test_read"
   | "tree_create_test"
   | "tree_add_step"
-  | "request_variable_users";
+  | "request_variable_users"
+  // Essais : chemins généralisés et transfert au référentiel (2.2-b, 2.2-c).
+  | "trial_generalization"
+  | "trial_generalize"
+  | "trial_keep_path"
+  | "trial_transfer";
 
 /**
  * Nature d'une erreur de commande.
@@ -1373,4 +1378,27 @@ export interface VariableUser {
   method: HttpMethod;
   url: string;
   variables: string[];
+}
+
+/** Paramètre de chemin proposé (`PathParam`, 2.2-c). */
+export interface PathParam {
+  name: string;
+  value: string;
+}
+
+/** Chemin généralisé proposé pour un essai (`Suggestion`, `trial_generalization`, 2.2-c). */
+export interface PathGeneralization {
+  /** Chemin actuel de l'opération : `/orders/42/tracking`. */
+  path: string;
+  template: { path: string; params: PathParam[] };
+  /** Contrat déduit (`contracts/…`). */
+  contract: string;
+}
+
+/** Essai transféré au référentiel de tests (`Transferred`, 2.2-b). */
+export interface TransferredTrial {
+  /** Dossier du test. */
+  test: string;
+  /** Son étape 1 : la requête de l'essai. */
+  step: string;
 }

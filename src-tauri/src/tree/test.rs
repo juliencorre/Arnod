@@ -23,9 +23,11 @@ pub const NEW_TEST: &str = "Nouveau test";
 
 /// Le dossier de ces enfants est un test (R1).
 pub fn is_test(children: &[TreeNode]) -> bool {
+    // Une requête liée à un contrat n'est jamais une étape (R1) : le dossier d'un serveur de
+    // « Non classés », qui ne range que des essais, n'est pas un test.
     children
         .iter()
-        .any(|node| matches!(node, TreeNode::Request { .. }))
+        .any(|node| matches!(node, TreeNode::Request { contract: None, .. }))
         && !children
             .iter()
             .any(|node| matches!(node, TreeNode::Folder { .. }))

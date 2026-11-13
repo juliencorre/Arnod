@@ -1116,6 +1116,8 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
         json(200, { etat: "ok", version: "1.4.2" });
       } else if (request.method === "POST" && request.url === "/commandes") {
         json(201, { id: 42, statut: "créée" });
+      } else if (request.method === "GET" && request.url === "/commandes/42/suivi") {
+        json(200, { commande: 42, transporteur: "Colissimo" });
       } else json(404, { message: "absent" });
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -1252,6 +1254,54 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
     expect(rows[0]).toContain("Non classés");
     expect(rows[0]).toContain("Hors workspaces");
     await screenshot(browser, "18-tous-les-projets-non-classes");
+  });
+
+  /** Marque l'onglet de l'essai `name` (`data-essai`), les autres essais restant ouverts. */
+  async function markTrial(name: string): Promise<boolean> {
+    return browser.execute((n) => {
+      const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find(
+        (t) => t.querySelector<HTMLInputElement>(".meta__input")?.value === n,
+      );
+      tab?.setAttribute("data-essai", "");
+      return tab !== undefined;
+    }, name);
+  }
+
+  it("un chemin qui ressemble à /commandes/{id}/suivi se généralise, puis l'essai devient un test (2.2-c, 2.2-b)", async () => {
+    await showAllProjects();
+    await paste(`${url}/commandes/42/suivi`);
+    await sendTrial("Essai 3");
+    await browser.waitUntil(() => markTrial("Essai 3"), {
+      timeoutMsg: "onglet de l'essai attendu",
+    });
+    const banner = browser.$("[data-essai] .generalize");
+    await banner.waitForDisplayed({ timeoutMsg: "proposition de chemin généralisé attendue" });
+    await screenshot(browser, "27-essai-chemin-generalise");
+    await clickText("[data-essai] .generalize button", "Généraliser");
+    const essai = () => path.join(inbox(), host.replace(":", " "), "essai-3.yml");
+    await browser.waitUntil(
+      () => readFileSync(contractFile(), "utf8").includes("/commandes/{id}/suivi"),
+      { timeoutMsg: "chemin généralisé dans le contrat déduit attendu" },
+    );
+    expect(readFileSync(essai(), "utf8")).toContain("/commandes/{id}/suivi");
+
+    await clickText("[data-essai] .trial-transfer > button", "Transférer au référentiel");
+    const input = browser.$("[data-essai] .transfer input");
+    await input.waitForDisplayed({ timeoutMsg: "fenêtre de transfert attendue" });
+    await browser.execute(() => {
+      const field = document.querySelector<HTMLInputElement>("[data-essai] .transfer input");
+      if (!field) throw new Error("nom du test introuvable");
+      field.value = "Suivre une commande";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await screenshot(browser, "28-transferer-au-referentiel");
+    await browser.execute(() => {
+      document.querySelector<HTMLFormElement>("[data-essai] .transfer")?.requestSubmit();
+    });
+    const step = path.join(inbox(), "Suivre une commande", "essai-3.yml");
+    await browser.waitUntil(() => existsSync(step), { timeoutMsg: "étape 1 du test attendue" });
+    expect(readFileSync(step, "utf8")).not.toContain("contract:");
+    expect(existsSync(essai())).toBe(false);
   });
 });
 

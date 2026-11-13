@@ -19,6 +19,8 @@ use crate::request::file as request_file;
 use crate::request::model::{ContractLink, Request};
 use crate::tree::{self, TreeNode};
 
+pub mod generalize;
+
 /// Préfixe du nom des essais : « Essai 1 », « Essai 2 »…
 pub const TRIAL_PREFIX: &str = "Essai";
 
@@ -170,6 +172,41 @@ pub fn record(
         contract,
         request,
     })
+}
+
+/// Essai transféré au référentiel de tests (écran 2.2-b) : le dossier du test et son étape 1.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Transferred {
+    pub test: String,
+    pub step: String,
+}
+
+/// « Transférer au référentiel de tests » (2.2-b) : un dossier `name` créé dans `parent`
+/// devient un test, dont la requête `path` est l'étape 1, telle quelle (adresse, vérifications,
+/// réponses attendues). Une étape n'est jamais liée à un contrat (R1 du lot E) : le lien est
+/// retiré, la requête quitte l'endpoint.
+pub fn transfer(
+    root: &Path,
+    path: &str,
+    name: &str,
+    parent: &str,
+) -> Result<Transferred, CommandError> {
+    let source = tree::resolve(root, path)?;
+    let mut request = request_file::read(&source)?;
+    let test = tree::create_folder(root, parent, name)?;
+    let step = match tree::move_to(root, path, &test) {
+        Ok(step) => step,
+        Err(error) => {
+            // Le dossier vient d'être créé, vide : il est retiré.
+            let _ = tree::resolve(root, &test).map(fs::remove_dir);
+            return Err(error);
+        }
+    };
+    request.contract = None;
+    request.seq = Some(1.0);
+    request_file::write(&tree::resolve(root, &step)?, &request)?;
+    Ok(Transferred { test, step })
 }
 
 #[cfg(test)]
