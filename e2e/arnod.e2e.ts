@@ -1633,3 +1633,122 @@ describe("Lot D - Barre latérale", () => {
     await screenshot(browser, "24-cartes-contrats");
   });
 });
+
+describe("Lot A - Réponse : format, aperçu, filtre JSONPath (5.1-b bis)", () => {
+  let server: Server;
+  let url = "";
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      if (request.url === "/commande") {
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(
+          JSON.stringify({
+            id: "ord_8F2kQ",
+            items: [
+              { sku: "TSH-BLU-M", qty: 2 },
+              { sku: "MUG-NOIR", qty: 1 },
+            ],
+            total: 47.82,
+          }),
+        );
+      } else {
+        response.writeHead(502, { "Content-Type": "text/html; charset=utf-8" });
+        response.end(
+          '<html><head><script>document.title="piégé"</script></head><body><h1>Panne</h1><img src="https://example.com/x.png" alt="Logo"><p>Réessayez.</p></body></html>',
+        );
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /** Onglet de la requête « Lister les commandes » (premier usage), ouvert depuis la barre. */
+  async function openRequest(): Promise<void> {
+    await browser.execute(() => {
+      const row = Array.from(
+        document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'),
+      ).find(
+        (item) => item.querySelector(".row__name")?.textContent.trim() === "Lister les commandes",
+      );
+      if (!row) throw new Error("requête « Lister les commandes » introuvable");
+      row.click();
+    });
+    await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+  }
+
+  /** Envoie la requête ouverte à `target` et attend la réponse. */
+  async function sendTo(target: string, status: string): Promise<void> {
+    await browser.execute((address) => {
+      const input = document.querySelector<HTMLInputElement>(".request-tab .editor__url");
+      if (!input) throw new Error("adresse introuvable");
+      input.value = address;
+      input.dispatchEvent(new Event("input"));
+    }, target);
+    await clickText(".request-tab button", "Envoyer");
+    await browser.waitUntil(
+      async () => (await browser.$(".response__status").getText()).startsWith(status),
+      { timeout: 15_000, timeoutMsg: `réponse ${status} attendue` },
+    );
+  }
+
+  it("met en forme le JSON, filtre en JSONPath et ajoute une vérification (F1 à F4)", async () => {
+    await openRequest();
+    await sendTo(`${url}/commande`, "200");
+    expect(await browser.$('select[aria-label="Format du corps"]').getValue()).toBe("json");
+    await browser.waitUntil(async () => (await browser.$(".code").getText()).includes("MUG-NOIR"));
+
+    await browser.$(".filter__input").setValue("$.items[*].sku");
+    await browser.waitUntil(
+      async () => (await browser.$(".filter__count").getText()) === "2 résultats",
+      { timeoutMsg: "deux résultats attendus" },
+    );
+    const marks = await browser.$$(".tok--match").map((m) => m.getText());
+    expect(marks).toEqual(['"TSH-BLU-M"', '"MUG-NOIR"']);
+    await screenshot(browser, "a1-reponse-filtre");
+
+    await browser.$(".filter__input").setValue("$.items[0");
+    await browser.waitUntil(async () =>
+      (await browser.$(".filter [role='alert']").getText()).includes("Crochet « [ » non fermé"),
+    );
+
+    await browser.$(".filter__input").setValue("$.items[1].sku");
+    await browser.waitUntil(
+      async () => (await browser.$(".filter__count").getText()) === "1 résultat",
+    );
+    await clickText(".filter__actions button", "+ Vérification");
+    const file = path.join(project(), "Commandes", "lister-les-commandes.yml");
+    await browser.waitUntil(() => readFileSync(file, "utf8").includes("res.body.items[1].sku"), {
+      timeout: 10_000,
+      timeoutMsg: "vérification écrite dans le fichier attendue",
+    });
+  });
+
+  it("montre un HTML en aperçu sans script ni image distante, puis efface la réponse (R4, R9)", async () => {
+    await sendTo(`${url}/page`, "502");
+    expect(await browser.$('select[aria-label="Format du corps"]').getValue()).toBe("html");
+    await browser.$(".body__bar [role='switch']").click();
+    const preview = browser.$(".preview");
+    await preview.waitForExist({ timeout: 10_000 });
+    expect(await preview.$("h1").getText()).toBe("Panne");
+    expect(await preview.getText()).toContain("[image : Logo]");
+    expect(await preview.$("script").isExisting()).toBe(false);
+    expect(await preview.$("img").isExisting()).toBe(false);
+    expect(await browser.getTitle()).not.toBe("piégé");
+    await screenshot(browser, "a2-reponse-apercu-html");
+
+    await browser.$('button[aria-label="Effacer la réponse"]').click();
+    await browser.waitUntil(async () =>
+      (await browser.$(".response").getText()).includes("Envoyez la requête pour voir la réponse."),
+    );
+  });
+});

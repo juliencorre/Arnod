@@ -53,6 +53,10 @@ import type {
   Undoable,
   WorkspaceColor,
   WorkspaceCreated,
+  FilterResult,
+  HtmlNode,
+  RenderedBody,
+  ResponseFormat,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -445,6 +449,36 @@ export const ipc = {
 
   /** Nombre de contrats du projet, sans les lire (W1, R5). */
   contractCount: (project: string): Promise<number> => call<number>("contract_count", { project }),
+
+  // --- Lot A - Réponse (docs/plan-mvp-a-reponse.md) ---------------------------------------
+
+  /** Corps mis en forme dans `format`, ou dans le format détecté (`null`). */
+  responseRender: (
+    body: string,
+    headers: [string, string][],
+    format: ResponseFormat | null,
+  ): Promise<RenderedBody> => call<RenderedBody>("response_render", { body, headers, format }),
+
+  /** Aperçu d'un corps HTML, sans script ni ressource distante. */
+  responsePreview: (body: string): Promise<HtmlNode[]> =>
+    call<HtmlNode[]>("response_preview", { body }),
+
+  /** Filtre JSONPath évalué par le cœur. */
+  responseFilter: (body: string, expression: string): Promise<FilterResult> =>
+    call<FilterResult>("response_filter", { body, expression }),
+
+  /** Enregistre le corps (sélecteur natif) ; renvoie le chemin écrit, `null` si annulé. */
+  responseSave: (
+    body: string,
+    name: string,
+    format: ResponseFormat,
+    truncated: boolean,
+  ): Promise<string | null> =>
+    call<string | null>("response_save", { body, name, format, truncated }),
+
+  /** Efface la réponse affichée d'une requête, dans toutes les fenêtres. */
+  responseClear: (project: string, path: string): Promise<RequestResult> =>
+    call<RequestResult>("response_clear", { project, path }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

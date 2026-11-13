@@ -124,7 +124,7 @@ async function main() {
   const opts = options(process.argv.slice(2));
   if (opts.liste) {
     const src = readFileSync(join(ROOT, "tests", "apercu", "scenarios.ts"), "utf8");
-    for (const m of src.matchAll(/^ {2}"?([\w-]+)"?: \{\n {4}description: "([^"]*)"/gm)) {
+    for (const m of src.matchAll(/^ {2}"?([\w.-]+)"?: \{\n {4}description: "([^"]*)"/gm)) {
       console.log(`${m[1].padEnd(32)} ${m[2]}`);
     }
     return;

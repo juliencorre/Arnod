@@ -89,7 +89,12 @@ export type CommandName =
   | "steps_detect"
   | "trial_send"
   // Lot D - Barre latérale
-  | "contract_count";
+  | "contract_count"
+  | "response_render"
+  | "response_preview"
+  | "response_filter"
+  | "response_save"
+  | "response_clear";
 
 /**
  * Nature d'une erreur de commande.
@@ -969,4 +974,66 @@ export interface TrialResult {
   /** Contrat déduit (`contracts/…`). */
   contract: string;
   outcome: SendOutcome;
+}
+
+// --- Lot A - Réponse (docs/plan-mvp-a-reponse.md, écran 5.1-b bis) -------------------------
+
+/**
+ * Format d'affichage d'un corps de réponse, détecté d'après `content-type` (R1).
+ *
+ * Équivalent Rust : `ResponseFormat` (`src-tauri/src/response/format.rs`).
+ */
+export type ResponseFormat = "json" | "xml" | "html" | "text";
+
+/** Nature d'un jeton de la mise en forme, pour sa couleur (`TokenKind`). */
+export type TokenKind =
+  | "key"
+  | "string"
+  | "number"
+  | "literal"
+  | "punct"
+  | "tag"
+  | "attr"
+  | "attrValue"
+  | "comment"
+  | "text";
+
+/** Morceau d'une ligne mise en forme (`Token`). */
+export interface BodyToken {
+  text: string;
+  kind: TokenKind;
+  /** Chemin canonique de la valeur JSON (`$.items[0].sku`), comme ceux du filtre. */
+  path?: string;
+}
+
+/** Réponse de `response_render` (`RenderedBody`). */
+export interface RenderedBody {
+  /** Format appliqué : celui choisi, sinon celui détecté. */
+  format: ResponseFormat;
+  detected: ResponseFormat;
+  lines: BodyToken[][];
+  /** Pourquoi le corps est montré sans mise en forme. */
+  notice: string | null;
+}
+
+/** Nœud de l'aperçu HTML (`HtmlNode`) : balises sûres, sans attribut. */
+export type HtmlNode =
+  { kind: "text"; text: string } | { kind: "element"; tag: string; children: HtmlNode[] };
+
+/** Correspondance du filtre JSONPath (`FilterMatch`). */
+export interface FilterMatch {
+  path: string;
+  /** Valeur en JSON compact, raccourcie au-delà de 200 caractères. */
+  value: string;
+  /** Vérification tirée de la valeur ; absente pour un nom qui ne s'écrit pas en notation pointée. */
+  assertion: Assertion | null;
+}
+
+/** Réponse de `response_filter` (`FilterResult`). */
+export interface FilterResult {
+  matches: FilterMatch[];
+  /** Nombre total de correspondances (500 renvoyées au plus). */
+  total: number;
+  /** Expression invalide ou corps non JSON, en français. */
+  error: string | null;
 }

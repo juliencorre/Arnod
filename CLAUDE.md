@@ -480,3 +480,19 @@ R1 à R6), écrans 1.2-e, 1.2-d, 1.2-a ter, 3.2-a3 et 1.1-a.
   d'un contrat passe par `useContractAdd`, partagé avec `ContractsSection`.
 - Menu « + » du projet : Nouvelle requête (Ctrl+N), Nouveau dossier (Ctrl+Maj+N), Ajouter un
   contrat ▸, Nouvel environnement… ; une création déplie la section concernée.
+
+## Corps de la réponse
+
+Référence : `docs/plan-mvp-a-reponse.md` (lot A, cas F1 à F8, règles R1 à R10), écran `5.1-b bis`.
+
+- Le cœur met en forme et filtre (`src-tauri/src/response/`, pur) : format détecté d'après
+  `content-type` (`response_render`), aperçu HTML en arbre de balises sûres sans attribut
+  (`response_preview`, ni `v-html` ni cadre), filtre JSONPath RFC 9535 (`response_filter`, crate
+  `serde_json_path`) dont une expression invalide revient en français dans `FilterResult.error`.
+- Chaque valeur JSON mise en forme et chaque correspondance portent le même chemin canonique
+  (`$.items[0].sku`) : l'interface surligne en comparant des chemins, jamais en relisant le JSON.
+- Une correspondance porte la vérification qu'elle donne (`FilterMatch.assertion`, cible
+  `body.…` sans joker) ; le store `response` l'ajoute au brouillon, qui s'enregistre seul.
+- Enregistrer passe par `response_save` (sélecteur natif appelé depuis Rust) ; effacer par
+  `response_clear` (`ResultBook::clear`, diffusé par `arnod://resultat`). Un corps tronqué à 5 Mo
+  est signalé à la copie et à l'enregistrement.

@@ -43,7 +43,7 @@ describe("éditer et envoyer une requête", () => {
     const response = app.get(".response");
     expect(response.text()).toContain("200 OK");
     expect(response.text()).toContain("Réussie");
-    expect(response.get(".response__body").text()).toContain('"name": "Alice"');
+    expect(response.get(".code").text()).toContain('"name": "Alice"');
   });
 
   it("affiche l'erreur de variable inconnue sans réponse", async () => {
