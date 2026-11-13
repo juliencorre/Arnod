@@ -5,6 +5,10 @@
  * nature choisie sur sa pastille. La nature choisie ouvre son formulaire sous
  * l'entrée (`open`) ; « Envoyer » garde l'essai dans « Non classés » et l'ouvre.
  * Échap ou « Fermer » revient à l'état de départ.
+ *
+ * Une commande cURL collée (docs/plan-mvp-b-saisie-curl.md, 2.1-a sexies) est lue par le cœur :
+ * méthode, adresse, en-têtes et corps passent dans le formulaire, le jeton est retiré du texte
+ * (gardé au coffre à l'envoi), les options sans équivalent sont signalées.
  */
 import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from "vue";
 
@@ -18,7 +22,7 @@ import { useNavigationStore } from "@/stores/navigation";
 import { useStepsStore } from "@/stores/steps";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
-import type { Detection } from "@/types/ipc";
+import type { CurlImport, Detection } from "@/types/ipc";
 
 withDefaults(defineProps<{ note?: string; headingLevel?: 2 | 3 }>(), {
   note: "Sans projet : l'essai est gardé dans « Non classés ».",
@@ -41,6 +45,8 @@ const detected = ref<Detection | null>(null);
 const values = ref<Record<string, string>>({});
 const sending = ref(false);
 const error = ref<string | null>(null);
+/** Commande cURL collée : secrets retirés et options signalées, jusqu'à la fin de l'essai. */
+const imported = ref<CurlImport | null>(null);
 
 const nature = computed(() => steps.nature(chosen.value ?? detected.value?.nature ?? null));
 const placeholder = computed(() => {
@@ -52,6 +58,7 @@ const placeholder = computed(() => {
 });
 const status = computed(() => {
   if (!nature.value) return "";
+  if (imported.value) return "Reconnu : une commande cURL.";
   return chosen.value === null
     ? `Reconnu : ${nature.value.name} (${nature.value.title}).`
     : `Nature choisie : ${nature.value.name}.`;
@@ -77,10 +84,36 @@ watch(text, async (value) => {
   const found = value.trim() === "" ? null : await steps.detect(value).catch(() => null);
   if (text.value !== value) return;
   detected.value = found;
-  if (found && Object.keys(found.values).length > 0 && found.subject !== value.trim()) {
+  // Entrée vidée : la commande collée et son jeton sont oubliés.
+  if (value.trim() === "") imported.value = null;
+  if (found?.curl) {
+    // Une commande cURL remplace tout le formulaire ; l'entrée garde l'adresse.
+    imported.value = found.curl;
+    values.value = { ...found.values };
+    text.value = found.subject;
+  } else if (found && Object.keys(found.values).length > 0 && found.subject !== value.trim()) {
     values.value = { ...values.value, ...found.values };
     text.value = found.subject;
   }
+});
+
+/** Ce que la commande cURL a donné, en une phrase (2.1-a sexies). */
+const importNote = computed(() => {
+  const curl = imported.value;
+  if (!curl) return null;
+  const headers = (values.value.headers ?? "").split("\n").filter((l) => l.trim() !== "").length;
+  const parts = ["méthode", "adresse"];
+  if (headers > 0) parts.push(headers === 1 ? "un en-tête" : `${String(headers)} en-têtes`);
+  if ((values.value.body ?? "").trim() !== "") parts.push("le corps");
+  const taken = `${parts.slice(0, -1).join(", ")} et ${parts[parts.length - 1] ?? ""}`;
+  return {
+    taken: `Repris de la commande : ${taken}.`,
+    secrets: curl.secrets.map(
+      (secret) =>
+        `${secret.header} : la valeur ne reste pas dans le texte, elle part dans le coffre du système et l'essai l'utilise par la variable locale {{${secret.name}}}.`,
+    ),
+    ignored: curl.ignored.map((item) => `${item.option} est ignorée : ${item.reason}.`),
+  };
 });
 
 function choose(id: string): void {
@@ -95,6 +128,7 @@ function reset(): void {
   detected.value = null;
   values.value = {};
   error.value = null;
+  imported.value = null;
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -119,7 +153,10 @@ async function send(): Promise<void> {
   sending.value = true;
   error.value = null;
   try {
-    const result = await steps.send(current.id, text.value.trim(), values.value);
+    const secrets = Object.fromEntries(
+      (imported.value?.secrets ?? []).map((secret) => [secret.name, secret.value]),
+    );
+    const result = await steps.send(current.id, text.value.trim(), values.value, secrets);
     // L'instantané d'abord : « Non classés » existe avant d'être ouvert.
     catalog.apply(result.snapshot);
     // « Non classés » déjà affiché : l'essai paraît sous le contrat déduit (RC8).
@@ -146,7 +183,9 @@ async function send(): Promise<void> {
           Essayer une étape
         </component>
         <span class="try__hint">Arnod reconnaît la nature d'étape de ce que vous collez</span>
-        <span class="try__note">{{ note }}</span>
+        <span class="try__note" :class="{ 'try__note--found': imported }">
+          {{ imported ? status : note }}
+        </span>
       </div>
       <div class="try__row">
         <div class="try__box" :class="{ 'try__box--idle': nature === null && text === '' }">
@@ -202,6 +241,13 @@ async function send(): Promise<void> {
         </BaseButton>
       </div>
       <NatureForm v-if="nature" v-model="values" :nature="nature" />
+      <div v-if="importNote" class="try__import" role="note">
+        <p>{{ importNote.taken }}</p>
+        <p v-for="line in importNote.secrets" :key="line" class="try__secret">
+          {{ line }}
+        </p>
+        <p v-for="line in importNote.ignored" :key="line" class="try__ignored">{{ line }}</p>
+      </div>
       <p v-if="sending" class="try__sending" role="status">Envoi en cours…</p>
       <p v-if="error" :id="ids.error" class="try__error" role="alert">{{ error }}</p>
     </form>
@@ -355,6 +401,34 @@ async function send(): Promise<void> {
 .try__chip:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+.try__note--found {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.try__import {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-small);
+  color: var(--color-muted);
+  background-color: var(--color-sidebar);
+}
+
+.try__import p {
+  margin: 0;
+}
+
+.try__secret {
+  color: var(--color-text);
+}
+
+.try__ignored {
+  color: var(--color-link);
 }
 
 .try__sending {

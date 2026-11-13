@@ -88,6 +88,18 @@ export type CommandName =
   | "steps_catalog"
   | "steps_detect"
   | "trial_send"
+  | "response_render"
+  | "response_preview"
+  | "response_filter"
+  | "response_save"
+  | "response_clear"
+  // Lot D - Barre latérale
+  | "contract_count"
+  // Lot B : saisie et cURL
+  | "request_input"
+  | "request_curl"
+  | "pairs_to_text"
+  | "pairs_from_text"
   // Lot C - Import Bruno.
   | "import_pick"
   | "import_detect"
@@ -260,6 +272,10 @@ export type TreeNode =
       invalid: boolean;
       /** Contrat lié (`contracts/petstore.yaml`), d'après l'étiquette `contract:`. */
       contract: string | null;
+      /** Adresse, pour le filtre (docs/plan-mvp-d-barre-laterale.md, R1) ; vide si illisible. */
+      url: string;
+      /** Étiquettes, sans celle du lien au contrat (R1). */
+      tags: string[];
     };
 
 /** Arborescence et dossiers repliés (`TreeView`). */
@@ -789,6 +805,16 @@ export interface LinkedView {
   path: string;
   name: string;
   method: HttpMethod;
+  /** Réponses attendues, dans l'ordre du fichier (docs/plan-mvp-d-barre-laterale.md, R2). */
+  examples: ExampleRef[];
+}
+
+/** Réponse attendue d'une requête liée, pour la barre latérale (`ExampleRef`, 3.2-a3). */
+export interface ExampleRef {
+  /** Position dans `examples` de la requête. */
+  index: number;
+  status: number | null;
+  name: string;
 }
 
 /** Opération affichée dans l'onglet du contrat (`OperationView`). */
@@ -907,7 +933,8 @@ export type StepRule =
   | { kind: "url"; schemes: string[]; methodField: string | null }
   | { kind: "keywords"; words: string[] }
   | { kind: "prefix"; text: string }
-  | { kind: "suffix"; text: string };
+  | { kind: "suffix"; text: string }
+  | { kind: "curl" };
 
 /** Nature d'étape disponible (`StepNature`). */
 export interface StepNature {
@@ -949,6 +976,8 @@ export interface Detection {
   nature: string;
   subject: string;
   values: Record<string, string>;
+  /** Commande cURL reconnue : secrets retirés des en-têtes, options signalées. */
+  curl?: CurlImport;
 }
 
 /** Réponse de `trial_send` : l'essai enregistré dans « Non classés ». */
@@ -960,6 +989,150 @@ export interface TrialResult {
   /** Contrat déduit (`contracts/…`). */
   contract: string;
   outcome: SendOutcome;
+}
+
+// --- Lot A - Réponse (docs/plan-mvp-a-reponse.md, écran 5.1-b bis) -------------------------
+
+/**
+ * Format d'affichage d'un corps de réponse, détecté d'après `content-type` (R1).
+ *
+ * Équivalent Rust : `ResponseFormat` (`src-tauri/src/response/format.rs`).
+ */
+export type ResponseFormat = "json" | "xml" | "html" | "text";
+
+/** Nature d'un jeton de la mise en forme, pour sa couleur (`TokenKind`). */
+export type TokenKind =
+  | "key"
+  | "string"
+  | "number"
+  | "literal"
+  | "punct"
+  | "tag"
+  | "attr"
+  | "attrValue"
+  | "comment"
+  | "text";
+
+/** Morceau d'une ligne mise en forme (`Token`). */
+export interface BodyToken {
+  text: string;
+  kind: TokenKind;
+  /** Chemin canonique de la valeur JSON (`$.items[0].sku`), comme ceux du filtre. */
+  path?: string;
+}
+
+/** Réponse de `response_render` (`RenderedBody`). */
+export interface RenderedBody {
+  /** Format appliqué : celui choisi, sinon celui détecté. */
+  format: ResponseFormat;
+  detected: ResponseFormat;
+  lines: BodyToken[][];
+  /** Pourquoi le corps est montré sans mise en forme. */
+  notice: string | null;
+}
+
+/** Nœud de l'aperçu HTML (`HtmlNode`) : balises sûres, sans attribut. */
+export type HtmlNode =
+  { kind: "text"; text: string } | { kind: "element"; tag: string; children: HtmlNode[] };
+
+/** Correspondance du filtre JSONPath (`FilterMatch`). */
+export interface FilterMatch {
+  path: string;
+  /** Valeur en JSON compact, raccourcie au-delà de 200 caractères. */
+  value: string;
+  /** Vérification tirée de la valeur ; absente pour un nom qui ne s'écrit pas en notation pointée. */
+  assertion: Assertion | null;
+}
+
+/** Réponse de `response_filter` (`FilterResult`). */
+export interface FilterResult {
+  matches: FilterMatch[];
+  /** Nombre total de correspondances (500 renvoyées au plus). */
+  total: number;
+  /** Expression invalide ou corps non JSON, en français. */
+  error: string | null;
+}
+
+// --- Lot B : saisie, texte et cURL (docs/plan-mvp-b-saisie-curl.md) ------------
+
+/** Environnement qui définit une variable inconnue de l'environnement actif (`VariableSource`). */
+export interface VariableSource {
+  environment: string;
+  /** Valeur d'une variable partagée ; `null` pour une variable locale. */
+  value: string | null;
+}
+
+/** Variable utilisée par la requête et absente de l'environnement actif (R2). */
+export interface UnknownVariable {
+  name: string;
+  definedIn: VariableSource[];
+}
+
+/** D'où vient un en-tête ajouté à l'envoi (`AddedOrigin`). */
+export type AddedOrigin = "auth" | "body" | "client";
+
+/** En-tête ajouté par Arnod à l'envoi (R3), montré grisé. */
+export interface AddedHeader {
+  name: string;
+  /** Valeur, secret masqué, ou ce qui la donne (« calculé à l'envoi »). */
+  value: string;
+  origin: AddedOrigin;
+  /** Dossier ou collection d'une authentification héritée. */
+  source: string | null;
+}
+
+/** Réponse de `request_input` : variables connues et inconnues, en-têtes ajoutés. */
+export interface RequestInput {
+  environment: string;
+  /** Variables connues : environnement actif, dossiers et collection (R1). */
+  known: string[];
+  /** Variables utilisées et inconnues, valeurs dynamiques `$…` exclues (R2). */
+  unknown: UnknownVariable[];
+  added: AddedHeader[];
+}
+
+/** Réponse de `request_curl` : la requête en commande cURL (R8 à R10). */
+export interface CurlCopy {
+  command: string;
+  /** Environnement dont les variables sont résolues. */
+  environment: string;
+}
+
+/** Écriture d'une liste en texte (`PairsFormat`) : `Nom: valeur` ou `nom=valeur`. */
+export type PairsFormat = "header" | "query";
+
+/** Ligne illisible d'une liste en texte. */
+export interface TextError {
+  /** Numéro de la ligne, à partir de 1. */
+  line: number;
+  message: string;
+}
+
+/** Réponse de `pairs_from_text` (R12, R13). */
+export interface PairsText {
+  pairs: Pair[];
+  errors: TextError[];
+}
+
+/** Secret retiré d'une commande cURL collée (`Secret`), gardé au coffre à l'envoi. */
+export interface CurlSecret {
+  /** Variable locale qui le remplace (`token`). */
+  name: string;
+  value: string;
+  /** En-tête d'où il vient. */
+  header: string;
+}
+
+/** Option cURL sans équivalent (`Ignored`), signalée (R6). */
+export interface CurlIgnored {
+  option: string;
+  reason: string;
+}
+
+/** Ce qu'une commande cURL collée a donné en plus des valeurs (`CurlImport`). */
+export interface CurlImport {
+  secrets: CurlSecret[];
+  ignored: CurlIgnored[];
 }
 
 // ---------------------------------------------------------------------------

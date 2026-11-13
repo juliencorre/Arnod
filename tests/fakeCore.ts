@@ -16,6 +16,7 @@ import {
   snapshotOf,
   type FakeWindows,
 } from "./fakeWindows";
+import { handleInput } from "./fakeInput";
 import { STEP_CATALOG, detect } from "./fakeSteps";
 // Lot C - Import Bruno.
 import { createFakeImports, handleImports, type FakeImports } from "./fakeImports";
@@ -26,6 +27,7 @@ import {
   okOutcome,
   type FakeWorkbench,
 } from "./fakeWorkbench";
+import { createFakeResponse, handleResponse, type FakeResponse } from "./fakeResponse";
 
 export const HOME = "/home/julien";
 export const DEFAULT_LOCATION = `${HOME}/arnod`;
@@ -52,6 +54,8 @@ export interface FakeCore {
   emit: (event: string, payload: unknown) => Promise<void>;
   /** Diffuse l'état des fenêtres, comme après une opération faite ailleurs. */
   emitWindows: () => Promise<void>;
+  /** Corps de la réponse (lot A) : fichier du prochain enregistrement. */
+  response: FakeResponse;
   /** Lot C - Import Bruno : sources reconnues, rapports. */
   imports: FakeImports;
 }
@@ -90,6 +94,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     contracts: createFakeContracts(),
     emit: (event, payload) => emit(event, payload),
     emitWindows: () => emit("arnod://fenetres", snapshotOf(core.windows)),
+    response: createFakeResponse(),
     imports: createFakeImports(),
   };
 
@@ -327,6 +332,11 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
         default: {
           const windows = handleWindows(core.windows, cmd, args);
           if (windows !== undefined) return windows;
+          const response = handleResponse(core.response, core.workbench, cmd, args);
+          if (response !== undefined) return response;
+          // Lot B : saisie et cURL.
+          const input = handleInput(core.workbench, cmd, args);
+          if (input !== undefined) return input;
           // Lot C - Import Bruno.
           const imported = handleImports(
             core.imports,

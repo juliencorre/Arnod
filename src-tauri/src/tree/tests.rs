@@ -278,6 +278,8 @@ fn request(name: &str, path: &str, contract: Option<&str>) -> TreeNode {
         assertion_count: 0,
         invalid: false,
         contract: contract.map(str::to_owned),
+        url: String::new(),
+        tags: Vec::new(),
     }
 }
 
@@ -356,4 +358,38 @@ fn le_lien_au_contrat_est_lu_dans_l_arborescence() {
         &read(dir.path()).unwrap()[0],
         TreeNode::Request { contract: Some(file), .. } if file == "contracts/petstore.yaml"
     ));
+}
+
+// --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) ---------------
+
+#[test]
+fn lot_d_r1_adresse_et_etiquettes_des_requetes() {
+    let dir = project();
+    let path = create_request(dir.path(), "", Some("Lister")).unwrap();
+    let absolute = dir.path().join(&path);
+    let mut request = file::read(&absolute).unwrap();
+    request.url = "{{baseUrl}}/orders".to_owned();
+    request.tags = vec!["critique".to_owned(), "smoke".to_owned()];
+    file::write(&absolute, &request).unwrap();
+    fs::write(dir.path().join("casse.yml"), "::: pas du yaml").unwrap();
+
+    let nodes = read(dir.path()).unwrap();
+    let json = serde_json::to_value(&nodes).unwrap();
+    let lister = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["name"] == "Lister")
+        .unwrap();
+    assert_eq!(lister["url"], "{{baseUrl}}/orders");
+    assert_eq!(lister["tags"], serde_json::json!(["critique", "smoke"]));
+    // Fichier illisible : ni adresse ni étiquettes.
+    let casse = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["name"] == "casse")
+        .unwrap();
+    assert_eq!(casse["url"], "");
+    assert_eq!(casse["tags"], serde_json::json!([]));
 }

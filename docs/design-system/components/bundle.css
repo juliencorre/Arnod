@@ -95,6 +95,31 @@ select:focus-visible {
   border: 0;
 }
 
+/*
+ * Variable inconnue d'un champ (directive v-variables, src/lib/variables.ts) : calque posé sur
+ * le champ, texte transparent, seul le soulignement ondulé se voit.
+ */
+.variable-marks {
+  position: absolute;
+  z-index: 1;
+  margin: 0;
+  overflow: hidden;
+  border-style: solid;
+  border-color: transparent;
+  color: transparent;
+  background: none;
+  pointer-events: none;
+}
+
+.variable-marks mark {
+  color: transparent;
+  background: none;
+  text-decoration: underline wavy var(--color-danger);
+  text-decoration-skip-ink: none;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.25em;
+}
+
 /* src/components/ui/BaseButton.vue */
 .button {
   display: inline-flex;
@@ -518,6 +543,38 @@ select:focus-visible {
 .section-head__count {
   flex: none;
   font: 400 var(--text-caption) var(--font-mono);
+  color: var(--color-muted);
+}
+
+/* Section repliable : chevron, icône, nom et nombre forment un seul bouton. */
+.section-head__toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--tree-gap, 0.5rem);
+  min-width: 0;
+  min-height: 1.875rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+.section-head__toggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.section-head__chevron {
+  flex: none;
+  width: var(--tree-indent, 1.25rem);
+  margin-right: calc(0px - var(--tree-gap, 0.5rem));
+  font-size: var(--text-small);
+  text-align: center;
   color: var(--color-muted);
 }
 

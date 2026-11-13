@@ -4,8 +4,9 @@
  * description, en-têtes, corps) enregistrés dans le fichier OpenCollection. Ajouter,
  * dupliquer, supprimer avec « Annuler », modifier, ou reprendre la dernière réponse reçue.
  */
-import { computed, ref, useId } from "vue";
+import { computed, ref, useId, watch } from "vue";
 
+import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { Example, ExampleBodyKind } from "@/types/ipc";
@@ -21,6 +22,19 @@ const examples = computed<Example[]>(() => editor.value?.draft?.examples ?? []);
 const selected = ref<number | null>(null);
 const current = computed(() =>
   selected.value === null ? null : (examples.value[selected.value] ?? null),
+);
+
+// Réponse choisie dans la barre latérale (docs/plan-mvp-d-barre-laterale.md, E3) : ouverte dès
+// que le brouillon de la requête est lu.
+const sidebar = useSidebarStore();
+watch(
+  () => [sidebar.exampleFocus, examples.value.length] as const,
+  ([focus, count]) => {
+    if (focus?.key !== props.editorKey || !editor.value?.draft) return;
+    if (focus.index < count) selected.value = focus.index;
+    sidebar.consumeExampleFocus(props.editorKey);
+  },
+  { immediate: true },
 );
 
 const BODY_KINDS: { id: ExampleBodyKind; label: string }[] = [

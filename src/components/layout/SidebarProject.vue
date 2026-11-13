@@ -66,9 +66,10 @@ const runLabel = computed(() => {
   return env === null ? `Exécuter ${what}` : `Exécuter ${what} sur ${env}`;
 });
 
+/** Menu « + » du projet (1.2-a ter, M1) : ce que le projet sait créer, avec ses raccourcis. */
 const ADD_ITEMS: MenuItem[] = [
   { id: "request", label: "Nouvelle requête", shortcut: "Ctrl+N" },
-  { id: "folder", label: "Nouveau dossier" },
+  { id: "folder", label: "Nouveau dossier", shortcut: "Ctrl+Maj+N" },
   {
     id: "contract",
     label: "Ajouter un contrat",
@@ -154,10 +155,18 @@ async function onMore(item: string): Promise<void> {
   }
 }
 
-/** Raccourcis de la barre latérale : Ctrl+N et Ctrl+Maj+E (B6). */
+/** Ctrl+F : focus dans le filtre du référentiel (lot D, F5). */
+async function focusFilter(): Promise<boolean> {
+  if (!(await ensureExpanded())) return false;
+  return (await tree.value?.focusFilter()) ?? false;
+}
+
+/** Raccourcis de la barre latérale : Ctrl+N, Ctrl+Maj+N, Ctrl+Maj+E (B6, M2) et Ctrl+F (F5). */
 defineExpose({
   newRequest: () => onAdd("request"),
+  newFolder: () => onAdd("folder"),
   manageEnvironments: () => onMore("environments"),
+  focusFilter,
 });
 </script>
 

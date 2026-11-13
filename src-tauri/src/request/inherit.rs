@@ -136,6 +136,33 @@ pub fn resolve(root: &Path, request_path: &str) -> Inherited {
     }
 }
 
+/// Noms des variables (`request.variables`) des `folder.yml` de la requête et
+/// de `opencollection.yml`, actives, du plus proche au plus lointain
+/// (`docs/plan-mvp-b-saisie-curl.md`, R1).
+pub fn variable_names(root: &Path, request_path: &str) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    for level in chain(root, request_path) {
+        for item in level
+            .request
+            .get("variables")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let name = item
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            let disabled = item.get("disabled").and_then(Value::as_bool) == Some(true);
+            if !name.is_empty() && !disabled && !names.iter().any(|n| n == name) {
+                names.push(name.to_owned());
+            }
+        }
+    }
+    names
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;

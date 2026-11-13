@@ -6,6 +6,7 @@
 import { computed, useId } from "vue";
 
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
+import { useKnownVariables, vVariables } from "@/lib/variables";
 import type { Body, BodyKind, BodyVariant } from "@/types/ipc";
 
 const body = defineModel<Body>({ required: true });
@@ -18,6 +19,7 @@ const KINDS: { id: BodyKind; label: string }[] = [
   { id: "form", label: "Formulaire" },
 ];
 
+const known = useKnownVariables();
 const typeId = useId();
 const nameId = useId();
 
@@ -120,6 +122,7 @@ function select(index: number): void {
       <textarea
         v-else
         v-model="current.content"
+        v-variables="known"
         class="body__content"
         spellcheck="false"
         aria-label="Contenu du corps"

@@ -45,6 +45,11 @@ import type {
   StepCatalog,
   Detection,
   TrialResult,
+  CurlCopy,
+  Pair,
+  PairsFormat,
+  PairsText,
+  RequestInput,
   ImportDone,
   ImportReport,
   ImportSource,
@@ -57,6 +62,10 @@ import type {
   Undoable,
   WorkspaceColor,
   WorkspaceCreated,
+  FilterResult,
+  HtmlNode,
+  RenderedBody,
+  ResponseFormat,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -338,12 +347,15 @@ export const ipc = {
   stepsDetect: (input: string): Promise<Detection | null> =>
     call<Detection | null>("steps_detect", { input }),
 
+  /** `secrets` : secrets d'une commande cURL collée, gardés au coffre à l'envoi. */
   trialSend: (
     execId: string,
     nature: string,
     subject: string,
     values: Record<string, string>,
-  ): Promise<TrialResult> => call<TrialResult>("trial_send", { execId, nature, subject, values }),
+    secrets: Record<string, string> = {},
+  ): Promise<TrialResult> =>
+    call<TrialResult>("trial_send", { execId, nature, subject, values, secrets }),
 
   // Lot C - Import Bruno (docs/plan-mvp-c-import-bruno.md).
   /** Sélecteur natif : un dossier, ou un fichier avec `file` ; `null` si annulé. */
@@ -458,6 +470,67 @@ export const ipc = {
   windowReattach: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach"),
 
   windowReattachAll: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach_all"),
+
+  // --- Lot A - Réponse (docs/plan-mvp-a-reponse.md) ---------------------------------------
+
+  /** Corps mis en forme dans `format`, ou dans le format détecté (`null`). */
+  responseRender: (
+    body: string,
+    headers: [string, string][],
+    format: ResponseFormat | null,
+  ): Promise<RenderedBody> => call<RenderedBody>("response_render", { body, headers, format }),
+
+  /** Aperçu d'un corps HTML, sans script ni ressource distante. */
+  responsePreview: (body: string): Promise<HtmlNode[]> =>
+    call<HtmlNode[]>("response_preview", { body }),
+
+  /** Filtre JSONPath évalué par le cœur. */
+  responseFilter: (body: string, expression: string): Promise<FilterResult> =>
+    call<FilterResult>("response_filter", { body, expression }),
+
+  /** Enregistre le corps (sélecteur natif) ; renvoie le chemin écrit, `null` si annulé. */
+  responseSave: (
+    body: string,
+    name: string,
+    format: ResponseFormat,
+    truncated: boolean,
+  ): Promise<string | null> =>
+    call<string | null>("response_save", { body, name, format, truncated }),
+
+  /** Efface la réponse affichée d'une requête, dans toutes les fenêtres. */
+  responseClear: (project: string, path: string): Promise<RequestResult> =>
+    call<RequestResult>("response_clear", { project, path }),
+  // --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) -------------
+
+  /** Nombre de contrats du projet, sans les lire (W1, R5). */
+  contractCount: (project: string): Promise<number> => call<number>("contract_count", { project }),
+
+  // --- Lot B : saisie, texte et cURL (docs/plan-mvp-b-saisie-curl.md) -------------
+
+  /** Variables connues et inconnues, en-têtes ajoutés à l'envoi (R1 à R3). */
+  requestInput: (
+    project: string,
+    environment: string,
+    path: string | null,
+    request: RequestDoc,
+  ): Promise<RequestInput> =>
+    call<RequestInput>("request_input", { project, environment, path, request }),
+
+  /** La requête en commande cURL, secrets remplacés par une variable du shell (R8 à R10). */
+  requestCurl: (
+    project: string,
+    environment: string,
+    path: string | null,
+    request: RequestDoc,
+  ): Promise<CurlCopy> => call<CurlCopy>("request_curl", { project, environment, path, request }),
+
+  /** Une liste de paires en texte, une ligne par paire (R11). */
+  pairsToText: (pairs: Pair[], format: PairsFormat): Promise<string> =>
+    call<string>("pairs_to_text", { pairs, format }),
+
+  /** Les paires d'un texte et ses lignes illisibles (R12, R13). */
+  pairsFromText: (text: string, format: PairsFormat, previous: Pair[]): Promise<PairsText> =>
+    call<PairsText>("pairs_from_text", { text, format, previous }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
