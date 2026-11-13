@@ -95,7 +95,7 @@ function removable(check: AssertionResult): boolean {
         </button>
       </div>
       <!-- Corps : format, aperçu, actions et filtre JSONPath (docs/plan-mvp-a-reponse.md). -->
-      <div v-if="view === 'body'" role="tabpanel" aria-label="Corps">
+      <div v-if="view === 'body'">
         <ResponseBody :editor-key="editorKey" />
       </div>
       <dl v-else-if="view === 'headers'" class="response__headers">

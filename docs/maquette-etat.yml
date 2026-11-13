@@ -566,6 +566,7 @@ pages:
         {
           etat: en partie,
           version: MVP,
+          pr: [47],
           captures: [a1-reponse-filtre, a2-reponse-apercu-html],
           ecart:
             {

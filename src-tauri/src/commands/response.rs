@@ -73,7 +73,16 @@ pub async fn response_save(
             format!("L'emplacement choisi n'est pas accessible : {error}."),
         )
     })?;
-    std::fs::write(&target, body.as_bytes())
+    // Écriture bloquante hors du fil asynchrone de la commande.
+    let path = target.clone();
+    tauri::async_runtime::spawn_blocking(move || std::fs::write(&path, body.as_bytes()))
+        .await
+        .map_err(|error| {
+            CommandError::new(
+                CommandErrorKind::Io,
+                format!("Enregistrement du corps interrompu : {error}."),
+            )
+        })?
         .map_err(|error| CommandError::io("Enregistrement du corps impossible", &target, &error))?;
     Ok(Some(target.display().to_string()))
 }

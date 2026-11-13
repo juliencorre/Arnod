@@ -103,18 +103,50 @@ function jsonLines(root: Json): BodyToken[][] {
   return lines.map((l) => l.filter((t) => t.text !== ""));
 }
 
+/** Découpe linéaire en commentaires, balises et textes (sans expression régulière). */
+function splitMarkup(body: string): string[] {
+  const items: string[] = [];
+  let i = 0;
+  while (i < body.length) {
+    if (body[i] !== "<") {
+      const next = body.indexOf("<", i);
+      const end = next === -1 ? body.length : next;
+      items.push(body.slice(i, end));
+      i = end;
+      continue;
+    }
+    const comment = body.startsWith("<!--", i);
+    const close = comment ? body.indexOf("-->", i + 4) : body.indexOf(">", i + 1);
+    const end = close === -1 ? body.length : close + (comment ? 3 : 1);
+    items.push(body.slice(i, end));
+    i = end;
+  }
+  return items;
+}
+
+/** Balise lue sans expression régulière : fermante, nom, attributs, auto-fermante. */
+function parseTag(raw: string): { close: string; name: string; attrs: string; self: string } {
+  let inner = raw.slice(1, -1);
+  const close = inner.startsWith("/") ? "/" : "";
+  if (close) inner = inner.slice(1);
+  const self = inner.endsWith("/") ? "/" : "";
+  if (self) inner = inner.slice(0, -1);
+  const space = inner.search(/\s/);
+  const name = space === -1 ? inner : inner.slice(0, space);
+  return { close, name, attrs: space === -1 ? "" : inner.slice(space), self };
+}
+
 /** Balises une par ligne, indentées ; texte court sur la ligne de sa balise (R3, simplifié). */
 function markupLines(body: string): BodyToken[][] {
-  const items = body.match(/<!--[\s\S]*?-->|<[^>]+>|[^<]+/g) ?? [];
+  const items = splitMarkup(body);
   const lines: BodyToken[][] = [];
   let depth = 0;
   const indent = (): BodyToken[] => (depth > 0 ? [{ text: "  ".repeat(depth), kind: "text" }] : []);
   const tag = (raw: string): BodyToken[] => {
     if (raw.startsWith("<!--")) return [{ text: raw, kind: "comment" }];
     if (raw.startsWith("<?") || raw.startsWith("<!")) return [{ text: raw, kind: "punct" }];
-    const m = /^<(\/?)([^\s/>]+)([\s\S]*?)(\/?)>$/.exec(raw);
-    if (!m) return [{ text: raw, kind: "text" }];
-    const [, close = "", name = "", attrs = "", self = ""] = m;
+    if (!raw.endsWith(">")) return [{ text: raw, kind: "text" }];
+    const { close, name, attrs, self } = parseTag(raw);
     const tokens: BodyToken[] = [
       { text: `<${close}`, kind: "punct" },
       { text: name, kind: "tag" },
@@ -174,14 +206,31 @@ function render(body: string, headers: [string, string][], chosen: ResponseForma
 
 /** Titres, paragraphes et lignes de liste, sans tête ni script (R4, simplifié). */
 function preview(body: string): HtmlNode[] {
-  const visible = body.replace(/<(head|script|style)[\s\S]*?<\/\1>/gi, "");
-  return [...visible.matchAll(/<(h[1-6]|p|li|pre)>([\s\S]*?)<\/\1>/gi)].map(
-    ([, tag = "p", inner = ""]): HtmlNode => ({
-      kind: "element",
-      tag: tag.toLowerCase(),
-      children: [{ kind: "text", text: inner.replace(/<[^>]*>/g, "") }],
-    }),
-  );
+  const KEPT = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "pre"]);
+  const HIDDEN = new Set(["head", "script", "style"]);
+  const nodes: HtmlNode[] = [];
+  let hidden: string | null = null;
+  let open: { tag: string; text: string } | null = null;
+  for (const item of splitMarkup(body)) {
+    if (!item.startsWith("<")) {
+      if (open && hidden === null) open.text += item;
+      continue;
+    }
+    if (item.startsWith("<!")) continue;
+    const { close, name } = parseTag(item);
+    const tag = name.toLowerCase();
+    if (hidden !== null) {
+      if (close && tag === hidden) hidden = null;
+      continue;
+    }
+    if (!close && HIDDEN.has(tag)) hidden = tag;
+    else if (!close && KEPT.has(tag)) open = { tag, text: "" };
+    else if (close && open?.tag === tag) {
+      nodes.push({ kind: "element", tag, children: [{ kind: "text", text: open.text }] });
+      open = null;
+    }
+  }
+  return nodes;
 }
 
 function assertionFor(path: string, value: Json): Assertion | null {

@@ -167,11 +167,12 @@ function onKeydown(event: KeyboardEvent): void {
     <p v-if="rendered?.notice" class="body__notice">{{ rendered.notice }}</p>
     <p v-if="rendered && rendered.lines.length === 0" class="body__empty">Réponse sans corps.</p>
     <HtmlPreview v-else-if="preview && view?.nodes" :nodes="view.nodes" class="body__view" />
+    <!-- Contenu de l'onglet « Corps » (ResponsePanel), focalisable pour défiler au clavier. -->
     <div
       v-else
       ref="code"
       class="body__view code"
-      role="region"
+      role="tabpanel"
       aria-label="Corps de la réponse"
       tabindex="0"
     >

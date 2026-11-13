@@ -62,7 +62,8 @@ function Tree(): (VNode | string)[] {
 </script>
 
 <template>
-  <div class="preview" role="document" aria-label="Aperçu du corps HTML" tabindex="0">
+  <div class="preview" role="tabpanel" aria-label="Aperçu du corps HTML" tabindex="0">
+    <!-- Contenu de l'onglet « Corps » (ResponsePanel), focalisable pour défiler au clavier. -->
     <Tree />
   </div>
 </template>
