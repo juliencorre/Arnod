@@ -2221,10 +2221,25 @@ describe("Lot F - onglets et clavier", () => {
   }
 
   async function waitForTabs(expected: { name: string; preview: boolean }[]): Promise<void> {
-    await browser.waitUntil(
-      async () => JSON.stringify(await activeZoneTabs()) === JSON.stringify(expected),
-      { timeout: 10_000, timeoutMsg: `onglets ${JSON.stringify(expected)} attendus` },
-    );
+    try {
+      await browser.waitUntil(
+        async () => JSON.stringify(await activeZoneTabs()) === JSON.stringify(expected),
+        { timeout: 10_000 },
+      );
+    } catch {
+      // Diagnostic : tous les onglets du DOM (cachés compris) et les zones enregistrées.
+      const dom = await browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab")).map(
+          (tab) => `${tab.className}:${tab.querySelector(".zone__name")?.textContent ?? ""}`,
+        ),
+      );
+      const saved = readWindows(sandbox).windows.map((w) =>
+        w.layout ? zonesOf(w.layout.root).map((z) => z.tabs) : w.kind,
+      );
+      throw new Error(
+        `onglets ${JSON.stringify(expected)} attendus ; DOM ${JSON.stringify(dom)} ; windows.json ${JSON.stringify(saved)}`,
+      );
+    }
   }
 
   /** Raccourci émis dans la WebView, par le code de la touche (AZERTY compris). */
