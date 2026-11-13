@@ -281,12 +281,12 @@ pages:
     reste: "Postman en V4 (d), SoapUI en V5 (e)."
     journal:
       - "2026-11-09 : Un projet Bruno au format OpenCollection s'ouvre (PR #29)."
-      - "2026-11-13 : Collections Bruno .bru converties en OpenCollection, rapport d'import, « Reprendre l'existant » (lot C)."
+      - "2026-11-13 : Collections Bruno .bru converties en OpenCollection, rapport d'import, « Reprendre l'existant » (PR #50)."
     ecrans:
       a:
         {
           etat: livré,
-          pr: [11, 29],
+          pr: [11, 29, 50],
           ecart:
             {
               texte: "La carte « Importer… » propose « Choisir un dossier… » et « ou un fichier… » (le sélecteur natif ne choisit pas les deux à la fois) ; pas de dépôt d'un dossier (glisser-déposer natif désactivé) ; Postman n'est pas cité avant V4.",
@@ -297,6 +297,7 @@ pages:
         {
           etat: livré,
           version: MVP,
+          pr: [50],
           ecart:
             {
               texte: "« Reprendre l'existant » est seul sous « Par où commencer ? » tant que les trois autres points de départ (1.2-d, lot D) ne sont pas livrés ; la fenêtre « Importer » ne montre pas la correspondance des environnements ni la case des secrets (ils vont toujours en variables locales).",
@@ -309,6 +310,7 @@ pages:
         {
           etat: livré,
           version: MVP,
+          pr: [50],
           captures: [c1-rapport-import],
           ecart:
             {
