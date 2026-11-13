@@ -594,3 +594,9 @@ Référence : écrans `2.2-c` et `2.2-b`.
   test (`tree::is_test`).
 - Interface : `TrialGeneralize.vue` sous l'adresse de toute requête liée à un contrat déduit,
   `TrialTransfer.vue` (« Requête au point ? ») sous l'éditeur d'un essai de « Non classés ».
+- « Ranger dans un projet… » (2.2-d, menu ⋯ d'un contrat déduit de « Non classés »,
+  `FileTrialsDialog.vue`) : `trial::filing::file_into` (`trial_file`) déplace les essais sous une
+  copie du contrat, ou sous un contrat du projet (opération qui sert le chemin, adresse en
+  `{{baseUrl}}` ; un contrat du projet n'est jamais modifié ; un essai sans opération reste). Le
+  contrat déduit quitte la boîte quand plus rien n'y est lié. « Annuler » (`trial_file_undo`)
+  remet chaque fichier touché.

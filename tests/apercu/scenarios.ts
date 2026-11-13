@@ -775,3 +775,16 @@ Object.assign(SCENARIOS, {
     },
   },
 } satisfies Record<string, Scenario>);
+
+Object.assign(SCENARIOS, {
+  "2.2-d": {
+    description: "Fenêtre « Ranger dans un projet » d'un contrat déduit de Non classés (2.2-d)",
+    setup: essaisNonClasses,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('button[aria-label="Actions pour le contrat api.boutique.dev"]');
+      await g.cliquer('[role="menuitem"]', "Ranger dans un projet…");
+      await g.attendre(150);
+    },
+  },
+} satisfies Record<string, Scenario>);

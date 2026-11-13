@@ -19,6 +19,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { CONTRACT_ADD_ITEMS } from "@/components/contracts/addItems";
 import { useContractAdd } from "@/composables/useContractAdd";
 import ContractDialog from "@/components/contracts/ContractDialog.vue";
+import FileTrialsDialog from "@/components/contracts/FileTrialsDialog.vue";
 import LinkedRequestRow from "@/components/contracts/LinkedRequestRow.vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import SectionHeading from "@/components/ui/SectionHeading.vue";
@@ -91,7 +92,8 @@ async function openExample(operation: OperationNode, example: ExampleRef): Promi
   if (endpoint) await sidebar.openExample(props.projectId, endpoint.path, example.index);
 }
 const toasts = useToastStore();
-const projectName = computed(() => useCatalogStore().projectById(props.projectId)?.name ?? "");
+const catalog = useCatalogStore();
+const projectName = computed(() => catalog.projectById(props.projectId)?.name ?? "");
 const list = computed(() => contracts.lists[props.projectId] ?? []);
 
 const sidebar = useSidebarStore();
@@ -222,14 +224,22 @@ function itemsFor(contract: ContractSummary): MenuItem[] {
   return [
     { id: "open", label: "Ouvrir" },
     { id: "run", label: "Exécuter le contrat", disabled: contract.error !== null },
+    // Essais de « Non classés » (2.2-d) : rangés avec leur contrat déduit.
+    ...(catalog.isInbox(props.projectId) && contract.deduced && contract.error === null
+      ? [{ id: "file", label: "Ranger dans un projet…" }]
+      : []),
     { id: "delete", label: "Mettre à la corbeille", tone: "danger", separatorBefore: true },
   ];
 }
+
+/** Contrat déduit dont les essais sont à ranger dans un projet (2.2-d). */
+const filing = ref<ContractSummary | null>(null);
 
 async function onItem(id: string, contract: ContractSummary): Promise<void> {
   try {
     if (id === "open") await contracts.show(props.projectId, contract.path);
     else if (id === "run") await workbench.runContract(props.projectId, contract.path);
+    else if (id === "file") filing.value = contract;
     else if (id === "delete") await contracts.remove(props.projectId, contract.path, contract.name);
   } catch (caught) {
     toasts.showError(caught);
@@ -607,6 +617,13 @@ async function rename(name: string): Promise<void> {
       :error="renameError"
       @close="renaming = null"
       @submit="rename"
+    />
+    <FileTrialsDialog
+      v-if="filing"
+      :open="filing !== null"
+      :project-id="projectId"
+      :contract="filing"
+      @close="filing = null"
     />
   </section>
 </template>

@@ -1303,6 +1303,38 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
     expect(readFileSync(step, "utf8")).not.toContain("contract:");
     expect(existsSync(essai())).toBe(false);
   });
+
+  it("les essais d'un contrat déduit se rangent dans un projet, avec leur contrat (2.2-d)", async () => {
+    const target = path.join(sandbox.home, "arnod", "boutique-tests");
+    await clickHidden(`aside button[aria-label="Actions pour le contrat ${host}"]`);
+    await clickText('[role="menuitem"]', "Ranger dans un projet…");
+    await browser.$(".filing").waitForDisplayed({ timeoutMsg: "fenêtre de rangement attendue" });
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".filing select");
+      const option = Array.from(select?.options ?? []).find((o) => o.text === "boutique-tests");
+      if (!select || !option) throw new Error("projet boutique-tests introuvable");
+      select.value = option.value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await screenshot(browser, "29-ranger-dans-un-projet");
+    await browser.execute(() => {
+      document.querySelector<HTMLFormElement>(".filing")?.requestSubmit();
+    });
+    const moved = path.join(target, host.replace(":", " "), "essai-1.yml");
+    await browser.waitUntil(() => existsSync(moved), {
+      timeoutMsg: "essai rangé dans le projet attendu",
+    });
+    expect(existsSync(path.join(target, "contracts", `${host.replace(/[.:]/g, "-")}.yaml`))).toBe(
+      true,
+    );
+    expect(existsSync(contractFile())).toBe(false);
+    await browser.waitUntil(
+      async () => (await toastText(browser)).includes("rangés dans boutique-tests"),
+      {
+        timeoutMsg: "notification du rangement attendue",
+      },
+    );
+  });
 });
 
 describe("Premier usage : vérifications, run et statuts", () => {

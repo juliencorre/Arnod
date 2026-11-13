@@ -3,7 +3,7 @@
  * référentiel de tests, en mémoire. Les règles sont testées côté Rust (`trial/generalize.rs`,
  * `trial/tests.rs`) ; ici, un segment fait de chiffres suffit à proposer `{id}`.
  */
-import type { PathGeneralization, TransferredTrial } from "@/types/ipc";
+import type { FiledTrials, PathGeneralization, RequestDoc, TransferredTrial } from "@/types/ipc";
 
 import type { FakeContracts } from "./fakeContracts";
 import type { FakeWorkbench } from "./fakeWorkbench";
@@ -36,6 +36,9 @@ function suggestion(wb: FakeWorkbench, path: string): PathGeneralization | null 
     contract: link.file,
   };
 }
+
+/** Essais rangés à remettre (« Annuler »), par jeton. */
+const undoBy = new Map<string, [string, RequestDoc][]>();
 
 /** Commandes des essais rangés ; `undefined` si `cmd` n'en est pas une. */
 export function handleTrials(
@@ -95,6 +98,28 @@ export function handleTrials(
       request.seq = 1;
       wb.requests.set(step, request);
       return { test, step } satisfies TransferredTrial;
+    }
+    case "trial_file": {
+      // Le faux établi est commun aux projets : les essais rangés quittent seulement la liste.
+      const file = String(args.contract);
+      const moved = [...wb.requests.entries()].filter(([, r]) => r.contract?.file === file);
+      for (const [path] of moved) wb.requests.delete(path);
+      const token = `annuler-${String(undoBy.size + 1)}`;
+      undoBy.set(token, moved);
+      const into = args.into as string | null;
+      return {
+        moved: moved.map(([path]) => [path, `rangés/${path}`]),
+        left: [],
+        contract: into ?? file,
+        contractName: into === null ? (contracts.files.get(file)?.name ?? file) : into,
+        undoToken: token,
+      } satisfies FiledTrials;
+    }
+    case "trial_file_undo": {
+      for (const [path, request] of undoBy.get(String(args.undoToken)) ?? []) {
+        wb.requests.set(path, request);
+      }
+      return null;
     }
     default:
       return undefined;

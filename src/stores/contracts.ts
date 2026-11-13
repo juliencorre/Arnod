@@ -9,6 +9,7 @@ import type {
   ContractSource,
   ContractSummary,
   ContractView,
+  FiledTrials,
   GenerateReport,
   ProjectChange,
 } from "@/types/ipc";
@@ -429,6 +430,26 @@ export const useContractsStore = defineStore("contracts", () => {
     });
   }
 
+  // --- Essais rangés dans un projet (2.2-d) ------------------------------------
+
+  /** Range les essais du contrat déduit `contract` de « Non classés » dans le projet `target`. */
+  async function fileTrials(
+    inbox: string,
+    contract: string,
+    target: string,
+    into: string | null,
+  ): Promise<FiledTrials> {
+    const filed = await ipc.trialFile(inbox, contract, target, into);
+    await Promise.all([sync(inbox), workbench.trees[target] ? sync(target) : Promise.resolve()]);
+    return filed;
+  }
+
+  /** « Annuler » un rangement : les essais reviennent dans « Non classés ». */
+  async function undoFiling(inbox: string, target: string, token: string): Promise<void> {
+    await ipc.trialFileUndo(token);
+    await Promise.all([sync(inbox), workbench.trees[target] ? sync(target) : Promise.resolve()]);
+  }
+
   return {
     lists,
     open,
@@ -456,5 +477,8 @@ export const useContractsStore = defineStore("contracts", () => {
     run,
     onProjectChange,
     subscribe,
+    // Essais rangés dans un projet (2.2-d).
+    fileTrials,
+    undoFiling,
   };
 });

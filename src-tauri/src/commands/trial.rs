@@ -237,6 +237,80 @@ pub fn trial_transfer(
     Ok(moved)
 }
 
+/// Essais rangés dans un projet (`trial_file`) et le jeton de « Annuler ».
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FiledTrials {
+    #[serde(flatten)]
+    pub filed: trial::filing::Filed,
+    pub undo_token: Uuid,
+}
+
+/// Rangement à annuler : « Non classés », le projet, et les fichiers d'avant.
+type Filing = (Uuid, Uuid, trial::filing::Undo);
+
+/// Rangements récents, à annuler (« Annuler » de la notification, 2.2-d).
+fn filings() -> &'static Mutex<BTreeMap<Uuid, Filing>> {
+    static FILINGS: std::sync::OnceLock<Mutex<BTreeMap<Uuid, Filing>>> = std::sync::OnceLock::new();
+    FILINGS.get_or_init(|| Mutex::new(BTreeMap::new()))
+}
+
+/// « Ranger dans un projet » (2.2-d) : les essais du contrat déduit `contract` de « Non
+/// classés » (`project`) vont dans le projet `target`, sous une copie du contrat ou sous son
+/// contrat `into`. Les onglets des essais déplacés se ferment.
+#[tauri::command]
+pub fn trial_file(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    project: Uuid,
+    contract: String,
+    target: Uuid,
+    into: Option<String>,
+) -> Result<FiledTrials, CommandError> {
+    if project == target {
+        return Err(invalid("Choisissez un autre projet que « Non classés »."));
+    }
+    let inbox = state.project_ctx(project)?;
+    let to = state.project_ctx(target)?;
+    let (filed, undo) =
+        trial::filing::file_into(&inbox.root, &contract, &to.root, into.as_deref())?;
+    let _ = windows::apply(
+        window.app_handle(),
+        |w: &mut crate::layout::windows::Windows| {
+            for (from, _) in &filed.moved {
+                w.close_path(project, from);
+            }
+            Ok(())
+        },
+    );
+    trial_changed(&window, project, None);
+    trial_changed(&window, target, None);
+    let undo_token = Uuid::new_v4();
+    if let Ok(mut map) = filings().lock() {
+        map.insert(undo_token, (project, target, undo));
+    }
+    Ok(FiledTrials { filed, undo_token })
+}
+
+/// « Annuler » un rangement (2.2-d) : les fichiers reviennent comme avant.
+#[tauri::command]
+pub fn trial_file_undo(window: WebviewWindow, undo_token: Uuid) -> Result<(), CommandError> {
+    let entry = filings()
+        .lock()
+        .ok()
+        .and_then(|mut map| map.remove(&undo_token));
+    let Some((project, target, undo)) = entry else {
+        return Err(CommandError::new(
+            CommandErrorKind::UndoExpired,
+            "Ce rangement ne peut plus être annulé.",
+        ));
+    };
+    undo.apply()?;
+    trial_changed(&window, project, None);
+    trial_changed(&window, target, None);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

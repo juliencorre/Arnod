@@ -177,6 +177,9 @@ pub fn run() {
             commands::trial::trial_generalize,
             commands::trial::trial_keep_path,
             commands::trial::trial_transfer,
+            // Essais rangés dans un projet (2.2-d).
+            commands::trial::trial_file,
+            commands::trial::trial_file_undo,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")
