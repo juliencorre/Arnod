@@ -27,6 +27,8 @@ pub mod input;
 pub mod import;
 // Lot E : tests et étapes.
 pub mod test_steps;
+// Lot I - Fichiers modifiés hors d'Arnod.
+pub mod files;
 
 #[cfg(test)]
 mod tests {

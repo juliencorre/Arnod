@@ -7,6 +7,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue";
 
+import ConflictPanel from "@/components/workbench/ConflictPanel.vue";
 import RequestEditor from "@/components/workbench/RequestEditor.vue";
 import StepBar from "@/components/workbench/StepBar.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
@@ -58,6 +59,11 @@ watch(
 );
 
 /** Clic sur la place active : retour à l'automatique ; sur l'autre : choix explicite. */
+/** Lot I : « Fermer l'onglet » d'une requête supprimée hors d'Arnod, brouillon abandonné. */
+async function closeRemoved(): Promise<void> {
+  if (await windows.close(props.tabId)) workbench.discardRemoved(key.value);
+}
+
 function place(target: "right" | "below"): void {
   const effective = below.value ? "below" : "right";
   const next: Placement = target === effective && props.placement !== "auto" ? "auto" : target;
@@ -76,6 +82,12 @@ function place(target: "right" | "below"): void {
       <BaseButton @click="tabs.close(tabId)">Fermer l'onglet</BaseButton>
     </div>
     <p v-else-if="!editor?.draft" class="request-tab__loading">Chargement…</p>
+    <!-- Lot I : brouillon en conflit avec le disque, ou fichier supprimé hors d'Arnod. -->
+    <ConflictPanel
+      v-else-if="editor.conflict || editor.removedOnDisk"
+      :editor-key="key"
+      @close="closeRemoved"
+    />
     <template v-else>
       <div class="request-tab__editor">
         <StepBar :project-id="projectId" :path="path" />

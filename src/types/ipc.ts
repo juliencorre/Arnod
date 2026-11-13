@@ -109,7 +109,10 @@ export type CommandName =
   | "test_read"
   | "tree_create_test"
   | "tree_add_step"
-  | "request_variable_users";
+  | "request_variable_users"
+  // Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md).
+  | "request_conflict"
+  | "request_conflict_resolve";
 
 /**
  * Nature d'une erreur de commande.
@@ -135,7 +138,8 @@ export type CommandErrorKind =
   | "timeout" // Délai dépassé.
   | "cancelled" // Exécution annulée par l'utilisateur.
   | "secretStore" // Le coffre du système est indisponible.
-  | "protectedEnvironment"; // Envoi sur un environnement protégé sans confirmation.
+  | "protectedEnvironment" // Envoi sur un environnement protégé sans confirmation.
+  | "changedOnDisk"; // Fichier modifié hors d'Arnod depuis sa lecture, rien n'est écrasé (lot I).
 
 /**
  * Erreur renvoyée par une commande Rust qui échoue : la promesse d'`invoke` est
@@ -1373,4 +1377,51 @@ export interface VariableUser {
   method: HttpMethod;
   url: string;
   variables: string[];
+}
+
+// --- Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md) ---
+
+/** Requête renommée ou déplacée hors d'Arnod (`Renamed`, R5). */
+export interface RenamedFile {
+  from: string;
+  to: string;
+}
+
+/** Changements d'un projet faits hors d'Arnod, diffusés par `arnod://fichiers` (`FilesChange`). */
+export interface FilesChange {
+  projectId: string;
+  /** Requêtes ajoutées, modifiées, supprimées (chemins relatifs au projet). */
+  added: string[];
+  modified: string[];
+  removed: string[];
+  renamed: RenamedFile[];
+  tree: boolean;
+  environments: boolean;
+  contracts: boolean;
+}
+
+/** Version gardée pour un élément en conflit (`ConflictSide`). */
+export type ConflictSide = "disk" | "draft";
+
+/** Élément d'une requête en conflit avec le disque (`ConflictItem`, R9, R10). */
+export interface ConflictItem {
+  /** Clé stable (`url`, `headers:x-request-id#0`). */
+  key: string;
+  /** Libellé en français (« En-tête X-Request-Id »). */
+  label: string;
+  /** Valeur sur le disque, prête à afficher ; `null` : absent sur le disque. */
+  disk: string | null;
+  /** Valeur du brouillon ; `null` : absent du brouillon. */
+  draft: string | null;
+  /** Même valeur des deux côtés, changée de la même façon. */
+  identical: boolean;
+  /** Version proposée : celle qui seule a changé. */
+  suggested: ConflictSide | null;
+}
+
+/** Conflit d'une requête ouverte (`RequestConflict`). */
+export interface RequestConflict {
+  items: ConflictItem[];
+  /** Date de modification du fichier (ms depuis l'époque Unix). */
+  modifiedAt: number | null;
 }

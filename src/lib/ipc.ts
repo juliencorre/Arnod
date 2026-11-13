@@ -9,6 +9,9 @@ import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
+  ConflictSide,
+  FilesChange,
+  RequestConflict,
   ActiveRequest,
   CatalogLoad,
   CatalogSnapshot,
@@ -90,6 +93,7 @@ const COMMAND_ERROR_KINDS: Record<CommandErrorKind, true> = {
   cancelled: true,
   secretStore: true,
   protectedEnvironment: true,
+  changedOnDisk: true,
 };
 
 /** Indique si la cause d'un rejet est une `CommandError` renvoyée par le cœur natif. */
@@ -552,6 +556,26 @@ export const ipc = {
   /** Requêtes du projet, hors `path`, qui lisent l'une des variables `names` (EX5). */
   requestVariableUsers: (project: string, path: string, names: string[]): Promise<VariableUser[]> =>
     call<VariableUser[]>("request_variable_users", { project, path, names }),
+
+  // --- Lot I - Fichiers modifiés hors d'Arnod ---
+
+  /** Éléments où le fichier et le brouillon diffèrent ; `base` : version de départ (R9). */
+  requestConflict: (
+    project: string,
+    path: string,
+    base: RequestDoc,
+    draft: RequestDoc,
+  ): Promise<RequestConflict> =>
+    call<RequestConflict>("request_conflict", { project, path, base, draft }),
+
+  /** Règle le conflit selon les choix et écrit le fichier une seule fois (R11). */
+  requestConflictResolve: (
+    project: string,
+    path: string,
+    draft: RequestDoc,
+    choices: Record<string, ConflictSide>,
+  ): Promise<RequestDoc> =>
+    call<RequestDoc>("request_conflict_resolve", { project, path, draft, choices }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
@@ -564,6 +588,8 @@ export const EVENTS = {
   result: "arnod://resultat",
   run: "arnod://run",
   statuses: "arnod://statuts",
+  // Lot I : fichiers modifiés hors d'Arnod.
+  files: "arnod://fichiers",
 } as const;
 
 /** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
@@ -614,5 +640,11 @@ export const events = {
   onClose: (handler: () => void): Promise<UnlistenFn> =>
     listen(EVENTS.close, () => {
       handler();
+    }),
+
+  /** Fichiers d'un projet modifiés hors d'Arnod : renommés, supprimés… (lot I, R6). */
+  onFiles: (handler: (change: FilesChange) => void): Promise<UnlistenFn> =>
+    listen<FilesChange>(EVENTS.files, (event) => {
+      handler(event.payload);
     }),
 };

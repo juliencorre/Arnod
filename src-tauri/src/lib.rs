@@ -33,6 +33,7 @@ pub mod tree;
 pub mod trial;
 #[cfg(test)]
 mod ts_contract;
+pub mod watch;
 pub mod windows;
 pub mod workbench;
 
@@ -43,6 +44,7 @@ use tauri::Manager;
 use crate::results::ResultBook;
 use crate::secrets::SystemSecretStore;
 use crate::state::{AppState, DEFAULT_LOCATION_DIR};
+use crate::watch::service::Watchers;
 use crate::windows::WindowsState;
 use crate::workbench::Workbench;
 
@@ -64,10 +66,22 @@ pub fn run() {
             app.manage(bench);
             app.manage(WindowsState::load(data_dir));
             app.manage(Mutex::new(ResultBook::default()));
+            // Dossiers des projets ouverts surveillés : changements faits hors d'Arnod diffusés
+            // aux fenêtres (lot I).
+            app.manage(Watchers::new(Arc::new(watch::app::AppSink::new(
+                app.handle().clone(),
+            ))));
             // Chaque modification du catalogue est diffusée à toutes les fenêtres (F11).
             let handle = app.handle().clone();
             app.state::<AppState>().on_change(Box::new(move |snapshot| {
-                windows::catalog_changed(&handle, snapshot)
+                windows::catalog_changed(&handle, snapshot);
+                // Projet oublié ou dossier introuvable : plus de surveillance (lot I).
+                handle.state::<Watchers>().retain(|id| {
+                    snapshot.projects.iter().any(|project| {
+                        project.id == id
+                            && project.status == catalog::snapshot::ProjectStatus::Ok
+                    })
+                });
             }));
             windows::restore(app.handle());
             Ok(())
@@ -172,6 +186,9 @@ pub fn run() {
             commands::test_steps::tree_create_test,
             commands::test_steps::tree_add_step,
             commands::test_steps::request_variable_users,
+            // Lot I - Fichiers modifiés hors d'Arnod.
+            commands::files::request_conflict,
+            commands::files::request_conflict_resolve,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

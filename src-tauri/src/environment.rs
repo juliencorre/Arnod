@@ -270,6 +270,7 @@ pub fn save(
         && old.path != target
     {
         let _ = fs::remove_file(&old.path);
+        crate::watch::settle(&old.path);
     }
     let order: Vec<String> = list(root).into_iter().map(|env| env.name).collect();
     collection::update_meta(root, |meta| {
@@ -306,6 +307,7 @@ pub fn delete(root: &Path, name: &str) -> Result<(), CommandError> {
     }
     for file in all.iter().filter(|f| same_name(&f.environment.name, name)) {
         let _ = fs::remove_file(&file.path);
+        crate::watch::settle(&file.path);
     }
     collection::update_meta(root, |meta| {
         meta.environment_order
