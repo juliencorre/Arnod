@@ -67,7 +67,15 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let quit = MenuItemBuilder::with_id(QUIT_ID, "&Quitter")
         .accelerator("CmdOrCtrl+Q")
         .build(app)?;
-    let file = SubmenuBuilder::new(app, "&Fichier").item(&quit).build()?;
+    // Lot H - Réseau et authentification : « Préférences… » (Ctrl+,), avant « Quitter ».
+    let preferences = MenuItemBuilder::with_id(PREFERENCES_ID, "&Préférences…")
+        .accelerator("CmdOrCtrl+,")
+        .build(app)?;
+    let file = SubmenuBuilder::new(app, "&Fichier")
+        .item(&preferences)
+        .separator()
+        .item(&quit)
+        .build()?;
     let mut layouts = SubmenuBuilder::new(app, "&Dispositions");
     for (_, id, label) in PRESETS {
         layouts = layouts.text(format!("{PRESET_PREFIX}{id}"), label);
@@ -103,6 +111,11 @@ pub fn handle_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     if id == QUIT_ID {
         // Fermeture propre : déclenche `RunEvent::ExitRequested` puis `RunEvent::Exit`.
         app.exit(0);
+        return;
+    }
+    // Lot H : les préférences s'ouvrent dans la fenêtre au premier plan.
+    if id == PREFERENCES_ID {
+        open_preferences(app);
         return;
     }
     let target = app
@@ -141,6 +154,25 @@ pub fn handle_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
             }),
     };
     let _ = result;
+}
+
+// Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md, PR1).
+
+/// « Préférences… » (Ctrl+,).
+pub const PREFERENCES_ID: &str = "preferences";
+/// Événement qui ouvre les préférences dans une fenêtre.
+pub const PREFERENCES_EVENT: &str = "arnod://preferences";
+
+/// Ouvre les préférences dans la fenêtre au premier plan, sinon la principale : l'événement
+/// nomme la fenêtre, les autres l'ignorent.
+fn open_preferences<R: Runtime>(app: &AppHandle<R>) {
+    use tauri::Emitter;
+    let label = app
+        .webview_windows()
+        .into_iter()
+        .find(|(_, w)| w.is_focused().unwrap_or(false))
+        .map_or_else(|| MAIN.to_owned(), |(label, _)| label);
+    let _ = app.emit(PREFERENCES_EVENT, serde_json::json!({ "window": label }));
 }
 
 #[cfg(test)]

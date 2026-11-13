@@ -51,6 +51,25 @@ serde_json_path = "0.7"
 # Arnod, sans crate de « debounce ».
 notify = "8"
 
+# Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md).
+# Configuration TLS du client écrite à la main : autorités internes ajoutées et vérificateur qui
+# garde le certificat refusé pour expliquer l'échec (5.1-i). Même version que reqwest et même
+# fournisseur `ring`, déjà tirés : rien de neuf dans le binaire.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# Autorités du magasin du système (Windows : magasin de certificats ; Linux : /etc/ssl).
+rustls-native-certs = "0.8"
+# Racines Mozilla, en repli si le magasin du système est vide (déjà tirées par reqwest).
+webpki-roots = "1"
+# Empreinte SHA-256 des certificats (déjà tirée par rustls).
+ring = "0.17"
+# Lecture des en-têtes Set-Cookie (déjà tirée par Tauri).
+cookie = "0.18"
+
+# Lot H : proxy du système lu dans le registre (`Internet Settings`), crate de Microsoft sans
+# autre dépendance que les liaisons Windows déjà tirées par Tauri.
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6"
+
 [dev-dependencies]
 tempfile = "3"
 # Serveur HTTP simulé pour les tests des envois et des runs.

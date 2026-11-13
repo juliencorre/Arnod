@@ -72,6 +72,13 @@ import type {
   CreatedTest,
   TestView,
   VariableUser,
+  Auth,
+  CertificateInfo,
+  CookieJarView,
+  NetworkPrefsInput,
+  NetworkView,
+  ProjectAuthView,
+  NetworkFailure,
   MenuShortcut,
   StartupProblem,
   StartupTarget,
@@ -121,6 +128,8 @@ function isCommandError(cause: unknown): cause is CommandError {
 export class IpcError extends Error {
   readonly command: CommandName;
   readonly kind: CommandErrorKind | null;
+  /** Lot H : échec réseau classé, s'il y en a un (5.1-i). */
+  readonly failure: NetworkFailure | null;
 
   constructor(command: CommandName, cause: unknown) {
     const commandError = isCommandError(cause) ? cause : null;
@@ -130,6 +139,7 @@ export class IpcError extends Error {
     this.name = "IpcError";
     this.command = command;
     this.kind = commandError?.kind ?? null;
+    this.failure = commandError?.failure ?? null;
   }
 }
 
@@ -567,6 +577,50 @@ export const ipc = {
   requestVariableUsers: (project: string, path: string, names: string[]): Promise<VariableUser[]> =>
     call<VariableUser[]>("request_variable_users", { project, path, names }),
 
+  // --- Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md) ----
+  /** Préférences réseau du poste (1.6-e). */
+  networkLoad: (): Promise<NetworkView> => call<NetworkView>("network_load"),
+  networkSave: (prefs: NetworkPrefsInput): Promise<NetworkView> =>
+    call<NetworkView>("network_save", { prefs }),
+  /** Choisit un certificat et le lit, sans l'ajouter ; `null` : choix annulé (R4). */
+  networkPickAuthority: (): Promise<CertificateInfo | null> =>
+    call<CertificateInfo | null>("network_pick_authority"),
+  networkAddAuthority: (pem: string): Promise<NetworkView> =>
+    call<NetworkView>("network_add_authority", { pem }),
+  networkRemoveAuthority: (fingerprint: string): Promise<NetworkView> =>
+    call<NetworkView>("network_remove_authority", { fingerprint }),
+  /** Authentification du projet, jeton et usage (3.4-a). */
+  projectAuthLoad: (project: string, environment: string): Promise<ProjectAuthView> =>
+    call<ProjectAuthView>("project_auth_load", { project, environment }),
+  projectAuthSave: (
+    project: string,
+    environment: string,
+    auth: Auth,
+    clientSecret: string | null,
+  ): Promise<ProjectAuthView> =>
+    call<ProjectAuthView>("project_auth_save", { project, environment, auth, clientSecret }),
+  oauth2TokenRenew: (project: string, environment: string): Promise<ProjectAuthView> =>
+    call<ProjectAuthView>("oauth2_token_renew", { project, environment }),
+  oauth2TokenForget: (project: string, environment: string): Promise<ProjectAuthView> =>
+    call<ProjectAuthView>("oauth2_token_forget", { project, environment }),
+  /** Cookies gardés de l'environnement ; avec `url`, ceux de son hôte (3.4-g). */
+  cookiesList: (project: string, environment: string, url: string | null): Promise<CookieJarView> =>
+    call<CookieJarView>("cookies_list", { project, environment, url }),
+  cookiesClear: (
+    project: string,
+    environment: string,
+    domain: string | null,
+    url: string | null,
+  ): Promise<CookieJarView> =>
+    call<CookieJarView>("cookies_clear", { project, environment, domain, url }),
+  cookiesSetSending: (
+    project: string,
+    environment: string,
+    domain: string,
+    enabled: boolean,
+    url: string | null,
+  ): Promise<CookieJarView> =>
+    call<CookieJarView>("cookies_set_sending", { project, environment, domain, enabled, url }),
   // --- Lot F : onglets et clavier ---------------------------------------------
 
   /** L'onglet d'aperçu devient permanent : double-clic, modification, glisser (1.3-a). */
@@ -633,6 +687,8 @@ export const EVENTS = {
   result: "arnod://resultat",
   run: "arnod://run",
   statuses: "arnod://statuts",
+  // Lot H : « Préférences… » du menu natif.
+  preferences: "arnod://preferences",
   // Lot F : raccourci choisi dans le menu natif Fenêtre.
   shortcut: "arnod://raccourci",
   // Lot I : fichiers modifiés hors d'Arnod.
@@ -681,6 +737,12 @@ export const events = {
   onStatuses: (handler: (change: StatusesChange) => void): Promise<UnlistenFn> =>
     listen<StatusesChange>(EVENTS.statuses, (event) => {
       handler(event.payload);
+    }),
+
+  /** Lot H : « Préférences… » du menu, pour la fenêtre nommée. */
+  onPreferences: (handler: (window: string) => void): Promise<UnlistenFn> =>
+    listen<{ window: string }>(EVENTS.preferences, (event) => {
+      handler(event.payload.window);
     }),
 
   /** Fermeture demandée pour cette fenêtre détachée : enregistrer puis se rattacher. */

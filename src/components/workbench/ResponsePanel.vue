@@ -10,6 +10,7 @@ import { computed, ref } from "vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import ResponseBody from "@/components/workbench/ResponseBody.vue";
 import SentPanel from "@/components/workbench/SentPanel.vue";
+import NetworkFailurePanel from "@/components/workbench/NetworkFailurePanel.vue";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { AssertionResult } from "@/types/ipc";
@@ -29,6 +30,11 @@ const failures = computed(
   () => outcome.value?.assertions.filter((a) => !a.passed && !a.ignored) ?? [],
 );
 const failed = computed(() => failures.value.length);
+
+/** Lot H (3.4-g) : la réponse pose un cookie, gardé pour l'environnement. */
+const setsCookie = computed(
+  () => outcome.value?.response.headers.some(([n]) => n.toLowerCase() === "set-cookie") ?? false,
+);
 
 /** Libellé d'un résultat : cible de la vérification, ou conformité au contrat lié (R8). */
 function labelOf(check: AssertionResult): string {
@@ -52,6 +58,12 @@ function removable(check: AssertionResult): boolean {
   <section class="response" aria-label="Réponse" aria-live="polite">
     <slot name="tools" />
     <p v-if="editor?.sending" class="response__info">Envoi en cours…</p>
+    <!-- Lot H (5.1-i) : échec réseau expliqué, avec l'action qui règle le poste. -->
+    <NetworkFailurePanel
+      v-else-if="editor?.sendFailure"
+      :failure="editor.sendFailure"
+      :environment="workbench.activeEnvironment(editor.projectId)"
+    />
     <p v-else-if="editor?.sendError" class="response__error" role="alert">
       {{ editor.sendError }}
     </p>
@@ -103,9 +115,17 @@ function removable(check: AssertionResult): boolean {
       <dl v-else-if="view === 'headers'" class="response__headers">
         <template v-for="[name, value] in outcome.response.headers" :key="name + value">
           <dt>{{ name }}</dt>
-          <dd>{{ value }}</dd>
+          <dd>
+            {{ value }}
+            <!-- Lot H (3.4-g) : le cookie reçu est gardé pour l'environnement. -->
+            <span v-if="name.toLowerCase() === 'set-cookie'" class="response__kept">gardé</span>
+          </dd>
         </template>
       </dl>
+      <p v-if="view === 'headers' && setsCookie" class="response__info">
+        Les cookies reçus rejoignent ceux de l'environnement : ils seront renvoyés aux requêtes
+        suivantes vers ce domaine.
+      </p>
       <!-- Lot E (5.1-h) : ce qui est parti, valeurs tirées et extraites. -->
       <SentPanel v-else-if="view === 'sent'" :editor-key="editorKey" />
       <div v-else>
@@ -251,6 +271,16 @@ function removable(check: AssertionResult): boolean {
 .response__headers dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.response__kept {
+  margin-left: 0.375rem;
+  padding: 0 0.375rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-link);
+  background: var(--color-accent-soft);
 }
 
 .response__checks {

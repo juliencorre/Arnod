@@ -2209,6 +2209,137 @@ describe("Lot E - tests et étapes", () => {
   });
 });
 
+describe("Lot H - Réseau et authentification", () => {
+  let server: Server;
+  let url = "";
+  /** Dernier en-tête Cookie reçu par le serveur. */
+  let received: string | null = null;
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      if (request.url === "/login") {
+        response.writeHead(200, {
+          "Content-Type": "application/json",
+          "Set-Cookie": "session=lot-h-1234; Path=/; HttpOnly; Max-Age=1800",
+        });
+        response.end('{"ok":true}');
+      } else {
+        // Garde le cookie reçu : la requête suivante doit l'avoir.
+        received = request.headers.cookie ?? null;
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ cookie: received }));
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /** Ouvre « Lister les commandes » et l'envoie à `target`. */
+  async function sendTo(target: string): Promise<void> {
+    await browser.execute(() => {
+      const row = Array.from(
+        document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'),
+      ).find(
+        (item) => item.querySelector(".row__name")?.textContent.trim() === "Lister les commandes",
+      );
+      if (!row) throw new Error("requête « Lister les commandes » introuvable");
+      row.click();
+    });
+    await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+    await browser.execute((address) => {
+      const input = document.querySelector<HTMLInputElement>(".request-tab .editor__url");
+      if (!input) throw new Error("adresse introuvable");
+      input.value = address;
+      input.dispatchEvent(new Event("input"));
+    }, target);
+    await clickText(".request-tab button", "Envoyer");
+  }
+
+  it("Ctrl+, ouvre les préférences : proxy et autorités du poste (1.6-e)", async () => {
+    await browser.execute(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ctrlKey: true }));
+    });
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForExist({ timeout: 10_000 });
+    await browser.waitUntil(async () => (await dialog.getText()).includes("Autorités racines"), {
+      timeoutMsg: "section Certificats attendue",
+    });
+    expect(await dialog.getText()).toContain("Celui du système");
+    await screenshot(browser, "h1-preferences-reseau");
+    await browser.keys("Escape");
+    await browser.$("dialog[open]").waitForExist({ reverse: true, timeout: 5_000 });
+  });
+
+  it("un serveur injoignable est expliqué : la requête n'est pas partie (5.1-i)", async () => {
+    await sendTo("http://127.0.0.1:1/commandes");
+    const panel = browser.$(".net-failure");
+    await panel.waitForExist({ timeout: 30_000 });
+    const text = await panel.getText();
+    expect(text).toContain("127.0.0.1:1");
+    expect(text).toContain("La requête n'est pas partie");
+    expect(text).not.toContain("Ignorer");
+    await screenshot(browser, "h2-echec-reseau");
+  });
+
+  it("un cookie reçu est gardé pour l'environnement et renvoyé (3.4-g)", async () => {
+    await sendTo(`${url}/login`);
+    await browser.waitUntil(
+      async () => (await browser.$(".response__status").getText()).startsWith("200"),
+      { timeout: 15_000, timeoutMsg: "réponse 200 attendue" },
+    );
+    await sendTo(`${url}/moi`);
+    await browser.waitUntil(() => received === "session=lot-h-1234", {
+      timeout: 15_000,
+      timeoutMsg: "le cookie gardé doit repartir",
+    });
+    // HttpOnly : sa valeur reste masquée dans la réponse affichée.
+    await browser.waitUntil(
+      async () => (await browser.$(".code").getText()).includes("session=••••"),
+      {
+        timeout: 10_000,
+        timeoutMsg: "valeur du cookie masquée attendue",
+      },
+    );
+    await clickText(".request-tab .editor__tab", "En-têtes");
+    const cookies = browser.$('[aria-label="Cookies gardés de 127.0.0.1"]');
+    await cookies.waitForExist({ timeout: 10_000 });
+    expect(await cookies.getText()).toContain("GET /login");
+    await screenshot(browser, "h4-cookies");
+    await clickText(".cookies button", "Vider");
+    await cookies.waitForExist({ reverse: true, timeout: 10_000 });
+  });
+
+  it("les réglages du projet règlent OAuth 2 et disent qui l'hérite (3.4-a)", async () => {
+    await clickHidden(`aside button[aria-label="Plus d'actions sur boutique-tests"]`);
+    await clickText('[role="menuitem"]', "Réglages du projet…");
+    // Le texte est lu dans le DOM : WebKitGTK ne rend pas toute la fenêtre visible d'un coup.
+    const settingsText = () =>
+      browser.execute(() => document.querySelector("dialog[open]")?.textContent ?? "");
+    await browser.waitUntil(async () => (await settingsText()).includes("Qui l'utilise"), {
+      timeout: 10_000,
+      timeoutMsg: "réglages du projet attendus",
+    });
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>("dialog[open] select");
+      if (!select) throw new Error("type introuvable");
+      select.value = "oauth2";
+      select.dispatchEvent(new Event("change"));
+    });
+    await browser.$("dialog[open] .oauth2").waitForExist({ timeout: 5_000 });
+    expect(await settingsText()).toContain("URL du jeton");
+    await screenshot(browser, "h3-reglages-projet");
+    await clickText("dialog[open] button", "Fermer");
+  });
+});
+
 describe("Lot F - onglets et clavier", () => {
   /** Onglets de la zone active : nom et aperçu (titre en italique). */
   async function activeZoneTabs(): Promise<{ name: string; preview: boolean }[]> {

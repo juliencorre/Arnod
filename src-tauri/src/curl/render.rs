@@ -154,6 +154,11 @@ pub fn command(request: &Request, variables: &Variables) -> Result<String, Comma
     let mut user = None;
     match copy.auth.kind {
         AuthKind::Bearer => copy.auth.token = placeholder("TOKEN"),
+        // Lot H : le jeton OAuth 2 part comme un Bearer, toujours remplacé par $TOKEN.
+        AuthKind::OAuth2 => {
+            copy.auth.kind = AuthKind::Bearer;
+            copy.auth.token = placeholder("TOKEN");
+        }
         AuthKind::ApiKey => copy.auth.value = placeholder("API_KEY"),
         AuthKind::Basic => {
             user = Some(format!(

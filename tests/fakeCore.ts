@@ -28,6 +28,8 @@ import {
   type FakeWorkbench,
 } from "./fakeWorkbench";
 import { createFakeResponse, handleResponse, type FakeResponse } from "./fakeResponse";
+// Lot H - Réseau et authentification.
+import { createFakeNetwork, handleNetwork, type FakeNetwork } from "./fakeNetwork";
 // Lot I - Fichiers modifiés hors d'Arnod.
 import { handleFilesLotI } from "./fakeFiles";
 import { createFakeStartup, handleStartupLotG, type FakeStartup } from "./fakeStartup";
@@ -61,6 +63,8 @@ export interface FakeCore {
   response: FakeResponse;
   /** Lot C - Import Bruno : sources reconnues, rapports. */
   imports: FakeImports;
+  /** Lot H - Réseau et authentification : préférences, authentification du projet, cookies. */
+  network: FakeNetwork;
   /** Lot G - Démarrage et erreurs : erreur bloquante, démarrage lent. */
   startup: FakeStartup;
 }
@@ -101,6 +105,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     emitWindows: () => emit("arnod://fenetres", snapshotOf(core.windows)),
     response: createFakeResponse(),
     imports: createFakeImports(),
+    network: createFakeNetwork(),
     startup: createFakeStartup(),
   };
 
@@ -368,6 +373,9 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
             DEFAULT_LOCATION,
           );
           if (imported !== undefined) return imported;
+          // Lot H - Réseau et authentification.
+          const network = handleNetwork(core.network, cmd, args);
+          if (network !== undefined) return network;
           // Lot I - Fichiers modifiés hors d'Arnod.
           const files = handleFilesLotI(core.workbench, cmd, args);
           if (files !== undefined) return files;

@@ -24,6 +24,7 @@ import { startProjectDrag } from "@/lib/dnd";
 import { countLabel } from "@/lib/format";
 import { useCatalogStore } from "@/stores/catalog";
 import { useNavigationStore } from "@/stores/navigation";
+import { useNetworkStore } from "@/stores/network";
 import { useToastStore } from "@/stores/toasts";
 import { useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -37,6 +38,7 @@ const workbench = useWorkbenchStore();
 const windows = useWindowsStore();
 const toasts = useToastStore();
 const actions = useProjectActions();
+const network = useNetworkStore();
 
 const tree = useTemplateRef<InstanceType<typeof TreePanel>>("tree");
 const contracts = useTemplateRef<InstanceType<typeof ContractsSection>>("contracts");
@@ -83,6 +85,8 @@ const moreItems = computed<MenuItem[]>(() => {
   const items: MenuItem[] = [
     { id: "open", label: "Ouvrir le projet" },
     { id: "environments", label: "Gérer les environnements…", shortcut: "Ctrl+Maj+E" },
+    // Lot H : réglages du projet, authentification (3.4-a).
+    { id: "settings", label: "Réglages du projet…" },
   ];
   const workspace = props.workspaceId === null ? null : catalog.workspaceById(props.workspaceId);
   if (workspace) {
@@ -149,10 +153,22 @@ async function onMore(item: string): Promise<void> {
   if (item === "open") await actions.openProject(id.value, props.workspaceId);
   else if (item === "environments") {
     if (await ensureExpanded()) environment.value?.manage();
-  } else if (item === "reveal") await navigation.showAll(id.value);
+  } else if (item === "settings") await openSettings();
+  else if (item === "reveal") await navigation.showAll(id.value);
   else if (item === "remove" && props.workspaceId !== null) {
     await actions.removeFromWorkspace(id.value, props.workspaceId);
   }
+}
+
+/** Lot H : réglages du projet sur son environnement actif (3.4-a). */
+async function openSettings(): Promise<void> {
+  if (!(await ensureExpanded())) return;
+  const env = workbench.activeEnvironment(id.value);
+  if (env === null) {
+    toasts.show("Créez d'abord un environnement : les réglages s'appliquent à l'un d'eux.");
+    return;
+  }
+  await network.openProjectSettings(id.value, env).catch(toasts.showError);
 }
 
 /** Ctrl+F : focus dans le filtre du référentiel (lot D, F5). */

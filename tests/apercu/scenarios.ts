@@ -11,6 +11,8 @@ import { PETSTORE_SOURCE } from "../fakeContracts";
 import { AUTH_SSO, BOUTIQUE_TESTS, boutiqueSnapshot, firstRunSnapshot } from "../fixtures";
 import type { Example } from "@/types/ipc";
 import { brunoSource } from "../fakeImports";
+// Lot H - Réseau et authentification.
+import { certificateFailureLotH, certificateLotH } from "../fakeNetwork";
 import { fichierVerrouilleLotG, versionPlusRecenteLotG } from "../fakeStartup";
 import type { StartupProblem } from "@/types/ipc";
 
@@ -814,6 +816,199 @@ async function ouvrirOngletsLotF(g: Gestes, noms: string[]): Promise<void> {
 /** Collection Bruno des scénarios d'import. */
 const BRUNO_DIR = "/home/julien/bruno/boutique-api";
 
+// --- Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md) -----------
+
+/** Lot H : « Créer une commande » sur « Recette fonctionnelle », comme la maquette. */
+function commandeLotH(): FakeCore {
+  const core = installFakeCore(boutiqueSnapshot());
+  const wb = core.workbench;
+  wb.envs = [
+    {
+      name: "Recette fonctionnelle",
+      color: "orange",
+      variables: [
+        { name: "baseUrl", value: "https://recette.boutique.dev" },
+        { name: "authUrl", value: "https://auth.boutique.dev" },
+        { name: "oauthClientId", value: "boutique-tests" },
+      ],
+      locals: ["oauth2ClientSecret"],
+    },
+  ];
+  wb.active = "Recette fonctionnelle";
+  wb.folders.add("commandes");
+  wb.requests.set(
+    "commandes/creer.yml",
+    newRequest("Créer une commande", {
+      method: "POST",
+      url: "{{baseUrl}}/orders",
+      headers: [
+        {
+          name: "Content-Type",
+          value: "application/json",
+          enabled: true,
+          kind: "query",
+          description: "",
+        },
+        {
+          name: "Accept",
+          value: "application/json",
+          enabled: true,
+          kind: "query",
+          description: "",
+        },
+      ],
+      body: {
+        kind: "json",
+        variants: [
+          {
+            title: "",
+            content:
+              '{\n  "customerId": "cus_31",\n  "items": [{ "sku": "TSH-BLU-M", "qty": 2 }],\n  "coupon": "BIENVENUE"\n}',
+            form: [],
+          },
+        ],
+        selected: 0,
+        other: "",
+      },
+    }),
+  );
+  wb.requests.set("commandes/lister.yml", newRequest("Lister les commandes"));
+  return core;
+}
+
+async function ouvrirCommandeLotH(g: Gestes): Promise<void> {
+  await ouvrirProjet(g);
+  await g.cliquer('[role="treeitem"]', "Créer une commande");
+}
+
+Object.assign(SCENARIOS, {
+  "1.6-e": {
+    description: "Préférences → Réseau et certificats : proxy et autorités du poste (1.6-e)",
+    setup: () => {
+      const core = commandeLotH();
+      core.network.view.authorities = [{ ...certificateLotH("Entreprise Root CA"), addedAt: 1 }];
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.touche(",", { ctrlKey: true });
+      await g.attendre(150);
+    },
+  },
+  "5.1-i": {
+    description: "Échec réseau : certificat non reconnu, cause et action (5.1-i)",
+    setup: () => {
+      const core = commandeLotH();
+      core.workbench.nextSend = certificateFailureLotH();
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirCommandeLotH(g);
+      await g.cliquer(".editor__tab", "Corps");
+      await g.cliquer(".editor__line button[type='submit']");
+      await g.attendre(150);
+    },
+  },
+  "3.4-a": {
+    description: "Réglages du projet → Authentification : OAuth 2 et jeton (3.4-a)",
+    setup: () => {
+      const core = commandeLotH();
+      const auth = newRequest("x").auth;
+      auth.type = "oauth2";
+      auth.oauth2 = {
+        accessTokenUrl: "{{authUrl}}/oauth/token",
+        clientId: "{{oauthClientId}}",
+        clientSecret: "{{oauth2ClientSecret}}",
+        scope: "orders:read orders:write payments:write",
+        credentials: "basicAuthHeader",
+        tokenPlacement: "header",
+        tokenName: "Authorization",
+      };
+      core.network.auth.set(BOUTIQUE_TESTS, auth);
+      core.network.hasClientSecret = true;
+      core.network.token = {
+        obtainedAt: new Date(2026, 10, 6, 11, 42).getTime(),
+        expiresAt: new Date(2026, 10, 6, 12, 42).getTime(),
+      };
+      core.network.usage = {
+        inheriting: 52,
+        overrides: [
+          { label: "dossier « v1-legacy »", path: "v1-legacy", type: "basic", other: "", count: 5 },
+        ],
+      };
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[aria-label="Plus d\'actions sur boutique-tests"]');
+      await g.cliquer('[role="menuitem"]', "Réglages du projet…");
+      await g.attendre(150);
+    },
+  },
+  "3.4-g": {
+    description: "Cookies gardés de l'environnement, sous les en-têtes (3.4-g)",
+    setup: () => {
+      const core = commandeLotH();
+      const now = Date.now();
+      core.network.cookies.set("Recette fonctionnelle", {
+        environment: "Recette fonctionnelle",
+        host: "recette.boutique.dev",
+        domains: [
+          {
+            domain: "recette.boutique.dev",
+            sending: true,
+            cookies: [
+              {
+                name: "session",
+                value: "••••••••",
+                path: "/",
+                expiresAt: now + 28 * 60_000,
+                httpOnly: true,
+                secure: true,
+                receivedFrom: "POST /login",
+              },
+              {
+                name: "csrf",
+                value: "9f2c…e1",
+                path: "/",
+                expiresAt: null,
+                httpOnly: false,
+                secure: true,
+                receivedFrom: "POST /login",
+              },
+            ],
+          },
+        ],
+      });
+      core.workbench.nextSend = okOutcome({
+        response: {
+          status: 201,
+          statusText: "Created",
+          headers: [
+            ["content-type", "application/json"],
+            ["set-cookie", "cart=c_71f2…; Path=/; HttpOnly"],
+            ["x-request-id", "a41f…c9"],
+          ],
+          body: '{"id":"ord_8F2kQ"}',
+          truncated: false,
+          sizeBytes: 612,
+          waitMs: 40,
+          receiveMs: 2,
+          totalMs: 42,
+        },
+      });
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirCommandeLotH(g);
+      await g.cliquer(".editor__line button[type='submit']");
+      await g.attendre(100);
+      await g.cliquer(".editor__tab", "En-têtes");
+      await g.cliquer(".response__tab", "En-têtes");
+      await g.attendre(150);
+    },
+  },
+} satisfies Record<string, Scenario>);
 // --- Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md) ------------
 
 /** Lot I : « commandes/v2/Créer une commande » de l'écran 4.1-e. */
