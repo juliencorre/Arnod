@@ -81,6 +81,8 @@ const items = computed<MenuItem[]>(() => {
   if (isTest.value) {
     return [
       { id: "add-step", label: "Ajouter une étape" },
+      // Une requête nommée s'ajoute aussi, comme dans un dossier (R4 : libellés gardés).
+      { id: "new-request", label: "Nouvelle requête" },
       { id: "run", label: "Exécuter le test", separatorBefore: true },
       { id: "rename", label: "Renommer", separatorBefore: true },
       move,

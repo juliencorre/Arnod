@@ -47,7 +47,8 @@ function keep(drawn: DrawnValue): void {
 
     <template v-if="body !== null">
       <h3 class="sent__title">Corps envoyé</h3>
-      <pre class="sent__body" tabindex="0">{{ body }}</pre>
+      <!-- Zone défilante focalisable au clavier : une région nommée (Web:S6845). -->
+      <pre class="sent__body" role="region" aria-label="Corps envoyé" tabindex="0">{{ body }}</pre>
     </template>
 
     <template v-if="sent.drawn.length > 0">

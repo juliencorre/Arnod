@@ -1685,10 +1685,12 @@ describe("Lot E - tests et étapes", () => {
     await browser.waitUntil(() => existsSync(path.join(project(), "Nouveau test", "etape-1.yml")), {
       timeoutMsg: "étape 1 du nouveau test attendue",
     });
-    const focused = await browser.execute(() =>
-      document.activeElement?.classList.contains("editor__url"),
+    // L'étape s'ouvre après la création : le curseur arrive dans l'adresse une fois l'éditeur monté.
+    await browser.waitUntil(
+      () =>
+        browser.execute(() => document.activeElement?.classList.contains("editor__url") ?? false),
+      { timeout: 10_000, timeoutMsg: "curseur dans l'adresse attendu" },
     );
-    expect(focused).toBe(true);
     await screenshot(browser, "24-nouveau-test");
   });
 });

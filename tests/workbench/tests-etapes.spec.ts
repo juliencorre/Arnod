@@ -186,7 +186,7 @@ describe("modifié, pas encore envoyé (écart 4.2-b)", () => {
 
     await app.get(".editor__url").setValue("{{baseUrl}}/autre");
     expect(app.get(".editor__unsent").text()).toContain("modifié, pas encore envoyé");
-    await click(app, ".editor__saved button", "Revenir à la version envoyée");
+    await click(app, ".editor__unsent button", "Revenir à la version envoyée");
     expect((app.get(".editor__url").element as HTMLInputElement).value).toBe("{{baseUrl}}/clients");
     expect(app.find(".editor__unsent").exists()).toBe(false);
     await waitAutosave();

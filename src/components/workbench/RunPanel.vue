@@ -374,10 +374,10 @@ const EMPTY: Record<View, string> = {
                 aria-hidden="true"
                 >{{ MARKS[t.status] }}</span
               >
-              <span class="run__group-name" :title="t.path">{{ t.name }}</span>
+              <span class="run__test-name" :title="t.path">{{ t.name }}</span>
               <span
-                class="run__group-count"
-                :class="{ 'run__group-count--bad': t.failedStep !== null }"
+                class="run__test-count"
+                :class="{ 'run__test-count--bad': t.failedStep !== null }"
               >
                 {{ t.failedStep !== null ? `étape ${t.failedStep}` : `${t.passed}/${t.steps}` }}
               </span>
@@ -806,6 +806,20 @@ const EMPTY: Record<View, string> = {
 }
 
 .run__test-mark--ko {
+  color: var(--color-danger);
+}
+
+.run__test-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run__test-count {
+  font: var(--text-body) var(--font-mono);
+}
+
+.run__test-count--bad {
   color: var(--color-danger);
 }
 

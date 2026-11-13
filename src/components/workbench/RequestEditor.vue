@@ -203,16 +203,16 @@ watch(
         <button v-if="editor?.saveState === 'error'" type="button" class="link" @click="retrySave">
           Réessayer
         </button>
-        <template v-if="changedSinceSent">
-          <span aria-hidden="true">·</span>
-          <span class="editor__unsent"><b aria-hidden="true">M</b> modifié, pas encore envoyé</span>
-          <span aria-hidden="true">·</span>
-          <button type="button" class="link" @click="workbench.revertToSent(editorKey)">
-            Revenir à la version envoyée
-          </button>
-        </template>
       </p>
     </div>
+    <!-- Lot E (écart 4.2-b) : à part de l'état d'enregistrement, qu'il ne change pas. -->
+    <p v-if="changedSinceSent" class="editor__unsent" role="status">
+      <span><b aria-hidden="true">M</b> modifié, pas encore envoyé</span>
+      <span aria-hidden="true">·</span>
+      <button type="button" class="link" @click="workbench.revertToSent(editorKey)">
+        Revenir à la version envoyée
+      </button>
+    </p>
     <p v-if="editor?.changedElsewhere" class="editor__elsewhere" role="status">
       Modifiée dans une autre fenêtre.
       <button type="button" class="link" @click="workbench.reload(editorKey)">Recharger</button>
@@ -453,10 +453,14 @@ watch(
   color: var(--color-danger);
 }
 
-.editor__saved:has(.editor__unsent) {
+.editor__unsent {
+  display: flex;
   flex-wrap: wrap;
+  gap: 0.375rem;
   justify-content: flex-end;
-  white-space: nowrap;
+  margin: -0.5rem 0 0;
+  font-size: var(--text-body);
+  color: var(--color-muted);
 }
 
 .editor__unsent b {
