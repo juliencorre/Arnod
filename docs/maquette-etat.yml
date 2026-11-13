@@ -499,7 +499,7 @@ pages:
       - "2026-11-11 : Devient le référentiel : les requêtes liées à un contrat sont rangées sous lui (PR #40)."
       - "2026-11-12 : Écrans du test (c, c bis, d) → 4.2."
       - "2026-11-13 : « Nouveau test » crée le dossier et son étape 1, ouverte, curseur dans l'adresse ; « + Étape » ajoute la suivante (b, plan-mvp-e-tests-etapes, PR #51)."
-      - "2026-11-13 : Fichiers modifiés hors d'Arnod : dossier surveillé, arborescence et onglets rechargés, brouillon en conflit réglé élément par élément (e, plan-mvp-i-fichiers-externes)."
+      - "2026-11-13 : Fichiers modifiés hors d'Arnod : dossier surveillé, arborescence et onglets rechargés, brouillon en conflit réglé élément par élément (e, plan-mvp-i-fichiers-externes, PR #54)."
     ecrans:
       a: { etat: livré, pr: [27, 40, 42], captures: [19-verification-en-echec] }
       "a bis": { etat: livré, pr: [27] }
@@ -519,6 +519,7 @@ pages:
       e:
         {
           etat: livré,
+          pr: [54],
           captures: [25-recharge-depuis-le-disque, 26-conflit],
           ecart:
             {
