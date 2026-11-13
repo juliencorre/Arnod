@@ -99,7 +99,12 @@ export type CommandName =
   | "request_input"
   | "request_curl"
   | "pairs_to_text"
-  | "pairs_from_text";
+  | "pairs_from_text"
+  // Lot C - Import Bruno.
+  | "import_pick"
+  | "import_detect"
+  | "import_run"
+  | "import_report";
 
 /**
  * Nature d'une erreur de commande.
@@ -620,7 +625,9 @@ export type ContentRef =
   | { kind: "run"; projectId: string }
   | { kind: "contract"; projectId: string; path: string }
   /** Résultat de la requête active, dans sa fenêtre (docs/plan-resultat-detachable.md). */
-  | { kind: "result" };
+  | { kind: "result" }
+  /** Dernier rapport d'import d'un projet (docs/plan-mvp-c-import-bruno.md, 2.3-f). */
+  | { kind: "importReport"; projectId: string };
 
 /** Onglet de contenu d'une zone (`Tab`). */
 export interface ContentTab {
@@ -1126,4 +1133,108 @@ export interface CurlIgnored {
 export interface CurlImport {
   secrets: CurlSecret[];
   ignored: CurlIgnored[];
+}
+
+// ---------------------------------------------------------------------------
+// Lot C - Import Bruno (docs/plan-mvp-c-import-bruno.md)
+// ---------------------------------------------------------------------------
+
+/** Format reconnu par l'import (`SourceFormat`). */
+export type ImportFormat = "bruno" | "openCollection" | "openApi";
+
+/** Réponse de `import_detect` : ce que l'import a reconnu, avant toute écriture. */
+export interface ImportSource {
+  /** Dossier (ou fichier, pour un contrat) à importer. */
+  path: string;
+  format: ImportFormat;
+  /** Nom de la collection, du projet, ou titre du contrat. */
+  name: string;
+  /** Ce que la conversion reprendra ; `requests` compte les opérations d'un contrat. */
+  counts: ImportCounts;
+  /** Fichiers `.bru` lus. */
+  files: number;
+}
+
+/** Destination d'un import (`ImportTarget`). */
+export type ImportTarget =
+  | { kind: "newProject"; location: string | null; workspaceId: string | null }
+  | { kind: "project"; projectId: string };
+
+/** Nature d'un élément du rapport (`ItemKind`). */
+export type ImportItemKind =
+  | "tests"
+  | "preRequest"
+  | "postResponse"
+  | "env"
+  | "auth"
+  | "body"
+  | "request"
+  | "assertion"
+  | "extraction"
+  | "option";
+
+/** Suite à donner à un élément du rapport (`ItemStatus`). */
+export type ImportItemStatus = "notRun" | "toFill" | "toCheck" | "skipped" | "stored";
+
+/** Élément signalé par l'import, avec son fichier d'origine. */
+export interface ImportReportItem {
+  kind: ImportItemKind;
+  status: ImportItemStatus;
+  name: string;
+  /** Dossier ou environnement ; vide à la racine. */
+  place: string;
+  /** Fichier d'origine, relatif à la collection. */
+  file: string;
+  /** Bloc d'origine (`tests`, `auth:oauth2`…). */
+  block: string | null;
+  /** Requête créée dans le projet, relative à sa racine. */
+  request: string | null;
+  detail: string;
+  /** Contenu d'origine (script, valeur). */
+  code: string | null;
+}
+
+/** Exemple de conversion sans code. */
+export interface ConversionExample {
+  before: string;
+  after: string;
+}
+
+/** Comptes du rapport (`ImportCounts`). */
+export interface ImportCounts {
+  folders: number;
+  requests: number;
+  environments: number;
+  assertions: number;
+  extractions: number;
+  secrets: number;
+  dynamicValues: number;
+  scripts: number;
+}
+
+/** Rapport d'import (2.3-f), gardé sur le poste. */
+export interface ImportReport {
+  collection: string;
+  format: ImportFormat;
+  source: string;
+  sourceFiles: number;
+  projectId: string;
+  projectName: string;
+  /** Dossier créé dans un projet existant ; `null` pour un nouveau projet. */
+  folder: string | null;
+  /** Millisecondes depuis 1970. */
+  importedAt: number;
+  counts: ImportCounts;
+  items: ImportReportItem[];
+  examples: ConversionExample[];
+}
+
+/** Réponse de `import_run`. */
+export interface ImportDone {
+  projectId: string;
+  /** Nouvel instantané si le catalogue a changé. */
+  snapshot: CatalogSnapshot | null;
+  report: ImportReport | null;
+  /** Contrat ajouté (OpenAPI), relatif au projet. */
+  contract: string | null;
 }

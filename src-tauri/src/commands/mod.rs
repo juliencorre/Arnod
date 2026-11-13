@@ -23,6 +23,8 @@ pub mod workspaces;
 pub mod response;
 // Lot B : saisie, texte et cURL.
 pub mod input;
+// Lot C - Import Bruno.
+pub mod import;
 
 #[cfg(test)]
 mod tests {

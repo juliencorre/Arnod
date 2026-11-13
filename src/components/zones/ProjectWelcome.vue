@@ -14,6 +14,8 @@ import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import { useContractAdd } from "@/composables/useContractAdd";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
+import { useImportStore } from "@/stores/imports";
+import { useNavigationStore } from "@/stores/navigation";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 
@@ -23,6 +25,8 @@ const catalog = useCatalogStore();
 const workbench = useWorkbenchStore();
 const contracts = useContractsStore();
 const toasts = useToastStore();
+const imports = useImportStore();
+const navigation = useNavigationStore();
 const project = computed(() => catalog.projectById(props.projectId));
 const empty = computed(
   () =>
@@ -44,14 +48,14 @@ async function newRequest(): Promise<void> {
 type Start = "import" | "contract" | "request" | "environment";
 
 /**
- * Points de départ, dans l'ordre de la maquette. « Importer… » importe un fichier OpenAPI ;
- * les collections Bruno viendront du lot C (2.3-b).
+ * Points de départ, dans l'ordre de la maquette. « Importer… » ouvre l'import (lot C, 2.3-b) :
+ * collection Bruno ou contrat OpenAPI, format reconnu par le cœur.
  */
 const STARTS: { id: Start; title: string; text: string; action: string }[] = [
   {
     id: "import",
     title: "Reprendre l'existant",
-    text: "Un fichier OpenAPI : ses opérations deviennent des requêtes, rangées sous leur contrat.",
+    text: "Une collection Bruno ou un fichier OpenAPI : vos requêtes deviennent des tests.",
     action: "Importer…",
   },
   {
@@ -75,7 +79,7 @@ const STARTS: { id: Start; title: string; text: string; action: string }[] = [
 ];
 
 function start(id: Start): void {
-  if (id === "import") adding.choose("file");
+  if (id === "import") imports.open(props.projectId, navigation.currentWorkspaceId);
   else if (id === "contract") adding.choose("template");
   else if (id === "request") void newRequest();
   else creatingEnvironment.value = true;

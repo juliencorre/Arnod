@@ -6,6 +6,7 @@
 //! vivent dans [`catalog`], leur persistance dans [`storage`] et [`manifest`],
 //! l'état partagé dans [`state`].
 
+pub mod bruno;
 pub mod catalog;
 pub mod commands;
 pub mod contract;
@@ -32,6 +33,7 @@ pub mod trial;
 #[cfg(test)]
 mod ts_contract;
 pub mod windows;
+pub mod import;
 pub mod workbench;
 
 use std::sync::{Arc, Mutex};
@@ -160,6 +162,11 @@ pub fn run() {
             commands::input::request_curl,
             commands::input::pairs_to_text,
             commands::input::pairs_from_text,
+            // Lot C - Import Bruno.
+            commands::import::import_pick,
+            commands::import::import_detect,
+            commands::import::import_run,
+            commands::import::import_report,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

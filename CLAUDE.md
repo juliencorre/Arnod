@@ -520,3 +520,25 @@ R13), écrans `5.1-b ter`, `5.1-b quater`, `2.1-a sexies`.
   `headers`, `bodyType`, `body`) : le jeton sort du texte (`{{token}}`), reste en mémoire dans
   l'interface et ne va au coffre (variable locale secrète de « Local » de « Non classés ») qu'à
   l'envoi de l'essai (`trial_send`, `secrets`), réponse masquée.
+
+## Import Bruno
+
+Référence : `docs/plan-mvp-c-import-bruno.md` (cas IM1 à IM6, règles R1 à R11), écrans `2.3-a`,
+`2.3-b` et `2.3-f`.
+
+- Un seul « Importer » : le cœur reconnaît le format (`import::detect`, sans écriture) : collection
+  Bruno en `.bru` (dossier avec `bruno.json`), projet Arnod ou OpenCollection (ajouté tel quel),
+  contrat OpenAPI (rangé dans `contracts/`). L'interface ne demande jamais d'où vient l'utilisateur.
+- Les fichiers d'origine ne sont jamais écrits : une collection Bruno devient un nouveau projet
+  (`AppState::create_project_with`, dossier retiré en cas d'échec) ou un nouveau dossier, au nom
+  libre, d'un projet (réglages de la collection dans son `folder.yml`, environnements complétés).
+- `src-tauri/src/bruno/` : `parse` (analyseur `.bru` écrit à la main, blocs inconnus gardés bruts),
+  `read` (disque, `.env`), `convert` (pur : fichiers OpenCollection validés contre le schéma et
+  rapport) ; tests sur la collection d'exemple `bruno/fixtures/boutique/`. Un bloc ou une option
+  sans équivalent est signalé, jamais inventé.
+- Correspondances fixes : `vars:post-response` → action `set-variable` `after-response` (sélecteur
+  `jsonq`, expression de Bruno telle quelle) ; scripts et `tests` → `runtime.scripts`, jamais
+  exécutés ; `{{$…}}` gardé ; `vars:secret` et `{{process.env.X}}` → variables locales sans valeur,
+  une valeur lue dans `.env` va au coffre.
+- Rapport : `ImportReport` gardé sur le poste (`projects/<id>/import.json`), montré dans l'onglet
+  `importReport` (`ImportReportTab`) ; chaque élément signalé cite son fichier et son bloc d'origine.

@@ -304,16 +304,48 @@ pages:
     plans:
       - "plan-opencollection (S1–S8)"
       - "plan-projets-workspaces (P12)"
+      - "plan-mvp-c-import-bruno (IM1–IM6)"
     liees: ["3.1"]
-    reste: "collections Bruno .bru (a) et leur rapport d'import (f), « Reprendre l'existant » (b) ; Postman en V4, SoapUI en V5."
+    reste: "Postman en V4 (d), SoapUI en V5 (e)."
     journal:
       - "2026-11-09 : Un projet Bruno au format OpenCollection s'ouvre (PR #29)."
+      - "2026-11-13 : Collections Bruno .bru converties en OpenCollection, rapport d'import, « Reprendre l'existant » (PR #50)."
     ecrans:
-      a: { etat: en partie, pr: [11, 29] }
-      b: { etat: à faire, version: MVP }
+      a:
+        {
+          etat: livré,
+          pr: [11, 29, 50],
+          ecart:
+            {
+              texte: "La carte « Importer… » propose « Choisir un dossier… » et « ou un fichier… » (le sélecteur natif ne choisit pas les deux à la fois) ; pas de dépôt d'un dossier (glisser-déposer natif désactivé) ; Postman n'est pas cité avant V4.",
+              aligner: maquette,
+            },
+        }
+      b:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [50],
+          ecart:
+            {
+              texte: "« Reprendre l'existant » est seul sous « Par où commencer ? » tant que les trois autres points de départ (1.2-d, lot D) ne sont pas livrés ; la fenêtre « Importer » ne montre pas la correspondance des environnements ni la case des secrets (ils vont toujours en variables locales).",
+              aligner: code,
+            },
+        }
       d: { etat: à faire, version: V4 }
       e: { etat: à faire, version: V5 }
-      f: { etat: à faire, version: MVP }
+      f:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [50],
+          captures: [c1-rapport-import],
+          ecart:
+            {
+              texte: "Sans « Remplacer par une assertion… » ni « Accepter sans ce script » : un script Bruno reste dans le fichier, signalé ; « vérifications » au lieu d'« assertions » (vocabulaire, lot K) ; le rapport se rouvre par son onglet tant qu'il est ouvert, pas depuis la barre latérale.",
+              aligner: code,
+            },
+        }
   "3.1":
     nom: "Contrats de service"
     version: MVP

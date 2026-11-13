@@ -1,0 +1,30 @@
+meta {
+  name: Annuler une commande
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/orders/:id/status
+  body: formUrlEncoded
+  auth: apikey
+}
+
+params:path {
+  id: {{orderId}}
+}
+
+auth:apikey {
+  key: x-api-key
+  value: {{partnerKey}}
+  placement: header
+}
+
+body:form-urlencoded {
+  status: cancelled
+  ~reason: test
+}
+
+body:json {
+  {"ignored": true}
+}

@@ -1,0 +1,22 @@
+headers {
+  x-client: arnod-tests
+  ~x-debug: 1
+}
+
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+vars:pre-request {
+  apiVersion: v2
+}
+
+docs {
+  # Boutique API
+  
+  Collection de démonstration.
+}
