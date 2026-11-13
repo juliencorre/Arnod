@@ -672,7 +672,7 @@ pages:
       - "2026-11-13 : Corps de la réponse (b bis) : format, aperçu HTML, copier, enregistrer, effacer, filtre JSONPath et vérification tirée d'un résultat (lot A)."
       - "2026-11-13 : Variables inconnues, compteurs d'onglets, en-têtes ajoutés, édition en texte et copie en cURL (lot B, PR #49)."
       - "2026-11-13 : Valeurs dynamiques tirées à chaque envoi par le cœur, montrées dans « Envoyé », « Garder » en fait une extraction (h, plan-mvp-e-tests-etapes, PR #51)."
-      - "2026-11-13 : Liste des valeurs dynamiques proposée à la frappe de {{$ dans tout champ à variables, avec description et exemple tirés par le cœur (h)."
+      - "2026-11-13 : Liste des valeurs dynamiques proposée à la frappe de {{$ dans tout champ à variables, avec description et exemple tirés par le cœur (h, PR #55)."
     ecrans:
       a: { etat: livré, pr: [27] }
       b: { etat: livré, pr: [27, 42], captures: [19-verification-en-echec] }
@@ -718,7 +718,7 @@ pages:
         {
           etat: livré,
           version: MVP,
-          pr: [51],
+          pr: [51, 55],
           captures: [25-valeurs-dynamiques],
           ecart:
             {
