@@ -63,18 +63,16 @@ pub async fn network_pick_authority(
         )
     })?;
     let read = path.clone();
-    let text = tauri::async_runtime::spawn_blocking(move || std::fs::read(&read))
+    let bytes = tauri::async_runtime::spawn_blocking(move || std::fs::read(&read))
         .await
         .map_err(|error| CommandError::new(CommandErrorKind::Io, error.to_string()))?
         .map_err(|error| CommandError::io("Lecture impossible", &path, &error))?;
-    let text = String::from_utf8_lossy(&text);
+    let text = String::from_utf8_lossy(&bytes);
     let info = if text.contains("BEGIN CERTIFICATE") {
         cert::parse_pem(&text)?.1
     } else {
-        // Certificat DER (.cer de Windows).
-        let der =
-            std::fs::read(&path).map_err(|e| CommandError::io("Lecture impossible", &path, &e))?;
-        cert::parse_der(&der)?
+        // Certificat DER (.cer de Windows), déjà lu.
+        cert::parse_der(&bytes)?
     };
     Ok(Some(info))
 }
