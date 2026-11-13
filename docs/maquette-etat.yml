@@ -77,7 +77,7 @@ pages:
         ecart:
           texte: "La cause est un texte simple du cœur, sans gras sur la version ; le pied donne le système sans numéro (« Windows »)."
           aligner: maquette
-      "b bis": { etat: livré, pr: [53], captures: [0.3-b-illisible] }
+      "b bis": { etat: livré, pr: [53] }
       "b ter":
         etat: livré
         pr: [53]
