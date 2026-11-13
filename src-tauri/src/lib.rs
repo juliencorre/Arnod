@@ -14,6 +14,7 @@ pub mod curl;
 pub mod environment;
 pub mod error;
 pub mod http;
+pub mod import;
 pub mod input;
 pub mod layout;
 pub mod local;
@@ -33,7 +34,6 @@ pub mod trial;
 #[cfg(test)]
 mod ts_contract;
 pub mod windows;
-pub mod import;
 pub mod workbench;
 
 use std::sync::{Arc, Mutex};
