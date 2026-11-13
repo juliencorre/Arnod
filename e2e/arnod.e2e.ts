@@ -2221,12 +2221,25 @@ describe("Lot F - onglets et clavier", () => {
   }
 
   async function waitForTabs(expected: { name: string; preview: boolean }[]): Promise<void> {
+    const norm = (tabs: { name: string; preview: boolean }[]) =>
+      JSON.stringify(
+        tabs.map((t) => ({
+          name: t.name.normalize("NFC").replace(/\s+/g, " "),
+          preview: t.preview,
+        })),
+      );
+    let last: unknown = null;
     try {
       await browser.waitUntil(
-        async () => JSON.stringify(await activeZoneTabs()) === JSON.stringify(expected),
+        async () => {
+          const tabs = await activeZoneTabs();
+          last = tabs;
+          return norm(tabs) === norm(expected);
+        },
         { timeout: 10_000 },
       );
-    } catch {
+    } catch (error) {
+      console.error("activeZoneTabs", JSON.stringify(last), String(error));
       // Diagnostic : tous les onglets du DOM (cachés compris) et les zones enregistrées.
       const dom = await browser.execute(() =>
         Array.from(document.querySelectorAll(".zone__tab")).map(
@@ -2237,7 +2250,7 @@ describe("Lot F - onglets et clavier", () => {
         w.layout ? zonesOf(w.layout.root).map((z) => z.tabs) : w.kind,
       );
       throw new Error(
-        `onglets ${JSON.stringify(expected)} attendus ; DOM ${JSON.stringify(dom)} ; windows.json ${JSON.stringify(saved)}`,
+        `onglets ${JSON.stringify(expected)} attendus, lus ${JSON.stringify(last)} ; DOM ${JSON.stringify(dom)} ; windows.json ${JSON.stringify(saved)}`,
       );
     }
   }
