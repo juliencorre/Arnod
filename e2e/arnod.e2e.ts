@@ -1652,7 +1652,7 @@ describe("Lot D - Barre latérale", () => {
   /** Valeur saisie dans le champ, événement `input` compris (le filtre réagit à la frappe). */
   async function typeFilter(value: string): Promise<void> {
     await browser.execute((text) => {
-      const input = document.querySelector<HTMLInputElement>("aside .tree .filter input");
+      const input = document.querySelector<HTMLInputElement>("aside .tree .tree-filter input");
       if (!input) throw new Error("filtre du référentiel introuvable");
       input.focus();
       input.value = text;
@@ -1662,7 +1662,7 @@ describe("Lot D - Barre latérale", () => {
 
   function filterState() {
     return browser.execute(() => ({
-      count: document.querySelector("aside .tree .filter__count")?.textContent.trim() ?? "",
+      count: document.querySelector("aside .tree .tree-filter__count")?.textContent.trim() ?? "",
       names: Array.from(document.querySelectorAll('aside .tree [role="treeitem"] .row__name')).map(
         (n) => n.textContent.trim(),
       ),
@@ -1674,7 +1674,7 @@ describe("Lot D - Barre latérale", () => {
     await chooseWorkspace("E-commerce");
     const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
     if (await expand.isExisting()) await expand.click();
-    await browser.$("aside .tree .filter input").waitForExist({ timeout: 10_000 });
+    await browser.$("aside .tree .tree-filter input").waitForExist({ timeout: 10_000 });
 
     await typeFilter("créer");
     await browser.waitUntil(async () => (await filterState()).count.startsWith("1 sur"), {
@@ -1739,7 +1739,13 @@ describe("Lot D - Barre latérale", () => {
     await chooseWorkspace("E-commerce");
     await waitForHeading(browser, "E-commerce");
     // Une carte par projet du workspace : chacune dit son nombre de contrats.
-    await browser.$("main article .card__stats").waitForExist({ timeout: 10_000 });
+    await browser.waitUntil(
+      async () => (await browser.$$("main article .card__stats")).length > 0,
+      {
+        timeout: 10_000,
+        timeoutMsg: "cartes de projet attendues",
+      },
+    );
     const stats = await browser.$$("main article .card__stats").map((s) => s.getText());
     expect(stats.length).toBeGreaterThan(0);
     for (const text of stats) expect(text).toMatch(/contrats? de service/);
@@ -1998,8 +2004,9 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
       timeoutMsg: "rapport d'import attendu",
     });
     expect(await browser.$(".report h1").getText()).toContain("Boutique API importée");
+    // WebKitGTK rend le nombre et son libellé sans séparateur : on compare sans les blancs.
     const stats = await browser.$$(".report__stat").map((s) => s.getText());
-    expect(stats.join(" | ")).toContain("6\nrequêtes");
+    expect(stats.map((s) => s.replace(/\s/g, ""))).toContain("6requêtes");
     await screenshot(browser, "c1-rapport-import");
 
     expect(readFileSync(path.join(source(), "Commandes", "Créer une commande.bru"), "utf8")).toBe(
