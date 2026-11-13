@@ -578,6 +578,15 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
 - « Extraire dans une variable » du filtre JSONPath (`ResponseFilter.vue`, store `response`)
   ajoute l'extraction de la correspondance courante (`workbench.addExtraction`).
 
+## Étiquettes proposées à la saisie
+
+Référence : écran `4.9-a`.
+
+- `TagsEditor.vue` (pastilles et champ d'ajout de `RequestEditor`) propose les étiquettes du projet
+  avec leur nombre de requêtes, puis « + Créer « … » » : comptage d'affichage dans `lib/tags.ts`
+  (pur, testé) sur les `TreeNode.tags` fournis par le cœur, sans casse ni accents.
+- Motif combobox : ↑ ↓, Entrée ajoute la proposition choisie (sinon le texte), Échap annule.
+
 ## Valeurs dynamiques à la saisie
 
 Référence : écran `5.1-h` (liste ouverte à la frappe de `{{$`).

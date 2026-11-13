@@ -28,6 +28,7 @@ import DynamicValuesMenu from "@/components/workbench/DynamicValuesMenu.vue";
 import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
+import TagsEditor from "@/components/workbench/TagsEditor.vue";
 import VariablesEditor from "@/components/workbench/VariablesEditor.vue";
 import { pathParamNames } from "@/lib/url";
 import { KNOWN_VARIABLES, vVariables } from "@/lib/variables";
@@ -110,33 +111,6 @@ const saveLabel = computed(() => {
 
 function retrySave(): void {
   void workbench.save(props.editorKey).catch(() => undefined);
-}
-
-// --- Étiquettes (EP1) -------------------------------------------------------------
-
-const addingTag = ref(false);
-const newTag = ref("");
-const tagInput = useTemplateRef<HTMLInputElement>("tagInput");
-
-async function startTag(): Promise<void> {
-  addingTag.value = true;
-  newTag.value = "";
-  await nextTick();
-  tagInput.value?.focus();
-}
-
-function commitTag(): void {
-  const tag = newTag.value.trim();
-  const tags = request.value?.tags;
-  if (tags && tag !== "" && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) {
-    tags.push(tag);
-  }
-  addingTag.value = false;
-  newTag.value = "";
-}
-
-function removeTag(index: number): void {
-  request.value?.tags.splice(index, 1);
 }
 
 // --- Paramètres de chemin (EP2, R1) ---------------------------------------------
@@ -486,33 +460,11 @@ watch(
       </div>
       <div class="meta">
         <span :id="ids.tags">Étiquettes</span>
-        <ul class="tags" :aria-labelledby="ids.tags">
-          <li v-for="(tag, index) in request.tags" :key="tag" class="tag">
-            {{ tag }}
-            <button
-              type="button"
-              class="tag__remove"
-              :aria-label="`Retirer l'étiquette ${tag}`"
-              @click="removeTag(index)"
-            >
-              ×
-            </button>
-          </li>
-          <li>
-            <input
-              v-if="addingTag"
-              ref="tagInput"
-              v-model="newTag"
-              class="tag__input"
-              type="text"
-              aria-label="Nouvelle étiquette"
-              @keydown.enter.prevent="commitTag"
-              @keydown.escape.prevent="addingTag = false"
-              @blur="commitTag"
-            />
-            <button v-else type="button" class="tag__add" @click="startTag">+ Étiquette</button>
-          </li>
-        </ul>
+        <TagsEditor
+          v-model="request.tags"
+          :project-id="editor?.projectId ?? ''"
+          :labelledby="ids.tags"
+        />
       </div>
     </div>
 
@@ -752,8 +704,7 @@ watch(
 .editor__url,
 .meta__input,
 .editor__docs,
-.path-param__input,
-.tag__input {
+.path-param__input {
   box-sizing: border-box;
   min-height: var(--control-md);
   padding: 0.3125rem 0.625rem;
@@ -974,56 +925,6 @@ watch(
   font-size: var(--text-body);
 }
 
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--radius-pill);
-  font-size: var(--text-body);
-  color: var(--color-text);
-  background: var(--color-chip);
-}
-
-.tag__remove,
-.tag__add {
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-}
-
-.tag__remove {
-  padding: 0 0.125rem;
-  color: var(--color-muted);
-}
-
-.tag__add {
-  min-height: var(--control-sm);
-  padding: 0 0.625rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  font-size: var(--text-body);
-  color: var(--color-text);
-  background: var(--color-surface);
-}
-
-.tag__input {
-  width: 9rem;
-  min-height: var(--control-sm);
-  padding: 0.1875rem 0.5rem;
-  font-size: var(--text-body);
-}
-
 /* Zone étroite : les onglets passent à la ligne, aucun n'est caché. */
 .editor__tabs {
   display: flex;
@@ -1191,9 +1092,6 @@ watch(
   .meta__input,
   .editor__docs,
   .path-param__input,
-  .tag__input,
-  .tag__remove,
-  .tag__add,
   .editor__tab,
   .editor__contract,
   .editor__curl-button,

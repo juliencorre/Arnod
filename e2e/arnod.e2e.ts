@@ -2224,6 +2224,48 @@ describe("Lot E - tests et étapes", () => {
     });
     expect(await browser.$(".dynamic-values").isExisting()).toBe(false);
   });
+
+  it("une étiquette du projet est proposée avec son nombre de requêtes (4.9-a)", async () => {
+    const file = (name: string) => path.join(project(), "Créer puis lire", name);
+    /** Ouvre une requête de la barre latérale et attend son éditeur. */
+    const open = async (name: string): Promise<void> => {
+      await clickText('aside [role="treeitem"]', name);
+      await browser.waitUntil(
+        () =>
+          browser.execute(
+            (n) =>
+              Array.from(
+                document.querySelectorAll<HTMLInputElement>(".request-tab .meta__input"),
+              ).some((input) => input.value === n) &&
+              document.querySelector(".request-tab .tag__add") !== null,
+            name,
+          ),
+        { timeoutMsg: `éditeur de « ${name} » attendu` },
+      );
+    };
+    await open("Lire le client");
+    await clickText(".request-tab .tag__add", "+ Étiquette");
+    await browser.keys([..."parcours".split(""), "Enter"]);
+    await browser.waitUntil(() => readFileSync(file("lire.yml"), "utf8").includes("parcours"), {
+      timeoutMsg: "étiquette enregistrée attendue",
+    });
+    await open("Supprimer le client");
+    await clickText(".request-tab .tag__add", "+ Étiquette");
+    await browser.keys("par".split(""));
+    await browser.waitUntil(
+      async () =>
+        (await browser.$(".tag-list").isExisting()) &&
+        (await browser.$(".tag-list").getText()).includes("parcours"),
+      { timeoutMsg: "étiquette du projet proposée attendue" },
+    );
+    await screenshot(browser, "26-etiquettes");
+    await browser.keys(["Enter"]);
+    await browser.waitUntil(
+      () => readFileSync(file("supprimer.yml"), "utf8").includes("parcours"),
+      { timeoutMsg: "étiquette proposée ajoutée attendue" },
+    );
+    expect(readFileSync(file("supprimer.yml"), "utf8")).toContain("parcours");
+  });
 });
 
 describe("Lot H - Réseau et authentification", () => {

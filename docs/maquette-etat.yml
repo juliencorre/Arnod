@@ -764,8 +764,20 @@ pages:
     reste: "filtrer, composer une campagne, ligne de commande (b, c, d)."
     journal:
       - "2026-11-09 : Étiquettes libres d'une requête (PR #32)."
+      - "2026-11-13 : Étiquettes du projet proposées avec leur nombre de requêtes à la saisie, puis « + Créer » (a, PR #56)."
     ecrans:
-      a: { etat: en partie, pr: [32] }
+      a:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [32, 56],
+          captures: [26-etiquettes],
+          ecart:
+            {
+              texte: "Le champ d'ajout s'ouvre par « + Étiquette » sous les étiquettes, pas en ligne sous l'adresse ; le nombre compte les requêtes du projet qui portent l'étiquette.",
+              aligner: maquette,
+            },
+        }
       b: { etat: à faire, version: V2 }
       c: { etat: à faire, version: V7 }
       d: { etat: à faire, version: V2 }
