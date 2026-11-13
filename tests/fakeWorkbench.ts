@@ -175,9 +175,10 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
         path,
         children,
         requestCount: count,
-        // Test : des requêtes et aucun sous-dossier (lot E, R1).
+        // Test : des requêtes sans contrat et aucun sous-dossier (lot E, R1).
         test:
-          children.some((c) => c.kind === "request") && !children.some((c) => c.kind === "folder"),
+          children.some((c) => c.kind === "request" && c.contract === null) &&
+          !children.some((c) => c.kind === "folder"),
       };
     });
     // Rang (`seq`) d'abord, puis le chemin (lot E, R1).

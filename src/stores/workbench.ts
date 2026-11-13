@@ -21,6 +21,8 @@ import type {
   TreeNode,
   TreeView,
   VariableUser,
+  PathGeneralization,
+  TransferredTrial,
   NetworkFailure,
 } from "@/types/ipc";
 
@@ -1061,6 +1063,64 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     });
   }
 
+  // --- Essais : chemins généralisés et transfert (2.2-b, 2.2-c) -------------------
+
+  /** Chemin généralisé proposé pour chaque requête ouverte (`null` : rien à proposer). */
+  const generalizations = reactive<Record<string, PathGeneralization | null>>({});
+
+  /** Relit la proposition de chemin généralisé d'une requête ouverte liée à un contrat. */
+  async function inspectTrial(key: string): Promise<void> {
+    const editor = editors[key];
+    if (!editor?.draft?.contract) {
+      generalizations[key] = null;
+      return;
+    }
+    generalizations[key] = await ipc
+      .trialGeneralization(editor.projectId, editor.path)
+      .catch(() => null);
+  }
+
+  /** Relit les requêtes ouvertes `paths` du projet après une modification par le cœur. */
+  async function reloadOpened(projectId: string, paths: string[]): Promise<void> {
+    for (const path of paths) {
+      const key = requestKey(projectId, path);
+      if (editors[key]) await reload(key);
+    }
+  }
+
+  /** « Généraliser » le chemin de l'essai ouvert `key` ; ses voisines liées suivent. */
+  async function generalizeTrial(key: string): Promise<void> {
+    const editor = editors[key];
+    if (!editor) return;
+    await save(key);
+    const changed = await ipc.trialGeneralize(editor.projectId, editor.path);
+    generalizations[key] = null;
+    await reloadOpened(editor.projectId, changed);
+  }
+
+  /** « Garder tel quel » le chemin de l'essai ouvert `key`. */
+  async function keepTrialPath(key: string): Promise<void> {
+    const editor = editors[key];
+    if (!editor) return;
+    await ipc.trialKeepPath(editor.projectId, editor.path);
+    generalizations[key] = null;
+  }
+
+  /** « Transférer au référentiel de tests » : l'essai devient l'étape 1 du test `name`. */
+  async function transferTrial(
+    projectId: string,
+    path: string,
+    name: string,
+    parent: string,
+  ): Promise<TransferredTrial> {
+    await saveUnder(projectId, path);
+    const moved = await ipc.trialTransfer(projectId, path, name, parent);
+    moveEditors(projectId, path, moved.step);
+    await reloadOpened(projectId, [moved.step]);
+    await refreshTree(projectId);
+    return moved;
+  }
+
   return {
     trees,
     environments,
@@ -1126,6 +1186,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     variableUsers,
     isChangedSinceSent,
     revertToSent,
+    // Essais (2.2-b, 2.2-c).
+    generalizations,
+    inspectTrial,
+    generalizeTrial,
+    keepTrialPath,
+    transferTrial,
     // Lot I : fichiers modifiés hors d'Arnod.
     detectConflict,
     chooseConflict,

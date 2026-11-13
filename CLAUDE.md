@@ -578,6 +578,23 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
 - « Extraire dans une variable » du filtre JSONPath (`ResponseFilter.vue`, store `response`)
   ajoute l'extraction de la correspondance courante (`workbench.addExtraction`).
 
+## Essais : chemins généralisés et transfert
+
+Référence : écrans `2.2-c` et `2.2-b`.
+
+- `trial/generalize.rs` (pur pour `template`, disque pour le reste) : un segment qui ressemble à
+  un identifiant (nombre, UUID, mot de 6 caractères ou plus mêlant lettres et chiffres) donne un
+  chemin généralisé (`/orders/{id}/tracking`, dernier paramètre `id`, les autres `<ressource>Id`).
+  `trial_generalization` le propose, `trial_generalize` déplace l'opération du contrat déduit
+  (fusionnée si le chemin existe) et fait suivre les requêtes liées, `trial_keep_path` l'écarte
+  (`x-arnod-path-kept`). Un essai suivant au même chemin rejoint l'opération généralisée
+  (`deduce::add_exchange`).
+- `trial::transfer` (`trial_transfer`) : l'essai devient l'étape 1 d'un nouveau test du
+  référentiel, sans lien au contrat. Un dossier qui ne range que des requêtes liées n'est pas un
+  test (`tree::is_test`).
+- Interface : `TrialGeneralize.vue` sous l'adresse de toute requête liée à un contrat déduit,
+  `TrialTransfer.vue` (« Requête au point ? ») sous l'éditeur d'un essai de « Non classés ».
+
 ## Étiquettes proposées à la saisie
 
 Référence : écran `4.9-a`.

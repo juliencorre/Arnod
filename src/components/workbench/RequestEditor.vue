@@ -28,10 +28,13 @@ import DynamicValuesMenu from "@/components/workbench/DynamicValuesMenu.vue";
 import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
+import TrialGeneralize from "@/components/workbench/TrialGeneralize.vue";
+import TrialTransfer from "@/components/workbench/TrialTransfer.vue";
 import TagsEditor from "@/components/workbench/TagsEditor.vue";
 import VariablesEditor from "@/components/workbench/VariablesEditor.vue";
 import { pathParamNames } from "@/lib/url";
 import { KNOWN_VARIABLES, vVariables } from "@/lib/variables";
+import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
 import { useInputStore } from "@/stores/input";
 import { useToastStore } from "@/stores/toasts";
@@ -44,6 +47,7 @@ const editorRoot = useTemplateRef<HTMLElement>("editorRoot");
 
 const workbench = useWorkbenchStore();
 const contracts = useContractsStore();
+const catalog = useCatalogStore();
 const inputs = useInputStore();
 const toasts = useToastStore();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
@@ -431,6 +435,7 @@ watch(
         Envoyer
       </BaseButton>
     </form>
+    <TrialGeneralize :editor-key="editorKey" />
     <div v-if="unknown.length > 0" :id="ids.unknown" class="unknown" role="status">
       <span class="unknown__icon" aria-hidden="true">!</span>
       <ul class="unknown__list">
@@ -602,6 +607,11 @@ watch(
       />
     </div>
 
+    <TrialTransfer
+      v-if="editor && catalog.isInbox(editor.projectId)"
+      :editor-key="editorKey"
+      :project-name="catalog.projects.find((p) => p.id === editor?.projectId)?.name ?? ''"
+    />
     <p v-if="request.preserved.length > 0" class="editor__preserved" role="note">
       Conservé dans le fichier sans être modifié par Arnod : {{ request.preserved.join(", ") }}.
     </p>

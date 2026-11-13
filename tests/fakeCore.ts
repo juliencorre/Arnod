@@ -17,6 +17,7 @@ import {
   type FakeWindows,
 } from "./fakeWindows";
 import { handleInput } from "./fakeInput";
+import { handleTrials } from "./fakeTrials";
 import { STEP_CATALOG, detect } from "./fakeSteps";
 // Lot C - Import Bruno.
 import { createFakeImports, handleImports, type FakeImports } from "./fakeImports";
@@ -373,6 +374,9 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
             DEFAULT_LOCATION,
           );
           if (imported !== undefined) return imported;
+          // Essais rangés (2.2-b, 2.2-c).
+          const trials = handleTrials(core.workbench, core.contracts, cmd, args);
+          if (trials !== undefined) return trials;
           // Lot H - Réseau et authentification.
           const network = handleNetwork(core.network, cmd, args);
           if (network !== undefined) return network;

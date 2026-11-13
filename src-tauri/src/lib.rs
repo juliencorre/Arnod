@@ -199,6 +199,11 @@ pub fn run() {
             commands::test_steps::tree_create_test,
             commands::test_steps::tree_add_step,
             commands::test_steps::request_variable_users,
+            // Essais : chemins généralisés et transfert au référentiel (2.2-b et 2.2-c).
+            commands::trial::trial_generalization,
+            commands::trial::trial_generalize,
+            commands::trial::trial_keep_path,
+            commands::trial::trial_transfer,
             // Valeurs dynamiques proposées à la saisie (5.1-h).
             commands::input::dynamic_values,
             // Lot H - Réseau et authentification.

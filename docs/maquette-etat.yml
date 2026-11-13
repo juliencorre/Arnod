@@ -354,13 +354,14 @@ pages:
       - "plan-accueil-non-classes (A5, N1–N5)"
       - "plan-requetes-dans-contrats (RC8)"
     liees: ["2.1", "3.1", "3.2"]
-    reste: "transférer au référentiel (b), chemins généralisés (c), ranger dans un projet (d) : lot « Ranger les essais »."
+    reste: "ranger dans un projet (d)."
     questions:
       - "« Contrats de service » ne décrit que des API : où ranger un essai SQL, Kafka ou batch (section « Systèmes testés » ?)"
     journal:
       - "2026-11-10 : Non classés et contrat déduit (PR #35)."
       - "2026-11-11 : Essais rangés sous leur opération (PR #40)."
       - "2026-11-12 : Partie 2 de « Premier usage » devenue une page."
+      - "2026-11-13 : Chemin généralisé proposé et appliqué au contrat déduit (c) ; essai transféré au référentiel de tests, étape 1 d'un test (b)."
     ecrans:
       a:
         {
@@ -373,8 +374,30 @@ pages:
               aligner: à décider,
             },
         }
-      b: { etat: à faire }
-      c: { etat: en partie, pr: [35] }
+      b:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [59],
+          captures: [28-transferer-au-referentiel],
+          ecart:
+            {
+              texte: "L'étape n'est plus liée au contrat (une étape n'est jamais liée, lot E) : elle quitte l'endpoint et n'est plus vérifiée contre lui ; « Transférer vers les templates » attend les templates ; le nom proposé est celui de l'essai ; « Requête au point ? » est un bloc sous l'éditeur, bouton secondaire.",
+              aligner: à décider,
+            },
+        }
+      c:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [35, 59],
+          captures: [27-essai-chemin-generalise],
+          ecart:
+            {
+              texte: "La proposition est au fond orangé des mises en évidence (pas de jeton « information ») ; « … servirait pour toutes les valeurs » au lieu de « toutes les commandes » ; l'essai suivant au même chemin rejoint l'opération généralisée.",
+              aligner: maquette,
+            },
+        }
       d: { etat: à faire }
       f: { etat: livré, pr: [35, 39], captures: [18-tous-les-projets-non-classes] }
   "2.3":

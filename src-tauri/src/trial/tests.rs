@@ -208,3 +208,107 @@ fn r11_numero_d_essai_libre() {
     assert_eq!(next_number(&nodes), 8);
     assert_eq!(next_number(&[]), 1);
 }
+
+#[test]
+fn c_generaliser_le_chemin_d_un_essai() {
+    let dir = project();
+    let root = dir.path();
+    let first = record(
+        root,
+        trial(Method::Get, "https://api.boutique.dev/orders/42/tracking"),
+        &response(200, r#"{"orderId":42}"#),
+    )
+    .unwrap();
+    let proposed = generalize::suggestion(root, &first.path).unwrap().unwrap();
+    assert_eq!(proposed.path, "/orders/42/tracking");
+    assert_eq!(proposed.template.path, "/orders/{id}/tracking");
+
+    let changed = generalize::generalize(root, &first.path).unwrap();
+    assert_eq!(changed, std::slice::from_ref(&first.path));
+    let request = request_file::read(&root.join(&first.path)).unwrap();
+    assert_eq!(request.url, "https://api.boutique.dev/orders/{id}/tracking");
+    assert_eq!(
+        request.contract.map(|l| l.operation).as_deref(),
+        Some("GET /orders/{id}/tracking")
+    );
+    let id = request.params.iter().find(|p| p.name == "id").unwrap();
+    assert_eq!(id.value, "42");
+    let contract = contract_file::read(root, &first.contract).unwrap();
+    assert_eq!(contract.operations.len(), 1);
+    // Plus rien à proposer, et l'essai suivant rejoint l'opération généralisée.
+    assert_eq!(generalize::suggestion(root, &first.path).unwrap(), None);
+    let second = record(
+        root,
+        trial(Method::Get, "https://api.boutique.dev/orders/43/tracking"),
+        &response(404, r#"{"error":"absent"}"#),
+    )
+    .unwrap();
+    let request = request_file::read(&root.join(&second.path)).unwrap();
+    assert_eq!(
+        request.contract.map(|l| l.operation).as_deref(),
+        Some("GET /orders/{id}/tracking")
+    );
+    assert_eq!(
+        contract_file::read(root, &first.contract)
+            .unwrap()
+            .operations
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn c_garder_le_chemin_tel_quel() {
+    let dir = project();
+    let root = dir.path();
+    let recorded = record(
+        root,
+        trial(Method::Get, "https://api.boutique.dev/orders/42"),
+        &response(200, "{}"),
+    )
+    .unwrap();
+    generalize::keep(root, &recorded.path).unwrap();
+    assert_eq!(generalize::suggestion(root, &recorded.path).unwrap(), None);
+    assert!(generalize::generalize(root, &recorded.path).is_err());
+}
+
+#[test]
+fn b_transferer_un_essai_au_referentiel_de_tests() {
+    let dir = project();
+    let root = dir.path();
+    let recorded = record(
+        root,
+        trial(Method::Get, "https://api.boutique.dev/products"),
+        &response(200, r#"{"id":"prd_101"}"#),
+    )
+    .unwrap();
+    let before = request_file::read(&root.join(&recorded.path)).unwrap();
+    let moved = transfer(root, &recorded.path, "Lister les produits", "").unwrap();
+    assert_eq!(
+        moved,
+        Transferred {
+            test: "Lister les produits".to_owned(),
+            step: "Lister les produits/essai-1.yml".to_owned(),
+        }
+    );
+    let step = request_file::read(&root.join(&moved.step)).unwrap();
+    assert_eq!(step.contract, None);
+    assert_eq!(step.seq, Some(1.0));
+    assert_eq!(step.assertions.len(), before.assertions.len());
+    assert_eq!(step.url, before.url);
+    assert!(!root.join(&recorded.path).exists());
+    // Le dossier est un test d'une étape, dans le référentiel.
+    let nodes = tree::read(root).unwrap();
+    let tests = tree::tests_view(&nodes, &contract_file::paths(root));
+    assert!(tests.iter().any(|n| matches!(n,
+        TreeNode::Folder { name, test: true, .. } if name == "Lister les produits")));
+    // Un nom déjà pris est refusé sans rien déplacer.
+    let other = record(
+        root,
+        trial(Method::Get, "https://api.boutique.dev/orders"),
+        &response(200, "[]"),
+    )
+    .unwrap();
+    assert!(transfer(root, &other.path, "lister les produits", "").is_err());
+    assert!(root.join(&other.path).exists());
+}

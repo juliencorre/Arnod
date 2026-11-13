@@ -172,6 +172,71 @@ fn keep_secrets(
     Ok(())
 }
 
+/// Prévient les fenêtres que l'arborescence et les contrats du projet ont changé.
+fn trial_changed(window: &WebviewWindow, project: Uuid, path: Option<&str>) {
+    for scope in [ProjectScope::Tree, ProjectScope::Contracts] {
+        windows::project_changed(window.app_handle(), window.label(), project, scope, path);
+    }
+}
+
+/// Chemin généralisé proposé pour l'essai `path` (écran 2.2-c), s'il y en a un.
+#[tauri::command]
+pub fn trial_generalization(
+    state: State<'_, AppState>,
+    project: Uuid,
+    path: String,
+) -> Result<Option<trial::generalize::Suggestion>, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    trial::generalize::suggestion(&ctx.root, &path)
+}
+
+/// « Généraliser » (2.2-c) : renvoie les requêtes modifiées.
+#[tauri::command]
+pub fn trial_generalize(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    project: Uuid,
+    path: String,
+) -> Result<Vec<String>, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    let changed = trial::generalize::generalize(&ctx.root, &path)?;
+    for changed_path in &changed {
+        trial_changed(&window, project, Some(changed_path));
+    }
+    Ok(changed)
+}
+
+/// « Garder tel quel » (2.2-c) : le chemin n'est plus proposé à la généralisation.
+#[tauri::command]
+pub fn trial_keep_path(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    project: Uuid,
+    path: String,
+) -> Result<(), CommandError> {
+    let ctx = state.project_ctx(project)?;
+    trial::generalize::keep(&ctx.root, &path)?;
+    trial_changed(&window, project, None);
+    Ok(())
+}
+
+/// « Transférer au référentiel de tests » (2.2-b) : l'essai devient l'étape 1 d'un test.
+#[tauri::command]
+pub fn trial_transfer(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    project: Uuid,
+    path: String,
+    name: String,
+    parent: String,
+) -> Result<trial::Transferred, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    let moved = trial::transfer(&ctx.root, &path, &name, &parent)?;
+    crate::commands::tree::follow_path(&window, project, &path, &moved.step);
+    trial_changed(&window, project, Some(&moved.step));
+    Ok(moved)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

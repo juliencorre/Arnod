@@ -81,7 +81,7 @@ fn tree_changed<T>(
 }
 
 /// Les onglets ouverts sur `from` suivent vers `to` dans toutes les fenêtres.
-fn follow_path(window: &WebviewWindow, project: Uuid, from: &str, to: &str) {
+pub(crate) fn follow_path(window: &WebviewWindow, project: Uuid, from: &str, to: &str) {
     let _ = windows::apply(window.app_handle(), |w: &mut Windows| {
         w.rename_path(project, from, to);
         Ok(())

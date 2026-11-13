@@ -219,8 +219,10 @@ fn query_parameters(url: &reqwest::Url) -> Vec<Value> {
 /// ajouté, un statut connu n'est pas modifié.
 pub fn add_exchange(doc: &mut Value, exchange: &Exchange<'_>) -> String {
     let method = exchange.method.to_lowercase();
-    let path = path_of(exchange.url);
-    let key = operation_key(exchange.method, exchange.url);
+    // Un chemin généralisé (`/orders/{id}`, écran 2.2-c) sert toutes les valeurs.
+    let path = generalized_path(doc, &method, &path_of(exchange.url))
+        .unwrap_or_else(|| path_of(exchange.url));
+    let key = format!("{} {path}", exchange.method.to_uppercase());
     let Some(root) = doc.as_object_mut() else {
         return key;
     };
@@ -270,6 +272,28 @@ pub fn add_exchange(doc: &mut Value, exchange: &Exchange<'_>) -> String {
         }
     }
     key
+}
+
+/// Le chemin concret `path` correspond-il au chemin généralisé `template` (`{nom}` vaut un
+/// segment quelconque) ?
+pub fn path_matches(template: &str, path: &str) -> bool {
+    let a: Vec<&str> = template.split('/').collect();
+    let b: Vec<&str> = path.split('/').collect();
+    a.len() == b.len()
+        && a.iter()
+            .zip(&b)
+            .all(|(t, s)| (t.starts_with('{') && t.ends_with('}') && !s.is_empty()) || t == s)
+}
+
+/// Chemin généralisé du contrat qui a déjà une opération `method` et sert `path`.
+fn generalized_path(doc: &Value, method: &str, path: &str) -> Option<String> {
+    doc.get("paths")?
+        .as_object()?
+        .iter()
+        .find(|(template, item)| {
+            template.contains('{') && item.get(method).is_some() && path_matches(template, path)
+        })
+        .map(|(template, _)| template.clone())
 }
 
 #[cfg(test)]
