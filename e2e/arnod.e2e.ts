@@ -2209,14 +2209,17 @@ describe("Lot E - tests et étapes", () => {
   });
 
   it("la liste des valeurs dynamiques s'ouvre à la frappe de {{$ et insère la valeur choisie (5.1-h)", async () => {
-    const field = browser.$(".request-tab .editor__url");
-    await field.click();
-    await browser.keys(["End"]);
-    await browser.keys("/{{$rand".split(""));
-    await browser.$(".dynamic-values").waitForDisplayed({ timeoutMsg: "liste attendue" });
+    // Le curseur est resté dans l'adresse de l'étape 1 (4.1-b) : on tape à la suite.
+    const value = () =>
+      browser.execute(() => (document.activeElement as HTMLInputElement | null)?.value ?? "");
+    // Deux « { » envoyés d'un coup se fondent en un sous WebKitGTK : une touche par appel.
+    for (const key of ["End", "{", "{", "$", "r", "a", "n", "d"]) await browser.keys([key]);
+    await browser.waitUntil(() => browser.$(".dynamic-values").isExisting(), {
+      timeoutMsg: "liste des valeurs dynamiques attendue",
+    });
     await screenshot(browser, "25-valeurs-dynamiques");
     await browser.keys(["ArrowDown", "Enter"]);
-    await browser.waitUntil(async () => (await field.getValue()).endsWith("{{$randomInt}}"), {
+    await browser.waitUntil(async () => (await value()).endsWith("{{$randomInt}}"), {
       timeoutMsg: "valeur dynamique insérée attendue",
     });
     expect(await browser.$(".dynamic-values").isExisting()).toBe(false);
