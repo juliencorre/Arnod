@@ -2208,3 +2208,75 @@ describe("Lot E - tests et étapes", () => {
     await screenshot(browser, "24-nouveau-test");
   });
 });
+
+describe("Lot G - Démarrage et erreurs (0.3)", () => {
+  const statePath = () => path.join(sandbox.dataDir, "arnod.json");
+
+  /** Texte d'un élément du DOM (WebKitGTK peut perdre les blancs entre éléments). */
+  function textOf(selector: string): Promise<string> {
+    return browser.execute(
+      (s) => document.querySelector(s)?.textContent.replace(/\s+/g, " ").trim() ?? "",
+      selector,
+    );
+  }
+
+  it("un arnod.json illisible s'explique, intact, avec deux issues (0.3-b, 0.3-b ter)", async () => {
+    const original = readFileSync(statePath(), "utf8");
+    await browser.deleteSession();
+    writeFileSync(statePath(), "{ pas du JSON");
+    browser = await launchApp();
+
+    await browser.$(".startup-problem").waitForDisplayed({ timeout: 10_000 });
+    expect(await heading(browser)).toBe("L'état d'Arnod est illisible");
+    expect(await textOf(".startup-problem__intact")).toContain("Rien n'a été modifié.");
+    const buttons = await browser.execute(() =>
+      Array.from(document.querySelectorAll(".startup-problem__option-button")).map((b) =>
+        b.textContent.trim(),
+      ),
+    );
+    expect(buttons).toEqual(["Repartir d'un état vide", "Réessayer"]);
+    // Rien n'est écrit tant que l'utilisateur n'a pas choisi.
+    expect(readFileSync(statePath(), "utf8")).toBe("{ pas du JSON");
+    await screenshot(browser, "0.3-b-illisible");
+
+    await browser.$(".startup-problem__toggle").click();
+    await browser.$("#startup-problem-details").waitForDisplayed();
+    expect(await textOf("#startup-problem-details")).toContain("corruptState");
+    await screenshot(browser, "0.3-b-ter-details");
+
+    await browser.$(".startup-problem__option-button*=Repartir").click();
+    await browser.$(".startup-problem").waitForExist({ reverse: true, timeout: 10_000 });
+    expect(await toastText(browser)).toContain("arnod.json.illisible");
+    expect(readFileSync(path.join(sandbox.dataDir, "arnod.json.illisible"), "utf8")).toBe(
+      "{ pas du JSON",
+    );
+    expect(readState(sandbox).projects).toEqual([]);
+
+    // L'état d'origine remis en place, les projets reviennent.
+    await browser.deleteSession();
+    writeFileSync(statePath(), original);
+    browser = await launchApp();
+    expect(await browser.$(".startup-problem").isExisting()).toBe(false);
+    expect(readState(sandbox).projects.length).toBeGreaterThan(0);
+  });
+
+  it("un état d'une version plus récente n'est ni lu ni réécrit (0.3-b)", async () => {
+    const original = readFileSync(statePath(), "utf8");
+    const newer = JSON.stringify({ version: 99, writtenBy: "9.0.0" });
+    await browser.deleteSession();
+    writeFileSync(statePath(), newer);
+    browser = await launchApp();
+
+    await browser.$(".startup-problem").waitForDisplayed({ timeout: 10_000 });
+    expect(await heading(browser)).toBe("Cet état vient d'une version plus récente d'Arnod");
+    expect(await textOf(".startup-problem__option--recommended h3")).toContain(
+      "Installer Arnod 9.0.0 ou plus récent",
+    );
+
+    await browser.deleteSession();
+    expect(readFileSync(statePath(), "utf8")).toBe(newer);
+    writeFileSync(statePath(), original);
+    browser = await launchApp();
+    expect(await browser.$(".startup-problem").isExisting()).toBe(false);
+  });
+});

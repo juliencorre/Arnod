@@ -25,6 +25,7 @@ pub mod request;
 pub mod response;
 pub mod results;
 pub mod secrets;
+pub mod startup;
 pub mod state;
 pub mod statuses;
 pub mod steps;
@@ -69,7 +70,16 @@ pub fn run() {
             app.state::<AppState>().on_change(Box::new(move |snapshot| {
                 windows::catalog_changed(&handle, snapshot)
             }));
-            windows::restore(app.handle());
+            // Lot G : une erreur de démarrage s'explique d'abord ; les fenêtres détachées
+            // reviennent une fois réglée (`startup_retry`, `startup_start_empty`).
+            app.manage(commands::startup::StartupAttempts::default());
+            if app.state::<AppState>().failure().is_none()
+                && app.state::<WindowsState>().failure().is_none()
+            {
+                windows::restore(app.handle());
+            }
+            // Fenêtre créée cachée, montrée prête (`window_ready`) ou après 300 ms (0.3-a).
+            windows::show_later(app.handle(), windows::MAIN_LABEL);
             Ok(())
         })
         .on_window_event(windows::on_window_event)
@@ -172,6 +182,13 @@ pub fn run() {
             commands::test_steps::tree_create_test,
             commands::test_steps::tree_add_step,
             commands::test_steps::request_variable_users,
+            // Lot G - Démarrage et erreurs.
+            commands::startup::startup_status,
+            commands::startup::startup_retry,
+            commands::startup::startup_start_empty,
+            commands::startup::startup_open,
+            commands::startup::startup_quit,
+            commands::startup::window_ready,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

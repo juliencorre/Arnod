@@ -11,6 +11,8 @@ import { PETSTORE_SOURCE } from "../fakeContracts";
 import { AUTH_SSO, BOUTIQUE_TESTS, boutiqueSnapshot, firstRunSnapshot } from "../fixtures";
 import type { Example } from "@/types/ipc";
 import { brunoSource } from "../fakeImports";
+import { fichierVerrouilleLotG, versionPlusRecenteLotG } from "../fakeStartup";
+import type { StartupProblem } from "@/types/ipc";
 
 /** Gestes dans la page, par sélecteur CSS et texte visible. */
 export interface Gestes {
@@ -706,7 +708,38 @@ Object.assign(SCENARIOS, {
       await g.attendre(100);
     },
   },
+  // Lot G - Démarrage et erreurs (0.3).
+  "0.3-a": {
+    description: "Démarrage lent : squelette de l'écran attendu (0.3-a)",
+    setup: () => {
+      const core = installFakeCore(boutiqueSnapshot());
+      core.startup.slow = true;
+      return core;
+    },
+  },
+  "0.3-b": {
+    description: "Erreur au démarrage, deux issues dont la recommandée (0.3-b)",
+    setup: () => erreurLotG(versionPlusRecenteLotG()),
+  },
+  "0.3-b-bis": {
+    description: "Fichier d'état verrouillé, essai automatique (0.3-b bis)",
+    setup: () => erreurLotG(fichierVerrouilleLotG()),
+  },
+  "0.3-b-ter": {
+    description: "Détails pour le support dépliés (0.3-b ter)",
+    setup: () => erreurLotG(versionPlusRecenteLotG()),
+    play: async (g: Gestes) => {
+      await g.cliquer(".startup-problem__toggle");
+    },
+  },
 } satisfies Record<string, Scenario>);
 
 /** Collection Bruno des scénarios d'import. */
 const BRUNO_DIR = "/home/julien/bruno/boutique-api";
+
+/** Lot G : erreur bloquante servie par le faux cœur au démarrage. */
+function erreurLotG(problem: StartupProblem): FakeCore {
+  const core = installFakeCore(firstRunSnapshot());
+  core.startup.problem = problem;
+  return core;
+}
