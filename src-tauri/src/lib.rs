@@ -25,6 +25,7 @@ pub mod request;
 pub mod response;
 pub mod results;
 pub mod secrets;
+pub mod startup;
 pub mod state;
 pub mod statuses;
 pub mod steps;
@@ -82,7 +83,16 @@ pub fn run() {
                     })
                 });
             }));
-            windows::restore(app.handle());
+            // Lot G : une erreur de démarrage s'explique d'abord ; les fenêtres détachées
+            // reviennent une fois réglée (`startup_retry`, `startup_start_empty`).
+            app.manage(commands::startup::StartupAttempts::default());
+            if app.state::<AppState>().failure().is_none()
+                && app.state::<WindowsState>().failure().is_none()
+            {
+                windows::restore(app.handle());
+            }
+            // Fenêtre créée cachée, montrée prête (`window_ready`) ou après 300 ms (0.3-a).
+            windows::show_later(app.handle(), windows::MAIN_LABEL);
             Ok(())
         })
         .on_window_event(windows::on_window_event)
@@ -188,6 +198,13 @@ pub fn run() {
             // Lot I - Fichiers modifiés hors d'Arnod.
             commands::files::request_conflict,
             commands::files::request_conflict_resolve,
+            // Lot G - Démarrage et erreurs.
+            commands::startup::startup_status,
+            commands::startup::startup_retry,
+            commands::startup::startup_start_empty,
+            commands::startup::startup_open,
+            commands::startup::startup_quit,
+            commands::startup::window_ready,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

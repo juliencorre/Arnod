@@ -72,6 +72,8 @@ import type {
   CreatedTest,
   TestView,
   VariableUser,
+  StartupProblem,
+  StartupTarget,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -576,6 +578,28 @@ export const ipc = {
     choices: Record<string, ConflictSide>,
   ): Promise<RequestDoc> =>
     call<RequestDoc>("request_conflict_resolve", { project, path, draft, choices }),
+  // Lot G - Démarrage et erreurs.
+
+  /** Erreur bloquante du démarrage, décrite ; `null` si Arnod peut démarrer. */
+  startupStatus: (): Promise<StartupProblem | null> =>
+    call<StartupProblem | null>("startup_status"),
+
+  /** Relit le fichier en échec ; `automatic` pour un essai automatique (R4). */
+  startupRetry: (automatic: boolean): Promise<StartupProblem | null> =>
+    call<StartupProblem | null>("startup_retry", { automatic }),
+
+  /** Met le fichier en échec de côté (renommé, intact) et repart d'un état vide (R3). */
+  startupStartEmpty: (): Promise<StartupProblem | null> =>
+    call<StartupProblem | null>("startup_start_empty"),
+
+  /** Ouvre le dossier de données, la page des versions ou l'issue préremplie (R6). */
+  startupOpen: (target: StartupTarget): Promise<null> => call<null>("startup_open", { target }),
+
+  /** Quitte Arnod sans rien écrire. */
+  startupQuit: (): Promise<null> => call<null>("startup_quit"),
+
+  /** L'interface est prête : la fenêtre, créée cachée, apparaît (0.3-a). */
+  windowReady: (): Promise<null> => call<null>("window_ready"),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

@@ -30,6 +30,7 @@ import {
 import { createFakeResponse, handleResponse, type FakeResponse } from "./fakeResponse";
 // Lot I - Fichiers modifiés hors d'Arnod.
 import { handleFilesLotI } from "./fakeFiles";
+import { createFakeStartup, handleStartupLotG, type FakeStartup } from "./fakeStartup";
 
 export const HOME = "/home/julien";
 export const DEFAULT_LOCATION = `${HOME}/arnod`;
@@ -60,6 +61,8 @@ export interface FakeCore {
   response: FakeResponse;
   /** Lot C - Import Bruno : sources reconnues, rapports. */
   imports: FakeImports;
+  /** Lot G - Démarrage et erreurs : erreur bloquante, démarrage lent. */
+  startup: FakeStartup;
 }
 
 const COLORS: WorkspaceColor[] = [
@@ -98,6 +101,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     emitWindows: () => emit("arnod://fenetres", snapshotOf(core.windows)),
     response: createFakeResponse(),
     imports: createFakeImports(),
+    startup: createFakeStartup(),
   };
 
   const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -150,6 +154,8 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
       }
       switch (cmd) {
         case "catalog_load":
+          // Lot G : démarrage lent, le squelette reste affiché (0.3-a).
+          if (core.startup.slow) return new Promise(() => undefined);
           return { snapshot: normalize(), warning: null };
         case "window_set_title":
           return null;
@@ -365,6 +371,8 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           // Lot I - Fichiers modifiés hors d'Arnod.
           const files = handleFilesLotI(core.workbench, cmd, args);
           if (files !== undefined) return files;
+          const started = handleStartupLotG(core.startup, cmd, args);
+          if (started !== undefined) return started;
           const contracts = handleContracts(core.contracts, core.workbench, cmd, args);
           const handled =
             contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);

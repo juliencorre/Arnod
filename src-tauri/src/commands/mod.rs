@@ -29,6 +29,8 @@ pub mod import;
 pub mod test_steps;
 // Lot I - Fichiers modifiés hors d'Arnod.
 pub mod files;
+// Lot G - Démarrage et erreurs.
+pub mod startup;
 
 #[cfg(test)]
 mod tests {
