@@ -1602,6 +1602,7 @@ describe("Lot D - Barre latérale", () => {
     await browser.waitUntil(async () => (await rows()).includes("Un animal"), {
       timeoutMsg: "réponses attendues sous l'endpoint attendues",
     });
+    expect(await rows()).toContain("Un animal");
     await clickText("aside .crow__example", "Un animal");
     await browser.waitUntil(
       () =>
