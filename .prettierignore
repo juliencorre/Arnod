@@ -11,3 +11,5 @@ docs/opencollection/*.json
 docs/design-system/tokens.json
 docs/design-system/tokens.css
 docs/design-system/components/bundle.css
+.maquette
+.apercu

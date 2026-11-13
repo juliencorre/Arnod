@@ -13,5 +13,5 @@
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["vite.config.ts", "vitest.e2e.config.ts"]
+  "include": ["vite.config.ts", "vite.apercu.config.ts", "vitest.e2e.config.ts"]
 }

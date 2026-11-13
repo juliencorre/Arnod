@@ -11,10 +11,8 @@ version: 1
 transverses:
   - texte: "Barre de titre : les écrans dessinent une barre intégrée (logo, sélecteur de workspace, boutons de fenêtre) ; l'application garde la barre du système et place le sélecteur en tête de la barre latérale (plan-selecteur-workspace)."
     aligner: maquette
-  - texte: "Barre d'état : présente sur tous les écrans (mocks actifs, catalogue, modifications à envoyer, partage) ; absente de l'application."
+  - texte: "Modèle et vocabulaire : un test est un dossier d'étapes, une étape a des assertions (0.2) ; l'application appelle encore « requête » un test et « vérification » une assertion."
     aligner: code
-  - texte: "Vocabulaire : les écrans parlent de « test » et d'« assertion » ; l'application de « requête » et de « vérification » (0.2 : une requête est une étape d'un test)."
-    aligner: maquette
   - texte: "Environnement : l'application crée « Local » dans chaque projet et dans Non classés ; plusieurs écrans montrent « Aucun environnement » (1.2-d, 2.2-a)."
     aligner: maquette
   - texte: "Couleurs : les écrans écrivent encore des teintes hors du design system (texte moyen #3a3732 et #4a463f, bordures #ddd6cb, bleus des contrats) ; le bouton principal et les teintes presque identiques sont alignés (scripts/maquette-couleurs.py). 0.5-e liste ce qui reste, avec le jeton le plus proche."
@@ -135,13 +133,13 @@ pages:
         }
   "1.2":
     nom: "Barre latérale du projet"
-    version: MVP
+    version: [MVP, V4]
     plans:
       - "plan-barre-laterale-projet (B1–B6)"
       - "plan-requetes-dans-contrats (RC6)"
       - "plan-selecteur-workspace (I1, I2)"
     liees: ["3.3", "3.1", "4.1"]
-    reste: "« Plus » et ses sept sections (d bis)."
+    reste: "filtre de l'arborescence (e), quatre points de départ (d), menu « + » complet (a ter) ; « Plus » en V4 (d bis)."
     journal:
       - "2026-11-10 : Option a retenue et livrée (PR #33) ; b et c restent des variantes."
       - "2026-11-11 : Sections « Contrats de service » puis « Référentiel de tests » (PR #40)."
@@ -150,7 +148,7 @@ pages:
       "0": { etat: remplacé }
       a: { etat: livré, pr: [33], captures: [03-workspace-boutique] }
       "a bis": { etat: livré, pr: [33], captures: [08b-menu-environnement] }
-      "a ter": { etat: livré, pr: [33] }
+      "a ter": { etat: en partie, pr: [33] }
       b: { etat: variante }
       c: { etat: variante }
       d:
@@ -164,7 +162,8 @@ pages:
               aligner: code,
             },
         }
-      "d bis": { etat: à faire }
+      "d bis": { etat: à faire, version: V4 }
+      e: { etat: à faire, version: MVP }
   "1.3":
     nom: "Onglets"
     version: MVP
@@ -208,20 +207,21 @@ pages:
       j: { etat: à faire, version: MVP }
   "1.5":
     nom: "Recherche"
-    version: Plus tard
+    version: V2
     ecrans:
       a: { etat: à faire }
       b: { etat: à faire }
   "1.6":
     nom: "Préférences"
-    version: [V1, Plus tard]
+    version: [MVP, V1]
     liees: ["3.4"]
     journal:
       - "2026-11-12 : Écrans repris de « Authentification et Préférences » (e, f, f bis)."
     ecrans:
-      e: { etat: à faire }
-      f: { etat: à faire }
+      e: { etat: à faire, version: MVP }
+      f: { etat: à faire, version: V1 }
       "f bis": { etat: à faire, version: V1 }
+      g: { etat: à faire, version: MVP }
   "2.1":
     nom: "Accueil et premier essai"
     version: MVP
@@ -272,19 +272,20 @@ pages:
       f: { etat: livré, pr: [35, 39], captures: [18-tous-les-projets-non-classes] }
   "2.3":
     nom: "Import"
-    version: [MVP, Plus tard]
+    version: [MVP, V4, V5]
     plans:
       - "plan-opencollection (S1–S8)"
       - "plan-projets-workspaces (P12)"
     liees: ["3.1"]
-    reste: "collections Bruno .bru (a), « Reprendre l'existant » (b) ; Postman et SoapUI plus tard."
+    reste: "collections Bruno .bru (a) et leur rapport d'import (f), « Reprendre l'existant » (b) ; Postman en V4, SoapUI en V5."
     journal:
       - "2026-11-09 : Un projet Bruno au format OpenCollection s'ouvre (PR #29)."
     ecrans:
       a: { etat: en partie, pr: [11, 29] }
-      b: { etat: à faire }
-      d: { etat: à faire, version: Plus tard }
-      e: { etat: à faire, version: Plus tard }
+      b: { etat: à faire, version: MVP }
+      d: { etat: à faire, version: V4 }
+      e: { etat: à faire, version: V5 }
+      f: { etat: à faire, version: MVP }
   "3.1":
     nom: "Contrats de service"
     version: MVP
@@ -322,7 +323,7 @@ pages:
         }
   "3.2":
     nom: "Endpoint"
-    version: MVP
+    version: [MVP, V4]
     plans:
       - "plan-configuration-endpoint (EP1–EP10)"
     liees: ["3.1", "4.2", "4.8"]
@@ -356,7 +357,7 @@ pages:
             },
         }
       c: { etat: à faire }
-      d: { etat: à faire, version: Plus tard }
+      d: { etat: à faire, version: V4 }
   "3.3":
     nom: "Environnements"
     version: MVP
@@ -382,24 +383,24 @@ pages:
       c: { etat: livré, pr: [27] }
   "3.4":
     nom: "Authentification"
-    version: [MVP, Plus tard]
+    version: [MVP, V3, V5]
     plans:
       - "plan-premier-usage (§ 4.2, auth)"
       - "plan-configuration-endpoint (héritage)"
     liees: ["3.3", "1.6"]
-    reste: "OAuth 2 par identifiants client (a), cookies (g) ; WS-Security et certificats plus tard (c, d)."
+    reste: "OAuth 2 par identifiants client (a), cookies (g) ; certificats en V3 (d), WS-Security en V5 (c)."
     journal:
       - "2026-11-09 : Basic, Bearer, clé d'API et héritage des dossiers."
       - "2026-11-12 : Préférences (e, f, f bis) → 1.6."
     ecrans:
       a: { etat: à faire, version: MVP }
       b: { etat: livré, pr: [27, 32] }
-      c: { etat: à faire, version: Plus tard }
-      d: { etat: à faire, version: Plus tard }
+      c: { etat: à faire, version: V5 }
+      d: { etat: à faire, version: V3 }
       g: { etat: à faire, version: MVP }
   "3.5":
     nom: "Mocks"
-    version: Plus tard
+    version: V5
     liees: ["3.1", "1.4"]
     ecrans:
       a: { etat: à faire }
@@ -415,7 +416,7 @@ pages:
       - "plan-requetes-dans-contrats (R5)"
       - "plan-fin-premier-usage (ST1–ST4)"
     liees: ["4.2", "3.1"]
-    reste: "sélection multiple (a quater)."
+    reste: "nouveau test et « + Étape » (b), fichiers modifiés hors d'Arnod (e), glisser-déposer, copier et déplacer une requête (f, g), sélection multiple (a quater)."
     journal:
       - "2026-11-09 : Arborescence livrée avec le premier usage."
       - "2026-11-11 : Devient le référentiel : les requêtes liées à un contrat sont rangées sous lui (PR #40)."
@@ -425,7 +426,10 @@ pages:
       "a bis": { etat: livré, pr: [27] }
       "a ter": { etat: livré, pr: [27] }
       "a quater": { etat: à faire }
-      b: { etat: livré, pr: [27] }
+      b: { etat: en partie, pr: [27] }
+      e: { etat: à faire, version: MVP }
+      f: { etat: à faire, version: MVP }
+      g: { etat: à faire, version: MVP }
   "4.2":
     nom: "Tests et étapes"
     version: MVP
@@ -453,7 +457,7 @@ pages:
       c: { etat: à faire }
   "4.3":
     nom: "Tests en schéma"
-    version: Plus tard
+    version: [V4, V5, V6]
     liees: ["4.2", "4.4"]
     ecrans:
       a: { etat: à faire }
@@ -470,7 +474,7 @@ pages:
       i: { etat: à faire }
   "4.4":
     nom: "Catalogue des étapes"
-    version: Plus tard
+    version: V6
     plans:
       - "plan-accueil-non-classes (K1, K2)"
       - "etude-catalogue-etapes"
@@ -495,7 +499,7 @@ pages:
       d: { etat: en partie, pr: [35], captures: [16-catalogue-etapes] }
   "4.5":
     nom: "Protocoles"
-    version: Plus tard
+    version: V3
     liees: ["4.2"]
     ecrans:
       a: { etat: à faire }
@@ -503,7 +507,7 @@ pages:
       c: { etat: à faire }
   "4.6":
     nom: "Étapes manuelles"
-    version: Plus tard
+    version: V7
     liees: ["4.2", "6.3", "5.3"]
     ecrans:
       a: { etat: à faire }
@@ -511,7 +515,7 @@ pages:
       c: { etat: à faire }
   "4.7":
     nom: "Jeux de données"
-    version: Plus tard
+    version: V4
     liees: ["4.2", "5.2"]
     ecrans:
       a: { etat: à faire }
@@ -522,7 +526,7 @@ pages:
       "c bis": { etat: à faire }
   "4.8":
     nom: "Templates"
-    version: Plus tard
+    version: V4
     liees: ["3.2", "4.2"]
     ecrans:
       a: { etat: à faire }
@@ -531,7 +535,7 @@ pages:
       d: { etat: à faire }
   "4.9":
     nom: "Étiquettes"
-    version: [MVP, Plus tard]
+    version: [MVP, V2, V7]
     plans:
       - "plan-configuration-endpoint (étiquettes)"
     liees: ["4.1", "6.3", "5.3"]
@@ -540,16 +544,16 @@ pages:
       - "2026-11-09 : Étiquettes libres d'une requête (PR #32)."
     ecrans:
       a: { etat: en partie, pr: [32] }
-      b: { etat: à faire, version: Plus tard }
-      c: { etat: à faire, version: Plus tard }
-      d: { etat: à faire, version: Plus tard }
+      b: { etat: à faire, version: V2 }
+      c: { etat: à faire, version: V7 }
+      d: { etat: à faire, version: V2 }
   "5.1":
     nom: "Envoi et réponse"
     version: [MVP, V1]
     plans:
       - "plan-premier-usage (X1–X5)"
     liees: ["5.2", "1.4"]
-    reste: "format, aperçu et filtre (b bis), variables inconnues (b ter), édition en texte et cURL (b quater), chronologie détaillée DNS, connexion, TLS (c) ; historique en V1 (c bis)."
+    reste: "format, aperçu et filtre (b bis), variables inconnues (b ter), édition en texte et cURL (b quater), chronologie détaillée DNS, connexion, TLS (c), valeurs dynamiques (h), échec réseau expliqué (i) ; historique en V1 (c bis)."
     journal:
       - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
       - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
@@ -561,6 +565,8 @@ pages:
       "b quater": { etat: à faire, version: MVP }
       c: { etat: en partie, pr: [27] }
       "c bis": { etat: à faire, version: V1 }
+      h: { etat: à faire, version: MVP }
+      i: { etat: à faire, version: MVP }
   "5.2":
     nom: "Exécution d'un dossier"
     version: MVP
@@ -589,7 +595,7 @@ pages:
         }
   "5.3":
     nom: "Ligne de commande"
-    version: Plus tard
+    version: [V2, V7]
     liees: ["5.2", "4.9"]
     ecrans:
       a: { etat: à faire }
@@ -598,7 +604,7 @@ pages:
       d: { etat: à faire }
   "6.1":
     nom: "Produits et versions"
-    version: Plus tard
+    version: V7
     liees: ["6.2", "6.3"]
     ecrans:
       a: { etat: à faire }
@@ -606,7 +612,7 @@ pages:
       c: { etat: à faire }
   "6.2":
     nom: "Exigences"
-    version: Plus tard
+    version: V7
     liees: ["6.1", "6.6", "4.2"]
     ecrans:
       a: { etat: à faire }
@@ -621,7 +627,7 @@ pages:
       d: { etat: à faire }
   "6.3":
     nom: "Campagnes"
-    version: Plus tard
+    version: V7
     liees: ["6.1", "6.5", "5.2"]
     journal:
       - "2026-11-12 : Écran « Depuis une campagne » repris de « Exécution » (g → f)."
@@ -635,7 +641,7 @@ pages:
       f: { etat: à faire }
   "6.4":
     nom: "Anomalies"
-    version: Plus tard
+    version: V7
     liees: ["6.3", "6.7"]
     ecrans:
       a: { etat: à faire }
@@ -647,7 +653,7 @@ pages:
       f: { etat: à faire }
   "6.5":
     nom: "Critères de sortie et PV"
-    version: Plus tard
+    version: V8
     liees: ["6.3", "6.4"]
     ecrans:
       a: { etat: à faire }
@@ -658,7 +664,7 @@ pages:
       e: { etat: à faire }
   "6.6":
     nom: "Impact des changements"
-    version: Plus tard
+    version: V8
     liees: ["6.2", "3.1"]
     ecrans:
       a: { etat: à faire }
@@ -668,7 +674,7 @@ pages:
       e: { etat: à faire }
   "6.7":
     nom: "Tableau de bord"
-    version: Plus tard
+    version: V8
     liees: ["6.3", "6.2", "6.4"]
     ecrans:
       a: { etat: à faire }
@@ -677,7 +683,7 @@ pages:
       d: { etat: à faire }
   "7.1":
     nom: "Synchronisation"
-    version: Plus tard
+    version: V2
     liees: ["3.3"]
     ecrans:
       a: { etat: à faire }

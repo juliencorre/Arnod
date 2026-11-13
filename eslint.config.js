@@ -6,7 +6,16 @@ export default defineConfigWithVueTs(
   {
     name: "arnod/ignores",
     // docs/design-system/ : types de documentation du design system, hors projet TypeScript.
-    ignores: ["dist/**", "src-tauri/target/**", "src-tauri/gen/**", "coverage/**", "docs/**"],
+    // .maquette/ et .apercu/ : copies locales de la maquette et captures, ignorées par Git.
+    ignores: [
+      "dist/**",
+      "src-tauri/target/**",
+      "src-tauri/gen/**",
+      "coverage/**",
+      "docs/**",
+      ".maquette/**",
+      ".apercu/**",
+    ],
   },
   pluginVue.configs["flat/recommended"],
   vueTsConfigs.strictTypeChecked,

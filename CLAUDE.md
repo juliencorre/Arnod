@@ -29,6 +29,11 @@ leur contrat selon `docs/plan-requetes-dans-contrats.md` (sections « Contrats d
 `docs/plan-qualite-interface.md` (échelles du design system appliquées au code et à la maquette).
 Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
+**Travail en cours** : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots A à L en
+trois vagues, règles communes R1 à R10). Un lot = une branche `claude/mvp-<lot>` et une pull request ;
+il respecte les règles communes, notamment les ajouts en fin de liste dans les fichiers partagés (R5)
+et la comparaison avec la maquette par l'aperçu (R6).
+
 ## Architecture
 
 - **Le frontend ne contient aucune logique métier.** Il affiche l'état et appelle des
@@ -100,6 +105,7 @@ src/                    Frontend Vue
                         StatusCount)
   types/ipc.ts          Types IPC documentés à la main
 tests/                  Tests Vitest (happy-dom, mockIPC, faux cœur fakeCore.ts), dont contrastes
+                        ; apercu/ : l'application sur le faux cœur dans un navigateur
 e2e/                    Tests e2e sur l'application réelle (tauri-driver, WebdriverIO)
 src-tauri/              Cœur Rust
   tauri.conf.json       Fenêtre, CSP, bundles (NSIS currentUser, AppImage)
@@ -138,7 +144,7 @@ docs/                   Plans, modèle de plan, maquettes, captures du README, s
                         (docs/design-system/)
 scripts/                Mesure de taille, concordance des versions, tests de fumée (CI), état de
                         la maquette (check-maquette.mjs, maquette-sync.py, maquette-couleurs.py),
-                        design system (design-system.mjs)
+                        design system (design-system.mjs), aperçu Playwright (apercu.mjs)
 .github/                Modèles d'issue et de pull request, Dependabot
   workflows/            CI de build Windows et Linux, contrôle des titres de pull request
 ```
@@ -154,6 +160,7 @@ npm run check               # avant chaque commit : tout ce que vérifie la CI h
 npm test                    # Vitest
 npm run build:e2e           # binaire debug pour les tests e2e (Linux)
 xvfb-run -a npm run test:e2e # e2e sur l'application réelle (voir e2e/README.md)
+node scripts/apercu.mjs requete --maquette 5.1-b  # aperçu Playwright sur le faux cœur, comparé à la maquette
 npm run lint                # ESLint
 npm run typecheck           # vue-tsc
 npm run format              # Prettier (écriture) ; format:check pour vérifier

@@ -11,7 +11,7 @@ import { parse } from "yaml";
 
 const FILE = "docs/maquette-etat.yml";
 const STATES = ["livré", "en partie", "à faire", "variante", "remplacé", "à décider", "référence"];
-const VERSIONS = ["Cadre", "MVP", "V1", "Plus tard"];
+const VERSIONS = ["Cadre", "MVP", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9"];
 const ALIGN = ["maquette", "code", "à décider"];
 const PAGE_STATES = ["livré", "en partie", "à faire", "référence"];
 const CODE = /^[0-7]\.\d+$/;
