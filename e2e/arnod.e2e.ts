@@ -2207,4 +2207,30 @@ describe("Lot E - tests et étapes", () => {
     ).toBe(true);
     await screenshot(browser, "24-nouveau-test");
   });
+
+  it("une étiquette du projet est proposée avec son nombre de requêtes (4.9-a)", async () => {
+    const file = (name: string) => path.join(project(), "Créer puis lire", name);
+    await clickText('aside [role="treeitem"]', "Lire le client");
+    await clickText(".request-tab .tag__add", "+ Étiquette");
+    await browser.keys([..."parcours".split(""), "Enter"]);
+    await browser.waitUntil(() => readFileSync(file("lire.yml"), "utf8").includes("parcours"), {
+      timeoutMsg: "étiquette enregistrée attendue",
+    });
+    await clickText('aside [role="treeitem"]', "Supprimer le client");
+    await clickText(".request-tab .tag__add", "+ Étiquette");
+    await browser.keys("par".split(""));
+    await browser.waitUntil(
+      async () =>
+        (await browser.$(".tag-list").isExisting()) &&
+        (await browser.$(".tag-list").getText()).includes("parcours"),
+      { timeoutMsg: "étiquette du projet proposée attendue" },
+    );
+    await screenshot(browser, "26-etiquettes");
+    await browser.keys(["Enter"]);
+    await browser.waitUntil(
+      () => readFileSync(file("supprimer.yml"), "utf8").includes("parcours"),
+      { timeoutMsg: "étiquette proposée ajoutée attendue" },
+    );
+    expect(readFileSync(file("supprimer.yml"), "utf8")).toContain("parcours");
+  });
 });

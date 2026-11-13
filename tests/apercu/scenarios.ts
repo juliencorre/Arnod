@@ -710,3 +710,40 @@ Object.assign(SCENARIOS, {
 
 /** Collection Bruno des scénarios d'import. */
 const BRUNO_DIR = "/home/julien/bruno/boutique-api";
+
+/** Étiquettes proposées avec leur nombre à la saisie (4.9-a). */
+Object.assign(SCENARIOS, {
+  "4.9-a": {
+    description: "Étiquette en cours de saisie : propositions du projet avec leur nombre (4.9-a)",
+    setup: () => {
+      const core = installFakeCore(boutiqueSnapshot());
+      const wb = core.workbench;
+      wb.folders.add("commandes");
+      wb.requests.set(
+        "commandes/creer.yml",
+        newRequest("Créer une commande", {
+          method: "POST",
+          url: "{{baseUrl}}/orders",
+          tags: ["smoke", "paiement"],
+        }),
+      );
+      const tagged: [string, string, string[]][] = [
+        ["lister", "Lister les commandes", ["non-régression", "nominal"]],
+        ["lire", "Lire une commande", ["non-régression", "nominal"]],
+        ["statut", "Changer le statut", ["non-régression"]],
+        ["annuler", "Annuler une commande", ["non-régression", "smoke"]],
+      ];
+      for (const [file, name, tags] of tagged) {
+        wb.requests.set(`commandes/${file}.yml`, newRequest(name, { tags }));
+      }
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Créer une commande");
+      await g.cliquer(".tag__add");
+      await g.saisir(".tag__input", "no");
+      await g.attendre(150);
+    },
+  },
+} satisfies Record<string, Scenario>);
