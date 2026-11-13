@@ -2,8 +2,12 @@ import { defineStore } from "pinia";
 import { computed, reactive, ref, watch, type ComputedRef } from "vue";
 
 import { events, ipc, IpcError } from "@/lib/ipc";
-import { contentKey, useWindowsStore } from "@/stores/windows";
+import { contentKey, MAIN_WINDOW, useWindowsStore } from "@/stores/windows";
+import { useToastStore } from "@/stores/toasts";
 import type {
+  ConflictSide,
+  FilesChange,
+  RequestConflict,
   DrawnValue,
   EnvironmentDoc,
   EnvironmentsView,
@@ -39,8 +43,19 @@ export interface Editor {
   sendError: string | null;
   /** Lecture impossible (fichier supprimé, illisible). */
   loadError: string | null;
-  /** Modifiée dans une autre fenêtre alors qu'elle l'était aussi ici (F11). */
-  changedElsewhere: boolean;
+  /**
+   * Lot I : fichier modifié sur le disque (hors d'Arnod ou dans une autre fenêtre) alors que
+   * l'onglet a un brouillon. Tant qu'il n'est pas réglé, rien n'est enregistré (R9).
+   */
+  conflict: RequestConflict | null;
+  /** Version choisie pour chaque élément en conflit (« disque » ou « brouillon »). */
+  choices: Record<string, ConflictSide>;
+  /** Lot I : fichier supprimé hors d'Arnod alors que l'onglet a un brouillon (R4). */
+  removedOnDisk: boolean;
+  /** Lot I : relue depuis le disque il y a quelques secondes (R3). */
+  reloaded: boolean;
+  /** Lot I : heure du début du brouillon, montrée dans le conflit. */
+  draftSince: Date | null;
   execId: string | null;
   saveState: SaveState;
   /** Raison d'un enregistrement impossible (B7). */
@@ -69,6 +84,24 @@ export type PendingConfirmation =
   | { kind: "run"; projectId: string; folder: string }
   | { kind: "contractRun"; projectId: string; path: string }
   | { kind: "retry"; projectId: string };
+
+/** Lot I : résumé d'un lot de changements faits hors d'Arnod (« 4 requêtes modifiées, 1 ajoutée »). */
+export function filesSummary(change: FilesChange): string {
+  const parts = (
+    [
+      [change.modified.length, "modifiée", "modifiées"],
+      [change.added.length, "ajoutée", "ajoutées"],
+      [change.removed.length, "supprimée", "supprimées"],
+      [change.renamed.length, "renommée", "renommées"],
+    ] as const
+  ).filter(([n]) => n > 0);
+  return parts
+    .map(([n, one, many], index) => {
+      const noun = index === 0 ? (n === 1 ? "requête " : "requêtes ") : "";
+      return `${String(n)} ${noun}${n === 1 ? one : many}`;
+    })
+    .join(", ");
+}
 
 /** Clé d'une requête ouverte. */
 export function requestKey(projectId: string, path: string): string {
@@ -195,7 +228,11 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       sending: false,
       sendError: null,
       loadError: null,
-      changedElsewhere: false,
+      conflict: null,
+      choices: {},
+      removedOnDisk: false,
+      reloaded: false,
+      draftSince: null,
       execId: null,
       saveState: "saved",
       saveError: null,
@@ -241,7 +278,10 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       editor.draft = request;
       editor.saved = JSON.stringify(request);
       editor.loadError = null;
-      editor.changedElsewhere = false;
+      editor.conflict = null;
+      editor.choices = {};
+      editor.removedOnDisk = false;
+      editor.draftSince = null;
     } catch (caught) {
       editor.draft = null;
       editor.loadError = caught instanceof Error ? caught.message : String(caught);
@@ -338,7 +378,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       const previous = new Map(before);
       for (const [key, text] of now) {
         if (text === null || text === previous.get(key)) continue;
-        if (text !== editors[key]?.saved) scheduleSave(key);
+        const editor = editors[key];
+        if (!editor || text === editor.saved) continue;
+        editor.draftSince ??= new Date();
+        // Conflit ou fichier supprimé : rien n'est enregistré avant le choix (lot I, R9).
+        if (editor.conflict || editor.removedOnDisk) continue;
+        scheduleSave(key);
       }
     },
   );
@@ -351,6 +396,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     const running = saving.get(key);
     if (running) await running.catch(() => undefined);
     const editor = editors[key];
+    if (editor && (editor.conflict || editor.removedOnDisk)) return;
     const snapshot = editor?.draft ? draftText(key) : null;
     if (!editor || snapshot === null || snapshot === editor.saved) {
       if (editor && editor.saveState !== "error") editor.saveState = "saved";
@@ -362,10 +408,16 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       try {
         await ipc.requestSave(editor.projectId, editor.path, JSON.parse(snapshot) as RequestDoc);
         editor.saved = snapshot;
-        editor.changedElsewhere = false;
         editor.saveError = null;
         editor.saveState = isDirty(key) ? "pending" : "saved";
+        if (!isDirty(key)) editor.draftSince = null;
       } catch (caught) {
+        // Fichier modifié hors d'Arnod depuis sa lecture : conflit, rien d'écrasé (lot I, R8).
+        if (caught instanceof IpcError && caught.kind === "changedOnDisk") {
+          editor.saveState = "pending";
+          await detectConflict(key);
+          return;
+        }
         editor.saveState = "error";
         editor.saveError = caught instanceof Error ? caught.message : String(caught);
         throw caught;
@@ -817,11 +869,162 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     if (trees.value[projectId]) await refreshTree(projectId);
     if (change.scope === "request" && change.path !== null) {
       const key = requestKey(projectId, change.path);
-      if (!editors[key]) return;
+      const editor = editors[key];
+      if (!editor) return;
+      // Lot I : avec un brouillon, le conflit se règle élément par élément (R9) ; sans, la
+      // requête est relue et l'onglet le dit quelques secondes (R3).
+      if (isDirty(key) || editor.conflict) await detectConflict(key);
+      else {
+        await reload(key);
+        if (change.origin === "") flashReloaded(key);
+      }
+    }
+  }
+
+  // --- Fichiers modifiés hors d'Arnod (lot I, docs/plan-mvp-i-fichiers-externes.md) ---
+
+  /** Durée de « Rechargé depuis le disque » dans l'onglet. */
+  const RELOADED_MS = 4000;
+
+  function flashReloaded(key: string): void {
+    const editor = editors[key];
+    if (!editor) return;
+    editor.reloaded = true;
+    setTimeout(() => {
+      const current = editors[key];
+      if (current) current.reloaded = false;
+    }, RELOADED_MS);
+  }
+
+  /**
+   * Compare le brouillon au fichier (le cœur le fait, élément par élément) : un conflit à
+   * régler, ou rien si le disque a rejoint le brouillon. Fichier supprimé : `removedOnDisk` ;
+   * illisible : l'erreur est montrée et rien n'est écrit.
+   */
+  async function detectConflict(key: string): Promise<void> {
+    const editor = editors[key];
+    if (!editor?.draft) return;
+    clearSaveTimer(key);
+    try {
+      const base = JSON.parse(editor.saved) as RequestDoc;
+      const found = await ipc.requestConflict(editor.projectId, editor.path, base, editor.draft);
+      if (found.items.every((item) => item.identical)) {
+        await reload(key);
+        return;
+      }
+      const choices: Record<string, ConflictSide> = {};
+      for (const item of found.items) {
+        if (item.identical) continue;
+        const choice = editor.choices[item.key] ?? item.suggested;
+        if (choice) choices[item.key] = choice;
+      }
+      editor.conflict = found;
+      editor.choices = choices;
+      editor.saveState = "pending";
+    } catch (caught) {
+      if (caught instanceof IpcError && caught.kind === "notFound") {
+        editor.removedOnDisk = true;
+        editor.saveState = "pending";
+      } else {
+        editor.saveState = "error";
+        editor.saveError = caught instanceof Error ? caught.message : String(caught);
+      }
+    }
+  }
+
+  /** Choisit la version d'un élément en conflit, ou de tous (« Tout prendre du disque »). */
+  function chooseConflict(key: string, item: string | null, side: ConflictSide): void {
+    const editor = editors[key];
+    if (!editor?.conflict) return;
+    if (item !== null) {
+      editor.choices = { ...editor.choices, [item]: side };
+      return;
+    }
+    editor.choices = Object.fromEntries(
+      editor.conflict.items.filter((i) => !i.identical).map((i) => [i.key, side]),
+    );
+  }
+
+  /** Chaque élément qui diffère a une version choisie. */
+  function conflictReady(key: string): boolean {
+    const editor = editors[key];
+    if (!editor?.conflict) return false;
+    return editor.conflict.items.every((item) => item.identical || item.key in editor.choices);
+  }
+
+  /** « Appliquer et enregistrer » : le cœur fusionne et écrit le fichier une seule fois (R11). */
+  async function resolveConflict(key: string): Promise<void> {
+    const editor = editors[key];
+    if (!editor?.draft || !editor.conflict || !conflictReady(key)) return;
+    try {
+      const merged = await ipc.requestConflictResolve(
+        editor.projectId,
+        editor.path,
+        JSON.parse(JSON.stringify(editor.draft)) as RequestDoc,
+        { ...editor.choices },
+      );
+      editor.draft = merged;
+      editor.saved = JSON.stringify(merged);
+      editor.conflict = null;
+      editor.choices = {};
+      editor.draftSince = null;
+      editor.saveError = null;
+      editor.saveState = "saved";
+      if (trees.value[editor.projectId]) await refreshTree(editor.projectId);
+    } catch (caught) {
+      // Le fichier a encore changé : les différences sont recalculées.
+      if (caught instanceof IpcError && caught.kind === "changedOnDisk") await detectConflict(key);
+      else throw caught;
+    }
+  }
+
+  /** Fichier supprimé hors d'Arnod, brouillon gardé : « Restaurer » le réécrit (R4). */
+  async function restoreRemoved(key: string): Promise<void> {
+    const editor = editors[key];
+    if (!editor?.removedOnDisk) return;
+    editor.removedOnDisk = false;
+    editor.saved = "";
+    await save(key);
+  }
+
+  /** « Fermer l'onglet » d'une requête supprimée hors d'Arnod : le brouillon est abandonné. */
+  function discardRemoved(key: string): void {
+    if (editors[key]?.removedOnDisk) forget(key);
+  }
+
+  /**
+   * Changements faits hors d'Arnod (R4 à R6) : les brouillons suivent les renommages ; l'onglet
+   * d'une requête supprimée se ferme, sauf s'il a un brouillon (« Restaurer » ou « Fermer ») ;
+   * la fenêtre principale résume le lot dans une notification.
+   */
+  async function onFiles(change: FilesChange): Promise<void> {
+    const { projectId } = change;
+    for (const renamed of change.renamed) moveEditors(projectId, renamed.from, renamed.to);
+    const closed: string[] = [];
+    for (const path of change.removed) {
+      const key = requestKey(projectId, path);
+      const editor = editors[key];
+      if (!editor) continue;
       if (isDirty(key)) {
-        const editor = editors[key];
-        editor.changedElsewhere = true;
-      } else await reload(key);
+        editor.removedOnDisk = true;
+        clearSaveTimer(key);
+        editor.saveState = "pending";
+        continue;
+      }
+      const tab = windows.tabFor({ kind: "request", projectId, path });
+      if (tab && (await windows.close(tab.id))) closed.push(editor.draft?.name ?? path);
+      forget(key);
+    }
+    const toasts = useToastStore();
+    if (closed.length > 0) {
+      toasts.show(
+        closed.length === 1
+          ? `« ${closed[0] ?? ""} » a été supprimée hors d'Arnod : son onglet est fermé.`
+          : `${String(closed.length)} requêtes supprimées hors d'Arnod : leurs onglets sont fermés.`,
+      );
+    } else if (windows.label === MAIN_WINDOW) {
+      const summary = filesSummary(change);
+      if (summary) toasts.show(`Rechargé depuis le disque : ${summary}`);
     }
   }
 
@@ -842,6 +1045,10 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     // Statuts des requêtes, pour la barre latérale (R4).
     await events.onStatuses((change) => {
       statuses.value[change.projectId] = change.statuses;
+    });
+    // Lot I : fichiers modifiés hors d'Arnod.
+    await events.onFiles((change) => {
+      void onFiles(change);
     });
   }
 
@@ -910,5 +1117,13 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     variableUsers,
     isChangedSinceSent,
     revertToSent,
+    // Lot I : fichiers modifiés hors d'Arnod.
+    detectConflict,
+    chooseConflict,
+    conflictReady,
+    resolveConflict,
+    restoreRemoved,
+    discardRemoved,
+    onFiles,
   };
 });

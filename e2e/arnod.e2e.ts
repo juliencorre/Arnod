@@ -2209,6 +2209,91 @@ describe("Lot E - tests et étapes", () => {
   });
 });
 
+describe("Lot I - Fichiers modifiés hors d'Arnod (4.1-e)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const file = () => path.join(project(), "surveille.yml");
+
+  /** Écrit la requête comme un éditeur ou un `git pull`, application lancée. */
+  function writeOutside(url: string): void {
+    writeFileSync(
+      file(),
+      `info:\n  name: Fichier surveillé\n  type: http\nhttp:\n  method: GET\n  url: ${url}\n`,
+    );
+  }
+
+  /** Adresse de l'onglet de la requête surveillée, s'il est affiché. */
+  function shownUrl(): Promise<string> {
+    return browser.execute(() => {
+      const fields = Array.from(document.querySelectorAll<HTMLInputElement>(".editor__url"));
+      return fields.find((f) => f.offsetParent !== null)?.value ?? "";
+    });
+  }
+
+  it("une requête ajoutée sur disque apparaît, puis son onglet suit le fichier (R3)", async () => {
+    writeOutside("http://localhost/v1");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll('aside [role="treeitem"]')).some((i) =>
+            i.textContent.includes("Fichier surveillé"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "requête ajoutée hors d'Arnod attendue dans l'arborescence" },
+    );
+    await clickText('aside [role="treeitem"]', "Fichier surveillé");
+    await browser.waitUntil(async () => (await shownUrl()) === "http://localhost/v1", {
+      timeoutMsg: "onglet de la requête attendu",
+    });
+
+    writeOutside("http://localhost/v2");
+    await browser.waitUntil(async () => (await shownUrl()) === "http://localhost/v2", {
+      timeout: 10_000,
+      timeoutMsg: "onglet relu après la modification sur disque attendu",
+    });
+    expect(await shownUrl()).toBe("http://localhost/v2");
+    await screenshot(browser, "25-recharge-depuis-le-disque");
+  });
+
+  it("un brouillon en conflit n'est pas écrasé et se règle élément par élément (R9 à R11)", async () => {
+    await browser.execute(() => {
+      const field = Array.from(document.querySelectorAll<HTMLInputElement>(".editor__url")).find(
+        (f) => f.offsetParent !== null,
+      );
+      if (!field) throw new Error("adresse introuvable");
+      field.value = "http://localhost/brouillon";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    // Écrit avant l'enregistrement automatique (600 ms) : le brouillon est en conflit.
+    writeOutside("http://localhost/v3");
+    await browser.$(".conflict").waitForDisplayed({ timeout: 10_000 });
+    expect(readFileSync(file(), "utf8")).toContain("http://localhost/v3");
+    await screenshot(browser, "26-conflit");
+
+    await clickText(".conflict__actions button", "Tout garder de mon brouillon");
+    await clickText(".conflict__actions button", "Appliquer et enregistrer");
+    await browser.waitUntil(
+      () => readFileSync(file(), "utf8").includes("http://localhost/brouillon"),
+      { timeout: 10_000, timeoutMsg: "brouillon écrit une seule fois après le choix" },
+    );
+    expect(await browser.$(".conflict").isExisting()).toBe(false);
+  });
+
+  it("une requête supprimée sur disque ferme son onglet (R4)", async () => {
+    rmSync(file());
+    await browser.waitUntil(async () => (await shownUrl()) !== "http://localhost/brouillon", {
+      timeout: 10_000,
+      timeoutMsg: "onglet fermé attendu",
+    });
+    expect(
+      await browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab-button")).some((t) =>
+          t.textContent.includes("Fichier surveillé"),
+        ),
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("Lot G - Démarrage et erreurs (0.3)", () => {
   const statePath = () => path.join(sandbox.dataDir, "arnod.json");
 

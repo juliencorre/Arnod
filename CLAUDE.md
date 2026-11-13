@@ -578,6 +578,29 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
 - « Extraire dans une variable » du filtre JSONPath (`ResponseFilter.vue`, store `response`)
   ajoute l'extraction de la correspondance courante (`workbench.addExtraction`).
 
+## Fichiers modifiés hors d'Arnod
+
+Référence : `docs/plan-mvp-i-fichiers-externes.md` (lot I : cas FE1 à FE7, règles R1 à R12), écran
+`4.1-e`.
+
+- `src-tauri/src/watch/` : un observateur `notify` par projet ouvert (`Watchers`, démarré par
+  `tree_load`, arrêté quand le projet est oublié ou introuvable), un fil qui regroupe les événements
+  300 ms, un registre de l'état connu (empreinte de chaque YAML / JSON, dossiers). `.git/`, éléments
+  cachés, `*.tmp` et `*~` sont ignorés.
+- Toute écriture d'Arnod dans un projet passe par `opencollection::yaml::write` ou
+  `contract::file::write_text` (qui appellent `watch::record_write`) ; une suppression ou un
+  renommage appelle `watch::settle`. Une nouvelle écriture directe (`fs::write`, `fs::rename`) dans
+  un projet doit faire de même, sinon son écho est pris pour une modification externe.
+- Un lot est diffusé par `arnod://fichiers` (`FilesChange` : renommés, supprimés…), puis par
+  `arnod://projet` (origine vide) pour chaque portée et chaque requête modifiée. Un renommage est
+  reconnu à l'empreinte (un supprimé, un ajouté identique).
+- `request_read` retient la version lue (`watch::acknowledge`) ; `request_save` refuse
+  (`changedOnDisk`) d'écrire sur une version plus récente. Le store passe alors l'onglet en conflit
+  (`Editor.conflict`, `ConflictPanel.vue`) : l'enregistrement automatique est suspendu, le cœur
+  compare (`request_conflict`, `watch::conflict::compare`, pur) et fusionne
+  (`request_conflict_resolve`). L'ancien bandeau « Modifiée dans une autre fenêtre » n'existe plus.
+- Un fichier de requête illisible n'est jamais réécrit (`request::file::write` le refuse).
+
 ## Démarrage et erreurs
 
 Référence : `docs/plan-mvp-g-demarrage-erreurs.md` (lot G : cas DL1, ER1 à ER3, VR1, SU1, SU2 ;

@@ -28,6 +28,8 @@ import {
   type FakeWorkbench,
 } from "./fakeWorkbench";
 import { createFakeResponse, handleResponse, type FakeResponse } from "./fakeResponse";
+// Lot I - Fichiers modifiés hors d'Arnod.
+import { handleFilesLotI } from "./fakeFiles";
 import { createFakeStartup, handleStartupLotG, type FakeStartup } from "./fakeStartup";
 
 export const HOME = "/home/julien";
@@ -366,6 +368,9 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
             DEFAULT_LOCATION,
           );
           if (imported !== undefined) return imported;
+          // Lot I - Fichiers modifiés hors d'Arnod.
+          const files = handleFilesLotI(core.workbench, cmd, args);
+          if (files !== undefined) return files;
           const started = handleStartupLotG(core.startup, cmd, args);
           if (started !== undefined) return started;
           const contracts = handleContracts(core.contracts, core.workbench, cmd, args);

@@ -88,6 +88,10 @@ function unlinkContract(): void {
 // --- Enregistrement automatique (EP1) -------------------------------------------
 
 const saveLabel = computed(() => {
+  // Lot I : relue après une modification faite hors d'Arnod, sans brouillon (R3).
+  if (editor.value?.reloaded && editor.value.saveState === "saved") {
+    return "⟳ Rechargé depuis le disque";
+  }
   switch (editor.value?.saveState) {
     case "pending":
       return "Modifications en attente…";
@@ -373,10 +377,6 @@ watch(
       <button type="button" class="link" @click="workbench.revertToSent(editorKey)">
         Revenir à la version envoyée
       </button>
-    </p>
-    <p v-if="editor?.changedElsewhere" class="editor__elsewhere" role="status">
-      Modifiée dans une autre fenêtre.
-      <button type="button" class="link" @click="workbench.reload(editorKey)">Recharger</button>
     </p>
 
     <form class="editor__line" @submit.prevent="workbench.send(editorKey)">
@@ -732,14 +732,6 @@ watch(
 .editor__unsent b {
   font: 700 var(--text-caption) var(--font-mono);
   color: var(--color-link);
-}
-
-.editor__elsewhere {
-  margin: 0;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-md);
-  font-size: var(--text-body);
-  background: var(--color-accent-soft);
 }
 
 /* Zone étroite (jusqu'à 280 px, Z4) : le bouton passe sous l'adresse. */
