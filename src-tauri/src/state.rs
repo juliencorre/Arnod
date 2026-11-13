@@ -18,6 +18,7 @@ use crate::catalog::{Catalog, INBOX_NAME, names};
 use crate::environment;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::manifest::{self, Manifest};
+use crate::startup::{Cause, Failure, StateFile};
 use crate::storage::{self, Loaded};
 use crate::workbench::ProjectCtx;
 
@@ -42,53 +43,82 @@ pub type ChangeListener = Box<dyn Fn(&CatalogSnapshot) + Send + Sync>;
 struct Inner {
     catalog: Catalog,
     undo: UndoStack,
-    /// Erreur qui interdit toute lecture et écriture, par exemple un fichier
-    /// d'état écrit par une version plus récente d'Arnod.
-    blocked: Option<CommandError>,
+    /// Échec de lecture au démarrage qui interdit toute lecture et écriture : fichier
+    /// d'état écrit par une version plus récente, illisible, verrouillé (lot G).
+    failure: Option<Failure>,
     /// Avertissement de démarrage, renvoyé une seule fois par `catalog_load`.
     warning: Option<CommandError>,
 }
 
+/// Lit l'état de `data_dir` : catalogue, ou échec à expliquer au démarrage.
+fn read_state(data_dir: &Path) -> (Catalog, Option<Failure>) {
+    match storage::load(data_dir) {
+        Ok(Loaded::Existing(catalog)) => (catalog, None),
+        Ok(Loaded::FirstLaunch(catalog)) => {
+            // Enregistré tout de suite pour que les identifiants restent stables. Un dossier
+            // de données où rien ne s'écrit bloque le démarrage, expliqué (lot G).
+            match storage::save(data_dir, &catalog) {
+                Ok(()) => (catalog, None),
+                Err(error) => {
+                    let failure = Failure {
+                        file: StateFile::Catalog,
+                        path: data_dir.to_path_buf(),
+                        cause: Cause::Inaccessible {
+                            code: None,
+                            error: error.message,
+                        },
+                    };
+                    (catalog, Some(failure))
+                }
+            }
+        }
+        Err(failure) => (Catalog::first_launch(), Some(failure)),
+    }
+}
+
 impl AppState {
-    /// Charge l'état depuis `data_dir`. N'échoue jamais : une erreur bloquante
-    /// est mémorisée et renvoyée par chaque commande.
+    /// Charge l'état depuis `data_dir`. N'échoue jamais : un échec de lecture est
+    /// mémorisé, expliqué par `startup_status` et renvoyé par chaque commande.
     pub fn load(data_dir: PathBuf, default_location: PathBuf) -> Self {
-        let (catalog, blocked, warning) = match storage::load(&data_dir) {
-            Ok(Loaded::Existing(catalog)) => (catalog, None, None),
-            Ok(Loaded::FirstLaunch(catalog)) => {
-                // Enregistré tout de suite pour que les identifiants restent stables ;
-                // en cas d'échec, la prochaine modification signalera l'erreur.
-                let _ = storage::save(&data_dir, &catalog);
-                (catalog, None, None)
-            }
-            Ok(Loaded::Recovered {
-                catalog,
-                backup,
-                reason,
-            }) => {
-                let _ = storage::save(&data_dir, &catalog);
-                let warning = CommandError::new(
-                    CommandErrorKind::CorruptState,
-                    format!(
-                        "L'état d'Arnod était illisible ({reason}). Il a été mis de côté sous {} \
-                         et Arnod repart d'un état neuf.",
-                        backup.display()
-                    ),
-                );
-                (catalog, None, Some(warning))
-            }
-            Err(error) => (Catalog::first_launch(), Some(error), None),
-        };
+        let (catalog, failure) = read_state(&data_dir);
         Self {
             data_dir,
             default_location,
             inner: Mutex::new(Inner {
                 catalog,
                 undo: UndoStack::default(),
-                blocked,
-                warning,
+                failure,
+                warning: None,
             }),
             listener: OnceLock::new(),
+        }
+    }
+
+    /// Échec de lecture au démarrage, s'il n'est pas réglé.
+    pub fn failure(&self) -> Option<Failure> {
+        self.inner
+            .lock()
+            .map_or(None, |inner| inner.failure.clone())
+    }
+
+    /// Relit l'état après un échec (réessai, fichier mis de côté) ; renvoie l'échec restant.
+    /// Sans échec en cours, ne relit rien.
+    pub fn reload(&self) -> Option<Failure> {
+        let Ok(mut inner) = self.inner.lock() else {
+            return None;
+        };
+        inner.failure.as_ref()?;
+        let (catalog, failure) = read_state(&self.data_dir);
+        inner.catalog = catalog;
+        inner.undo = UndoStack::default();
+        inner.failure.clone_from(&failure);
+        failure
+    }
+
+    /// Avertissement à notifier au prochain `catalog_load` (fichier mis de côté).
+    pub fn set_warning(&self, warning: CommandError) {
+        if let Ok(mut inner) = self.inner.lock() {
+            inner.warning = Some(warning);
         }
     }
 
@@ -409,8 +439,8 @@ impl AppState {
                 "L'état d'Arnod est indisponible : redémarrez l'application.",
             )
         })?;
-        match &inner.blocked {
-            Some(blocked) => Err(blocked.clone()),
+        match &inner.failure {
+            Some(failure) => Err(failure.to_command_error()),
             None => Ok(inner),
         }
     }

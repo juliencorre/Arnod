@@ -27,6 +27,8 @@ pub mod input;
 pub mod import;
 // Lot E : tests et étapes.
 pub mod test_steps;
+// Lot G - Démarrage et erreurs.
+pub mod startup;
 
 #[cfg(test)]
 mod tests {

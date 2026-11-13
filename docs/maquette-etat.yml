@@ -55,16 +55,34 @@ pages:
   "0.3":
     nom: "Démarrage et erreurs"
     version: MVP
-    developpement: "Écran d'erreur minimal du socle (App.vue : « Arnod ne peut pas démarrer ») ; pas de plan."
+    etat: livré
+    plans:
+      - "plan-mvp-g-demarrage-erreurs (DL1, ER1–ER3, VR1, SU1, SU2)"
+    developpement: "Lot G : startup.rs (erreur classée et décrite par le cœur), StartupProblemScreen.vue, StartupSkeleton.vue, fenêtre créée cachée puis montrée prête (window_ready, 300 ms au plus)."
     liees: ["2.1"]
-    reste: "squelette au démarrage lent (a), issues proposées (b), fichier verrouillé (b bis), détails pour le support (b ter)."
     journal:
       - "2026-11-12 : Écrans repris de « Premier usage » (Démarrage → a, Erreur → b, Erreur bis → b bis, Erreur ter → b ter)."
+      - "2026-11-13 : Lot G livré (docs/plan-mvp-g-demarrage-erreurs.md) : squelette, erreur expliquée avec deux issues, verrou réessayé seul, détails pour le support et issue préremplie."
     ecrans:
-      a: { etat: à faire }
-      b: { etat: en partie, pr: [7] }
-      "b bis": { etat: à faire }
-      "b ter": { etat: à faire }
+      a:
+        etat: livré
+        ecart:
+          texte: "La légende « Ouverture de « … »… » n'apparaît qu'une fois le catalogue lu ; avant, le squelette seul."
+          aligner: maquette
+      b:
+        etat: livré
+        pr: [7]
+        captures: [0.3-b-illisible]
+        ecart:
+          texte: "La cause est un texte simple du cœur, sans gras sur la version ; le pied donne le système sans numéro (« Windows »)."
+          aligner: maquette
+      "b bis": { etat: livré }
+      "b ter":
+        etat: livré
+        captures: [0.3-b-ter-details]
+        ecart:
+          texte: "Pas de ligne « Journal » : Arnod n'écrit pas de journal."
+          aligner: maquette
   "0.4":
     nom: "Thème sombre"
     version: MVP

@@ -577,3 +577,22 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
   inconnues. Une valeur `$…` fournie par l'appelant (copie cURL) n'est pas tirée.
 - « Extraire dans une variable » du filtre JSONPath (`ResponseFilter.vue`, store `response`)
   ajoute l'extraction de la correspondance courante (`workbench.addExtraction`).
+
+## Démarrage et erreurs
+
+Référence : `docs/plan-mvp-g-demarrage-erreurs.md` (lot G : cas DL1, ER1 à ER3, VR1, SU1, SU2 ;
+règles R1 à R8), écrans 0.3-a, 0.3-b, 0.3-b bis, 0.3-b ter.
+
+- Un fichier d'état (`arnod.json`, `windows.json`) illisible, plus récent, verrouillé ou un dossier
+  de données inaccessible donne un `startup::Failure` : rien n'est lu ni écrit (pas même
+  `windows.json` à la sortie) tant que l'utilisateur n'a pas choisi. Le cœur décrit l'écran
+  (`startup::describe`, pur : cause, ce qui est intact, deux issues dont la recommandée en premier,
+  détails, adresse de l'issue) ; `StartupProblemScreen.vue` affiche tel quel.
+- « Repartir d'un état vide » renomme le fichier (`.format-N`, `.illisible`, puis `-2`…), jamais ne
+  le supprime ; un verrou est réessayé seul (2, 4, 8 s, `startup_retry` automatique) puis à la main.
+- Navigateur et explorateur : programme du système par chemin absolu (`startup::open_external`),
+  sans plugin ni permission ; à défaut, l'adresse de l'issue est copiée. Rien n'est envoyé seul.
+- `arnod.json` porte `writtenBy` (version d'Arnod qui l'a écrit), cité par une version plus ancienne.
+- Fenêtres créées cachées (`visible: false`, `.visible(false)` des détachées) : `App.vue` appelle
+  `window_ready` après le premier rendu ; `windows::show_later` les montre après 300 ms sinon, avec
+  le squelette (`StartupSkeleton`), jamais un écran « Chargement… ».

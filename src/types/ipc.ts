@@ -109,7 +109,14 @@ export type CommandName =
   | "test_read"
   | "tree_create_test"
   | "tree_add_step"
-  | "request_variable_users";
+  | "request_variable_users"
+  // Lot G - Démarrage et erreurs.
+  | "startup_status"
+  | "startup_retry"
+  | "startup_start_empty"
+  | "startup_open"
+  | "startup_quit"
+  | "window_ready";
 
 /**
  * Nature d'une erreur de commande.
@@ -1373,4 +1380,64 @@ export interface VariableUser {
   method: HttpMethod;
   url: string;
   variables: string[];
+}
+
+// Lot G - Démarrage et erreurs (docs/plan-mvp-g-demarrage-erreurs.md).
+
+/** Nature d'une erreur bloquante au démarrage (`startup::ProblemNature`). */
+export type ProblemNature = "newerVersion" | "corruptState" | "locked" | "inaccessible";
+
+/** Issue proposée par l'écran d'erreur (`startup::StartupAction`). */
+export type StartupAction = "openReleases" | "startEmpty" | "retry" | "openFolder";
+
+/** Ce que `startup_open` ouvre avec le programme du système (`startup::StartupTarget`). */
+export type StartupTarget = "folder" | "releases" | "issue";
+
+/** Une issue et ses conséquences (`startup::StartupOption`). */
+export interface StartupOption {
+  action: StartupAction;
+  title: string;
+  description: string;
+  button: string;
+  /** La recommandée, toujours en premier. */
+  recommended: boolean;
+  /** Ligne de plus : essais automatiques épuisés. */
+  note: string | null;
+}
+
+/** Prochain essai automatique d'un fichier verrouillé (`startup::RetryPlan`). */
+export interface RetryPlan {
+  attempt: number;
+  maxAttempts: number;
+  delaySeconds: number;
+}
+
+/** Ligne des détails pour le support (`startup::DetailRow`). */
+export interface DetailRow {
+  label: string;
+  value: string;
+}
+
+/** Erreur bloquante décrite par le cœur (`startup::StartupProblem`). */
+export interface StartupProblem {
+  nature: ProblemNature;
+  /** `arnod.json` ou `windows.json`. */
+  file: string;
+  title: string;
+  /** La cause en clair. */
+  message: string;
+  /** Ce qui est intact : début en gras, puis la suite. */
+  intactLead: string;
+  intactText: string;
+  /** Deux issues, la recommandée en premier. */
+  options: StartupOption[];
+  pathLabel: string;
+  path: string;
+  retry: RetryPlan | null;
+  details: DetailRow[];
+  /** Détails en texte, pour « Copier le détail ». */
+  supportText: string;
+  /** Issue GitHub préremplie : rien n'est envoyé sans l'utilisateur. */
+  issueUrl: string;
+  footer: string;
 }
