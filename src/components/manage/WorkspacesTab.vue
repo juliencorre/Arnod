@@ -199,7 +199,7 @@ async function setColor(color: string): Promise<void> {
 
 .list__label {
   margin: 0;
-  font: 600 0.6875rem / 1.4 var(--font-mono);
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-muted);
@@ -222,7 +222,7 @@ async function setColor(color: string): Promise<void> {
   width: 100%;
   padding: 0.625rem 0.75rem;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   text-align: left;
   color: var(--color-text);
@@ -247,13 +247,13 @@ async function setColor(color: string): Promise<void> {
 }
 
 .list__count {
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .list__note {
   margin: auto 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -269,7 +269,7 @@ async function setColor(color: string): Promise<void> {
 
 .detail__label {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   font-weight: 400;
   color: var(--color-muted);
 }
@@ -289,9 +289,11 @@ async function setColor(color: string): Promise<void> {
 .detail__input {
   flex: 1;
   max-width: 28rem;
-  padding: 0.5rem 0.75rem;
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   font-weight: 600;
   color: var(--color-text);
@@ -310,7 +312,7 @@ async function setColor(color: string): Promise<void> {
 .detail__color {
   padding: 0.5rem 0.625rem;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   color: var(--color-muted);
   background: none;
@@ -324,13 +326,13 @@ async function setColor(color: string): Promise<void> {
 
 .detail__error {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-danger);
 }
 
 .detail__muted {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -347,7 +349,7 @@ async function setColor(color: string): Promise<void> {
 }
 
 .projects__head .detail__label {
-  font: 600 0.6875rem / 1.4 var(--font-mono);
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -356,7 +358,7 @@ async function setColor(color: string): Promise<void> {
   margin: 0;
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   list-style: none;
   background: var(--color-surface);
 }
@@ -385,7 +387,7 @@ async function setColor(color: string): Promise<void> {
 
 .projects__path {
   overflow-wrap: anywhere;
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   color: var(--color-muted);
 }
 

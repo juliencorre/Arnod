@@ -60,12 +60,12 @@ async function newRequest(): Promise<void> {
 
 .welcome__title {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 650;
+  font-size: var(--text-display);
+  font-weight: 600;
 }
 
 .welcome__path {
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   color: var(--color-muted);
   overflow-wrap: anywhere;
 }

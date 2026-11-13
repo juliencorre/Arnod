@@ -221,7 +221,7 @@ const detachHover = ref(false);
   border: 1px solid var(--color-border-strong);
   border-radius: 50%;
   font: inherit;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-text);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);

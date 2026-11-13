@@ -123,9 +123,11 @@ function submit(): void {
 
 .contract-form__input,
 .contract-form__text {
-  padding: 0.5rem 0.625rem;
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   color: var(--color-text);
   background: var(--color-surface);
@@ -133,7 +135,7 @@ function submit(): void {
 
 .contract-form__text {
   min-height: 16rem;
-  font: 0.8125rem/1.5 var(--font-mono);
+  font: var(--text-body) / 1.5 var(--font-mono);
   resize: vertical;
 }
 
@@ -145,7 +147,7 @@ function submit(): void {
 
 .contract-form__hint {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 

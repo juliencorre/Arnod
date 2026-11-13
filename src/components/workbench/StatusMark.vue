@@ -25,7 +25,7 @@ defineProps<{ status: RequestStatus | null }>();
 .status-mark {
   flex: none;
   width: 1rem;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 700;
   text-align: center;
 }

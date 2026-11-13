@@ -377,13 +377,13 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
   align-items: baseline;
   gap: 0.5rem;
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .editor__folder {
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
 }
 
 .editor__contract {
@@ -399,8 +399,8 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
 .editor__version {
   padding: 0.0625rem 0.5rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
-  font: 600 0.75rem var(--font-mono);
+  border-radius: var(--radius-pill);
+  font: 600 var(--text-small) var(--font-mono);
   color: var(--color-text);
   background: var(--color-chip);
 }
@@ -409,7 +409,7 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
   display: flex;
   gap: 0.375rem;
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -420,8 +420,8 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
 .editor__elsewhere {
   margin: 0;
   padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  font-size: 0.8125rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
   background: var(--color-accent-soft);
 }
 
@@ -438,23 +438,32 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
 .editor__docs,
 .path-param__input,
 .tag__input {
-  padding: 0.5rem 0.625rem;
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   color: var(--color-text);
-  background: var(--color-surface);
+  background-color: var(--color-surface);
+}
+
+/* La barre d'adresse est le champ principal : plus haute que les autres contrôles. */
+.editor__method,
+.editor__url {
+  min-height: var(--control-lg);
 }
 
 .editor__method {
-  font-weight: 700;
+  padding-right: 1.75rem;
+  font-weight: 600;
 }
 
 .editor__url {
   flex: 1 1 12rem;
   min-width: 0;
   font-family: var(--font-mono);
-  font-size: 0.9375rem;
+  font-size: var(--text-body-large);
 }
 
 .editor__meta {
@@ -468,13 +477,13 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
   flex-direction: column;
   gap: 0.25rem;
   min-width: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .meta__input {
   min-width: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .tags {
@@ -491,8 +500,8 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.8125rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-body);
   color: var(--color-text);
   background: var(--color-chip);
 }
@@ -511,37 +520,38 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
 }
 
 .tag__add {
-  padding: 0.25rem 0.625rem;
+  min-height: var(--control-sm);
+  padding: 0 0.625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
-  font-size: 0.8125rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
   color: var(--color-text);
   background: var(--color-surface);
 }
 
 .tag__input {
   width: 9rem;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8125rem;
+  min-height: var(--control-sm);
+  padding: 0.1875rem 0.5rem;
+  font-size: var(--text-body);
 }
 
+/* Zone étroite : les onglets passent à la ligne, aucun n'est caché. */
 .editor__tabs {
   display: flex;
-  gap: 0.25rem;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--color-border);
 }
 
 .editor__tab {
   flex: none;
-  padding: 0.5rem 0.625rem;
+  padding: 0.4375rem 0.375rem;
   white-space: nowrap;
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
   cursor: pointer;
 }
@@ -555,8 +565,8 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
 .editor__badge {
   margin-left: 0.25rem;
   padding: 0 0.375rem;
-  border-radius: 999px;
-  font-size: 0.6875rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
   background: var(--color-chip);
 }
 
@@ -568,13 +578,13 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
 
 .section {
   margin: 0.25rem 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 600;
 }
 
 .hint {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -586,20 +596,21 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
 }
 
 .path-param__name {
-  font: 600 0.8125rem var(--font-mono);
+  font: 600 var(--text-body) var(--font-mono);
 }
 
 .path-param__input {
   min-width: 0;
-  padding: 0.375rem 0.5rem;
+  min-height: var(--control-sm);
+  padding: 0.1875rem 0.5rem;
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
 }
 
 .path-param__description {
   grid-column: 2;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
 }
 
 .inherited {
@@ -609,7 +620,7 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
 }
 
 .inherited__source {
@@ -619,13 +630,13 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
 
 .editor__docs {
   min-height: 12rem;
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   resize: vertical;
 }
 
 .editor__preserved {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
@@ -634,7 +645,7 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--color-link);
   cursor: pointer;

@@ -161,14 +161,14 @@ onBeforeUnmount(() => {
 .sidebar__empty {
   margin: 0;
   padding: 0 var(--tree-pad);
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .sidebar__label {
   margin: 0;
   padding: 0 var(--tree-pad);
-  font: 600 0.65625rem / 1.4 var(--font-mono);
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-muted);
@@ -191,9 +191,9 @@ onBeforeUnmount(() => {
   margin-top: 0.25rem;
   padding: 0.5rem calc(var(--tree-pad) - 1px);
   border: 1px dashed var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   font-weight: 600;
   text-align: left;
   color: var(--color-link);
@@ -204,7 +204,7 @@ onBeforeUnmount(() => {
 .sidebar__hint {
   margin: 0;
   padding: 0 var(--tree-pad);
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   line-height: 1.4;
   color: var(--color-muted);
 }

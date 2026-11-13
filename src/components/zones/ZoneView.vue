@@ -511,7 +511,7 @@ const welcome = computed(
   padding: 0 0.25rem 0 0.75rem;
   border: none;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
   background: none;
   cursor: pointer;
@@ -530,7 +530,7 @@ const welcome = computed(
 }
 
 .zone__badge {
-  font: 700 0.625rem var(--font-mono);
+  font: 700 var(--text-caption) var(--font-mono);
   color: var(--color-muted);
 }
 
@@ -587,9 +587,9 @@ const welcome = computed(
   width: 1.625rem;
   height: 1.625rem;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
   background: none;
   cursor: pointer;
@@ -628,7 +628,7 @@ const welcome = computed(
   padding: 2rem;
   max-width: 22rem;
   text-align: center;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -638,7 +638,7 @@ const welcome = computed(
   display: grid;
   place-items: center;
   border: 2px dashed var(--color-accent);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--color-accent-soft) 80%, transparent);
   pointer-events: none;
 }
@@ -657,8 +657,8 @@ const welcome = computed(
 
 .zone__drop-label {
   padding: 0.375rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.8125rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
   color: var(--color-toast-text);
   background: var(--color-toast-bg);
 }
@@ -677,8 +677,8 @@ const welcome = computed(
 .zone__drop-hints span {
   padding: 0.1875rem 0.5rem;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-small);
   color: var(--color-muted);
   background: var(--color-surface);
 }

@@ -198,7 +198,7 @@ function resultFor(id: string): boolean | null {
 
 .hint {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -218,7 +218,7 @@ function resultFor(id: string): boolean | null {
   gap: 0.375rem;
   align-items: center;
   padding: 0.25rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .assertion--ok {
@@ -239,24 +239,26 @@ function resultFor(id: string): boolean | null {
   align-self: stretch;
   margin: 0;
   padding: 0.5rem 0.625rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   border: 1px dashed var(--color-border-strong);
 }
 
 .assertion input[type="text"],
 .assertion select {
   min-width: 0;
-  padding: 0.3125rem 0.5rem;
+  box-sizing: border-box;
+  min-height: var(--control-sm);
+  padding: 0.1875rem 0.5rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-text);
-  background: var(--color-surface);
+  background-color: var(--color-surface);
 }
 
 .assertion__origin {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
@@ -269,12 +271,12 @@ function resultFor(id: string): boolean | null {
 }
 
 .assertion__remove {
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .link {
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--color-link);
 }
@@ -282,5 +284,10 @@ function resultFor(id: string): boolean | null {
 :is(.assertion input, .assertion select, .assertion__remove, .link):focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;
+}
+
+/* La flèche de la liste déroulante garde sa place (styles.css). */
+.assertion select {
+  padding-right: 1.75rem;
 }
 </style>

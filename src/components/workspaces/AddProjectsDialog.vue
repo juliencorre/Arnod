@@ -212,7 +212,7 @@ async function submit(): Promise<void> {
   column-gap: 0.875rem;
   padding: 0.75rem 1rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   font: inherit;
   text-align: left;
   color: var(--color-text);
@@ -240,7 +240,7 @@ async function submit(): Promise<void> {
   justify-content: center;
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--color-link);
   background: var(--color-accent-soft);
 }
@@ -262,7 +262,7 @@ async function submit(): Promise<void> {
 }
 
 .choice__text {
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -277,13 +277,13 @@ async function submit(): Promise<void> {
 
 .registry__title {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-body-large);
   font-weight: 600;
 }
 
 .registry__text {
   margin: -0.375rem 0 0;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -295,7 +295,7 @@ async function submit(): Promise<void> {
   padding: 0;
   overflow-y: auto;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   list-style: none;
 }
 
@@ -323,18 +323,18 @@ async function submit(): Promise<void> {
 }
 
 .row__name {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .row__path {
   overflow-wrap: anywhere;
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   color: var(--color-muted);
 }
 
 .row__note {
   max-width: 45%;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   text-align: right;
   color: var(--color-muted);
 }

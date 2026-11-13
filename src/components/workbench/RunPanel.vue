@@ -396,20 +396,20 @@ const EMPTY: Record<View, string> = {
 
 .run__meta {
   margin: 0;
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   color: var(--color-muted);
 }
 
 .run__title {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--color-muted);
 }
 
 .run__progress {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: var(--text-display);
   font-weight: 700;
   color: var(--color-text);
 }
@@ -426,7 +426,7 @@ const EMPTY: Record<View, string> = {
 .run__group-bar {
   display: flex;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-border);
 }
 
@@ -464,7 +464,7 @@ const EMPTY: Record<View, string> = {
 .run__card,
 .run__groups {
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 
@@ -484,10 +484,10 @@ const EMPTY: Record<View, string> = {
 .run__tab {
   padding: 0.25rem 0.5rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: none;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
   cursor: pointer;
 }
@@ -499,13 +499,14 @@ const EMPTY: Record<View, string> = {
 }
 
 .run__layout select {
-  padding: 0.125rem 0.25rem;
+  min-height: var(--control-sm);
+  padding: 0 1.75rem 0 0.5rem;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-text);
-  background: var(--color-surface);
+  background-color: var(--color-surface);
 }
 
 .run__panel {
@@ -519,7 +520,7 @@ const EMPTY: Record<View, string> = {
 .run__section {
   margin: 0.5rem 0 0;
   padding: 0 0.75rem;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -537,7 +538,7 @@ const EMPTY: Record<View, string> = {
 .run__item {
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--color-border);
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .run__item:last-child {
@@ -574,7 +575,7 @@ const EMPTY: Record<View, string> = {
 
 .run__method {
   min-width: 3rem;
-  font: 700 0.6875rem var(--font-mono);
+  font: 700 var(--text-caption) var(--font-mono);
   color: var(--color-muted);
 }
 
@@ -606,18 +607,18 @@ const EMPTY: Record<View, string> = {
 .run__check,
 .run__info,
 .run__status {
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .run__status {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
 }
 
 .run__slow {
   padding: 0 0.375rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
   background: var(--color-chip);
 }
 
@@ -637,7 +638,7 @@ const EMPTY: Record<View, string> = {
 
 .run__error {
   margin: 0.25rem 0 0 1.5rem;
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   color: var(--color-danger);
 }
 
@@ -650,7 +651,7 @@ const EMPTY: Record<View, string> = {
 }
 
 .run__ignored {
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -659,7 +660,7 @@ const EMPTY: Record<View, string> = {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   text-decoration: underline;
   color: var(--color-link);
   cursor: pointer;
@@ -672,7 +673,7 @@ const EMPTY: Record<View, string> = {
 .run__groups-title {
   margin: 0 0 0.25rem;
   padding: 0 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .run__group {
@@ -685,7 +686,7 @@ const EMPTY: Record<View, string> = {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
@@ -706,7 +707,7 @@ const EMPTY: Record<View, string> = {
 }
 
 .run__group-count {
-  font: 0.8125rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
 }
 
 .run__group-count--bad {

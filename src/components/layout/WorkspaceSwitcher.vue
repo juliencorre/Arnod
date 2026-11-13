@@ -564,9 +564,9 @@ onBeforeUnmount(() => {
   height: 1.75rem;
   padding: 0 0.5rem 0 0.5625rem;
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--color-text);
   background: var(--color-surface);
@@ -622,7 +622,7 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   padding: 0.375rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
 }
@@ -639,8 +639,8 @@ onBeforeUnmount(() => {
   gap: 0.625rem;
   min-height: 2rem;
   padding: 0 0.625rem;
-  border-radius: 6px;
-  font-size: 0.8125rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
   color: var(--color-text);
   cursor: pointer;
   outline: none;
@@ -666,7 +666,7 @@ onBeforeUnmount(() => {
 }
 
 .switcher__item--link {
-  font-weight: 500;
+  font-weight: 400;
   color: var(--color-link);
 }
 
@@ -691,14 +691,14 @@ onBeforeUnmount(() => {
 .switcher__count {
   flex: none;
   margin-left: auto;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
 .switcher__key {
   flex: none;
   min-width: 3.25rem;
-  font: 0.6875rem var(--font-mono);
+  font: var(--text-caption) var(--font-mono);
   text-align: right;
   color: var(--color-muted);
 }
@@ -711,7 +711,7 @@ onBeforeUnmount(() => {
   width: 1.375rem;
   height: 1.375rem;
   margin-left: calc(3.25rem - 1.375rem);
-  border-radius: 5px;
+  border-radius: var(--radius-md);
   color: var(--color-text);
   background: var(--color-chip);
 }
@@ -732,7 +732,7 @@ onBeforeUnmount(() => {
 
 .switcher__heading {
   margin: 0.25rem 0.625rem 0.25rem;
-  font: 600 0.6875rem / 1.4 var(--font-mono);
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-muted);
@@ -740,7 +740,7 @@ onBeforeUnmount(() => {
 
 .switcher__hint {
   margin: 0.375rem 0.625rem 0.25rem;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 

@@ -1,6 +1,88 @@
 /* Styles des composants d'Arnod, recopiés du code par scripts/design-system.mjs (ne pas modifier). */
 
-/* src/styles.css */
+/* src/styles.css : tailles de texte, règles de base des contrôles natifs */
+:root {
+  --text-display: 1.5rem;
+  --text-title: 1.125rem;
+  --text-body-large: 0.9375rem;
+  --text-body: 0.8125rem;
+  --text-small: 0.75rem;
+  --text-caption: 0.6875rem;
+  accent-color: var(--color-accent);
+}
+/*
+ * Liste déroulante : le style des champs, flèche dessinée en CSS (la CSP interdit les images
+ * distantes). Un composant qui change son fond utilise `background-color`, pas `background`.
+ */
+select {
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0 1.75rem 0 0.625rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-muted) 50%),
+    linear-gradient(135deg, var(--color-muted) 50%, transparent 50%);
+  background-repeat: no-repeat;
+  background-position:
+    right 0.875rem center,
+    right 0.5625rem center;
+  background-size:
+    0.3125rem 0.3125rem,
+    0.3125rem 0.3125rem;
+  appearance: none;
+  cursor: pointer;
+}
+
+/*
+ * Case à cocher : la couleur d'accent et une coche foncée (7:1), comme l'interrupteur ; la case
+ * native du système tirait sur le bleu.
+ */
+input[type="checkbox"] {
+  display: inline-grid;
+  flex: none;
+  place-content: center;
+  box-sizing: border-box;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="checkbox"]:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+input[type="checkbox"]:checked::after {
+  width: 0.25rem;
+  height: 0.5rem;
+  margin-top: -0.125rem;
+  border: solid var(--color-accent-text);
+  border-width: 0 2px 2px 0;
+  content: "";
+  transform: rotate(45deg);
+}
+
+input[type="checkbox"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[type="checkbox"]:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -1px;
+}
+
+/* Texte réservé aux lecteurs d'écran. */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -19,9 +101,10 @@
   align-items: center;
   justify-content: center;
   gap: 0.375rem;
-  padding: 0.5rem 1rem;
+  min-height: var(--control-md);
+  padding: 0 0.75rem;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   font-weight: 600;
   line-height: 1.25;
@@ -71,6 +154,7 @@
 }
 
 .button--link {
+  min-height: 0;
   padding: 0.25rem 0;
   color: var(--color-link);
   background: none;
@@ -99,7 +183,7 @@
   height: 1.25rem;
   padding: 0;
   border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-chip);
   cursor: inherit;
   transition: background-color 120ms ease;
@@ -143,9 +227,10 @@
 .search {
   box-sizing: border-box;
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   color: var(--color-text);
   background: var(--color-surface);
@@ -174,14 +259,14 @@
   max-width: min(26rem, 90vw);
   padding: 0.375rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
 }
 
 .menu__heading {
   margin: 0.25rem 0.625rem 0.375rem;
-  font: 600 0.6875rem / 1.4 var(--font-mono);
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-muted);
@@ -201,7 +286,7 @@
   max-width: min(26rem, 90vw);
   padding: 0.375rem;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
 }
@@ -211,8 +296,10 @@
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  padding: 0.5rem 0.625rem;
-  border-radius: 6px;
+  min-height: var(--control-sm);
+  box-sizing: border-box;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-md);
   color: var(--color-text);
   cursor: pointer;
   outline: none;
@@ -249,13 +336,13 @@
 }
 
 .menu__hint {
-  font-size: 0.8125rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
 .menu__shortcut,
 .menu__detail {
-  font: 0.75rem var(--font-mono);
+  font: var(--text-small) var(--font-mono);
   color: var(--color-muted);
 }
 
@@ -270,7 +357,7 @@
   flex: none;
   width: 0.625rem;
   height: 0.625rem;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
 }
 
 /* L'espace avant la mention fait partie du nom accessible (« Recette protégé »). */
@@ -279,7 +366,7 @@
 }
 
 .menu__tag {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 600;
   color: var(--color-link);
 }
@@ -300,7 +387,7 @@
   max-height: calc(100vh - 4rem);
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   color: var(--color-text);
   background: var(--color-surface);
   box-shadow: var(--shadow-dialog);
@@ -334,8 +421,8 @@
 
 .dialog__title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 650;
+  font-size: var(--text-title);
+  font-weight: 600;
 }
 
 .dialog__description {
@@ -366,8 +453,8 @@
   align-items: center;
   gap: 1.25rem;
   max-width: 48rem;
-  padding: 0.75rem 1.125rem;
-  border-radius: 10px;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-lg);
   color: var(--color-toast-text);
   background: var(--color-toast-bg);
   box-shadow: var(--shadow-popover);
@@ -382,9 +469,9 @@
   flex: none;
   padding: 0.25rem 0.5rem;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--color-toast-action);
   background: none;
   cursor: pointer;
@@ -421,7 +508,7 @@
 .section-head__title {
   margin: 0;
   overflow: hidden;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -430,7 +517,7 @@
 
 .section-head__count {
   flex: none;
-  font: 500 0.6875rem var(--font-mono);
+  font: 400 var(--text-caption) var(--font-mono);
   color: var(--color-muted);
 }
 
@@ -454,7 +541,7 @@
 .dot {
   display: inline-block;
   flex: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .dot--sm {
@@ -465,14 +552,14 @@
 .dot--md {
   width: 0.875rem;
   height: 0.875rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 /* src/components/workbench/StatusMark.vue */
 .status-mark {
   flex: none;
   width: 1rem;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 700;
   text-align: center;
 }
@@ -491,7 +578,7 @@
   align-items: center;
   box-sizing: border-box;
   border: 1px solid var(--pill-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-family: var(--font-mono);
   font-weight: 600;
   white-space: nowrap;
@@ -502,13 +589,13 @@
 .pill--sm {
   height: 1.25rem;
   padding: 0 0.5rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-caption);
 }
 
 .pill--md {
   height: 1.5rem;
   padding: 0 0.5625rem;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
 }
 
 .pill--calls {

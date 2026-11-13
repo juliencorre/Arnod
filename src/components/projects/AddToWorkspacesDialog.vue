@@ -104,7 +104,7 @@ async function submit(): Promise<void> {
   align-items: center;
   gap: 0.625rem;
   padding: 0.5rem 0.625rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -122,7 +122,7 @@ async function submit(): Promise<void> {
 }
 
 .choice__note {
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 </style>

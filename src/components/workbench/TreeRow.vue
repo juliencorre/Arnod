@@ -166,7 +166,7 @@ function activate(): void {
   display: flex;
   align-items: center;
   padding-left: calc(var(--tree-pad) + var(--tree-indent) * var(--depth));
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .row:hover,
@@ -185,7 +185,7 @@ function activate(): void {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
@@ -195,7 +195,7 @@ function activate(): void {
 .row__more:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -2px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 /* Colonne de tête : chevron et dossier, ou méthode. */
@@ -209,7 +209,7 @@ function activate(): void {
 
 .row__chevron {
   width: 0.875rem;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   text-align: center;
   color: var(--color-muted);
 }
@@ -232,12 +232,12 @@ function activate(): void {
 
 .row__count {
   margin-left: auto;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
 .row__method {
-  font: 700 0.6875rem var(--font-mono);
+  font: 700 var(--text-caption) var(--font-mono);
   color: var(--color-muted);
 }
 

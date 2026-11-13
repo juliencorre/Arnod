@@ -90,7 +90,7 @@ const focused = ref(false);
 
 .first-run__title {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: var(--text-display);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -98,7 +98,7 @@ const focused = ref(false);
 .first-run__lead {
   margin: 0;
   max-width: 44rem;
-  font-size: 0.9375rem;
+  font-size: var(--text-body-large);
   color: var(--color-muted);
 }
 
@@ -128,13 +128,13 @@ const focused = ref(false);
   gap: 0.75rem;
   padding: 1.25rem;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 
 .first-run__card-title {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: var(--text-body-large);
   font-weight: 600;
 }
 
@@ -143,7 +143,7 @@ const focused = ref(false);
   align-items: center;
   gap: 1rem;
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -164,7 +164,7 @@ const focused = ref(false);
   gap: 0.625rem;
   padding: 1.25rem;
   border: 1.5px dashed var(--color-border-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font: inherit;
   text-align: center;
   color: var(--color-text);
@@ -186,7 +186,7 @@ const focused = ref(false);
   place-items: center;
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 700;
   color: var(--color-link);
   background: var(--color-accent-soft);
@@ -198,13 +198,13 @@ const focused = ref(false);
 
 .first-run__import-text {
   max-width: 18rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .first-run__note {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   text-align: center;
   color: var(--color-muted);
 }
@@ -216,12 +216,12 @@ const focused = ref(false);
   gap: 0.625rem;
   padding-top: 0.875rem;
   border-top: 1px solid var(--color-border);
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .first-run__compact-note {
   margin-left: auto;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
 }
 </style>

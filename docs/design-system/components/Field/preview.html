@@ -1,0 +1,65 @@
+<!-- @dsCard group="Saisie" height=230 subtitle="Champ, liste déroulante, case à cocher" -->
+<div class="demo">
+  <style>
+    .demo {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 260px));
+      gap: 16px 24px;
+      padding: 16px;
+      font: var(--text-body) / 1.5 var(--font-sans);
+      color: var(--color-text);
+      background: var(--color-bg);
+    }
+    .demo__field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: var(--text-small);
+      color: var(--color-muted);
+    }
+    .demo__input {
+      box-sizing: border-box;
+      min-height: var(--control-md);
+      padding: 0.3125rem 0.625rem;
+      border: 1px solid var(--color-border-strong);
+      border-radius: var(--radius-md);
+      font: inherit;
+      font-size: var(--text-body);
+      color: var(--color-text);
+      background-color: var(--color-surface);
+    }
+    .demo__input:focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: -1px;
+    }
+    .demo__check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
+  <label class="demo__field" for="field-name">
+    Nom
+    <input id="field-name" class="demo__input" type="text" value="Créer une commande" />
+  </label>
+  <label class="demo__field" for="field-color">
+    Couleur
+    <select id="field-color">
+      <option>Gris</option>
+      <option>Orange</option>
+      <option>Turquoise</option>
+    </select>
+  </label>
+  <label class="demo__check" for="field-on">
+    <input id="field-on" type="checkbox" checked />
+    Environnement protégé
+  </label>
+  <label class="demo__check" for="field-off">
+    <input id="field-off" type="checkbox" />
+    Activer la vérification
+  </label>
+  <label class="demo__check" for="field-disabled">
+    <input id="field-disabled" type="checkbox" checked disabled />
+    Projet déjà dans ce workspace
+  </label>
+</div>

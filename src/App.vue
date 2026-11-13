@@ -80,8 +80,8 @@ onMounted(async () => {
 
 .startup-error__title {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 650;
+  font-size: var(--text-display);
+  font-weight: 600;
 }
 
 .startup-error__message {

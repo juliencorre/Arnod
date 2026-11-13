@@ -18,7 +18,7 @@ withDefaults(defineProps<{ color: WorkspaceColor; size?: "sm" | "md" }>(), { siz
 .dot {
   display: inline-block;
   flex: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .dot--sm {
@@ -29,6 +29,6 @@ withDefaults(defineProps<{ color: WorkspaceColor; size?: "sm" | "md" }>(), { siz
 .dot--md {
   width: 0.875rem;
   height: 0.875rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 </style>

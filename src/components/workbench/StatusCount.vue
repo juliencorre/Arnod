@@ -28,7 +28,7 @@ const failed = computed(() => props.count.executed > props.count.passed);
 <style scoped>
 .status-count {
   margin-left: auto;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 

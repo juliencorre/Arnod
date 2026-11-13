@@ -130,6 +130,9 @@
   --radius-md: 6px;
   --radius-lg: 10px;
   --radius-pill: 999px;
+  --control-sm: 28px;
+  --control-md: 32px;
+  --control-lg: 40px;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
 }

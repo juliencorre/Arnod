@@ -305,16 +305,18 @@ async function submit(): Promise<void> {
 }
 
 .field__label {
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .field__input {
   box-sizing: border-box;
   width: 100%;
-  padding: 0.625rem 0.75rem;
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   color: var(--color-text);
   background: var(--color-surface);
@@ -331,7 +333,7 @@ async function submit(): Promise<void> {
 
 .field__error {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   color: var(--color-danger);
 }
 
@@ -341,7 +343,7 @@ async function submit(): Promise<void> {
   align-items: center;
   gap: 0.375rem;
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
@@ -349,9 +351,11 @@ async function submit(): Promise<void> {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.5rem 0.75rem;
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0 0.625rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
 }
 
@@ -359,7 +363,7 @@ async function submit(): Promise<void> {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
-  font: 0.875rem var(--font-mono);
+  font: var(--text-body) var(--font-mono);
   color: var(--color-text);
 }
 
@@ -374,15 +378,17 @@ async function submit(): Promise<void> {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4375rem 0.75rem;
-  border-radius: 8px;
-  font-size: 0.875rem;
+  box-sizing: border-box;
+  min-height: var(--control-sm);
+  padding: 0 0.625rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
   font-weight: 600;
   background: var(--color-chip);
 }
 
 .storage__badge {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   font-weight: 400;
   color: var(--color-muted);
 }
@@ -399,11 +405,12 @@ async function submit(): Promise<void> {
 }
 
 .storage__add {
-  padding: 0.4375rem 0.75rem;
+  min-height: var(--control-sm);
+  padding: 0 0.625rem;
   border: 1px dashed var(--color-border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--color-text);
   background: none;
@@ -423,7 +430,7 @@ async function submit(): Promise<void> {
 
 .actions__note {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   text-align: center;
   color: var(--color-muted);
 }

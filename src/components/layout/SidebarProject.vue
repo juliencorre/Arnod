@@ -268,7 +268,7 @@ defineExpose({
   gap: 0;
   min-height: 2rem;
   padding: 0 calc(var(--tree-pad) - 0.125rem) 0 var(--tree-pad);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .project__row:hover,
@@ -281,9 +281,9 @@ defineExpose({
   width: var(--tree-indent);
   padding: 0.375rem 0.375rem 0.375rem 0;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font: inherit;
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   text-align: center;
   color: var(--color-muted);
   background: none;
@@ -305,7 +305,7 @@ defineExpose({
   padding: 0.375rem 0;
   border: none;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   font-weight: 600;
   text-align: left;
   color: var(--color-text);
@@ -319,8 +319,8 @@ defineExpose({
   place-items: center;
   width: calc(var(--tree-lead) - var(--tree-indent));
   height: 1.25rem;
-  border-radius: 4px;
-  font: 600 0.6875rem var(--font-mono);
+  border-radius: var(--radius-sm);
+  font: 600 var(--text-caption) var(--font-mono);
   color: var(--color-muted);
   background: var(--color-chip);
 }
@@ -371,7 +371,7 @@ defineExpose({
   opacity: 0;
   padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: none;
   cursor: pointer;
 }

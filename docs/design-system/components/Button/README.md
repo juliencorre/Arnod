@@ -12,6 +12,9 @@ Source : `src/components/ui/BaseButton.vue` (aperçu statique recopié à la mai
 - `danger` : une action destructrice ; texte `color-danger`, bord rouge au survol.
 - `link` : une action textuelle dans une liste ou une section (« + Ajouter un projet »).
 
+Hauteur `control-md` (32 px), texte `text-body` en graisse 600, rayon `radius-md`. Dans la barre
+d'adresse d'une requête, « Envoyer » prend la hauteur de la barre (`control-lg`).
+
 ## Ce que fournit l'appelant
 
 - Le libellé dans le contenu : un verbe à l'infinitif, sans point final.

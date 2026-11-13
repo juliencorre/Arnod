@@ -56,7 +56,9 @@ et focus 3:1). Un composant n'écrit jamais une couleur en dur : il prend un jet
 
 Police système uniquement (`font-sans`) : la politique de sécurité de l'application interdit les
 polices distantes. Les données (méthodes, chemins, raccourcis, compteurs, pastilles) sont en
-`font-mono`. Hauteur de ligne 1,5.
+`font-mono`. Hauteur de ligne 1,5. Six tailles, pas une de plus : le texte de l'interface est en
+`text-body` (13 px) partout, barre latérale comme zone principale ; dans le code, ce sont les
+variables `--text-*`.
 
 | Style             | Taille | Graisse | Usage                                       |
 | ----------------- | ------ | ------- | ------------------------------------------- |
@@ -70,17 +72,22 @@ polices distantes. Les données (méthodes, chemins, raccourcis, compteurs, past
 | `mono-small`      | 12 px  | 400     | Raccourcis clavier, chemins, valeurs        |
 
 Graisses : 400 pour le texte, 600 pour les titres, libellés de bouton et en-têtes, 700 pour les
-méthodes et les marques d'état.
+seules méthodes et marques d'état en chasse fixe. Un libellé de champ est en `text-small` et
+`color-muted` : il ne doit jamais être plus fort que la valeur qu'il nomme.
 
-## Espacements, rayons et ombres
+## Espacements, hauteurs, rayons et ombres
 
+- Hauteur des contrôles : `control-md` (32 px) pour les boutons, champs et listes d'un formulaire,
+  `control-sm` (28 px) dans une ligne de tableau, un menu ou une barre d'outils, `control-lg`
+  (40 px) pour la seule barre d'adresse d'une requête et son bouton « Envoyer » : c'est le champ
+  principal de l'application.
 - Pas d'espacement : `space-2` à `space-32`. `space-8` est le plus employé (rembourrage vertical
   des boutons et des champs), `space-24` rembourre une fenêtre modale.
 - Barre latérale : toute ligne suit la grille `tree-pad`, `tree-indent`, `tree-lead`, `tree-gap`
   (colonne de tête de largeur fixe, libellé après) au lieu de marges propres.
 - Rayons : `radius-sm` (2 px) pour les petites marques, `radius-md` (6 px) pour les boutons,
   champs et lignes, `radius-lg` (10 px) pour les menus, notifications, cartes et fenêtres,
-  `radius-pill` pour les formes rondes.
+  `radius-pill` pour les formes rondes. Aucune autre valeur.
 - Ombres : `shadow-popover` pour les menus et notifications, `shadow-dialog` pour les fenêtres
   modales, posées sur le voile `backdrop`. Les autres éléments n'ont pas d'ombre : une bordure
   `color-border` les sépare.
@@ -108,7 +115,9 @@ Les aperçus sont des rendus statiques : les composants sont écrits en Vue, et 
 recopiés tels quels dans `components/bundle.css`. Dans l'application, réutiliser ces composants au
 lieu d'en écrire de nouveaux.
 
-- **Button** (`BaseButton`) : principal, secondaire, danger, lien.
+- **Button** (`BaseButton`) : principal, secondaire, danger, lien. Un seul bouton plein par vue,
+  et il est orange : pas de bouton plein d'une autre couleur.
+- **Field** : champ, liste déroulante et case à cocher, habillés par les règles de base.
 - **Toggle** (`ToggleSwitch`) : interrupteur `role="switch"` avec son libellé.
 - **SearchInput** : champ de recherche, Échap le vide.
 - **Menu** (`BaseMenu`) : menu accessible au clavier, avec choix, nuanciers, mentions, raccourcis.
@@ -123,14 +132,15 @@ lieu d'en écrire de nouveaux.
 
 Ce design system est la référence de la maquette et du code. Décisions du 12 novembre 2026 :
 
-- **Couleurs : le code fait foi.** Bouton principal orange `color-accent`, texte foncé. La maquette
-  dessine encore son bouton principal en rouille `#b4561d`, texte blanc, et écrit ses couleurs à
-  la main, la moitié seulement sur des valeurs de jetons : elle passe aux jetons. La page 0.5 de
-  la maquette compte ces teintes et donne le jeton qui remplace chacune.
-- **Tailles de texte : l'échelle de la maquette fait foi** (11, 12, 13, 15, 18, 24 px). Le code
-  emploie aussi 10, 14 (49 fois), 16, 17, 20 et 28 px : il s'aligne.
-- **Rayons : l'échelle de la maquette fait foi** (2, 6, 10 px et formes rondes). Le code emploie
-  aussi 8 px (boutons, champs) et 3, 4, 5, 12, 14 px : il s'aligne.
+- **Couleurs : le code fait foi.** Bouton principal orange `color-accent`, texte foncé. Les écrans
+  de la maquette ont repris ce bouton et remplacé leurs teintes presque identiques par les jetons
+  (`scripts/maquette-couleurs.py`) ; les teintes plus éloignées restent à revoir une à une, la
+  page 0.5 de la maquette les liste avec le jeton le plus proche.
+- **Tailles de texte, rayons et hauteurs : une seule échelle.** Le code l'applique depuis le
+  12 novembre (variables `--text-*`, `--radius-*`, `--control-*`) ; la maquette dessine encore
+  quelques tailles et rayons hors échelle (1.2-a, 4.2-a).
+- **Espacements : pas encore de variables.** Les pas `space-*` décrivent l'usage du code ; ils ne
+  sont pas imposés.
 
 Ces écarts sont suivis dans `docs/maquette-etat.yml` (écarts transverses).
 
@@ -138,9 +148,9 @@ Ces écarts sont suivis dans `docs/maquette-etat.yml` (écarts transverses).
 
 Les jetons, les styles des composants et les icônes sont générés depuis le code par
 `node scripts/design-system.mjs` ; `npm run check` échoue tant que `docs/design-system/` n'est pas
-à jour. Un jeton ajouté à `src/styles.css` doit recevoir sa note d'usage dans ce script. Ce texte,
+à jour. Une couleur ajoutée à `src/styles.css` doit recevoir sa note d'usage dans ce script ; une
+taille, un rayon ou une hauteur, son commentaire d'usage dans `src/styles.css`. Ce texte,
 les guides et les aperçus des composants s'écrivent à la main dans `docs/design-system/`.
 
 Non synchronisé : aucune police à fournir (police système) ; composants non exécutables (Vue,
-aperçus statiques) ; les tailles et rayons hors échelle restent dans le code jusqu'à leur
-alignement.
+aperçus statiques).

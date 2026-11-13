@@ -68,7 +68,7 @@ function onClick(event: MouseEvent): void {
   max-height: calc(100vh - 4rem);
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   color: var(--color-text);
   background: var(--color-surface);
   box-shadow: var(--shadow-dialog);
@@ -102,8 +102,8 @@ function onClick(event: MouseEvent): void {
 
 .dialog__title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 650;
+  font-size: var(--text-title);
+  font-weight: 600;
 }
 
 .dialog__description {

@@ -228,13 +228,13 @@ async function send(): Promise<void> {
 
 .try__title {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   font-weight: 600;
 }
 
 .try__hint,
 .try__note {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
@@ -253,7 +253,7 @@ async function send(): Promise<void> {
   align-items: center;
   min-width: 0;
   border: 1.5px solid var(--color-text);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-surface);
 }
@@ -282,9 +282,9 @@ async function send(): Promise<void> {
   height: 1.25rem;
   padding: 0 0.5rem;
   border: 1px dashed var(--color-border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-caption);
   font-weight: 600;
   color: var(--color-muted);
   background: var(--color-surface);
@@ -296,7 +296,7 @@ async function send(): Promise<void> {
   padding: 0.625rem 0.75rem;
   border: 0;
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-text);
   background: none;
 }
@@ -309,7 +309,7 @@ async function send(): Promise<void> {
   margin-right: 0.25rem;
   padding: 0.25rem 0.5rem;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font: inherit;
   font-size: 1rem;
   line-height: 1;
@@ -335,7 +335,7 @@ async function send(): Promise<void> {
 }
 
 .try__chips-label {
-  font-size: 0.75rem;
+  font-size: var(--text-small);
   color: var(--color-muted);
 }
 
@@ -343,7 +343,7 @@ async function send(): Promise<void> {
   display: inline-flex;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   cursor: pointer;
 }
@@ -359,13 +359,13 @@ async function send(): Promise<void> {
 
 .try__sending {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 
 .try__error {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-danger);
 }
 </style>
