@@ -78,8 +78,7 @@ pub fn run() {
                 // Projet oublié ou dossier introuvable : plus de surveillance (lot I).
                 handle.state::<Watchers>().retain(|id| {
                     snapshot.projects.iter().any(|project| {
-                        project.id == id
-                            && project.status == catalog::snapshot::ProjectStatus::Ok
+                        project.id == id && project.status == catalog::snapshot::ProjectStatus::Ok
                     })
                 });
             }));

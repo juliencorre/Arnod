@@ -87,15 +87,19 @@ export type PendingConfirmation =
 
 /** Lot I : résumé d'un lot de changements faits hors d'Arnod (« 4 requêtes modifiées, 1 ajoutée »). */
 export function filesSummary(change: FilesChange): string {
-  const count = (n: number, one: string, many: string): string | null =>
-    n === 0 ? null : `${String(n)} ${n === 1 ? one : many}`;
-  return [
-    count(change.modified.length, "requête modifiée", "requêtes modifiées"),
-    count(change.added.length, "ajoutée", "ajoutées"),
-    count(change.removed.length, "supprimée", "supprimées"),
-    count(change.renamed.length, "renommée", "renommées"),
-  ]
-    .filter((part): part is string => part !== null)
+  const parts = (
+    [
+      [change.modified.length, "modifiée", "modifiées"],
+      [change.added.length, "ajoutée", "ajoutées"],
+      [change.removed.length, "supprimée", "supprimées"],
+      [change.renamed.length, "renommée", "renommées"],
+    ] as const
+  ).filter(([n]) => n > 0);
+  return parts
+    .map(([n, one, many], index) => {
+      const noun = index === 0 ? (n === 1 ? "requête " : "requêtes ") : "";
+      return `${String(n)} ${noun}${n === 1 ? one : many}`;
+    })
     .join(", ");
 }
 
@@ -956,8 +960,8 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       const merged = await ipc.requestConflictResolve(
         editor.projectId,
         editor.path,
-        editor.draft,
-        editor.choices,
+        JSON.parse(JSON.stringify(editor.draft)) as RequestDoc,
+        { ...editor.choices },
       );
       editor.draft = merged;
       editor.saved = JSON.stringify(merged);

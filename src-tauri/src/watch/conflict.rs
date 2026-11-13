@@ -143,10 +143,7 @@ fn elements(request: &Map<String, Value>) -> BTreeMap<String, (String, Value)> {
     }
     for (list, prefix) in LISTS {
         for (key, label, item) in lines(list, request) {
-            out.insert(
-                key,
-                (format!("{prefix} {label}"), comparable(list, &item)),
-            );
+            out.insert(key, (format!("{prefix} {label}"), comparable(list, &item)));
         }
     }
     out

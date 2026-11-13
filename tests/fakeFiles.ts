@@ -13,8 +13,10 @@ import type {
 
 import type { FakeWorkbench } from "./fakeWorkbench";
 
-/** Date de modification renvoyée par le faux cœur (15:04 heure locale, un jour fixe). */
-export const FICHIERS_LOT_I_MODIFIED_AT = new Date(2026, 10, 13, 15, 4).getTime();
+/** Date de modification renvoyée par le faux cœur : l'instant de la comparaison. */
+function modifiedAtLotI(): number {
+  return Date.now();
+}
 
 type Elements = Map<string, { label: string; value: string }>;
 
@@ -26,7 +28,7 @@ function elementsLotI(request: RequestDoc): Elements {
   const content = request.body.variants[request.body.selected]?.content ?? "";
   out.set("body", {
     label: "Corps",
-    value: content ? `${request.body.type} · ${content}` : request.body.type,
+    value: content ? `${request.body.kind} · ${content}` : request.body.kind,
   });
   for (const header of request.headers) {
     out.set(`headers:${header.name.toLowerCase()}#0`, {
@@ -36,7 +38,9 @@ function elementsLotI(request: RequestDoc): Elements {
   }
   for (const assertion of request.assertions) {
     const value =
-      assertion.value === undefined || assertion.value === null ? "" : ` ${String(assertion.value)}`;
+      assertion.value === undefined || assertion.value === null
+        ? ""
+        : ` ${String(assertion.value)}`;
     out.set(`assertions:${assertion.target}#0`, {
       label: `Vérification ${assertion.target}`,
       value: `${assertion.operator === "equals" ? "égal à" : assertion.operator}${value}`,
@@ -45,11 +49,7 @@ function elementsLotI(request: RequestDoc): Elements {
   return out;
 }
 
-export function compareLotI(
-  base: RequestDoc,
-  disk: RequestDoc,
-  draft: RequestDoc,
-): ConflictItem[] {
+export function compareLotI(base: RequestDoc, disk: RequestDoc, draft: RequestDoc): ConflictItem[] {
   const [b, d, m] = [elementsLotI(base), elementsLotI(disk), elementsLotI(draft)];
   const keys = [...new Set([...d.keys(), ...m.keys()])];
   const different: ConflictItem[] = [];
@@ -128,7 +128,7 @@ export function handleFilesLotI(
       if (!disk) throw { kind: "notFound", message: "La requête n'existe plus." };
       const conflict: RequestConflict = {
         items: compareLotI(args.base as RequestDoc, disk, args.draft as RequestDoc),
-        modifiedAt: FICHIERS_LOT_I_MODIFIED_AT,
+        modifiedAt: modifiedAtLotI(),
       };
       return conflict;
     }

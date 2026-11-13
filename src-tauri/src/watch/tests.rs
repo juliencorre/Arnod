@@ -13,7 +13,9 @@ use super::service::{Sink, Watchers};
 use super::*;
 use crate::error::CommandErrorKind;
 use crate::request::file;
-use crate::request::model::{Assertion, Body, BodyKind, Method, Operator, Origin, Pair, Request, Scalar};
+use crate::request::model::{
+    Assertion, Body, BodyKind, Method, Operator, Origin, Pair, Request, Scalar,
+};
 
 /// Projet suivi dans un dossier temporaire, oublié à la fin du test.
 struct Project {
@@ -119,7 +121,11 @@ fn r2_les_operations_de_l_arborescence_ne_sont_pas_des_changements() {
 #[test]
 fn r3_ecriture_externe_d_une_requete() {
     let project = Project::new();
-    external_edit(&project.path("commandes/creer.yml"), "/orders", "/v3/orders");
+    external_edit(
+        &project.path("commandes/creer.yml"),
+        "/orders",
+        "/v3/orders",
+    );
     let change = project.refresh(&["commandes/creer.yml"]);
     assert_eq!(change.modified, vec!["commandes/creer.yml".to_owned()]);
     assert!(change.tree);
@@ -156,7 +162,11 @@ fn r3_portees_environnements_contrats_collection() {
     let contracts = project.refresh(&["contracts"]);
     assert!(contracts.contracts && contracts.tree && contracts.modified.is_empty());
 
-    fs::write(project.path("opencollection.yml"), "opencollection: 1.0.0\n").unwrap();
+    fs::write(
+        project.path("opencollection.yml"),
+        "opencollection: 1.0.0\n",
+    )
+    .unwrap();
     let root = project.refresh(&["opencollection.yml"]);
     assert!(root.tree && root.environments && root.modified.is_empty());
 
@@ -335,7 +345,8 @@ fn base() -> Request {
 fn r9_compare_les_elements_qui_different() {
     let base = base();
     let mut disk = base.clone();
-    disk.headers.push(Pair::new("X-Request-Id", "{{$randomUUID}}"));
+    disk.headers
+        .push(Pair::new("X-Request-Id", "{{$randomUUID}}"));
     disk.assertions.retain(|a| a.target != "body.total");
     disk.assertions[0].value = Some(Scalar::Int(201));
     let mut draft = base.clone();
@@ -362,7 +373,10 @@ fn r9_compare_les_elements_qui_different() {
     assert_eq!(header.suggested, Some(ConflictSide::Disk));
     assert!(!header.identical);
     let body = &items[0];
-    assert_eq!(body.draft.as_deref(), Some("json · {\"coupon\": \"NOEL26\"}"));
+    assert_eq!(
+        body.draft.as_deref(),
+        Some("json · {\"coupon\": \"NOEL26\"}")
+    );
     assert_eq!(body.suggested, Some(ConflictSide::Draft));
     let total = &items[2];
     assert_eq!(total.label, "Vérification body.total");
@@ -392,7 +406,8 @@ fn r10_rien_de_propose_quand_les_deux_ont_change() {
 fn r11_fusion_selon_les_choix() {
     let base = base();
     let mut disk = base.clone();
-    disk.headers.push(Pair::new("X-Request-Id", "{{$randomUUID}}"));
+    disk.headers
+        .push(Pair::new("X-Request-Id", "{{$randomUUID}}"));
     disk.assertions.retain(|a| a.target != "body.total");
     let mut draft = base.clone();
     draft.body = Body::raw(BodyKind::Json, "{\"coupon\": \"NOEL26\"}");
@@ -409,8 +424,15 @@ fn r11_fusion_selon_les_choix() {
     let merged = conflict::merge(&disk_url, &draft, &choices).unwrap();
     assert_eq!(merged.url, "{{baseUrl}}/v3/orders");
     assert_eq!(merged.body, draft.body);
-    assert_eq!(merged.headers, vec![Pair::new("X-Request-Id", "{{$randomUUID}}")]);
-    let targets: Vec<&str> = merged.assertions.iter().map(|a| a.target.as_str()).collect();
+    assert_eq!(
+        merged.headers,
+        vec![Pair::new("X-Request-Id", "{{$randomUUID}}")]
+    );
+    let targets: Vec<&str> = merged
+        .assertions
+        .iter()
+        .map(|a| a.target.as_str())
+        .collect();
     assert_eq!(targets, vec!["status", "body.total"]);
 
     // Vérification retirée sur le disque, choisie « disque » : retirée.

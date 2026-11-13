@@ -64,7 +64,9 @@ impl Watchers {
                 loop {
                     let wait = pending
                         .values()
-                        .map(|(_, last)| (*last + DEBOUNCE).saturating_duration_since(Instant::now()))
+                        .map(|(_, last)| {
+                            (*last + DEBOUNCE).saturating_duration_since(Instant::now())
+                        })
                         .min()
                         .unwrap_or(Duration::from_secs(3600));
                     match receiver.recv_timeout(wait) {

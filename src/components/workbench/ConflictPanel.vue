@@ -113,8 +113,11 @@ async function restore(): Promise<void> {
           <tr v-for="item in different" :key="item.key" class="conflict__row">
             <th scope="row" class="conflict__label">{{ item.label }}</th>
             <td class="conflict__value">
-              <code v-if="item.disk !== null">{{ item.disk }}</code>
-              <span v-else class="conflict__absent">absent</span>
+              <template v-if="item.disk !== null">
+                <code>{{ item.disk }}</code>
+                <span v-if="item.draft === null" class="conflict__added">ajouté</span>
+              </template>
+              <span v-else class="conflict__absent">retiré</span>
             </td>
             <td class="conflict__value">
               <code v-if="item.draft !== null">{{ item.draft }}</code>
@@ -293,6 +296,12 @@ async function restore(): Promise<void> {
 .conflict__absent {
   font-style: italic;
   color: var(--color-muted);
+}
+
+.conflict__added {
+  display: block;
+  font-size: var(--text-small);
+  color: var(--color-success);
 }
 
 .conflict__row--same {

@@ -710,3 +710,111 @@ Object.assign(SCENARIOS, {
 
 /** Collection Bruno des scénarios d'import. */
 const BRUNO_DIR = "/home/julien/bruno/boutique-api";
+
+// --- Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md) ------------
+
+/** Lot I : « commandes/v2/Créer une commande » de l'écran 4.1-e. */
+function commandesLotI(): FakeCore {
+  const core = largeur(commandes(), 320);
+  core.workbench.requests.set(
+    "commandes/v2/creer-une-commande.yml",
+    newRequest("Créer une commande", {
+      method: "POST",
+      url: "{{baseUrl}}/orders",
+      body: {
+        kind: "json",
+        variants: [{ title: "", content: '{ "coupon": "BIENVENUE" }', form: [] }],
+        selected: 0,
+        other: "",
+      },
+      assertions: [
+        {
+          id: "statut",
+          target: "status",
+          operator: "equals",
+          value: 200,
+          origin: "manual",
+          enabled: true,
+        },
+        {
+          id: "total",
+          target: "body.total",
+          operator: "equals",
+          value: 59.8,
+          origin: "manual",
+          enabled: true,
+        },
+      ],
+    }),
+  );
+  return core;
+}
+
+/**
+ * Lot I : brouillon commencé ici (coupon, statut 201), puis le fichier change sur le disque (en-tête
+ * ajouté, vérification retirée, même statut) : l'onglet montre le conflit.
+ */
+async function conflitLotI(g: Gestes, core: FakeCore): Promise<void> {
+  await ouvrirProjet(g);
+  await g.cliquer('[role="treeitem"]', "Créer une commande");
+  await g.attendre(100);
+  const { useWorkbenchStore } = await import("@/stores/workbench");
+  const editor = Object.values(useWorkbenchStore().editors).find((e) =>
+    e.path.endsWith("creer-une-commande.yml"),
+  );
+  const draft = editor?.draft;
+  if (!draft) throw new Error("brouillon introuvable");
+  const variant = draft.body.variants[0];
+  if (variant) variant.content = '{ "coupon": "NOEL26" }';
+  const status = draft.assertions.find((a) => a.target === "status");
+  if (status) status.value = 201;
+  const disk = core.workbench.requests.get("commandes/v2/creer-une-commande.yml");
+  if (disk) {
+    disk.headers.push({
+      name: "X-Request-Id",
+      value: "{{$randomUUID}}",
+      enabled: true,
+      kind: "query",
+      description: "",
+    });
+    disk.assertions = disk.assertions
+      .filter((a) => a.target !== "body.total")
+      .map((a) => (a.target === "status" ? { ...a, value: 201 } : a));
+  }
+  await core.emit("arnod://projet", {
+    projectId: BOUTIQUE_TESTS,
+    scope: "request",
+    path: "commandes/v2/creer-une-commande.yml",
+    origin: "",
+  });
+  await g.attendre(200);
+}
+
+Object.assign(SCENARIOS, {
+  "4.1-e": {
+    description: "Brouillon en conflit avec le disque, réglé élément par élément (4.1-e)",
+    setup: commandesLotI,
+    play: conflitLotI,
+  },
+  "4.1-e-supprime": {
+    description: "Requête supprimée hors d'Arnod avec un brouillon : Restaurer ou Fermer (4.1-e)",
+    setup: commandesLotI,
+    play: async (g: Gestes, core: FakeCore) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Créer une commande");
+      await g.saisir(".editor__url", "{{baseUrl}}/v2/orders");
+      core.workbench.requests.delete("commandes/v2/creer-une-commande.yml");
+      await core.emit("arnod://fichiers", {
+        projectId: BOUTIQUE_TESTS,
+        added: [],
+        modified: [],
+        removed: ["commandes/v2/creer-une-commande.yml"],
+        renamed: [],
+        tree: true,
+        environments: false,
+        contracts: false,
+      });
+      await g.attendre(200);
+    },
+  },
+} satisfies Record<string, Scenario>);

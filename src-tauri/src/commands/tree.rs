@@ -16,8 +16,8 @@ use crate::local;
 use crate::results::ResultBook;
 use crate::state::AppState;
 use crate::tree::{self, TreeNode};
-use crate::windows::{self, ProjectScope};
 use crate::watch::service::Watchers;
+use crate::windows::{self, ProjectScope};
 use crate::workbench::Workbench;
 
 /// Arborescence d'un projet et dossiers repliés.
