@@ -6,12 +6,14 @@
 //! vivent dans [`catalog`], leur persistance dans [`storage`] et [`manifest`],
 //! l'état partagé dans [`state`].
 
+pub mod bruno;
 pub mod catalog;
 pub mod commands;
 pub mod contract;
 pub mod environment;
 pub mod error;
 pub mod http;
+pub mod import;
 pub mod layout;
 pub mod local;
 pub mod manifest;
@@ -145,6 +147,11 @@ pub fn run() {
             commands::steps::steps_catalog,
             commands::steps::steps_detect,
             commands::trial::trial_send,
+            // Lot C - Import Bruno.
+            commands::import::import_pick,
+            commands::import::import_detect,
+            commands::import::import_run,
+            commands::import::import_report,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

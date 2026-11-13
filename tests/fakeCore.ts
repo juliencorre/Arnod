@@ -17,6 +17,8 @@ import {
   type FakeWindows,
 } from "./fakeWindows";
 import { STEP_CATALOG, detect } from "./fakeSteps";
+// Lot C - Import Bruno.
+import { createFakeImports, handleImports, type FakeImports } from "./fakeImports";
 import {
   createFakeWorkbench,
   handleWorkbench,
@@ -50,6 +52,8 @@ export interface FakeCore {
   emit: (event: string, payload: unknown) => Promise<void>;
   /** Diffuse l'état des fenêtres, comme après une opération faite ailleurs. */
   emitWindows: () => Promise<void>;
+  /** Lot C - Import Bruno : sources reconnues, rapports. */
+  imports: FakeImports;
 }
 
 const COLORS: WorkspaceColor[] = [
@@ -86,6 +90,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     contracts: createFakeContracts(),
     emit: (event, payload) => emit(event, payload),
     emitWindows: () => emit("arnod://fenetres", snapshotOf(core.windows)),
+    imports: createFakeImports(),
   };
 
   const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -322,6 +327,28 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
         default: {
           const windows = handleWindows(core.windows, cmd, args);
           if (windows !== undefined) return windows;
+          // Lot C - Import Bruno.
+          const imported = handleImports(
+            core.imports,
+            cmd,
+            args,
+            (name, path, workspaceId) => {
+              const taken = state.projects.find((p) => same(p.name, name));
+              if (taken) {
+                fail(
+                  "nameTaken",
+                  `Un projet « ${taken.name} » existe déjà dans « Tous les projets ».`,
+                );
+              }
+              const id = `p-${name}`;
+              state.projects.push({ id, name, path, status: "ok", workspaceIds: [] });
+              if (workspaceId !== null) workspace(workspaceId).projectIds.push(id);
+              return { snapshot: normalize(), projectId: id };
+            },
+            (id) => project(id).name,
+            DEFAULT_LOCATION,
+          );
+          if (imported !== undefined) return imported;
           const contracts = handleContracts(core.contracts, core.workbench, cmd, args);
           const handled =
             contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);

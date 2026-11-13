@@ -13,6 +13,7 @@ import { computed, nextTick, ref, useTemplateRef } from "vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import ContractTab from "@/components/contracts/ContractTab.vue";
+import ImportReportTab from "@/components/import/ImportReportTab.vue";
 import RunPanel from "@/components/workbench/RunPanel.vue";
 import ProjectWelcome from "@/components/zones/ProjectWelcome.vue";
 import RequestTab from "@/components/zones/RequestTab.vue";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/dnd";
 import { useCatalogStore } from "@/stores/catalog";
 import { contractKey, useContractsStore } from "@/stores/contracts";
+import { useImportStore } from "@/stores/imports";
 import { useWindowsStore, zonesOf } from "@/stores/windows";
 import { findRequest, requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type { ContentTab, ZoneView } from "@/types/ipc";
@@ -38,6 +40,7 @@ const windows = useWindowsStore();
 const workbench = useWorkbenchStore();
 const catalog = useCatalogStore();
 const contracts = useContractsStore();
+const imports = useImportStore();
 const actions = useTabActions();
 const strip = useTemplateRef<HTMLElement>("strip");
 const body = useTemplateRef<HTMLElement>("body");
@@ -59,6 +62,14 @@ function info(tab: ContentTab): { name: string; badge: string; dirty: boolean } 
     return {
       name: `Run · ${catalog.projectById(content.projectId)?.name ?? "projet"}`,
       badge: "RUN",
+      dirty: false,
+    };
+  }
+  if (content.kind === "importReport") {
+    const report = imports.reports[content.projectId];
+    return {
+      name: report ? `Rapport d'import · ${report.collection}` : "Rapport d'import",
+      badge: "⇩",
       dirty: false,
     };
   }
@@ -419,6 +430,11 @@ const welcome = computed(
           :path="activeTab.content.path"
         />
         <ResultTab v-else-if="activeTab.content.kind === 'result'" :key="activeTab.id" />
+        <ImportReportTab
+          v-else-if="activeTab.content.kind === 'importReport'"
+          :key="activeTab.id"
+          :project-id="activeTab.content.projectId"
+        />
         <div v-else class="zone__run">
           <RunPanel :project-id="activeTab.content.projectId" />
         </div>

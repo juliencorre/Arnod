@@ -19,6 +19,8 @@ pub mod tree;
 pub mod trial;
 pub mod window;
 pub mod workspaces;
+// Lot C - Import Bruno.
+pub mod import;
 
 #[cfg(test)]
 mod tests {

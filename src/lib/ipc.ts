@@ -45,6 +45,10 @@ import type {
   StepCatalog,
   Detection,
   TrialResult,
+  ImportDone,
+  ImportReport,
+  ImportSource,
+  ImportTarget,
   TreeView,
   ProjectCreated,
   ProjectCreateInput,
@@ -340,6 +344,20 @@ export const ipc = {
     subject: string,
     values: Record<string, string>,
   ): Promise<TrialResult> => call<TrialResult>("trial_send", { execId, nature, subject, values }),
+
+  // Lot C - Import Bruno (docs/plan-mvp-c-import-bruno.md).
+  /** Sélecteur natif : un dossier, ou un fichier avec `file` ; `null` si annulé. */
+  importPick: (file: boolean): Promise<string | null> =>
+    call<string | null>("import_pick", { file }),
+  /** Reconnaît le format d'un dossier ou d'un fichier, sans rien écrire. */
+  importDetect: (path: string): Promise<ImportSource> =>
+    call<ImportSource>("import_detect", { path }),
+  /** Importe dans un nouveau projet ou dans un projet existant. */
+  importRun: (path: string, target: ImportTarget): Promise<ImportDone> =>
+    call<ImportDone>("import_run", { path, target }),
+  /** Dernier rapport d'import d'un projet. */
+  importReport: (projectId: string): Promise<ImportReport | null> =>
+    call<ImportReport | null>("import_report", { projectId }),
   runStart: (
     project: string,
     folder: string,

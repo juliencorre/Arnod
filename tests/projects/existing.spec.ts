@@ -3,9 +3,8 @@ import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { installFakeCore } from "../fakeCore";
-import { BOUTIQUE, boutiqueSnapshot, firstRunSnapshot } from "../fixtures";
+import { BOUTIQUE, boutiqueSnapshot } from "../fixtures";
 import { type AppWrapper, mountApp } from "../mountApp";
-import { chooseWorkspace } from "../switcher";
 
 let wrapper: AppWrapper | undefined;
 
@@ -15,13 +14,6 @@ afterEach(() => {
   clearMocks();
   document.body.innerHTML = "";
 });
-
-async function clickButton(app: AppWrapper, selector: string, text: string): Promise<void> {
-  const found = app.findAll(`${selector} button`).find((b) => b.text().trim() === text);
-  if (!found) throw new Error(`bouton « ${text} » introuvable`);
-  await found.trigger("click");
-  await flushPromises();
-}
 
 /** Clique sur un choix de la fenêtre « Ajouter un projet » (2c), par son titre. */
 async function clickChoice(app: AppWrapper, title: string): Promise<void> {
@@ -81,39 +73,5 @@ describe("importer un projet existant (P12)", () => {
     expect(toast.text()).toBe(
       "Le dossier /home/julien/vide ne contient pas de projet Arnod (arnod.yml absent).",
     );
-  });
-
-  it("depuis « Tous les projets », l'inscrit sans workspace", async () => {
-    const core = installFakeCore(boutiqueSnapshot());
-    core.pickedFolder = "/home/julien/dev/partenaires-v2";
-    wrapper = await mountApp();
-    await chooseWorkspace(wrapper, "Tous les projets");
-
-    await clickButton(wrapper, "main", "Importer…");
-
-    expect(core.calls.find((c) => c.cmd === "project_add_existing")?.args).toEqual({
-      path: "/home/julien/dev/partenaires-v2",
-      workspaceId: null,
-    });
-    expect(wrapper.get("main h1").text()).toBe("Tous les projets · 3");
-    expect(core.snapshot().workspaces.some((w) => w.projectIds.includes("p-partenaires-v2"))).toBe(
-      false,
-    );
-    expect(wrapper.get(".toast").text()).toBe("« partenaires-v2 » ajouté à « Tous les projets ».");
-  });
-
-  it("depuis le premier lancement, « Importer… » inscrit le projet sans workspace", async () => {
-    const core = installFakeCore(firstRunSnapshot());
-    core.pickedFolder = "/home/julien/dev/boutique-tests";
-    wrapper = await mountApp();
-
-    await wrapper.get(".first-run__import").trigger("click");
-    await flushPromises();
-
-    expect(core.calls.find((c) => c.cmd === "project_add_existing")?.args).toEqual({
-      path: "/home/julien/dev/boutique-tests",
-      workspaceId: null,
-    });
-    expect(wrapper.get("main h1").text()).toBe("Tous les projets · 1");
   });
 });

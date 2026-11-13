@@ -18,7 +18,7 @@
 import type { ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -1524,5 +1524,82 @@ describe("Premier usage : vérifications, run et statuts", () => {
     expect((await treeRow("Créer une commande"))?.status).toBe("✓, réussie");
     expect((await treeRow("Lister les commandes"))?.status).toBe("✓, réussie");
     expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
+  });
+});
+
+// Lot C - Import Bruno (docs/plan-mvp-c-import-bruno.md).
+describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
+  const source = () => path.join(sandbox.home, "bruno", "boutique-api");
+  const project = () => path.join(sandbox.home, "arnod", "Boutique API");
+
+  function invoke(cmd: string, args: unknown): Promise<unknown> {
+    return browser.execute(
+      (name, payload) =>
+        (
+          window as unknown as {
+            __TAURI_INTERNALS__: { invoke: (cmd: string, args: unknown) => Promise<unknown> };
+          }
+        ).__TAURI_INTERNALS__.invoke(name, payload),
+      cmd,
+      args,
+    );
+  }
+
+  beforeAll(() => {
+    cpSync(
+      path.join(import.meta.dirname, "..", "src-tauri", "src", "bruno", "fixtures", "boutique"),
+      source(),
+      {
+        recursive: true,
+      },
+    );
+  });
+
+  it("reconnaît la collection .bru sans rien écrire (2.3-a)", async () => {
+    const detected = (await invoke("import_detect", { path: source() })) as {
+      format: string;
+      name: string;
+      counts: { requests: number };
+    };
+    expect(detected.format).toBe("bruno");
+    expect(detected.name).toBe("Boutique API");
+    expect(detected.counts.requests).toBe(6);
+    expect(existsSync(project())).toBe(false);
+  });
+
+  it("crée le projet OpenCollection à côté, ouvre le rapport, les .bru restent intacts (2.3-f)", async () => {
+    const before = readFileSync(path.join(source(), "Commandes", "Créer une commande.bru"), "utf8");
+    // Le sélecteur natif ne se pilote pas : on appelle la commande Rust réelle.
+    const done = (await invoke("import_run", {
+      path: source(),
+      target: { kind: "newProject", location: path.join(sandbox.home, "arnod"), workspaceId: null },
+    })) as { projectId: string };
+    await invoke("layout_open_selection", {
+      content: { kind: "importReport", projectId: done.projectId },
+    });
+
+    await browser.waitUntil(async () => await browser.$(".report h1").isExisting(), {
+      timeout: 15_000,
+      timeoutMsg: "rapport d'import attendu",
+    });
+    expect(await browser.$(".report h1").getText()).toContain("Boutique API importée");
+    const stats = await browser.$$(".report__stat").map((s) => s.getText());
+    expect(stats.join(" | ")).toContain("6\nrequêtes");
+    await screenshot(browser, "c1-rapport-import");
+
+    expect(readFileSync(path.join(source(), "Commandes", "Créer une commande.bru"), "utf8")).toBe(
+      before,
+    );
+    const root = readFileSync(path.join(project(), "opencollection.yml"), "utf8");
+    expect(root).toContain("name: Boutique API");
+    const request = readFileSync(
+      path.join(project(), "Commandes", "creer-une-commande.yml"),
+      "utf8",
+    );
+    expect(request).toContain("set-variable");
+    expect(request).toContain("{{$randomUUID}}");
+    expect(readFileSync(path.join(project(), "environments", "recette.yml"), "utf8")).not.toContain(
+      "ne-pas-lire",
+    );
   });
 });

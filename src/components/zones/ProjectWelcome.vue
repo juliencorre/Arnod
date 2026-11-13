@@ -5,6 +5,7 @@
  */
 import { computed } from "vue";
 
+import ImportStart from "@/components/import/ImportStart.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import { useCatalogStore } from "@/stores/catalog";
 import { useToastStore } from "@/stores/toasts";
@@ -43,6 +44,11 @@ async function newRequest(): Promise<void> {
       Un contrat OpenAPI ? « + Ajouter un contrat » dans la barre latérale crée ses requêtes.
     </p>
     <BaseButton variant="primary" @click="newRequest">+ Nouvelle requête</BaseButton>
+    <!-- Lot C - Import Bruno : point de départ « Reprendre l'existant » (2.3-b). -->
+    <div v-if="empty" class="welcome__start">
+      <p class="welcome__text">Par où commencer ?</p>
+      <ImportStart :project-id="projectId" />
+    </div>
   </div>
 </template>
 
@@ -73,5 +79,12 @@ async function newRequest(): Promise<void> {
 .welcome__text {
   margin: 0.25rem 0 0.5rem;
   color: var(--color-muted);
+}
+.welcome__start {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(16rem, 100%);
+  margin-top: 1rem;
 }
 </style>

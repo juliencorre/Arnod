@@ -13,9 +13,11 @@ import ProjectForm from "@/components/projects/ProjectForm.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import { useProjectActions } from "@/composables/useProjectActions";
 import { useDialogStore } from "@/stores/dialogs";
+import { useImportStore } from "@/stores/imports";
 
-const { announceCreated, addExistingProject } = useProjectActions();
+const { announceCreated } = useProjectActions();
 const dialogs = useDialogStore();
+const imports = useImportStore();
 const titleId = useId();
 const importTitleId = useId();
 /** Une nature est choisie : son formulaire est ouvert. */
@@ -40,18 +42,19 @@ const focused = ref(false);
             <h2 class="first-run__card-title">Créer un projet</h2>
             <ProjectForm mode="firstRun" :initial-workspace-id="null" @created="announceCreated" />
           </div>
-          <button
-            type="button"
-            class="first-run__import"
-            :aria-labelledby="importTitleId"
-            @click="addExistingProject(null)"
-          >
+          <section class="first-run__import" :aria-labelledby="importTitleId">
             <span class="first-run__import-icon" aria-hidden="true">⇩</span>
-            <span :id="importTitleId" class="first-run__import-title">Importer…</span>
-            <span class="first-run__import-text">
-              Un projet Arnod existant, par exemple après un clone Git : choisissez son dossier.
-            </span>
-          </button>
+            <h2 :id="importTitleId" class="first-run__import-title">Importer…</h2>
+            <p class="first-run__import-text">
+              Une collection Bruno, un fichier OpenAPI ou un projet Arnod : Arnod reconnaît le
+              format.
+            </p>
+            <BaseButton @click="imports.choose(null, null)">Choisir un dossier…</BaseButton>
+            <BaseButton variant="link" @click="imports.choose(null, null, true)">
+              ou un fichier…
+            </BaseButton>
+            <p class="first-run__import-note">L'import crée le projet.</p>
+          </section>
         </div>
         <p class="first-run__note">
           Un projet = un dossier sur votre poste, prêt à être partagé avec l'équipe.
@@ -60,7 +63,7 @@ const focused = ref(false);
       <div v-else class="first-run__compact">
         <span>Pas encore de projet ?</span>
         <BaseButton @click="dialogs.openNewProject(null)">Créer un projet…</BaseButton>
-        <BaseButton @click="addExistingProject(null)">⇩ Importer…</BaseButton>
+        <BaseButton @click="imports.open(null, null)">⇩ Importer…</BaseButton>
         <span class="first-run__compact-note">
           Un projet = un dossier sur votre poste, partagé avec l'équipe.
         </span>
@@ -165,20 +168,9 @@ const focused = ref(false);
   padding: 1.25rem;
   border: 1.5px dashed var(--color-border-strong);
   border-radius: var(--radius-lg);
-  font: inherit;
   text-align: center;
   color: var(--color-text);
   background: var(--color-surface);
-  cursor: pointer;
-}
-
-.first-run__import:hover {
-  background: var(--color-sidebar);
-}
-
-.first-run__import:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
 }
 
 .first-run__import-icon {
@@ -193,10 +185,19 @@ const focused = ref(false);
 }
 
 .first-run__import-title {
+  margin: 0;
+  font-size: var(--text-body);
   font-weight: 600;
 }
 
+.first-run__import-note {
+  margin: 0;
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
 .first-run__import-text {
+  margin: 0;
   max-width: 18rem;
   font-size: var(--text-body);
   color: var(--color-muted);

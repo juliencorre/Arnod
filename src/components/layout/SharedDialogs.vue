@@ -4,6 +4,8 @@ import AddToWorkspacesDialog from "@/components/projects/AddToWorkspacesDialog.v
 import NewProjectDialog from "@/components/projects/NewProjectDialog.vue";
 import ConfirmProtectedDialog from "@/components/workbench/ConfirmProtectedDialog.vue";
 import AddProjectsDialog from "@/components/workspaces/AddProjectsDialog.vue";
+// Lot C - Import Bruno.
+import ImportDialog from "@/components/import/ImportDialog.vue";
 </script>
 
 <template>
@@ -11,4 +13,5 @@ import AddProjectsDialog from "@/components/workspaces/AddProjectsDialog.vue";
   <AddToWorkspacesDialog />
   <AddProjectsDialog />
   <ConfirmProtectedDialog />
+  <ImportDialog />
 </template>
