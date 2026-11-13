@@ -93,9 +93,11 @@ function detectCurl(input: string): Detection | null {
     if (word === "-X") method = (all[++i] ?? "").toUpperCase();
     else if (word === "-H") {
       let header = all[++i] ?? "";
-      const bearer = /^Authorization:\s*Bearer\s+(.+)$/i.exec(header);
-      if (bearer?.[1] !== undefined) {
-        secrets.push({ name: "token", value: bearer[1], header: "Authorization" });
+      const colon = header.indexOf(":");
+      const value = colon < 0 ? "" : header.slice(colon + 1).trim();
+      const isAuth = header.slice(0, Math.max(colon, 0)).trim().toLowerCase() === "authorization";
+      if (isAuth && value.toLowerCase().startsWith("bearer ")) {
+        secrets.push({ name: "token", value: value.slice(7).trim(), header: "Authorization" });
         header = "Authorization: Bearer {{token}}";
       }
       headers.push(header);

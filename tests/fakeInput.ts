@@ -19,7 +19,7 @@ import type { FakeWorkbench } from "./fakeWorkbench";
 
 /** Noms des `{{…}}` d'un texte. */
 function names(text: string): string[] {
-  return [...text.matchAll(/\{\{\s*([^}]*?)\s*\}\}/g)].map((m) => m[1] ?? "");
+  return [...text.matchAll(/\{\{([^}]*)\}\}/g)].map((m) => (m[1] ?? "").trim());
 }
 
 function used(request: RequestDoc): string[] {
@@ -91,7 +91,8 @@ function fromText(text: string, format: PairsFormat, previous: Pair[]): PairsTex
 function curl(wb: FakeWorkbench, request: RequestDoc): CurlCopy {
   const env = wb.envs.find((e) => e.name === wb.active);
   const resolve = (text: string): string =>
-    text.replace(/\{\{\s*([^}]*?)\s*\}\}/g, (all, name: string) => {
+    text.replace(/\{\{([^}]*)\}\}/g, (all, raw: string) => {
+      const name = raw.trim();
       if (env?.locals.includes(name)) return `$${name.toUpperCase()}`;
       return env?.variables.find((v) => v.name === name)?.value ?? all;
     });

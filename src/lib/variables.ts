@@ -84,7 +84,9 @@ function place(field: Field, overlay: HTMLElement): void {
   } else {
     // Un champ d'une ligne centre son texte : le calque fait de même.
     const inner =
-      field.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+      field.clientHeight -
+      Number.parseFloat(style.paddingTop) -
+      Number.parseFloat(style.paddingBottom);
     overlay.style.lineHeight = inner > 0 ? `${String(inner)}px` : style.lineHeight;
     overlay.style.whiteSpace = "pre";
   }

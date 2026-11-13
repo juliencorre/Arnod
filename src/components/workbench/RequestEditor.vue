@@ -233,7 +233,7 @@ const curlPlace = ref<{ top: string; left: string }>({ top: "0", left: "0" });
 function placeCurl(): void {
   const rect = curlButton.value?.getBoundingClientRect();
   if (!rect) return;
-  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   const width = Math.min(30 * rem, window.innerWidth - 2 * rem);
   const left = Math.max(rem, Math.min(rect.left - 0.75 * rem, window.innerWidth - width - rem));
   curlPlace.value = { top: `${String(rect.bottom + 6)}px`, left: `${String(left)}px` };
