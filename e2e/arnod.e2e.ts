@@ -2207,4 +2207,18 @@ describe("Lot E - tests et étapes", () => {
     ).toBe(true);
     await screenshot(browser, "24-nouveau-test");
   });
+
+  it("la liste des valeurs dynamiques s'ouvre à la frappe de {{$ et insère la valeur choisie (5.1-h)", async () => {
+    const field = browser.$(".request-tab .editor__url");
+    await field.click();
+    await browser.keys(["End"]);
+    await browser.keys("/{{$rand".split(""));
+    await browser.$(".dynamic-values").waitForDisplayed({ timeoutMsg: "liste attendue" });
+    await screenshot(browser, "25-valeurs-dynamiques");
+    await browser.keys(["ArrowDown", "Enter"]);
+    await browser.waitUntil(async () => (await field.getValue()).endsWith("{{$randomInt}}"), {
+      timeoutMsg: "valeur dynamique insérée attendue",
+    });
+    expect(await browser.$(".dynamic-values").isExisting()).toBe(false);
+  });
 });

@@ -710,3 +710,24 @@ Object.assign(SCENARIOS, {
 
 /** Collection Bruno des scénarios d'import. */
 const BRUNO_DIR = "/home/julien/bruno/boutique-api";
+
+/** Liste des valeurs dynamiques proposée à la frappe de `{{$` (5.1-h). */
+Object.assign(SCENARIOS, {
+  "5.1-h-liste": {
+    description: "Liste des valeurs dynamiques ouverte à la frappe de {{$ dans le corps (5.1-h)",
+    setup: commandesLotE,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Créer une commande");
+      await g.cliquer(".editor__line button[type='submit']");
+      await g.attendre(100);
+      await g.cliquer(".response__tab", "Envoyé");
+      await g.cliquer(".editor__tab", "Corps");
+      await g.saisir(
+        ".body__content",
+        '{\n  "externalRef": "{{$randomUUID}}",\n  "customerId": "cus_31",\n  "customerEmail": "{{$randomEmail}}",\n  "deliveryDate": "{{$date:+3d}}",\n  "requestedAt": "{{$',
+      );
+      await g.attendre(200);
+    },
+  },
+} satisfies Record<string, Scenario>);

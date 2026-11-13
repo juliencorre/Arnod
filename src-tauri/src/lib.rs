@@ -172,6 +172,8 @@ pub fn run() {
             commands::test_steps::tree_create_test,
             commands::test_steps::tree_add_step,
             commands::test_steps::request_variable_users,
+            // Valeurs dynamiques proposées à la saisie (5.1-h).
+            commands::input::dynamic_values,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

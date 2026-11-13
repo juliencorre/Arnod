@@ -23,6 +23,7 @@ import BaseButton from "@/components/ui/BaseButton.vue";
 import AssertionsEditor from "@/components/workbench/AssertionsEditor.vue";
 import AuthEditor from "@/components/workbench/AuthEditor.vue";
 import BodyEditor from "@/components/workbench/BodyEditor.vue";
+import DynamicValuesMenu from "@/components/workbench/DynamicValuesMenu.vue";
 import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
@@ -36,6 +37,8 @@ import { useWorkbenchStore } from "@/stores/workbench";
 import type { CurlCopy, HttpMethod, Pair, RequestDoc, UnknownVariable } from "@/types/ipc";
 
 const props = defineProps<{ editorKey: string }>();
+/** Racine de l'éditeur : la liste des valeurs dynamiques écoute ses champs (5.1-h). */
+const editorRoot = useTemplateRef<HTMLElement>("editorRoot");
 
 const workbench = useWorkbenchStore();
 const contracts = useContractsStore();
@@ -329,7 +332,7 @@ watch(
 </script>
 
 <template>
-  <section v-if="request" class="editor" aria-label="Requête" @keydown="onKeydown">
+  <section v-if="request" ref="editorRoot" class="editor" aria-label="Requête" @keydown="onKeydown">
     <div class="editor__top">
       <p v-if="contract" class="editor__crumbs">
         <span>Contrats de service</span>
@@ -654,6 +657,7 @@ watch(
       :start-new="false"
       @close="managingEnvironments = false"
     />
+    <DynamicValuesMenu :root="editorRoot" />
   </section>
 </template>
 

@@ -577,3 +577,13 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
   inconnues. Une valeur `$…` fournie par l'appelant (copie cURL) n'est pas tirée.
 - « Extraire dans une variable » du filtre JSONPath (`ResponseFilter.vue`, store `response`)
   ajoute l'extraction de la correspondance courante (`workbench.addExtraction`).
+
+## Valeurs dynamiques à la saisie
+
+Référence : écran `5.1-h` (liste ouverte à la frappe de `{{$`).
+
+- Le cœur fournit noms, descriptions et un exemple tiré (`dynamic_values`, `request::dynamic::catalog`,
+  ordre de `NAMES`) ; le store `input` les lit une fois (`loadDynamicValues`).
+- `DynamicValuesMenu.vue` (monté par `RequestEditor`) écoute les champs marqués par `v-variables`
+  (`data-variables`) : `lib/dynamicValues.ts` (pur, testé) repère la saisie au curseur, filtre et
+  insère `{{$nom}}`. Motif combobox : le champ garde le focus, ↑ ↓, Entrée ou Tab, Échap.

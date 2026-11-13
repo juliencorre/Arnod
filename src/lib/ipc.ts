@@ -69,6 +69,7 @@ import type {
   CreatedTest,
   TestView,
   VariableUser,
+  DynamicValue,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -552,6 +553,8 @@ export const ipc = {
   /** Requêtes du projet, hors `path`, qui lisent l'une des variables `names` (EX5). */
   requestVariableUsers: (project: string, path: string, names: string[]): Promise<VariableUser[]> =>
     call<VariableUser[]>("request_variable_users", { project, path, names }),
+  /** Valeurs dynamiques proposées à la frappe de `{{$`, avec un exemple (5.1-h). */
+  dynamicValues: (): Promise<DynamicValue[]> => call<DynamicValue[]>("dynamic_values"),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
