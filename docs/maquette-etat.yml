@@ -190,12 +190,12 @@ pages:
     liees: ["1.4"]
     journal:
       - "2026-11-12 : Nom aligné sur le contenu (fichier « Récents »)."
-      - "2026-11-13 : Aperçu en italique et ◐, « +N » avec « Fermer les autres » et « Fermer tout », Ctrl+Tab dans l'ordre d'utilisation (plan-mvp-f-onglets-clavier, lot F)."
+      - "2026-11-13 : Aperçu en italique et ◐, « +N » avec « Fermer les autres » et « Fermer tout », Ctrl+Tab dans l'ordre d'utilisation (plan-mvp-f-onglets-clavier, PR #57)."
     ecrans:
       a:
         {
           etat: livré,
-          pr: [27],
+          pr: [27, 57],
           captures: [25-onglet-apercu],
           ecart:
             {
@@ -206,6 +206,7 @@ pages:
       b:
         {
           etat: livré,
+          pr: [57],
           captures: [26-onglets-en-trop],
           ecart:
             {
@@ -216,6 +217,7 @@ pages:
       c:
         {
           etat: livré,
+          pr: [57],
           captures: [27-ctrl-tab],
           ecart:
             {
@@ -234,7 +236,7 @@ pages:
     journal:
       - "2026-11-09 : Fenêtres et zones (PR #27)."
       - "2026-11-10 : Résultat détachable, écran i (PR #34)."
-      - "2026-11-13 : Ctrl+J et Ctrl+\\, dans le menu Fenêtre et sur l'icône de l'en-tête du résultat, gardés par fenêtre (plan-mvp-f-onglets-clavier, lot F)."
+      - "2026-11-13 : Ctrl+J et Ctrl+\\, dans le menu Fenêtre et sur l'icône de l'en-tête du résultat, gardés par fenêtre (plan-mvp-f-onglets-clavier, PR #57)."
     ecrans:
       a: { etat: livré, pr: [27], captures: [06-zones] }
       b: { etat: livré, pr: [27], captures: [06-zones] }
@@ -255,6 +257,7 @@ pages:
         {
           etat: livré,
           version: MVP,
+          pr: [57],
           captures: [28-clavier],
           ecart:
             {
