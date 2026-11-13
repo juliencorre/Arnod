@@ -19,6 +19,8 @@ pub mod tree;
 pub mod trial;
 pub mod window;
 pub mod workspaces;
+// Lot E : tests et étapes.
+pub mod test_steps;
 
 #[cfg(test)]
 mod tests {

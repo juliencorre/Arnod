@@ -213,12 +213,14 @@ async fn un_run_execute_le_dossier_et_garde_le_dernier() {
     let status = |name: &str| view.items.iter().find(|i| i.name == name).unwrap().status;
     assert_eq!(status("Bon"), ItemStatus::Passed);
     assert_eq!(status("Mauvais"), ItemStatus::Failed);
-    assert_eq!(status("Variable"), ItemStatus::Error);
+    // « Dossier » est un test : l'étape après l'échec n'est pas jouée (lot E, R3).
+    assert_eq!(status("Variable"), ItemStatus::Skipped);
+    assert_eq!(view.tests[0].failed_step, Some(2));
     assert_eq!(Workbench::last_run(&f.ctx).unwrap().id, started.id);
 
+    // Un test en échec est rejoué en entier (lot E, TE5).
     let retry = f.bench.retry_failures(&f.ctx, started.id, false).unwrap();
-    assert_eq!(retry.items.len(), 2);
-    assert!(retry.items.iter().all(|i| i.name != "Bon"));
+    assert_eq!(retry.items.len(), 3);
     wait(&f.bench, retry.id).await;
 }
 
@@ -566,7 +568,8 @@ async fn r1_r2_un_run_porte_numero_duree_et_resultat_par_dossier() {
         groups,
         [
             ("Catalogue", "Boutique/Catalogue", 1, 0, 1),
-            ("Commandes", "Boutique/Commandes", 1, 1, 2),
+            // Test « Commandes » arrêté à « Créer » : « Lire » n'est pas jouée (lot E, R3).
+            ("Commandes", "Boutique/Commandes", 0, 1, 2),
             ("Boutique", "Boutique", 1, 0, 1),
         ]
     );
@@ -594,6 +597,9 @@ fn r2_groupes_a_la_racine_du_projet() {
         slow: false,
         assertions: Vec::new(),
         error: None,
+        test: None,
+        step: None,
+        extracted: Vec::new(),
     };
     let groups = run_groups(
         "",
@@ -778,10 +784,14 @@ fn forme_json_du_run_et_des_statuts() {
                 ignored: false,
             }],
             error: None,
+            test: Some("D".into()),
+            step: Some(1),
+            extracted: Vec::new(),
         }],
         contract: None,
         revision: 0,
         groups: Vec::new(),
+        tests: Vec::new(),
     };
     run.touch();
     let json = serde_json::to_value(&run).unwrap();
@@ -793,6 +803,14 @@ fn forme_json_du_run_et_des_statuts() {
         json["groups"],
         serde_json::json!([{ "name": "D", "path": "D", "passed": 0, "failed": 1, "total": 1 }])
     );
+    assert_eq!(
+        json["tests"],
+        serde_json::json!([{
+            "path": "D", "name": "D", "status": "failed", "steps": 1, "passed": 0, "failedStep": 1
+        }])
+    );
+    assert_eq!(json["items"][0]["test"], "D");
+    assert_eq!(json["items"][0]["step"], 1);
     assert_eq!(
         json["items"][0]["assertions"][0],
         serde_json::json!({
@@ -821,4 +839,251 @@ fn forme_json_du_run_et_des_statuts() {
             "statuses": { "D/a.yml": { "passed": false, "at": 7 } }
         })
     );
+}
+
+// Tests et étapes (docs/plan-mvp-e-tests-etapes.md).
+
+use crate::request::model::{Body, BodyKind, Extraction, Operator, Origin, Scalar};
+
+fn step(f: &Fixture, test: &str, name: &str, seq: f64, edit: impl FnOnce(&mut Request)) -> String {
+    let path = tree::create_request(&f.ctx.root, test, Some(name)).unwrap();
+    let full = tree::resolve(&f.ctx.root, &path).unwrap();
+    let mut request = file::read(&full).unwrap();
+    request.seq = Some(seq);
+    request.assertions.clear();
+    edit(&mut request);
+    file::write(&full, &request).unwrap();
+    path
+}
+
+fn status_is(code: i64) -> Assertion {
+    Assertion {
+        id: "s".into(),
+        target: "status".into(),
+        operator: Operator::Equals,
+        value: Some(Scalar::Int(code)),
+        origin: Origin::Manual,
+        enabled: true,
+    }
+}
+
+/// Critère du lot : trois étapes, la valeur extraite de l'étape 1 sert à
+/// l'étape 3 ; un échec à l'étape 2 arrête le test.
+#[tokio::test]
+async fn lot_e_un_test_passe_la_valeur_extraite_et_s_arrete_au_premier_echec() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/clients"))
+        .respond_with(ResponseTemplate::new(201).set_body_string(r#"{"id":"cus_7"}"#))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/clients/cus_7"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{}"))
+        .mount(&server)
+        .await;
+    Mock::given(method("DELETE"))
+        .and(path("/clients/cus_7"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+    let f = fixture();
+    set_base_url(&f, &server.uri());
+    let test = tree::create_folder(&f.ctx.root, "", "Créer puis lire").unwrap();
+    let first = step(&f, &test, "Créer", 1.0, |r| {
+        r.method = Method::Post;
+        r.url = "{{baseUrl}}/clients".into();
+        r.extractions.push(Extraction {
+            name: "client.id".into(),
+            source: "body.id".into(),
+            enabled: true,
+        });
+        r.assertions.push(status_is(201));
+    });
+    let second = step(&f, &test, "Lire", 2.0, |r| {
+        r.url = "{{baseUrl}}/clients/{{client.id}}".into();
+        r.assertions.push(status_is(200));
+    });
+    let third = step(&f, &test, "Supprimer", 3.0, |r| {
+        r.method = Method::Delete;
+        r.url = "{{baseUrl}}/clients/{{client.id}}".into();
+        r.assertions.push(status_is(204));
+    });
+
+    let run = f
+        .bench
+        .start_run(&f.ctx, &test, "Local", None, false)
+        .unwrap();
+    assert_eq!(run.tests.len(), 1);
+    assert_eq!(run.tests[0].status, ItemStatus::Pending);
+    let run = wait(&f.bench, run.id).await;
+    let summary: Vec<(&str, ItemStatus, Option<usize>)> = run
+        .items
+        .iter()
+        .map(|i| (i.path.as_str(), i.status, i.step))
+        .collect();
+    assert_eq!(
+        summary,
+        [
+            (first.as_str(), ItemStatus::Passed, Some(1)),
+            (second.as_str(), ItemStatus::Passed, Some(2)),
+            (third.as_str(), ItemStatus::Passed, Some(3)),
+        ]
+    );
+    assert_eq!(run.items[0].extracted[0].value.as_deref(), Some("cus_7"));
+    assert_eq!(run.tests[0].status, ItemStatus::Passed);
+    assert_eq!((run.tests[0].passed, run.tests[0].steps), (3, 3));
+    // Les valeurs du run restent pour les envois de la session (R6).
+    assert_eq!(f.bench.runtime_variables(f.ctx.id)["client.id"], "cus_7");
+
+    // L'étape 2 échoue : l'étape 3 n'est pas jouée et garde son statut (R3).
+    let full = tree::resolve(&f.ctx.root, &second).unwrap();
+    let mut request = file::read(&full).unwrap();
+    request.assertions = vec![status_is(418)];
+    file::write(&full, &request).unwrap();
+    let run = f.bench.start_run(&f.ctx, "", "Local", None, false).unwrap();
+    let run = wait(&f.bench, run.id).await;
+    let statuses: Vec<ItemStatus> = run.items.iter().map(|i| i.status).collect();
+    assert_eq!(
+        statuses,
+        [ItemStatus::Passed, ItemStatus::Failed, ItemStatus::Skipped]
+    );
+    assert_eq!(run.tests[0].status, ItemStatus::Failed);
+    assert_eq!(run.tests[0].failed_step, Some(2));
+    assert_eq!(run.groups[0].total, 3);
+    assert_eq!((run.groups[0].passed, run.groups[0].failed), (1, 1));
+    let book = f.bench.statuses(&f.ctx);
+    assert!(
+        book[&third].passed,
+        "le statut de l'étape non jouée ne change pas"
+    );
+    assert!(!book[&second].passed);
+
+    // Relancer les échecs rejoue le test entier (TE5).
+    let retry = f.bench.retry_failures(&f.ctx, run.id, false).unwrap();
+    assert_eq!(retry.items.len(), 3);
+}
+
+#[tokio::test]
+async fn lot_e_les_tests_d_un_dossier_ont_chacun_leur_verdict() {
+    let server = MockServer::start().await;
+    Mock::given(path("/ok"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&server)
+        .await;
+    let f = fixture();
+    set_base_url(&f, &server.uri());
+    let shelf = tree::create_folder(&f.ctx.root, "", "Clients").unwrap();
+    let good = tree::create_folder(&f.ctx.root, &shelf, "Bon").unwrap();
+    let bad = tree::create_folder(&f.ctx.root, &shelf, "Mauvais").unwrap();
+    step(&f, &good, "a", 1.0, |r| r.url = "{{baseUrl}}/ok".into());
+    step(&f, &bad, "b", 1.0, |r| r.url = "{{baseUrl}}/absente".into());
+    step(&f, &bad, "c", 2.0, |r| r.url = "{{baseUrl}}/ok".into());
+    let run = f
+        .bench
+        .start_run(&f.ctx, &shelf, "Local", None, false)
+        .unwrap();
+    let run = wait(&f.bench, run.id).await;
+    let verdicts: Vec<(&str, ItemStatus)> = run
+        .tests
+        .iter()
+        .map(|t| (t.name.as_str(), t.status))
+        .collect();
+    assert_eq!(
+        verdicts,
+        [("Bon", ItemStatus::Passed), ("Mauvais", ItemStatus::Failed)]
+    );
+    assert_eq!(run.items[2].status, ItemStatus::Skipped);
+}
+
+#[tokio::test]
+async fn lot_e_un_envoi_seul_extrait_tire_et_montre_ce_qui_est_parti() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(
+            ResponseTemplate::new(201)
+                .insert_header("Location", "/commandes/9")
+                .set_body_string(r#"{"id":9}"#),
+        )
+        .mount(&server)
+        .await;
+    let f = fixture();
+    set_base_url(&f, &server.uri());
+    let mut request = Request::new("Créer");
+    request.method = Method::Post;
+    request.url = "{{baseUrl}}/commandes".into();
+    request.body = Body::raw(BodyKind::Json, r#"{"ref": "{{$randomUUID}}"}"#);
+    request.extractions = vec![
+        Extraction {
+            name: "commande".into(),
+            source: "headers.Location".into(),
+            enabled: true,
+        },
+        Extraction {
+            name: "ref".into(),
+            source: "request.body.ref".into(),
+            enabled: true,
+        },
+    ];
+    let outcome = f
+        .bench
+        .send(&f.ctx, Uuid::new_v4(), "Local", request, false)
+        .await
+        .unwrap();
+    let sent = outcome.sent.unwrap();
+    assert_eq!(sent.method, "POST");
+    assert!(sent.url.ends_with("/commandes"));
+    assert_eq!(sent.drawn.len(), 1);
+    assert_eq!(sent.drawn[0].source.as_deref(), Some("request.body.ref"));
+    assert_eq!(sent.used[0].name, "baseUrl");
+    assert!(!sent.used[0].runtime);
+    assert_eq!(sent.extracted[0].value.as_deref(), Some("/commandes/9"));
+    assert_eq!(sent.extracted[1].value.as_ref(), Some(&sent.drawn[0].value));
+
+    // La valeur extraite sert à l'envoi suivant, et y est signalée (R6).
+    Mock::given(method("GET"))
+        .and(path("/commandes/9"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&server)
+        .await;
+    let mut next = Request::new("Lire");
+    next.url = "{{baseUrl}}{{commande}}".into();
+    let outcome = f
+        .bench
+        .send(&f.ctx, Uuid::new_v4(), "Local", next, false)
+        .await
+        .unwrap();
+    assert_eq!(outcome.response.status, 200);
+    let used = outcome.sent.unwrap().used;
+    assert!(used.iter().any(|u| u.name == "commande" && u.runtime));
+}
+
+#[test]
+fn lot_e_unites_et_verdicts() {
+    let item = |path: &str, test: Option<&str>, status| RunItem {
+        path: path.into(),
+        name: path.into(),
+        method: Method::Get,
+        status,
+        http_status: None,
+        duration_ms: None,
+        slow: false,
+        assertions: Vec::new(),
+        error: None,
+        test: test.map(str::to_owned),
+        step: None,
+        extracted: Vec::new(),
+    };
+    let items = [
+        item("libre.yml", None, ItemStatus::Passed),
+        item("t/a.yml", Some("t"), ItemStatus::Passed),
+        item("t/b.yml", Some("t"), ItemStatus::Running),
+        item("u/a.yml", Some("u"), ItemStatus::Pending),
+        item("autre.yml", None, ItemStatus::Pending),
+    ];
+    assert_eq!(run_units(&items), [vec![0], vec![1, 2], vec![3], vec![4]]);
+    let tests = run_tests(&items);
+    assert_eq!(tests[0].status, ItemStatus::Running);
+    assert_eq!(tests[1].status, ItemStatus::Pending);
+    assert_eq!(tests[0].failed_step, None);
 }

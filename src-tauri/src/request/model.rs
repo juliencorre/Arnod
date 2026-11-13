@@ -308,6 +308,22 @@ pub struct Assertion {
     pub enabled: bool,
 }
 
+/// Extraction (`docs/plan-mvp-e-tests-etapes.md`, R7) : une valeur de la
+/// réponse, ou de la requête envoyée, rangée dans une variable d'exécution.
+/// Écrite en action OpenCollection `set-variable` (R2 du plan d'ensemble).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Extraction {
+    /// Nom de la variable (`client.id`).
+    pub name: String,
+    /// `body.id`, `headers.Location`, `status`, ou `request.body.ref` pour
+    /// une valeur envoyée ; une autre expression est gardée telle quelle.
+    pub source: String,
+    /// Une extraction désactivée n'est pas appliquée.
+    #[serde(default = "yes")]
+    pub enabled: bool,
+}
+
 /// Opération d'un contrat dont la requête est issue (C7).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -475,6 +491,12 @@ pub struct Request {
     pub docs: String,
     #[serde(default)]
     pub assertions: Vec<Assertion>,
+    /// Extractions, appliquées après la réponse (R2 du plan d'ensemble).
+    #[serde(default)]
+    pub extractions: Vec<Extraction>,
+    /// Rang de l'étape dans son dossier (`info.seq`), s'il est écrit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seq: Option<f64>,
     /// Réponses attendues (EP8).
     #[serde(default)]
     pub examples: Vec<Example>,
@@ -514,6 +536,8 @@ impl Request {
                 origin: Origin::Default,
                 enabled: true,
             }],
+            extractions: Vec::new(),
+            seq: None,
             examples: Vec::new(),
             contract: None,
             preserved: Vec::new(),

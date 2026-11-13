@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::error::{CommandError, CommandErrorKind};
 use crate::request::assertions;
+use crate::request::model::Request;
 use crate::workbench::SendOutcome;
 
 /// Nombre de résultats gardés : les corps de réponse pèsent jusqu'à 5 Mo (R5).
@@ -30,6 +31,9 @@ pub struct RequestResult {
     pub error: Option<String>,
     /// Réception de la réponse, en millisecondes depuis l'époque Unix.
     pub received_at: Option<u64>,
+    /// Requête telle qu'envoyée, pour « modifié, pas encore envoyé » et « Revenir à
+    /// la version envoyée » (`docs/plan-mvp-e-tests-etapes.md`, R12).
+    pub request: Option<Request>,
 }
 
 /// Résultat diffusé aux fenêtres, avec la fenêtre d'origine qui l'a déjà appliqué.
@@ -76,6 +80,7 @@ impl ResultBook {
             outcome: None,
             error: None,
             received_at: None,
+            request: None,
         });
         result.sending = true;
         result.error = None;
@@ -135,6 +140,21 @@ impl ResultBook {
         Ok(entry.clone())
     }
 
+    /// Garde la requête envoyée avec le dernier résultat (R12).
+    pub fn keep_request(
+        &mut self,
+        project_id: Uuid,
+        path: &str,
+        request: Request,
+    ) -> Option<RequestResult> {
+        let entry = self
+            .entries
+            .iter_mut()
+            .find(|e| e.project_id == project_id && e.path == path)?;
+        entry.request = Some(request);
+        Some(entry.clone())
+    }
+
     /// Une requête renommée ou déplacée garde son résultat.
     pub fn rename(&mut self, project_id: Uuid, from: &str, to: &str) {
         for entry in &mut self.entries {
@@ -168,7 +188,22 @@ mod tests {
             assertions: Vec::new(),
             passed: true,
             slow: false,
+            sent: None,
         }
+    }
+
+    #[test]
+    fn lot_e_r12_la_version_envoyee_est_gardee_avec_le_resultat() {
+        let mut book = ResultBook::default();
+        assert!(book.keep_request(P, "a.yml", Request::new("x")).is_none());
+        book.finish(P, "a.yml", &Ok(outcome(200)), 1);
+        let kept = book
+            .keep_request(P, "a.yml", Request::new("Envoyée"))
+            .unwrap();
+        assert_eq!(kept.request.unwrap().name, "Envoyée");
+        // Un nouvel envoi garde la version précédente jusqu'à sa fin.
+        let started = book.start(P, "a.yml");
+        assert_eq!(started.request.unwrap().name, "Envoyée");
     }
 
     #[test]
@@ -303,7 +338,8 @@ mod tests {
                     "sending": true,
                     "outcome": null,
                     "error": null,
-                    "receivedAt": null
+                    "receivedAt": null,
+                    "request": null
                 },
                 "origin": "main"
             })

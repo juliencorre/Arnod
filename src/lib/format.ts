@@ -71,3 +71,13 @@ export function pathSegments(path: string): string[] {
   if (start < path.length || segments.length === 0) segments.push(path.slice(start));
   return segments;
 }
+
+/** Temps écoulé lisible : « à l'instant », « il y a 5 min », « il y a 2 h », « il y a 3 j ». */
+export function formatAgo(timestampMs: number, nowMs: number = Date.now()): string {
+  const minutes = Math.floor(Math.max(0, nowMs - timestampMs) / 60_000);
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `il y a ${String(minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${String(hours)} h`;
+  return `il y a ${String(Math.floor(hours / 24))} j`;
+}

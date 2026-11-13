@@ -74,6 +74,8 @@ export function contentKey(content: ContentRef): string {
       return `${content.projectId}::contrat::${content.path}`;
     case "result":
       return "resultat";
+    case "test":
+      return `${content.projectId}::test::${content.path}`;
   }
 }
 

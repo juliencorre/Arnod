@@ -4,7 +4,7 @@
  * place et s'enregistre seul. En-tête (contrat lié, méthode, adresse, nom, description,
  * étiquettes), puis la requête par onglets, comme dans Bruno.
  */
-import { computed, nextTick, ref, useId, useTemplateRef } from "vue";
+import { computed, nextTick, ref, useId, useTemplateRef, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import AssertionsEditor from "@/components/workbench/AssertionsEditor.vue";
@@ -12,6 +12,7 @@ import AuthEditor from "@/components/workbench/AuthEditor.vue";
 import BodyEditor from "@/components/workbench/BodyEditor.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
+import VariablesEditor from "@/components/workbench/VariablesEditor.vue";
 import { pathParamNames } from "@/lib/url";
 import { useContractsStore } from "@/stores/contracts";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -131,7 +132,8 @@ function setPathParam(name: string, field: "value" | "description", text: string
 
 // --- Onglets ---------------------------------------------------------------------
 
-type Tab = "params" | "body" | "headers" | "auth" | "docs" | "settings" | "assertions";
+type Tab =
+  "params" | "body" | "headers" | "auth" | "docs" | "settings" | "variables" | "assertions";
 const tab = ref<Tab>("params");
 const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
   const r = request.value;
@@ -143,9 +145,26 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
     { id: "auth", label: "Auth" },
     { id: "docs", label: "Docs" },
     { id: "settings", label: "Réglages" },
+    { id: "variables", label: "Variables", count: r?.extractions.length },
     { id: "assertions", label: "Vérifications", count: r?.assertions.length },
   ];
 });
+// --- Lot E : modifié depuis l'envoi (écart 4.2-b), curseur dans l'adresse (4.1-b) ---------
+
+const changedSinceSent = computed(() => workbench.isChangedSinceSent(props.editorKey));
+const urlInput = useTemplateRef<HTMLInputElement>("urlInput");
+
+watch(
+  () => [workbench.focusUrl, urlInput.value] as const,
+  async ([wanted, input]) => {
+    if (wanted !== props.editorKey || !input) return;
+    workbench.focusUrl = null;
+    await nextTick();
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -184,6 +203,14 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
         <button v-if="editor?.saveState === 'error'" type="button" class="link" @click="retrySave">
           Réessayer
         </button>
+        <template v-if="changedSinceSent">
+          <span aria-hidden="true">·</span>
+          <span class="editor__unsent"><b aria-hidden="true">M</b> modifié, pas encore envoyé</span>
+          <span aria-hidden="true">·</span>
+          <button type="button" class="link" @click="workbench.revertToSent(editorKey)">
+            Revenir à la version envoyée
+          </button>
+        </template>
       </p>
     </div>
     <p v-if="editor?.changedElsewhere" class="editor__elsewhere" role="status">
@@ -199,6 +226,7 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
       <label :for="ids.url" class="sr-only">Adresse</label>
       <input
         :id="ids.url"
+        ref="urlInput"
         v-model="request.url"
         class="editor__url"
         type="text"
@@ -341,6 +369,14 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
         :inherited="request.inherited.settings"
       />
 
+      <VariablesEditor
+        v-else-if="tab === 'variables' && editor"
+        v-model="request.extractions"
+        :project-id="editor.projectId"
+        :path="editor.path"
+        :extracted="editor.outcome?.sent?.extracted ?? null"
+      />
+
       <AssertionsEditor
         v-else
         v-model="request.assertions"
@@ -415,6 +451,17 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
 
 .editor__saved--error {
   color: var(--color-danger);
+}
+
+.editor__saved:has(.editor__unsent) {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.editor__unsent b {
+  font: 700 var(--text-caption) var(--font-mono);
+  color: var(--color-link);
 }
 
 .editor__elsewhere {

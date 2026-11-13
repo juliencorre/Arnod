@@ -157,7 +157,7 @@ describe("sections d'un projet", () => {
     const add = app.get('[aria-label="Ajouter au référentiel de tests de boutique-tests"]');
     await add.trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
-    expect(menuTexts(app)).toEqual(["Nouvelle requêteCtrl+N", "Nouveau dossier"]);
+    expect(menuTexts(app)).toEqual(["Nouvelle requêteCtrl+N", "Nouveau dossier", "Nouveau test"]);
     await app.findAll('[role="menuitem"]')[0]?.trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
     await app.findAll('[role="menuitem"]')[1]?.trigger("keydown", { key: "Enter" });

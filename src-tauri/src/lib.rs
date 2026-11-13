@@ -145,6 +145,10 @@ pub fn run() {
             commands::steps::steps_catalog,
             commands::steps::steps_detect,
             commands::trial::trial_send,
+            commands::test_steps::test_read,
+            commands::test_steps::tree_create_test,
+            commands::test_steps::tree_add_step,
+            commands::test_steps::request_variable_users,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

@@ -38,6 +38,10 @@ pub enum Content {
     /// Le résultat de la requête active, dans sa propre fenêtre
     /// (`docs/plan-resultat-detachable.md`).
     Result,
+    /// Un test du projet (dossier d'étapes), par son chemin relatif
+    /// (`docs/plan-mvp-e-tests-etapes.md`, TE2).
+    #[serde(rename_all = "camelCase")]
+    Test { project_id: Uuid, path: String },
 }
 
 impl Content {
@@ -46,7 +50,8 @@ impl Content {
         match self {
             Self::Request { project_id, .. }
             | Self::Run { project_id }
-            | Self::Contract { project_id, .. } => Some(*project_id),
+            | Self::Contract { project_id, .. }
+            | Self::Test { project_id, .. } => Some(*project_id),
             Self::Result => None,
         }
     }
@@ -566,6 +571,10 @@ impl Layout {
                         if let Content::Request {
                             project_id: id,
                             path,
+                        }
+                        | Content::Test {
+                            project_id: id,
+                            path,
                         } = &mut tab.content
                             && *id == project_id
                             && let Some(rest) = within(path, from)
@@ -594,6 +603,10 @@ impl Layout {
                     path: tab_path,
                 }
                 | Content::Contract {
+                    project_id: id,
+                    path: tab_path,
+                }
+                | Content::Test {
                     project_id: id,
                     path: tab_path,
                 } => *id == project_id && within(tab_path, path).is_some(),

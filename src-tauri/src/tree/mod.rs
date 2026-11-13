@@ -34,6 +34,9 @@ pub enum TreeNode {
         children: Vec<TreeNode>,
         /// Nombre de requêtes dans le dossier, sous-dossiers compris.
         request_count: usize,
+        /// Test : au moins une requête et aucun sous-dossier
+        /// (`docs/plan-mvp-e-tests-etapes.md`, R1).
+        test: bool,
     },
     Request {
         name: String,
@@ -89,7 +92,8 @@ fn read_dir(
     let entries = fs::read_dir(dir)
         .map_err(|error| CommandError::io("Lecture du dossier impossible", dir, &error))?;
     let mut folders = Vec::new();
-    let mut requests = Vec::new();
+    // Requêtes avec leur rang (`info.seq`), qui décide de l'ordre des étapes (R1).
+    let mut requests: Vec<(Option<f64>, TreeNode)> = Vec::new();
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
         if name.starts_with('.') || (top && name == ROOT_FILE) || name == FOLDER_FILE {
@@ -116,11 +120,13 @@ fn read_dir(
             ancestors.pop();
             let children = children?;
             let request_count = children.iter().map(TreeNode::count).sum();
+            let test = is_test(&children);
             folders.push(TreeNode::Folder {
                 name,
                 path: relative,
                 children,
                 request_count,
+                test,
             });
         } else if is_request_file(&path) {
             let stem = path
@@ -128,22 +134,28 @@ fn read_dir(
                 .map(|stem| stem.to_string_lossy().into_owned())
                 .unwrap_or_default();
             requests.push(match file::read(&path) {
-                Ok(request) => TreeNode::Request {
-                    name: request.name,
-                    path: relative,
-                    method: Some(request.method),
-                    assertion_count: request.assertions.len(),
-                    invalid: false,
-                    contract: request.contract.map(|link| link.file),
-                },
-                Err(_) => TreeNode::Request {
-                    name: stem,
-                    path: relative,
-                    method: None,
-                    assertion_count: 0,
-                    invalid: true,
-                    contract: None,
-                },
+                Ok(request) => (
+                    request.seq,
+                    TreeNode::Request {
+                        name: request.name,
+                        path: relative,
+                        method: Some(request.method),
+                        assertion_count: request.assertions.len(),
+                        invalid: false,
+                        contract: request.contract.map(|link| link.file),
+                    },
+                ),
+                Err(_) => (
+                    None,
+                    TreeNode::Request {
+                        name: stem,
+                        path: relative,
+                        method: None,
+                        assertion_count: 0,
+                        invalid: true,
+                        contract: None,
+                    },
+                ),
             });
         }
     }
@@ -151,8 +163,13 @@ fn read_dir(
         TreeNode::Folder { name, .. } | TreeNode::Request { name, .. } => sort_key(name),
     };
     folders.sort_by_key(key);
-    requests.sort_by_key(key);
-    folders.extend(requests);
+    // Rang écrit d'abord, puis le nom (R1) : sans rang, l'ordre alphabétique reste.
+    requests.sort_by(|(a, x), (b, y)| {
+        a.unwrap_or(f64::INFINITY)
+            .total_cmp(&b.unwrap_or(f64::INFINITY))
+            .then_with(|| key(x).cmp(&key(y)))
+    });
+    folders.extend(requests.into_iter().map(|(_, node)| node));
     Ok(folders)
 }
 
@@ -174,6 +191,7 @@ pub fn tests_view(nodes: &[TreeNode], contracts: &HashSet<String>) -> Vec<TreeNo
                 path,
                 children,
                 request_count,
+                test,
             } => {
                 let kept = tests_view(children, contracts);
                 let count: usize = kept.iter().map(TreeNode::count).sum();
@@ -185,6 +203,7 @@ pub fn tests_view(nodes: &[TreeNode], contracts: &HashSet<String>) -> Vec<TreeNo
                     path: path.clone(),
                     children: kept,
                     request_count: count,
+                    test: *test,
                 })
             }
         })
@@ -550,6 +569,12 @@ pub fn requests_in(root: &Path, folder: &str) -> Result<Vec<String>, CommandErro
     }
     Ok(out)
 }
+
+mod test;
+pub use test::{
+    CreatedTest, StepView, TestView, VariableUser, add_step, create_test, is_test, test_view,
+    variable_users,
+};
 
 #[cfg(test)]
 mod tests;

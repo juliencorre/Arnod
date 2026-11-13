@@ -87,7 +87,12 @@ export type CommandName =
   | "contract_run"
   | "steps_catalog"
   | "steps_detect"
-  | "trial_send";
+  | "trial_send"
+  // Lot E : tests et étapes (docs/plan-mvp-e-tests-etapes.md).
+  | "test_read"
+  | "tree_create_test"
+  | "tree_add_step"
+  | "request_variable_users";
 
 /**
  * Nature d'une erreur de commande.
@@ -245,7 +250,15 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | 
 
 /** Noeud de l'arborescence d'un projet (`TreeNode` en Rust). */
 export type TreeNode =
-  | { kind: "folder"; name: string; path: string; children: TreeNode[]; requestCount: number }
+  | {
+      kind: "folder";
+      name: string;
+      path: string;
+      children: TreeNode[];
+      requestCount: number;
+      /** Test : au moins une requête et aucun sous-dossier (docs/plan-mvp-e-tests-etapes.md, R1). */
+      test: boolean;
+    }
   | {
       kind: "request";
       name: string;
@@ -429,6 +442,10 @@ export interface RequestDoc {
   /** Documentation en Markdown (EP6). */
   docs: string;
   assertions: Assertion[];
+  /** Extractions, appliquées après la réponse (lot E, R2 du plan d'ensemble). */
+  extractions: Extraction[];
+  /** Rang de l'étape dans son dossier (`info.seq`), s'il est écrit. */
+  seq?: number;
   /** Réponses attendues (EP8). */
   examples: Example[];
   /** Opération du contrat liée (étiquette `contract:` du fichier, C7). */
@@ -478,6 +495,8 @@ export interface SendOutcome {
   assertions: AssertionResult[];
   passed: boolean;
   slow: boolean;
+  /** Ce qui est parti, pour l'onglet « Envoyé » (lot E, VD2). */
+  sent: Sent | null;
 }
 
 /** Variable partagée d'un environnement. */
@@ -515,7 +534,15 @@ export interface EnvironmentsView {
   active: string;
 }
 
-export type RunItemStatus = "pending" | "running" | "passed" | "failed" | "error" | "cancelled";
+export type RunItemStatus =
+  | "pending"
+  | "running"
+  | "passed"
+  | "failed"
+  | "error"
+  | "cancelled"
+  /** Non jouée : une étape précédente du test a échoué (lot E, R3). */
+  | "skipped";
 
 export interface RunItem {
   path: string;
@@ -527,6 +554,12 @@ export interface RunItem {
   slow: boolean;
   assertions: AssertionResult[];
   error: string | null;
+  /** Test dont la requête est une étape (lot E), sinon `null`. */
+  test: string | null;
+  /** Numéro de l'étape dans son test, à partir de 1. */
+  step: number | null;
+  /** Valeurs extraites par la ligne, masquées. */
+  extracted: ExtractedValue[];
 }
 
 /** Résultat d'un groupe de requêtes d'un run (`RunGroup`, R2). */
@@ -560,6 +593,8 @@ export interface RunView {
   revision: number;
   /** Résultat par dossier (R2). */
   groups: RunGroup[];
+  /** Verdict de chaque test (lot E, R4). */
+  tests: RunTest[];
 }
 
 /** Dernière exécution d'une requête (`RequestStatus`, R4). */
@@ -604,7 +639,9 @@ export type ContentRef =
   | { kind: "run"; projectId: string }
   | { kind: "contract"; projectId: string; path: string }
   /** Résultat de la requête active, dans sa fenêtre (docs/plan-resultat-detachable.md). */
-  | { kind: "result" };
+  | { kind: "result" }
+  /** Test du projet, dossier d'étapes (docs/plan-mvp-e-tests-etapes.md, TE2). */
+  | { kind: "test"; projectId: string; path: string };
 
 /** Onglet de contenu d'une zone (`Tab`). */
 export interface ContentTab {
@@ -706,6 +743,8 @@ export interface RequestResult {
   error: string | null;
   /** Réception de la réponse, en millisecondes depuis l'époque Unix. */
   receivedAt: number | null;
+  /** Requête telle qu'envoyée (lot E, R12), `null` avant le premier envoi réussi. */
+  request: RequestDoc | null;
 }
 
 /** Envoi diffusé par `arnod://resultat` (`ResultChange`). */
@@ -953,4 +992,101 @@ export interface TrialResult {
   /** Contrat déduit (`contracts/…`). */
   contract: string;
   outcome: SendOutcome;
+}
+
+// ---------------------------------------------------------------------------
+// Lot E : tests et étapes (docs/plan-mvp-e-tests-etapes.md)
+// ---------------------------------------------------------------------------
+
+/** Extraction (`Extraction`) : une valeur de la réponse rangée dans une variable (R7). */
+export interface Extraction {
+  /** Nom de la variable (`client.id`). */
+  name: string;
+  /** `body.id`, `headers.Location`, `status`, ou `request.body.ref` pour une valeur envoyée. */
+  source: string;
+  enabled: boolean;
+}
+
+/** Valeur extraite à un envoi (`ExtractedValue`). */
+export interface ExtractedValue {
+  name: string;
+  source: string;
+  /** `null` : source absente, la variable n'est pas remplie. */
+  value: string | null;
+  message: string | null;
+}
+
+/** Valeur dynamique tirée (`DrawnValue`, R9, R10). */
+export interface DrawnValue {
+  /** Nom avec son `$` : `$randomUUID`. */
+  name: string;
+  value: string;
+  /** Source de la valeur envoyée (`request.body.ref`), pour « Garder ». */
+  source: string | null;
+}
+
+/** Variable lue par un envoi (`UsedVariable`) ; un secret est masqué. */
+export interface UsedVariable {
+  name: string;
+  value: string;
+  /** Variable d'exécution (valeur extraite), et non de l'environnement. */
+  runtime: boolean;
+}
+
+/** Ce qui est parti (`Sent`, VD2). */
+export interface Sent {
+  method: string;
+  url: string;
+  headers: [string, string][];
+  body: string | null;
+  drawn: DrawnValue[];
+  used: UsedVariable[];
+  extracted: ExtractedValue[];
+}
+
+/** Verdict d'un test dans un run (`RunTest`, R4). */
+export interface RunTest {
+  path: string;
+  name: string;
+  status: RunItemStatus;
+  steps: number;
+  passed: number;
+  /** Étape qui a arrêté le test (R3). */
+  failedStep: number | null;
+}
+
+/** Étape d'un test (`StepView`). */
+export interface StepView {
+  path: string;
+  name: string;
+  method: HttpMethod | null;
+  url: string;
+  assertionCount: number;
+  /** Variables extraites par l'étape. */
+  extractions: string[];
+  invalid: boolean;
+}
+
+/** Test ouvert dans un onglet (`TestView`, TE2). */
+export interface TestView {
+  path: string;
+  name: string;
+  /** Le dossier est un test ; sinon il range des dossiers. */
+  test: boolean;
+  steps: StepView[];
+}
+
+/** Réponse de `tree_create_test` (`CreatedTest`, NT1). */
+export interface CreatedTest {
+  folder: string;
+  step: string;
+}
+
+/** Requête qui lit une variable (`VariableUser`, EX5). */
+export interface VariableUser {
+  path: string;
+  name: string;
+  method: HttpMethod;
+  url: string;
+  variables: string[];
 }

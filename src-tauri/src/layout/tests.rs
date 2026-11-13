@@ -37,6 +37,7 @@ fn names(layout: &Layout) -> Vec<Vec<String>> {
                     Content::Run { .. } => "run".to_owned(),
                     Content::Contract { path, .. } => format!("contrat:{path}"),
                     Content::Result => "résultat".to_owned(),
+                    Content::Test { path, .. } => format!("test:{path}"),
                 })
                 .collect()
         })
@@ -826,4 +827,28 @@ fn unions_typescript_concordantes() {
             ProjectScope::Contracts
         ])
     );
+}
+
+#[test]
+fn lot_e_un_onglet_de_test_suit_renommage_et_suppression() {
+    let project = Uuid::from_u128(9);
+    let mut layout = Layout::single(Vec::new());
+    layout
+        .open(
+            Content::Test {
+                project_id: project,
+                path: "Clients/Créer".into(),
+            },
+            None,
+        )
+        .unwrap();
+    layout.rename_path(project, "Clients", "Comptes");
+    assert_eq!(names(&layout), [["test:Comptes/Créer"]]);
+    let json = serde_json::to_value(&layout.zones()[0].tabs[0].content).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({ "kind": "test", "projectId": project.to_string(), "path": "Comptes/Créer" })
+    );
+    layout.close_path(project, "Comptes");
+    assert!(layout.zones()[0].tabs.is_empty());
 }

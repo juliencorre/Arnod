@@ -4,6 +4,7 @@ import { computed, reactive, ref, watch, type ComputedRef } from "vue";
 import { events, ipc, IpcError } from "@/lib/ipc";
 import { contentKey, useWindowsStore } from "@/stores/windows";
 import type {
+  DrawnValue,
   EnvironmentDoc,
   EnvironmentsView,
   ProjectChange,
@@ -12,8 +13,10 @@ import type {
   RequestStatuses,
   RunView,
   SendOutcome,
+  TestView,
   TreeNode,
   TreeView,
+  VariableUser,
 } from "@/types/ipc";
 
 /** Attente après la dernière modification avant l'enregistrement automatique (EP1). */
@@ -42,6 +45,22 @@ export interface Editor {
   saveState: SaveState;
   /** Raison d'un enregistrement impossible (B7). */
   saveError: string | null;
+  /**
+   * Requête telle qu'envoyée la dernière fois, en JSON aux clés triées (lot E, R12) : de quoi
+   * dire « modifié, pas encore envoyé » et y revenir. `null` avant le premier envoi.
+   */
+  sent: string | null;
+}
+
+/** JSON aux clés triées : deux requêtes égales ont le même texte, quel que soit l'ordre. */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    item !== null && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.entries(item as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)),
+        )
+      : item,
+  );
 }
 
 /** Action en attente de la confirmation d'un environnement protégé (R8). */
@@ -180,6 +199,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       execId: null,
       saveState: "saved",
       saveError: null,
+      sent: null,
     };
     editors[key] = editor;
     await Promise.all([
@@ -201,6 +221,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     editor.outcome = result.outcome;
     editor.sendError = result.error;
     editor.receivedAt = result.receivedAt === null ? null : new Date(result.receivedAt);
+    if (result.request !== null) editor.sent = canonical(result.request);
   }
 
   /** Reprend le dernier envoi gardé par le cœur, pour une requête ouverte ici (D2). */
@@ -252,6 +273,31 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return draftText(key) !== editor.saved;
   }
 
+  /** Brouillon aux clés triées, calculé une fois par modification et seulement après un envoi. */
+  const canonicalDrafts = new Map<string, ComputedRef<string | null>>();
+
+  /** La requête a changé depuis son dernier envoi (lot E, R12, écart 4.2-b). */
+  function isChangedSinceSent(key: string): boolean {
+    const editor = editors[key];
+    if (!editor?.draft || editor.sent === null) return false;
+    let text = canonicalDrafts.get(key);
+    if (!text) {
+      text = computed(() => {
+        const draft = editors[key]?.draft;
+        return draft ? canonical(draft) : null;
+      });
+      canonicalDrafts.set(key, text);
+    }
+    return text.value !== editor.sent;
+  }
+
+  /** Reprend la requête telle qu'envoyée ; elle s'enregistre seule (R12). */
+  function revertToSent(key: string): void {
+    const editor = editors[key];
+    if (!editor || editor.sent === null) return;
+    editor.draft = JSON.parse(editor.sent) as RequestDoc;
+  }
+
   const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const saving = new Map<string, Promise<void>>();
 
@@ -259,6 +305,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
   function forget(key: string): void {
     clearSaveTimer(key);
     serialized.delete(key);
+    canonicalDrafts.delete(key);
     Reflect.deleteProperty(editors, key);
   }
 
@@ -359,6 +406,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       // (« Non enregistré · Réessayer »), ne le bloque pas.
       await save(key).catch(() => undefined);
       editor.execId = crypto.randomUUID();
+      const sending = canonical(editor.draft);
       editor.outcome = await ipc.requestSend(
         editor.projectId,
         editor.execId,
@@ -368,6 +416,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
         confirmed,
       );
       editor.receivedAt = new Date();
+      editor.sent = sending;
     } catch (caught) {
       if (caught instanceof IpcError && caught.kind === "protectedEnvironment") {
         pending.value = { kind: "send", key };
@@ -434,6 +483,85 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     );
     editor.draft.examples.push(example);
     return editor.draft.examples.length - 1;
+  }
+
+  // --- Tests et étapes (lot E, docs/plan-mvp-e-tests-etapes.md) -------------------
+
+  /** Onglets de test ouverts, par clé de contenu. */
+  const tests = ref<Record<string, TestView>>({});
+  /** Requête dont l'adresse doit recevoir le curseur à l'ouverture (NT1). */
+  const focusUrl = ref<string | null>(null);
+
+  function testKey(projectId: string, path: string): string {
+    return contentKey({ kind: "test", projectId, path });
+  }
+
+  /** Lit (ou relit) un test ouvert dans un onglet. */
+  async function loadTest(projectId: string, path: string): Promise<TestView> {
+    const view = await ipc.testRead(projectId, path);
+    tests.value[testKey(projectId, path)] = view;
+    return view;
+  }
+
+  /** Ouvre l'onglet d'un test (TE1). */
+  function openTest(projectId: string, path: string): Promise<boolean> {
+    return windows.openSelection({ kind: "test", projectId, path });
+  }
+
+  /** Déplie un dossier replié de la barre latérale. */
+  async function unfold(projectId: string, path: string): Promise<void> {
+    if (trees.value[projectId]?.collapsed.includes(path)) await toggleFolder(projectId, path);
+  }
+
+  /** « Nouveau test » (NT1) : dossier et étape 1 créés, étape ouverte, curseur dans l'adresse. */
+  async function createTest(projectId: string, parent: string): Promise<string> {
+    const created = await ipc.treeCreateTest(projectId, parent);
+    await unfold(projectId, parent);
+    await refreshTree(projectId);
+    focusUrl.value = requestKey(projectId, created.step);
+    await openRequest(projectId, created.step);
+    return created.step;
+  }
+
+  /** « + Étape » (NT2) : étape suivante du test, ouverte, curseur dans l'adresse. */
+  async function addStep(projectId: string, test: string): Promise<string> {
+    const path = await ipc.treeAddStep(projectId, test);
+    await unfold(projectId, test);
+    await refreshTree(projectId);
+    focusUrl.value = requestKey(projectId, path);
+    await openRequest(projectId, path);
+    return path;
+  }
+
+  /**
+   * « Garder » une valeur tirée (VD3) : une extraction de la valeur envoyée, nommée d'après sa
+   * place (`externalRef`), range la valeur dans une variable du test.
+   */
+  function keepDrawn(key: string, drawn: DrawnValue): string | null {
+    const draft = editors[key]?.draft;
+    if (!draft || drawn.source === null) return null;
+    const existing = draft.extractions.find((e) => e.source === drawn.source);
+    if (existing) return existing.name;
+    const base =
+      drawn.source
+        .split(/[.[\]]/)
+        .filter(Boolean)
+        .at(-1) ?? "valeur";
+    let name = base;
+    for (let n = 2; draft.extractions.some((e) => e.name === name); n += 1) {
+      name = `${base}${String(n)}`;
+    }
+    draft.extractions.push({ name, source: drawn.source, enabled: true });
+    return name;
+  }
+
+  /** Requêtes du projet qui lisent l'une des variables `names` de la requête `path` (EX5). */
+  function variableUsers(
+    projectId: string,
+    path: string,
+    names: string[],
+  ): Promise<VariableUser[]> {
+    return ipc.requestVariableUsers(projectId, path, names);
   }
 
   // --- Arborescence ----------------------------------------------------------
@@ -762,5 +890,16 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     pendingEnvironment,
     onProjectChange,
     subscribe,
+    // Lot E : tests et étapes.
+    tests,
+    focusUrl,
+    loadTest,
+    openTest,
+    createTest,
+    addStep,
+    keepDrawn,
+    variableUsers,
+    isChangedSinceSent,
+    revertToSent,
   };
 });

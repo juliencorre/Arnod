@@ -49,6 +49,7 @@ pages:
     journal:
       - "2026-11 : Décision : plus de suites de tests ; un test est un dossier d'étapes, une campagne joue une sélection de tests."
       - "2026-11-12 : Encart repris de « Tests et étapes » pour servir à toutes les pages."
+      - "2026-11-13 : Le dossier devient un test dans l'application : verdict, arrêt sur échec, valeurs extraites passées aux étapes suivantes, étapes numérotées (plan-mvp-e-tests-etapes)."
     ecrans: {}
   "0.3":
     nom: "Démarrage et erreurs"
@@ -415,18 +416,30 @@ pages:
       - "plan-premier-usage (A1–A10)"
       - "plan-requetes-dans-contrats (R5)"
       - "plan-fin-premier-usage (ST1–ST4)"
+      - "plan-mvp-e-tests-etapes (NT1, NT2)"
     liees: ["4.2", "3.1"]
-    reste: "nouveau test et « + Étape » (b), fichiers modifiés hors d'Arnod (e), glisser-déposer, copier et déplacer une requête (f, g), sélection multiple (a quater)."
+    reste: "fichiers modifiés hors d'Arnod (e), glisser-déposer, copier et déplacer une requête (f, g), sélection multiple (a quater)."
     journal:
       - "2026-11-09 : Arborescence livrée avec le premier usage."
       - "2026-11-11 : Devient le référentiel : les requêtes liées à un contrat sont rangées sous lui (PR #40)."
       - "2026-11-12 : Écrans du test (c, c bis, d) → 4.2."
+      - "2026-11-13 : « Nouveau test » crée le dossier et son étape 1, ouverte, curseur dans l'adresse ; « + Étape » ajoute la suivante (b, plan-mvp-e-tests-etapes)."
     ecrans:
       a: { etat: livré, pr: [27, 40, 42], captures: [19-verification-en-echec] }
       "a bis": { etat: livré, pr: [27] }
       "a ter": { etat: livré, pr: [27] }
       "a quater": { etat: à faire }
-      b: { etat: en partie, pr: [27] }
+      b:
+        {
+          etat: livré,
+          pr: [27],
+          captures: [24-nouveau-test],
+          ecart:
+            {
+              texte: "Le test est créé sous le nom « Nouveau test » (renommer par le menu ⋯) au lieu d'un nom saisi sur place dans l'arborescence ; pas de « Version métier du test » ni de « Lier à un endpoint » sous l'adresse.",
+              aligner: à décider,
+            },
+        }
       e: { etat: à faire, version: MVP }
       f: { etat: à faire, version: MVP }
       g: { etat: à faire, version: MVP }
@@ -436,12 +449,24 @@ pages:
     plans:
       - "plan-premier-usage (B1–B7, V1–V5)"
       - "plan-fin-premier-usage (VT1–VT4)"
+      - "plan-mvp-e-tests-etapes (TE1–TE5, EX1–EX5, MV1, MV2)"
     liees: ["0.2", "4.1", "4.3"]
-    reste: "verdict du test, arrêt sur échec, valeurs passées d'une étape à l'autre (a, b bis), secret proposé en variable locale (c)."
+    reste: "secret proposé en variable locale (c)."
     journal:
       - "2026-11-12 : Encart de vocabulaire → 0.2 ; écrans repris du référentiel (c → b, c bis → b bis, d → c)."
+      - "2026-11-13 : Test = dossier d'étapes : verdict, arrêt à la première étape en échec, extractions OpenCollection passées aux étapes suivantes, onglet du test, onglet « Variables », « modifié, pas encore envoyé » (plan-mvp-e-tests-etapes)."
     ecrans:
-      a: { etat: en partie, pr: [27] }
+      a:
+        {
+          etat: livré,
+          pr: [27],
+          captures: [21-test-reussi, 22-test-arrete],
+          ecart:
+            {
+              texte: "Pas de réglage « Si une étape échoue » (le test s'arrête toujours, Q2, V4), ni de réglages du test ni de campagnes sous la liste ; pas de poignée ⋮⋮ (glisser une étape : 4.1-f).",
+              aligner: maquette,
+            },
+        }
       b:
         {
           etat: livré,
@@ -449,11 +474,20 @@ pages:
           captures: [19-verification-en-echec],
           ecart:
             {
-              texte: "Pas d'indication « modifié, pas encore envoyé » ni « Revenir à la version envoyée » ; temps de la réponse sur une ligne au lieu d'un onglet Chronologie.",
+              texte: "Temps de la réponse sur une ligne au lieu d'un onglet Chronologie (5.1-c, lot K).",
               aligner: code,
             },
         }
-      "b bis": { etat: à faire }
+      "b bis":
+        {
+          etat: livré,
+          captures: [23-variables],
+          ecart:
+            {
+              texte: "Un clic sur une valeur de la réponse ne propose pas encore « Extraire dans une variable » (réponse, lot A) ; la portée est toujours « le test » (variable d'exécution).",
+              aligner: code,
+            },
+        }
       c: { etat: à faire }
   "4.3":
     nom: "Tests en schéma"
@@ -552,11 +586,13 @@ pages:
     version: [MVP, V1]
     plans:
       - "plan-premier-usage (X1–X5)"
+      - "plan-mvp-e-tests-etapes (VD1–VD4)"
     liees: ["5.2", "1.4"]
-    reste: "format, aperçu et filtre (b bis), variables inconnues (b ter), édition en texte et cURL (b quater), chronologie détaillée DNS, connexion, TLS (c), valeurs dynamiques (h), échec réseau expliqué (i) ; historique en V1 (c bis)."
+    reste: "format, aperçu et filtre (b bis), variables inconnues (b ter), édition en texte et cURL (b quater), chronologie détaillée DNS, connexion, TLS (c), liste des valeurs dynamiques à la frappe de {{$ (h), échec réseau expliqué (i) ; historique en V1 (c bis)."
     journal:
       - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
       - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
+      - "2026-11-13 : Valeurs dynamiques tirées à chaque envoi par le cœur, montrées dans « Envoyé », « Garder » en fait une extraction (h, plan-mvp-e-tests-etapes)."
     ecrans:
       a: { etat: livré, pr: [27] }
       b: { etat: livré, pr: [27, 42], captures: [19-verification-en-echec] }
@@ -565,7 +601,15 @@ pages:
       "b quater": { etat: à faire, version: MVP }
       c: { etat: en partie, pr: [27] }
       "c bis": { etat: à faire, version: V1 }
-      h: { etat: à faire, version: MVP }
+      h:
+        {
+          etat: en partie,
+          ecart:
+            {
+              texte: "La liste des valeurs dynamiques ne s'ouvre pas encore à la frappe de {{$ dans le corps (saisie, lot B) ; « Envoyé » montre aussi les variables utilisées, les valeurs extraites et les en-têtes envoyés.",
+              aligner: code,
+            },
+        }
       i: { etat: à faire, version: MVP }
   "5.2":
     nom: "Exécution d'un dossier"

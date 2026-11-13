@@ -457,3 +457,33 @@ l'étude `docs/etude-catalogue-etapes.md` (catalogue synchronisé, non implémen
   à la main n'est jamais modifié ; un contrat déduit illisible refuse l'essai.
 - Couleurs des familles : jetons `--color-family-*` (texte, fond, bord) des deux thèmes, contrastes
   vérifiés dans `tests/theme.spec.ts`.
+
+## Tests, étapes et variables
+
+Référence : `docs/plan-mvp-e-tests-etapes.md` (lot E : cas TE1 à TE5, EX1 à EX5, VD1 à VD4, NT1, NT2,
+MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
+
+- Un **test** est un dossier qui contient au moins une requête et aucun sous-dossier
+  (`TreeNode::Folder.test`, calculé par `tree::read`) ; ses étapes suivent `info.seq` puis le nom.
+  « Nouveau test » (`tree_create_test`) et « + Étape » (`tree_add_step`) posent `seq`. Une requête
+  liée à un contrat n'est jamais une étape, et un run de contrat n'a pas de test.
+- Run (`workbench.rs`) : unités `run_units` (étapes consécutives d'un test ensemble, requête hors test
+  seule), concurrentes entre elles ; dans un test, une étape à la fois, arrêt à la première en échec
+  ou en erreur, les suivantes `skipped` (« Non jouée », statut inchangé). `RunView.tests`
+  (`run_tests`) donne le verdict de chaque test ; « Relancer les échecs » rejoue un test entier.
+- **Extraction** = action OpenCollection `set-variable` hors phase `before-request`
+  (`Request.extractions`, source `body.id`, `headers.Nom`, `status`, `request.body.…` écrite
+  `req.…`) ; les autres actions restent conservées (`preserved`). Valeurs extraites : variables
+  d'exécution, passées aux étapes suivantes du test, puis gardées par projet pour la session
+  (`Workbench::runtime_variables`), jamais écrites dans un environnement ; elles priment sur lui.
+- **Valeurs dynamiques** `{{$nom}}` (noms de Bruno, `request/dynamic.rs`, sans crate ajoutée) :
+  tirées par `resolve.rs` à chaque occurrence, jamais inconnues (un nom inconnu part tel quel).
+  `SendOutcome.sent` porte ce qui est parti (masqué), les valeurs tirées (avec leur source si elles
+  forment seules une valeur envoyée), les variables lues et les valeurs extraites (onglet « Envoyé »,
+  `SentPanel.vue`) ; « Garder » ajoute l'extraction de la valeur envoyée.
+- Le cœur garde la requête envoyée avec le résultat (`RequestResult.request`) ; le store compare le
+  brouillon (JSON aux clés triées) pour « modifié, pas encore envoyé » et « Revenir à la version
+  envoyée » (`isChangedSinceSent`, `revertToSent`).
+- Onglets : contenu `test` (`TestTab.vue`), barre des étapes au-dessus d'une étape (`StepBar.vue`),
+  onglet « Variables » de l'éditeur (`VariablesEditor.vue`, « Utilisée par » :
+  `request_variable_users`).

@@ -16,8 +16,12 @@ import type {
   RunGroup,
   RunItem,
   RunView,
+  RunTest,
   SendOutcome,
+  StepView,
+  TestView,
   TreeNode,
+  VariableUser,
 } from "@/types/ipc";
 
 export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): RequestDoc {
@@ -52,6 +56,7 @@ export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): R
         enabled: true,
       },
     ],
+    extractions: [],
     examples: [],
     preserved: [],
     inherited: {
@@ -88,6 +93,7 @@ export function okOutcome(overrides: Partial<SendOutcome> = {}): SendOutcome {
     ],
     passed: true,
     slow: false,
+    sent: null,
     ...overrides,
   };
 }
@@ -114,6 +120,8 @@ export interface FakeWorkbench {
   runChecks: Map<string, RunItem["assertions"]>;
   /** Numéro du dernier run. */
   runNumber: number;
+  /** Heure des statuts écrits par un run (aperçu : l'heure réelle), sinon 1. */
+  now?: number;
 }
 
 export function createFakeWorkbench(): FakeWorkbench {
@@ -165,10 +173,15 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
         path,
         children,
         requestCount: count,
+        // Test : des requêtes et aucun sous-dossier (lot E, R1).
+        test:
+          children.some((c) => c.kind === "request") && !children.some((c) => c.kind === "folder"),
       };
     });
-    for (const [path, request] of [...wb.requests.entries()].sort(([a], [b]) =>
-      a.localeCompare(b),
+    // Rang (`seq`) d'abord, puis le chemin (lot E, R1).
+    const rank = (request: RequestDoc): number => request.seq ?? Number.POSITIVE_INFINITY;
+    for (const [path, request] of [...wb.requests.entries()].sort(
+      ([a, x], [b, y]) => rank(x) - rank(y) || a.localeCompare(b),
     )) {
       if (path.startsWith(prefix) && !path.slice(prefix.length).includes("/")) {
         nodes.push({
@@ -239,30 +252,82 @@ export function groupsOf(folder: string, items: RunItem[]): RunGroup[] {
   return groups;
 }
 
+/** Requêtes de l'arborescence, dans son ordre, avec leur test et leur numéro d'étape. */
+function orderedRequests(wb: FakeWorkbench): { path: string; test: string | null; step: number }[] {
+  const out: { path: string; test: string | null; step: number }[] = [];
+  const walk = (nodes: TreeNode[], test: string | null): void => {
+    let step = 0;
+    for (const node of nodes) {
+      if (node.kind === "folder") walk(node.children, node.test ? node.path : null);
+      else out.push({ path: node.path, test, step: test === null ? 0 : (step += 1) });
+    }
+  };
+  walk(buildTree(wb), null);
+  return out;
+}
+
+/** Verdict des tests, comme `run_tests` du cœur (lot E, R4). */
+export function testsOf(items: RunItem[]): RunTest[] {
+  const tests: RunTest[] = [];
+  for (const item of items) {
+    if (item.test === null) continue;
+    let test = tests.find((t) => t.path === item.test);
+    if (!test) {
+      test = {
+        path: item.test,
+        name: item.test.split("/").at(-1) ?? item.test,
+        status: "passed",
+        steps: 0,
+        passed: 0,
+        failedStep: null,
+      };
+      tests.push(test);
+    }
+    test.steps += 1;
+    if (item.status === "passed") test.passed += 1;
+    if ((item.status === "failed" || item.status === "error") && test.failedStep === null) {
+      test.failedStep = item.step;
+      test.status = "failed";
+    }
+  }
+  return tests;
+}
+
 export function runOf(wb: FakeWorkbench, folder: string, only?: string[]): RunView {
   const prefix = folder === "" ? "" : `${folder}/`;
-  const paths = [...wb.requests.keys()].filter(
-    (p) => p.startsWith(prefix) && (!only || only.includes(p)),
+  const entries = orderedRequests(wb).filter(
+    (r) => (folder === "" || r.path.startsWith(prefix)) && (!only || only.includes(r.path)),
   );
   wb.runNumber += 1;
-  const items: RunItem[] = paths.map((path) => {
+  const stopped = new Set<string>();
+  const items: RunItem[] = entries.map(({ path, test, step }) => {
     const request = wb.requests.get(path) as RequestDoc;
-    const status = wb.runStatus.get(path) ?? "passed";
+    // Une étape après un échec de son test n'est pas jouée (lot E, R3).
+    const status =
+      test !== null && stopped.has(test) ? "skipped" : (wb.runStatus.get(path) ?? "passed");
+    if (test !== null && (status === "failed" || status === "error")) stopped.add(test);
     return {
       path,
       name: request.name,
       method: request.method,
       status,
-      httpStatus: status === "error" ? null : status === "failed" ? 500 : 200,
-      durationMs: 12,
+      httpStatus:
+        status === "error" || status === "skipped" ? null : status === "failed" ? 500 : 200,
+      durationMs: status === "skipped" ? null : 12,
       slow: false,
       assertions: structuredClone(wb.runChecks.get(path) ?? []),
       error: status === "error" ? "Variable « x » absente de l'environnement Local." : null,
+      test,
+      step: test === null ? null : step,
+      extracted: [],
     };
   });
-  for (const item of items) wb.statuses[item.path] = { passed: item.status === "passed", at: 1 };
+  for (const item of items) {
+    if (item.status !== "skipped")
+      wb.statuses[item.path] = { passed: item.status === "passed", at: wb.now ?? 1 };
+  }
   return {
-    id: `run-${paths.length}-${Math.random().toString(36).slice(2, 7)}`,
+    id: `run-${String(entries.length)}-${Math.random().toString(36).slice(2, 7)}`,
     number: wb.runNumber,
     folder,
     environment: wb.active,
@@ -275,7 +340,51 @@ export function runOf(wb: FakeWorkbench, folder: string, only?: string[]): RunVi
     items,
     revision: 1,
     groups: groupsOf(folder, items),
+    tests: testsOf(items),
   };
+}
+
+/** Onglet d'un test, comme `test_read` du cœur (lot E, TE2). */
+function testView(wb: FakeWorkbench, path: string): TestView {
+  const find = (nodes: TreeNode[]): TreeNode | null => {
+    for (const node of nodes) {
+      if (node.kind !== "folder") continue;
+      if (node.path === path) return node;
+      const found = find(node.children);
+      if (found) return found;
+    }
+    return null;
+  };
+  const folder = find(buildTree(wb));
+  if (folder?.kind !== "folder") return fail("notFound", "Ce test n'existe plus.");
+  const steps: StepView[] = folder.children.flatMap((node) => {
+    if (node.kind !== "request") return [];
+    const request = wb.requests.get(node.path) as RequestDoc;
+    return [
+      {
+        path: node.path,
+        name: node.name,
+        method: node.method,
+        url: request.url,
+        assertionCount: request.assertions.length,
+        extractions: request.extractions.filter((e) => e.enabled).map((e) => e.name),
+        invalid: false,
+      },
+    ];
+  });
+  return { path, name: folder.name, test: folder.test, steps };
+}
+
+/** Écrit une étape « name » de rang `seq` dans le dossier `folder`. */
+function writeStep(wb: FakeWorkbench, folder: string, name: string, seq: number): string {
+  const slug = name
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replaceAll(" ", "-");
+  const path = `${folder}/${slug}.yml`;
+  wb.requests.set(path, newRequest(name, { seq, assertions: [] }));
+  return path;
 }
 
 /** Répond aux commandes du premier usage ; `undefined` pour une commande inconnue. */
@@ -356,6 +465,7 @@ export function handleWorkbench(
           outcome: structuredClone(outcome),
           error: null,
           receivedAt: 1,
+          request: clone(args.request as RequestDoc),
         });
       }
       return outcome;
@@ -436,8 +546,13 @@ export function handleWorkbench(
       return null;
     case "run_retry_failures": {
       const previous = wb.lastRun;
+      const bad = (previous?.items ?? []).filter(
+        (i) => i.status === "failed" || i.status === "error",
+      );
+      // Un test en échec est rejoué en entier (lot E, TE5).
+      const tests = new Set(bad.map((i) => i.test).filter((t) => t !== null));
       const failed = (previous?.items ?? [])
-        .filter((i) => i.status === "failed" || i.status === "error")
+        .filter((i) => bad.includes(i) || (i.test !== null && tests.has(i.test)))
         .map((i) => i.path);
       wb.runStatus.clear();
       wb.lastRun = runOf(wb, previous?.folder ?? "", failed);
@@ -461,6 +576,46 @@ export function handleWorkbench(
     }
     case "project_last_runs":
       return wb.projectLastRuns;
+    // Lot E : tests et étapes.
+    case "test_read":
+      return testView(wb, String(args.path));
+    case "tree_create_test": {
+      const parent = String(args.parent);
+      let name = "Nouveau test";
+      for (let n = 2; wb.folders.has(parent === "" ? name : `${parent}/${name}`); n += 1)
+        name = `Nouveau test ${String(n)}`;
+      const folder = parent === "" ? name : `${parent}/${name}`;
+      wb.folders.add(folder);
+      return { folder, step: writeStep(wb, folder, "Étape 1", 1) };
+    }
+    case "tree_add_step": {
+      const test = String(args.test);
+      const steps = testView(wb, test).steps;
+      // Les étapes sans rang reçoivent le leur, dans l'ordre actuel (R11).
+      steps.forEach((step, index) => {
+        const request = wb.requests.get(step.path);
+        if (request && request.seq === undefined) request.seq = index + 1;
+      });
+      return writeStep(wb, test, `Étape ${String(steps.length + 1)}`, steps.length + 1);
+    }
+    case "request_variable_users": {
+      const names = args.names as string[];
+      const users: VariableUser[] = [];
+      for (const [path, request] of wb.requests) {
+        if (path === args.path) continue;
+        const text = JSON.stringify([request.url, request.headers, request.body, request.params]);
+        const found = names.filter((n) => text.replaceAll(" ", "").includes(`{{${n}}}`));
+        if (found.length > 0)
+          users.push({
+            path,
+            name: request.name,
+            method: request.method,
+            url: request.url,
+            variables: found,
+          });
+      }
+      return users;
+    }
     default:
       return undefined;
   }

@@ -33,6 +33,7 @@ function result(overrides: Partial<RequestResult> = {}): RequestResult {
     outcome: okOutcome(),
     error: null,
     receivedAt: 1_700_000_000_000,
+    request: null,
     ...overrides,
   };
 }

@@ -10,8 +10,8 @@ use serde_json::{Map, Value, json};
 use crate::opencollection::schema::{self, Part};
 use crate::request::model::{
     ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, BodyVariant, ContractLink,
-    DEFAULT_MAX_DURATION_MS, Example, ExampleBodyKind, Method, Operator, Origin, Pair, ParamKind,
-    Request, ResponseHeader, Scalar, Settings,
+    DEFAULT_MAX_DURATION_MS, Example, ExampleBodyKind, Extraction, Method, Operator, Origin, Pair,
+    ParamKind, Request, ResponseHeader, Scalar, Settings,
 };
 
 /// Préfixe de l'étiquette qui lie une requête à une opération de contrat (S7).
@@ -453,22 +453,122 @@ pub fn contract_tag(link: &ContractLink) -> String {
     format!("{CONTRACT_TAG}{}#{}", link.file, link.operation)
 }
 
-/// Parties du fichier conservées sans être gérées par Arnod.
+/// Parties du fichier conservées sans être gérées par Arnod ; les actions ne
+/// le sont que si l'une n'est pas une extraction (`docs/plan-mvp-e-tests-etapes.md`, R8).
 fn preserved(value: &Value) -> Vec<String> {
     let present = |pointer: &str| {
         value
             .pointer(pointer)
             .is_some_and(|v| !(v.is_null() || v.as_array().is_some_and(Vec::is_empty)))
     };
+    let other_actions = value
+        .pointer("/runtime/actions")
+        .and_then(Value::as_array)
+        .is_some_and(|list| list.iter().any(|item| extraction_from(item).is_none()));
     [
         ("/runtime/scripts", "scripts"),
         ("/runtime/variables", "variables de requête"),
-        ("/runtime/actions", "actions"),
     ]
     .into_iter()
     .filter(|(pointer, _)| present(pointer))
     .map(|(_, label)| label.to_owned())
+    .chain(other_actions.then(|| "actions".to_owned()))
     .collect()
+}
+
+/// Préfixe OpenCollection d'une valeur lue dans la requête envoyée.
+const REQUEST_EXPRESSION: &str = "req.";
+
+/// Expression OpenCollection de la source d'une extraction (R7) : `res.…`
+/// pour la réponse, `req.…` pour la requête envoyée.
+pub fn extraction_expression(source: &str) -> String {
+    match source.strip_prefix(crate::request::extract::REQUEST_PREFIX) {
+        Some(rest) => {
+            let response = expression(rest);
+            match response.strip_prefix("res.") {
+                Some(tail) => format!("{REQUEST_EXPRESSION}{tail}"),
+                None => response,
+            }
+        }
+        None => expression(source),
+    }
+}
+
+/// Source Arnod d'une expression d'extraction.
+pub fn extraction_source(expression: &str) -> String {
+    let expression = expression.trim();
+    match expression.strip_prefix(REQUEST_EXPRESSION) {
+        Some(rest) => format!(
+            "{}{}",
+            crate::request::extract::REQUEST_PREFIX,
+            target_from(&format!("res.{rest}"))
+        ),
+        None => target_from(expression),
+    }
+}
+
+/// Extraction d'une action : `set-variable` hors de la phase `before-request` (R8).
+fn extraction_from(item: &Value) -> Option<Extraction> {
+    if item.get("type").and_then(Value::as_str) != Some("set-variable")
+        || item.get("phase").and_then(Value::as_str) == Some("before-request")
+    {
+        return None;
+    }
+    let name = item.pointer("/variable/name").and_then(Value::as_str)?;
+    let expression = item
+        .pointer("/selector/expression")
+        .and_then(Value::as_str)?;
+    Some(Extraction {
+        name: name.to_owned(),
+        source: extraction_source(expression),
+        enabled: !disabled(item),
+    })
+}
+
+/// Actions écrites : celles qu'Arnod ne gère pas d'abord, telles quelles, puis
+/// les extractions ; description et portée d'une extraction de même nom gardées (R8).
+fn action_values(list: &[Extraction], previous: Option<&Value>) -> Option<Value> {
+    let previous: &[Value] = previous
+        .and_then(Value::as_array)
+        .map_or(&[], Vec::as_slice);
+    let mut items: Vec<Value> = previous
+        .iter()
+        .filter(|item| extraction_from(item).is_none())
+        .cloned()
+        .collect();
+    for extraction in list {
+        let name = extraction.name.trim();
+        if name.is_empty() {
+            continue;
+        }
+        let old = previous.iter().find(|item| {
+            extraction_from(item).is_some()
+                && item.pointer("/variable/name").and_then(Value::as_str) == Some(name)
+        });
+        let scope = old
+            .and_then(|o| o.pointer("/variable/scope"))
+            .and_then(Value::as_str)
+            .unwrap_or("runtime");
+        let mut item = Map::new();
+        item.insert("type".to_owned(), Value::from("set-variable"));
+        if let Some(description) = old.and_then(|o| o.get("description")) {
+            item.insert("description".to_owned(), description.clone());
+        }
+        item.insert("phase".to_owned(), Value::from("after-response"));
+        item.insert(
+            "selector".to_owned(),
+            json!({ "expression": extraction_expression(&extraction.source), "method": "jsonq" }),
+        );
+        item.insert(
+            "variable".to_owned(),
+            json!({ "name": name, "scope": scope }),
+        );
+        if !extraction.enabled {
+            item.insert("disabled".to_owned(), Value::Bool(true));
+        }
+        items.push(Value::Object(item));
+    }
+    (!items.is_empty()).then_some(Value::Array(items))
 }
 
 /// Nom de la requête d'un fichier, s'il en a un.
@@ -544,6 +644,14 @@ pub fn from_value(value: &Value, fallback: &str) -> Result<Request, String> {
         settings: settings_from(value.get("settings")),
         docs: description_text(value.get("docs")),
         assertions,
+        extractions: value
+            .pointer("/runtime/actions")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(extraction_from)
+            .collect(),
+        seq: value.pointer("/info/seq").and_then(Value::as_f64),
         examples: examples_from(value.get("examples")),
         contract: contract_from(value.pointer("/info/tags")),
         preserved: preserved(value),
@@ -873,6 +981,15 @@ pub fn into_value(request: &Request, existing: Option<&Value>) -> Value {
             description_value(&request.description, old.as_ref()),
         );
         info.insert("type".to_owned(), Value::from("http"));
+        // Rang de l'étape : écrit s'il est connu, sinon celui du fichier reste.
+        if let Some(seq) = request.seq {
+            let value = if seq.fract() == 0.0 && seq.abs() < 1e15 {
+                Value::from(seq as i64)
+            } else {
+                json!(seq)
+            };
+            info.insert("seq".to_owned(), value);
+        }
         let mut tags: Vec<Value> = request
             .tags
             .iter()
@@ -922,6 +1039,12 @@ pub fn into_value(request: &Request, existing: Option<&Value>) -> Value {
             runtime,
             "assertions",
             assertion_values(&request.assertions, previous.as_ref()),
+        );
+        let previous = runtime.get("actions").cloned();
+        set(
+            runtime,
+            "actions",
+            action_values(&request.extractions, previous.as_ref()),
         );
     });
     prune(map, "runtime");

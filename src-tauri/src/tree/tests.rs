@@ -286,6 +286,7 @@ fn folder(path: &str, children: Vec<TreeNode>) -> TreeNode {
     TreeNode::Folder {
         name: path.rsplit('/').next().unwrap_or(path).to_owned(),
         path: path.to_owned(),
+        test: is_test(&children),
         children,
         request_count,
     }
@@ -356,4 +357,110 @@ fn le_lien_au_contrat_est_lu_dans_l_arborescence() {
         &read(dir.path()).unwrap()[0],
         TreeNode::Request { contract: Some(file), .. } if file == "contracts/petstore.yaml"
     ));
+}
+
+// Tests et étapes (docs/plan-mvp-e-tests-etapes.md, R1, R11).
+
+#[test]
+fn lot_e_r1_un_dossier_de_requetes_sans_sous_dossier_est_un_test() {
+    let dir = project();
+    let rangement = create_folder(dir.path(), "", "Clients").unwrap();
+    let test = create_folder(dir.path(), &rangement, "Créer puis lire").unwrap();
+    create_folder(dir.path(), "", "Vide").unwrap();
+    create_request(dir.path(), &test, Some("Lire")).unwrap();
+    create_request(dir.path(), &rangement, Some("Libre")).unwrap();
+    let tree = read(dir.path()).unwrap();
+    let flags: Vec<(String, bool)> = tree
+        .iter()
+        .filter_map(|n| match n {
+            TreeNode::Folder {
+                name,
+                test,
+                children,
+                ..
+            } => {
+                let inner = children.iter().find_map(|c| match c {
+                    TreeNode::Folder { test, .. } => Some(*test),
+                    TreeNode::Request { .. } => None,
+                });
+                Some((format!("{name}:{inner:?}"), *test))
+            }
+            TreeNode::Request { .. } => None,
+        })
+        .collect();
+    // Un dossier qui range un dossier n'est pas un test, même avec une requête ; vide non plus.
+    assert_eq!(
+        flags,
+        [
+            ("Clients:Some(true)".to_owned(), false),
+            ("Vide:None".to_owned(), false)
+        ]
+    );
+}
+
+#[test]
+fn lot_e_r1_les_etapes_suivent_seq_puis_le_nom() {
+    let dir = project();
+    let test = create_folder(dir.path(), "", "Parcours").unwrap();
+    for (name, seq) in [
+        ("Alpha", Some(3.0)),
+        ("Zulu", Some(1.0)),
+        ("Bravo", None),
+        ("Mike", Some(2.0)),
+    ] {
+        let path = create_request(dir.path(), &test, Some(name)).unwrap();
+        let file_path = resolve(dir.path(), &path).unwrap();
+        let mut request = file::read(&file_path).unwrap();
+        request.seq = seq;
+        file::write(&file_path, &request).unwrap();
+    }
+    let view = test_view(dir.path(), &test).unwrap();
+    let order: Vec<&str> = view.steps.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(order, ["Zulu", "Mike", "Alpha", "Bravo"]);
+    assert!(view.test);
+}
+
+#[test]
+fn lot_e_r11_nouveau_test_puis_etapes() {
+    let dir = project();
+    let created = create_test(dir.path(), "").unwrap();
+    assert_eq!(created.folder, "Nouveau test");
+    assert_eq!(created.step, "Nouveau test/etape-1.yml");
+    let again = create_test(dir.path(), "").unwrap();
+    assert_eq!(again.folder, "Nouveau test 2");
+
+    // Une étape sans rang, ajoutée à la main : « + Étape » pose les rangs dans l'ordre actuel.
+    create_request(dir.path(), &created.folder, Some("Autre")).unwrap();
+    let second = add_step(dir.path(), &created.folder).unwrap();
+    let view = test_view(dir.path(), &created.folder).unwrap();
+    let order: Vec<&str> = view.steps.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(order, ["Étape 1", "Autre", "Étape 3"]);
+    assert_eq!(view.steps[2].path, second);
+    let seq = |path: &str| file::read(&resolve(dir.path(), path).unwrap()).unwrap().seq;
+    assert_eq!(seq(&second), Some(3.0));
+    assert_eq!(seq(&view.steps[1].path), Some(2.0));
+
+    // Un dossier qui range des dossiers refuse une étape.
+    let error = add_step(dir.path(), "").unwrap_err();
+    assert_eq!(error.kind, CommandErrorKind::NotFound);
+    let parent = create_folder(dir.path(), "", "Rangement").unwrap();
+    create_folder(dir.path(), &parent, "Sous").unwrap();
+    let error = add_step(dir.path(), &parent).unwrap_err();
+    assert_eq!(error.kind, CommandErrorKind::InvalidRequest);
+}
+
+#[test]
+fn lot_e_variables_lues_par_les_autres_requetes() {
+    let dir = project();
+    let first = create_request(dir.path(), "", Some("Créer")).unwrap();
+    let second = create_request(dir.path(), "", Some("Lire")).unwrap();
+    let path = resolve(dir.path(), &second).unwrap();
+    let mut request = file::read(&path).unwrap();
+    request.url = "{{baseUrl}}/clients/{{ client.id }}".to_owned();
+    file::write(&path, &request).unwrap();
+    let users = variable_users(dir.path(), &first, &["client.id".to_owned()]).unwrap();
+    assert_eq!(users.len(), 1);
+    assert_eq!(users[0].path, second);
+    assert_eq!(users[0].variables, ["client.id"]);
+    assert!(variable_users(dir.path(), &first, &[]).unwrap().is_empty());
 }

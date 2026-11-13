@@ -188,6 +188,7 @@ fn r11_numero_d_essai_libre() {
                 contract: None,
             }],
             request_count: 1,
+            test: true,
         },
         TreeNode::Request {
             name: "Essai rapide".to_owned(),
