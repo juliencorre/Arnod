@@ -8,10 +8,16 @@
  * sur sa ligne visible la plus proche (RC2). Le « + » de la section propose d'importer un
  * fichier, de coller un contrat, de le lire à une adresse ou d'en créer un vide. Les lignes
  * suivent la grille de la barre latérale (B5) ; `add` est exposé au menu « + » du projet.
+ *
+ * Lot D (docs/plan-mvp-d-barre-laterale.md) : la section se replie, vide elle l'est par défaut
+ * (D1, R6). La ligne d'une opération est son endpoint (Q4) : le nombre de ses réponses attendues,
+ * son statut et son menu ⋯ ; dépliée, elle liste ses réponses attendues par code, puis les autres
+ * requêtes de l'opération (E1 à E3).
  */
 import { computed, onMounted, ref, watch } from "vue";
 
 import { CONTRACT_ADD_ITEMS } from "@/components/contracts/addItems";
+import { useContractAdd } from "@/composables/useContractAdd";
 import ContractDialog from "@/components/contracts/ContractDialog.vue";
 import LinkedRequestRow from "@/components/contracts/LinkedRequestRow.vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
@@ -22,13 +28,14 @@ import StatusCount from "@/components/workbench/StatusCount.vue";
 import StatusMark from "@/components/workbench/StatusMark.vue";
 import { countStatuses } from "@/lib/status";
 import { useCatalogStore } from "@/stores/catalog";
-import { type ContractDialogMode, type ContractNode, useContractsStore } from "@/stores/contracts";
+import { type ContractNode, useContractsStore } from "@/stores/contracts";
+import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
 import { useWindowsStore } from "@/stores/windows";
-import { useWorkbenchStore } from "@/stores/workbench";
+import { requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type {
-  ContractSource,
   ContractSummary,
+  ExampleRef,
   LinkedView,
   OperationNode,
   RequestStatus,
@@ -41,23 +48,69 @@ const contracts = useContractsStore();
 const windows = useWindowsStore();
 const workbench = useWorkbenchStore();
 
-/** Dernière exécution de la seule requête d'une opération (ST1). */
+/** Dernière exécution de l'endpoint d'une opération, sa première requête (ST1, Q4 du lot D). */
 function endpointStatus(operation: OperationNode): RequestStatus | null {
-  const only = operation.requests.length === 1 ? operation.requests[0] : undefined;
-  return only ? (workbench.statuses[props.projectId]?.[only.path] ?? null) : null;
+  const endpoint = operation.requests[0];
+  return endpoint ? (workbench.statuses[props.projectId]?.[endpoint.path] ?? null) : null;
+}
+
+/** Réponses attendues de l'endpoint (E1). */
+function examplesOf(operation: OperationNode): ExampleRef[] {
+  return operation.requests[0]?.examples ?? [];
+}
+
+/** L'opération se déplie : réponses attendues de l'endpoint, ou autres requêtes (E2). */
+function expandable(operation: OperationNode): boolean {
+  return examplesOf(operation).length > 0 || operation.requests.length > 1;
+}
+
+/** Famille d'un code, pour sa couleur (comme `ExpectedResponses`). */
+function family(status: number | null): string {
+  return status === null ? "none" : `${String(Math.floor(status / 100))}xx`;
+}
+
+function exampleLabel(example: ExampleRef): string {
+  return `${example.status === null ? "" : String(example.status)} ${example.name}`.trim();
+}
+
+/** Réponse ouverte depuis la barre latérale, sur l'endpoint de l'onglet actif (E3). */
+function exampleShown(operation: OperationNode, example: ExampleRef): boolean {
+  const endpoint = operation.requests[0];
+  const shown = sidebar.shownExample;
+  return (
+    endpoint !== undefined &&
+    endpoint.path === activeRequest.value &&
+    shown?.key === requestKey(props.projectId, endpoint.path) &&
+    shown.index === example.index
+  );
+}
+
+/** Ouvre l'endpoint sur ses réponses attendues, la réponse choisie (E3). */
+async function openExample(operation: OperationNode, example: ExampleRef): Promise<void> {
+  const endpoint = operation.requests[0];
+  if (endpoint) await sidebar.openExample(props.projectId, endpoint.path, example.index);
 }
 const toasts = useToastStore();
 const projectName = computed(() => useCatalogStore().projectById(props.projectId)?.name ?? "");
 const list = computed(() => contracts.lists[props.projectId] ?? []);
 
-const mode = ref<ContractDialogMode | null>(null);
-const error = ref<string | null>(null);
-const busy = ref(false);
+const sidebar = useSidebarStore();
+const adding = useContractAdd(() => props.projectId);
+const { mode, error, busy } = adding;
 /** Requête liée en cours de renommage (RC5). */
 const renaming = ref<LinkedView | null>(null);
 const renameError = ref<string | null>(null);
 
 const ADD_ITEMS = CONTRACT_ADD_ITEMS;
+
+/** Section dépliée : vide, repliée par défaut (D1, R6). */
+const open = computed(() =>
+  sidebar.isSectionOpen(props.projectId, "contracts", list.value.length === 0),
+);
+
+function toggleSection(): void {
+  sidebar.setSectionOpen(props.projectId, "contracts", !open.value);
+}
 
 onMounted(() => {
   if (!(props.projectId in contracts.lists)) {
@@ -107,6 +160,16 @@ function operationHolds(operation: OperationNode): boolean {
   return holds(operation.requests);
 }
 
+/**
+ * Ligne de l'opération mise en évidence : son endpoint est la requête active (la ligne est
+ * l'endpoint, Q4 du lot D), ou elle est repliée sur la requête active (RC2).
+ */
+function operationSelected(contract: ContractSummary, operation: OperationNode): boolean {
+  const endpoint = operation.requests[0];
+  if (endpoint !== undefined && endpoint.path === activeRequest.value) return true;
+  return !isOpen(operationNode(contract, operation)) && operationHolds(operation);
+}
+
 function resourceHolds(resource: ResourceView): boolean {
   return resource.operations.some(operationHolds);
 }
@@ -132,6 +195,7 @@ let pendingReveal: string | null = null;
 function tryReveal(): void {
   if (pendingReveal !== null && contracts.reveal(props.projectId, pendingReveal)) {
     pendingReveal = null;
+    if (!open.value) sidebar.setSectionOpen(props.projectId, "contracts", true);
   }
 }
 
@@ -150,26 +214,8 @@ watch(list, tryReveal);
 defineExpose({ add: onAdd });
 
 function onAdd(id: string): void {
-  if (id === "file") {
-    void contracts.importFile(props.projectId);
-    return;
-  }
-  error.value = null;
-  mode.value = id as ContractDialogMode;
-}
-
-async function submit(source: ContractSource): Promise<void> {
-  busy.value = true;
-  error.value = null;
-  try {
-    const view = await contracts.add(props.projectId, source);
-    mode.value = null;
-    toasts.show(`Contrat « ${view.name} » ajouté.`);
-  } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
-  } finally {
-    busy.value = false;
-  }
+  if (!open.value) sidebar.setSectionOpen(props.projectId, "contracts", true);
+  adding.choose(id);
 }
 
 function itemsFor(contract: ContractSummary): MenuItem[] {
@@ -210,6 +256,18 @@ function operationLabel(contract: ContractSummary, operation: OperationNode): st
   return creatable(contract, operation) ? `Créer la requête de ${what}` : what;
 }
 
+/** Actions de l'endpoint, sur la ligne de son opération (RC5, Q4 du lot D). */
+const ENDPOINT_ITEMS: MenuItem[] = [
+  { id: "rename", label: "Renommer" },
+  { id: "duplicate", label: "Dupliquer" },
+  { id: "delete", label: "Mettre à la corbeille", tone: "danger", separatorBefore: true },
+];
+
+async function onEndpoint(id: string, operation: OperationNode): Promise<void> {
+  const endpoint = operation.requests[0];
+  if (endpoint) await onRequest(id, endpoint);
+}
+
 /** Actions d'une requête liée (RC5) : celles de l'arborescence. */
 async function onRequest(id: string, request: LinkedView): Promise<void> {
   try {
@@ -240,7 +298,13 @@ async function rename(name: string): Promise<void> {
 
 <template>
   <section class="contracts" :aria-label="`Contrats de ${projectName}`">
-    <SectionHeading icon="contracts" title="Contrats de service" :count="list.length">
+    <SectionHeading
+      icon="contracts"
+      title="Contrats de service"
+      :count="list.length"
+      :expanded="open"
+      @toggle="toggleSection"
+    >
       <BaseMenu :items="ADD_ITEMS" label="Ajouter un contrat" align="end" @select="onAdd">
         <template #trigger="{ attrs }">
           <button
@@ -257,7 +321,7 @@ async function rename(name: string): Promise<void> {
         </template>
       </BaseMenu>
     </SectionHeading>
-    <ul v-if="list.length > 0" class="contracts__list">
+    <ul v-if="open && list.length > 0" class="contracts__list">
       <li v-for="contract in list" :key="contract.path" class="contracts__item">
         <div class="contract-row" :class="{ 'contract-row--selected': contractSelected(contract) }">
           <button
@@ -349,13 +413,12 @@ async function rename(name: string): Promise<void> {
                 <div
                   class="crow crow--operation"
                   :class="{
-                    'crow--selected':
-                      !isOpen(operationNode(contract, operation)) && operationHolds(operation),
+                    'crow--selected': operationSelected(contract, operation),
                   }"
                   style="--depth: 2"
                 >
                   <button
-                    v-if="operation.requests.length > 0"
+                    v-if="expandable(operation)"
                     type="button"
                     class="crow__toggle"
                     :aria-expanded="isOpen(operationNode(contract, operation))"
@@ -390,32 +453,71 @@ async function rename(name: string): Promise<void> {
                       aria-hidden="true"
                       >Créer</span
                     >
-                    <StatusCount
-                      v-else-if="operation.requests.length > 1"
-                      class="crow__count"
-                      aria-hidden="true"
-                      :count="
-                        countStatuses(
-                          operation.requests.map((r) => r.path),
-                          workbench.statuses[projectId],
-                        )
-                      "
-                      :fallback="operation.requests.length"
-                    />
-                    <StatusMark
-                      v-else-if="operation.requests.length === 1"
-                      class="crow__mark"
-                      aria-hidden="true"
-                      :status="endpointStatus(operation)"
-                    />
+                    <template v-else-if="operation.requests.length > 0">
+                      <span
+                        v-if="examplesOf(operation).length > 0"
+                        class="crow__examples"
+                        :title="`${String(examplesOf(operation).length)} réponse(s) attendue(s)`"
+                        aria-hidden="true"
+                        >{{ examplesOf(operation).length }}</span
+                      >
+                      <StatusMark
+                        class="crow__mark"
+                        aria-hidden="true"
+                        :status="endpointStatus(operation)"
+                      />
+                    </template>
                   </button>
+                  <BaseMenu
+                    v-if="operation.requests[0]"
+                    :items="ENDPOINT_ITEMS"
+                    :label="`Actions pour ${operation.requests[0].name}`"
+                    align="end"
+                    @select="(id) => onEndpoint(id, operation)"
+                  >
+                    <template #trigger="{ attrs }">
+                      <button
+                        type="button"
+                        class="crow__more"
+                        v-bind="attrs"
+                        :aria-label="`Actions pour ${operation.requests[0].name}`"
+                      >
+                        ⋯
+                      </button>
+                    </template>
+                  </BaseMenu>
                 </div>
                 <ul
-                  v-if="operation.requests.length > 0 && isOpen(operationNode(contract, operation))"
+                  v-if="expandable(operation) && isOpen(operationNode(contract, operation))"
                   class="contracts__group"
+                  :aria-label="`Réponses attendues et requêtes de ${operation.method} ${operation.path}`"
                 >
+                  <li v-for="example in examplesOf(operation)" :key="`e${example.index}`">
+                    <div
+                      class="crow"
+                      :class="{ 'crow--shown': exampleShown(operation, example) }"
+                      style="--depth: 3"
+                    >
+                      <button
+                        type="button"
+                        class="crow__main crow__example"
+                        :aria-label="`Ouvrir la réponse attendue ${exampleLabel(example)}`"
+                        @click="openExample(operation, example)"
+                      >
+                        <span
+                          class="crow__lead crow__code"
+                          :class="`crow__code--${family(example.status)}`"
+                          aria-hidden="true"
+                          >{{ example.status ?? "—" }}</span
+                        >
+                        <span class="crow__name" aria-hidden="true">{{
+                          example.name || "Sans nom"
+                        }}</span>
+                      </button>
+                    </div>
+                  </li>
                   <LinkedRequestRow
-                    v-for="request in operation.requests"
+                    v-for="request in operation.requests.slice(1)"
                     :key="request.path"
                     :request="request"
                     :project-id="projectId"
@@ -481,7 +583,7 @@ async function rename(name: string): Promise<void> {
         </ul>
       </li>
     </ul>
-    <BaseMenu v-else :items="ADD_ITEMS" label="Ajouter un contrat" @select="onAdd">
+    <BaseMenu v-else-if="open" :items="ADD_ITEMS" label="Ajouter un contrat" @select="onAdd">
       <template #trigger="{ attrs }">
         <button type="button" class="contracts__ghost" v-bind="attrs">
           <span class="contracts__lead" aria-hidden="true">+</span>
@@ -493,8 +595,8 @@ async function rename(name: string): Promise<void> {
       :mode="mode"
       :error="error"
       :busy="busy"
-      @close="mode = null"
-      @submit="submit"
+      @close="adding.close"
+      @submit="adding.submit"
     />
     <NameDialog
       :open="renaming !== null"
@@ -751,6 +853,65 @@ async function rename(name: string): Promise<void> {
 
 .crow__mark {
   margin-left: auto;
+}
+
+/* Nombre de réponses attendues de l'endpoint (E1). */
+.crow__examples {
+  margin-left: auto;
+  font: var(--text-caption) var(--font-mono);
+  color: var(--color-muted);
+}
+
+.crow__examples + .crow__mark {
+  margin-left: 0.375rem;
+}
+
+/* ⋯ de l'endpoint : dans l'ordre de tabulation, visible au survol ou au focus ; caché, il ne
+   prend aucune largeur (comme les actions d'un projet), le chemin garde sa place. */
+.crow__more {
+  flex: none;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  border: 0;
+  background: none;
+  padding: 0.125rem 0;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.crow:hover .crow__more,
+.crow:focus-within .crow__more,
+.crow__more[aria-expanded="true"] {
+  width: 1.5rem;
+  opacity: 1;
+}
+
+/* Réponse attendue : code coloré par famille (comme ExpectedResponses), puis son nom (E2). */
+.crow__code {
+  font: 700 var(--text-caption) var(--font-mono);
+  color: var(--color-muted);
+}
+
+.crow__code--2xx {
+  color: var(--color-success);
+}
+
+.crow__code--3xx {
+  color: var(--color-link);
+}
+
+.crow__code--4xx,
+.crow__code--5xx {
+  color: var(--color-danger);
+}
+
+.crow--shown {
+  background: var(--color-chip);
+}
+
+.crow__example {
+  font-size: var(--text-small);
 }
 
 .crow__count {

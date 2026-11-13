@@ -474,6 +474,10 @@ export const ipc = {
   /** Efface la réponse affichée d'une requête, dans toutes les fenêtres. */
   responseClear: (project: string, path: string): Promise<RequestResult> =>
     call<RequestResult>("response_clear", { project, path }),
+  // --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) -------------
+
+  /** Nombre de contrats du projet, sans les lire (W1, R5). */
+  contractCount: (project: string): Promise<number> => call<number>("contract_count", { project }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

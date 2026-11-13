@@ -521,6 +521,38 @@ select:focus-visible {
   color: var(--color-muted);
 }
 
+/* Section repliable : chevron, icône, nom et nombre forment un seul bouton. */
+.section-head__toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--tree-gap, 0.5rem);
+  min-width: 0;
+  min-height: 1.875rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+.section-head__toggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.section-head__chevron {
+  flex: none;
+  width: var(--tree-indent, 1.25rem);
+  margin-right: calc(0px - var(--tree-gap, 0.5rem));
+  font-size: var(--text-small);
+  text-align: center;
+  color: var(--color-muted);
+}
+
 .section-head__actions {
   display: flex;
   flex: none;

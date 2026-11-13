@@ -151,6 +151,8 @@ pub fn run() {
             commands::response::response_filter,
             commands::response::response_save,
             commands::response::response_clear,
+            // Lot D - Barre latérale
+            commands::contracts::contract_count,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

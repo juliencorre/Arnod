@@ -9,6 +9,7 @@ import { computed, ref, watch } from "vue";
 
 import ExpectedResponses from "@/components/workbench/ExpectedResponses.vue";
 import ResponsePanel from "@/components/workbench/ResponsePanel.vue";
+import { useSidebarStore } from "@/stores/sidebar";
 import { useWorkbenchStore } from "@/stores/workbench";
 
 const props = defineProps<{ editorKey: string }>();
@@ -38,6 +39,16 @@ watch(
   ([outcome, sending]) => {
     if (outcome || sending === true) side.value = "response";
   },
+);
+// Réponse attendue choisie dans la barre latérale : l'onglet « Réponses attendues »
+// (docs/plan-mvp-d-barre-laterale.md, E3) ; `ExpectedResponses` ouvre la réponse.
+const sidebar = useSidebarStore();
+watch(
+  () => sidebar.exampleFocus,
+  (focus) => {
+    if (focus?.key === props.editorKey) side.value = "expected";
+  },
+  { immediate: true },
 );
 const expectedCount = computed(() => editor.value?.draft?.examples.length ?? 0);
 </script>

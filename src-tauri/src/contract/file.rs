@@ -15,7 +15,7 @@ use crate::environment;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::request::assertions::{AssertionResult, ResponseData};
 use crate::request::file as request_file;
-use crate::request::model::{ContractLink, Method, Request};
+use crate::request::model::{ContractLink, Example, Method, Request};
 use crate::tree::{self, ENVIRONMENTS_DIR, TreeNode};
 
 /// Dossier des contrats, à la racine du projet (réservé comme `environments/`).
@@ -73,6 +73,19 @@ pub struct LinkedView {
     pub path: String,
     pub name: String,
     pub method: Method,
+    /// Réponses attendues de la requête, dans l'ordre du fichier
+    /// (docs/plan-mvp-d-barre-laterale.md, R2).
+    pub examples: Vec<ExampleRef>,
+}
+
+/// Réponse attendue d'une requête liée, telle que la barre latérale la liste (3.2-a3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExampleRef {
+    /// Position dans `examples` de la requête.
+    pub index: usize,
+    pub status: Option<u16>,
+    pub name: String,
 }
 
 /// Opération affichée dans l'onglet du contrat.
@@ -343,6 +356,8 @@ pub struct Linked {
     pub name: String,
     pub method: Method,
     pub link: ContractLink,
+    /// Réponses attendues (R2 du lot D).
+    pub examples: Vec<ExampleRef>,
 }
 
 impl Linked {
@@ -351,8 +366,27 @@ impl Linked {
             path: self.path.clone(),
             name: self.name.clone(),
             method: self.method,
+            examples: self.examples.clone(),
         }
     }
+}
+
+/// Réponses attendues d'une requête, pour la barre latérale (R2 du lot D).
+pub fn example_refs(examples: &[Example]) -> Vec<ExampleRef> {
+    examples
+        .iter()
+        .enumerate()
+        .map(|(index, example)| ExampleRef {
+            index,
+            status: example.status,
+            name: example.name.clone(),
+        })
+        .collect()
+}
+
+/// Nombre de contrats du projet : fichiers de `contracts/`, sans les lire (R5 du lot D).
+pub fn count(root: &Path) -> usize {
+    contract_files(root).len()
 }
 
 /// Requêtes du projet liées à un contrat, dans l'ordre de l'arborescence.
@@ -371,6 +405,7 @@ pub fn linked(root: &Path) -> Vec<Linked> {
                         name,
                         method,
                         contract: Some(link),
+                        examples,
                         ..
                     }) = request
                     {
@@ -379,6 +414,7 @@ pub fn linked(root: &Path) -> Vec<Linked> {
                             name,
                             method,
                             link,
+                            examples: example_refs(&examples),
                         });
                     }
                 }
