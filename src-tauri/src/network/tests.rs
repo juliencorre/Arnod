@@ -304,11 +304,13 @@ async fn r5_serveur_injoignable() {
 async fn r6_delai_depasse_la_requete_a_pu_arriver() {
     let server = MockServer::start().await;
     Mock::given(path("/lent"))
-        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_millis(800)))
+        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
         .mount(&server)
         .await;
     let mut p = prepared(format!("{}/lent", server.uri()));
-    p.timeout_ms = Some(100);
+    // Assez long pour que la connexion locale aboutisse même sur une machine de CI chargée :
+    // à 100 ms, le délai tombait parfois pendant la connexion (classée « injoignable »).
+    p.timeout_ms = Some(1_000);
     let error = network()
         .send(&mut p, None, &Cancel::new())
         .await
