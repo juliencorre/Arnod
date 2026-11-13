@@ -104,9 +104,9 @@ pages:
     journal:
       - "2026-11-09 : Workspaces en onglets."
       - "2026-11-10 : Sélecteur de workspace à la place des onglets (PR #36)."
-      - "2026-11-13 : Nombre de contrats de service sur les cartes de projet (lot D)."
+      - "2026-11-13 : Nombre de contrats de service sur les cartes de projet (lot D, PR #48)."
     ecrans:
-      a: { etat: livré, pr: [9, 27], captures: [03-workspace-boutique, 24-cartes-contrats] }
+      a: { etat: livré, pr: [9, 27, 48], captures: [03-workspace-boutique, 24-cartes-contrats] }
       "a bis": { etat: livré, pr: [27] }
       b: { etat: livré, pr: [36], captures: [02b-selecteur-workspace] }
       "b bis": { etat: livré, pr: [36], captures: [02b-selecteur-workspace] }
@@ -137,7 +137,7 @@ pages:
       - "2026-11-10 : Option a retenue et livrée (PR #33) ; b et c restent des variantes."
       - "2026-11-11 : Sections « Contrats de service » puis « Référentiel de tests » (PR #40)."
       - "2026-11-12 : Page ajoutée à la liste ; écrans repris de « Premier usage » (b → d, b bis → d bis)."
-      - "2026-11-13 : Filtre du référentiel, sections repliables, quatre points de départ, menu « + » avec raccourcis (lot D)."
+      - "2026-11-13 : Filtre du référentiel, sections repliables, quatre points de départ, menu « + » avec raccourcis (lot D, PR #48)."
     ecrans:
       "0": { etat: remplacé }
       a: { etat: livré, pr: [33], captures: [03-workspace-boutique] }
@@ -145,7 +145,7 @@ pages:
       "a ter":
         {
           etat: en partie,
-          pr: [33],
+          pr: [33, 48],
           captures: [22-menu-ajouter],
           ecart:
             {
@@ -158,7 +158,7 @@ pages:
       d:
         {
           etat: livré,
-          pr: [36, 40],
+          pr: [36, 40, 48],
           captures: [02-projet-cree],
           ecart:
             {
@@ -171,6 +171,7 @@ pages:
         {
           etat: livré,
           version: MVP,
+          pr: [48],
           captures: [21-filtre-referentiel],
           ecart:
             {
@@ -346,7 +347,7 @@ pages:
     journal:
       - "2026-11-09 : Configuration d'un endpoint (PR #32)."
       - "2026-11-12 : Page « Contrats de service » (fichier « Endpoints ») recentrée sur l'endpoint ; e, f, g → 3.1."
-      - "2026-11-13 : Réponses attendues listées sous l'endpoint dans la barre latérale (lot D)."
+      - "2026-11-13 : Réponses attendues listées sous l'endpoint dans la barre latérale (lot D, PR #48)."
     ecrans:
       a:
         {
@@ -364,6 +365,7 @@ pages:
         {
           etat: livré,
           version: MVP,
+          pr: [48],
           captures: [23-reponses-attendues-arborescence],
           ecart:
             {
