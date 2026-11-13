@@ -1620,7 +1620,13 @@ describe("Lot D - Barre latérale", () => {
     await chooseWorkspace("E-commerce");
     await waitForHeading(browser, "E-commerce");
     // Une carte par projet du workspace : chacune dit son nombre de contrats.
-    await browser.$("main article .card__stats").waitForExist({ timeout: 10_000 });
+    await browser.waitUntil(
+      async () => (await browser.$$("main article .card__stats")).length > 0,
+      {
+        timeout: 10_000,
+        timeoutMsg: "cartes de projet attendues",
+      },
+    );
     const stats = await browser.$$("main article .card__stats").map((s) => s.getText());
     expect(stats.length).toBeGreaterThan(0);
     for (const text of stats) expect(text).toMatch(/contrats? de service/);
