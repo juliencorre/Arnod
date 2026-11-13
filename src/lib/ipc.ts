@@ -440,6 +440,11 @@ export const ipc = {
   windowReattach: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach"),
 
   windowReattachAll: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach_all"),
+
+  // --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) -------------
+
+  /** Nombre de contrats du projet, sans les lire (W1, R5). */
+  contractCount: (project: string): Promise<number> => call<number>("contract_count", { project }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

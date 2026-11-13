@@ -1156,8 +1156,58 @@ fn rc_resume_de_contrat_serialise() {
                 "path": "Petstore/animaux/lister-les-animaux.yml",
                 "name": "Lister les animaux",
                 "method": "GET",
+                // Réponse attendue reprise du contrat (lot D, R2).
+                "examples": [{ "index": 0, "status": 200, "name": "Liste" }],
             }],
         })
     );
     assert_eq!(json["unplaced"], json!([]));
+}
+
+// --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) ---------------
+
+#[test]
+fn lot_d_r2_reponses_attendues_des_requetes_liees_dans_l_ordre() {
+    let dir = project();
+    let path = file::add(dir.path(), PETSTORE).unwrap();
+    file::generate(dir.path(), &path, &["GET /pets".to_owned()], None).unwrap();
+    let request_path = dir.path().join("Petstore/animaux/lister-les-animaux.yml");
+    let mut request = request_file::read(&request_path).unwrap();
+    let mut created = request.examples.first().cloned().unwrap_or_else(|| {
+        serde_json::from_value(json!({ "name": "Liste", "status": 200 })).unwrap()
+    });
+    created.name = "Liste".to_owned();
+    created.status = Some(200);
+    let mut missing = created.clone();
+    missing.name = "Introuvable".to_owned();
+    missing.status = Some(404);
+    request.examples = vec![created, missing];
+    request_file::write(&request_path, &request).unwrap();
+
+    let summary = &file::list(dir.path())[0];
+    let get = summary
+        .resources
+        .iter()
+        .flat_map(|r| &r.operations)
+        .find(|o| o.key == "GET /pets")
+        .unwrap();
+    let json = serde_json::to_value(&get.requests[0].examples).unwrap();
+    assert_eq!(
+        json,
+        json!([
+            { "index": 0, "status": 200, "name": "Liste" },
+            { "index": 1, "status": 404, "name": "Introuvable" },
+        ])
+    );
+}
+
+#[test]
+fn lot_d_r5_nombre_de_contrats_sans_les_lire() {
+    let dir = project();
+    assert_eq!(file::count(dir.path()), 0);
+    file::add(dir.path(), PETSTORE).unwrap();
+    assert_eq!(file::count(dir.path()), 1);
+    // Un contrat illisible compte : il est listé avec son erreur (R10 des contrats).
+    fs::write(dir.path().join("contracts/casse.yaml"), "pas un contrat").unwrap();
+    assert_eq!(file::count(dir.path()), 2);
 }

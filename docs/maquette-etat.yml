@@ -99,22 +99,14 @@ pages:
       - "plan-projets-workspaces (P1–P12, W1–W11)"
       - "plan-workspaces-onglets (O1–O12)"
       - "plan-selecteur-workspace (S1–S9)"
+      - "plan-mvp-d-barre-laterale (W1)"
     liees: ["1.2", "2.2"]
     journal:
       - "2026-11-09 : Workspaces en onglets."
       - "2026-11-10 : Sélecteur de workspace à la place des onglets (PR #36)."
+      - "2026-11-13 : Nombre de contrats de service sur les cartes de projet (lot D)."
     ecrans:
-      a:
-        {
-          etat: livré,
-          pr: [9, 27],
-          captures: [03-workspace-boutique],
-          ecart:
-            {
-              texte: "Les cartes de projet n'affichent pas leur nombre de contrats de service.",
-              aligner: code,
-            },
-        }
+      a: { etat: livré, pr: [9, 27], captures: [03-workspace-boutique, 24-cartes-contrats] }
       "a bis": { etat: livré, pr: [27] }
       b: { etat: livré, pr: [36], captures: [02b-selecteur-workspace] }
       "b bis": { etat: livré, pr: [36], captures: [02b-selecteur-workspace] }
@@ -138,32 +130,54 @@ pages:
       - "plan-barre-laterale-projet (B1–B6)"
       - "plan-requetes-dans-contrats (RC6)"
       - "plan-selecteur-workspace (I1, I2)"
+      - "plan-mvp-d-barre-laterale (F1–F5, D1, D2, M1, M2)"
     liees: ["3.3", "3.1", "4.1"]
-    reste: "filtre de l'arborescence (e), quatre points de départ (d), menu « + » complet (a ter) ; « Plus » en V4 (d bis)."
+    reste: "« Nouveau test » et « Requête libre » du menu « + » avec le modèle test = dossier d'étapes (lots E, K) ; « Plus » en V4 (d bis)."
     journal:
       - "2026-11-10 : Option a retenue et livrée (PR #33) ; b et c restent des variantes."
       - "2026-11-11 : Sections « Contrats de service » puis « Référentiel de tests » (PR #40)."
       - "2026-11-12 : Page ajoutée à la liste ; écrans repris de « Premier usage » (b → d, b bis → d bis)."
+      - "2026-11-13 : Filtre du référentiel, sections repliables, quatre points de départ, menu « + » avec raccourcis (lot D)."
     ecrans:
       "0": { etat: remplacé }
       a: { etat: livré, pr: [33], captures: [03-workspace-boutique] }
       "a bis": { etat: livré, pr: [33], captures: [08b-menu-environnement] }
-      "a ter": { etat: en partie, pr: [33] }
+      "a ter":
+        {
+          etat: en partie,
+          pr: [33],
+          captures: [22-menu-ajouter],
+          ecart:
+            {
+              texte: "Le menu « + » dit « Nouvelle requête » (Ctrl+N) et « Nouveau dossier » (Ctrl+Maj+N), sans « Nouveau test » ni « Requête libre » (vocabulaire inchangé, R4 du plan de finalisation) ; « Ajouter un contrat » ouvre ses quatre façons dans un sous-menu.",
+              aligner: code,
+            },
+        }
       b: { etat: variante }
       c: { etat: variante }
       d:
         {
-          etat: en partie,
+          etat: livré,
           pr: [36, 40],
           captures: [02-projet-cree],
           ecart:
             {
-              texte: "Le projet ouvert montre un texte et « + Nouvelle requête » au lieu des quatre points de départ ; sections vides suivies d'une ligne d'ajout (comme 1.2-a ter) au lieu de sections repliées.",
+              texte: "« Écrire une requête » et « + Requête » au lieu de « Écrire un test » et « + Test » (R4) ; « Reprendre l'existant » importe un fichier OpenAPI, les collections Bruno viennent du lot C (2.3-b).",
               aligner: code,
             },
         }
       "d bis": { etat: à faire, version: V4 }
-      e: { etat: à faire, version: MVP }
+      e:
+        {
+          etat: livré,
+          version: MVP,
+          captures: [21-filtre-referentiel],
+          ecart:
+            {
+              texte: "Passage trouvé souligné et en gras (pas de fond) ; dossiers avec leur nombre de requêtes non filtré ; le filtre ne porte pas sur les requêtes rangées sous les contrats (la maquette ne le montre que sur le référentiel).",
+              aligner: maquette,
+            },
+        }
   "1.3":
     nom: "Onglets"
     version: MVP
@@ -326,11 +340,13 @@ pages:
     version: [MVP, V4]
     plans:
       - "plan-configuration-endpoint (EP1–EP10)"
+      - "plan-mvp-d-barre-laterale (E1–E3)"
     liees: ["3.1", "4.2", "4.8"]
-    reste: "réponses attendues dans l'arborescence (a3), test transféré au référentiel ou aux templates (b, c, d)."
+    reste: "test transféré au référentiel ou aux templates (b, c, d)."
     journal:
       - "2026-11-09 : Configuration d'un endpoint (PR #32)."
       - "2026-11-12 : Page « Contrats de service » (fichier « Endpoints ») recentrée sur l'endpoint ; e, f, g → 3.1."
+      - "2026-11-13 : Réponses attendues listées sous l'endpoint dans la barre latérale (lot D)."
     ecrans:
       a:
         {
@@ -344,7 +360,17 @@ pages:
             },
         }
       a2: { etat: livré, pr: [32], captures: [12-endpoint] }
-      a3: { etat: à faire, version: MVP }
+      a3:
+        {
+          etat: livré,
+          version: MVP,
+          captures: [23-reponses-attendues-arborescence],
+          ecart:
+            {
+              texte: "La ligne de l'opération est l'endpoint : son ⋯ (renommer, dupliquer, corbeille) et son statut ; dépliée, elle liste ses réponses attendues puis les autres requêtes de l'opération (essais, copies).",
+              aligner: maquette,
+            },
+        }
       b:
         {
           etat: en partie,

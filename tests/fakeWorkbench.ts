@@ -179,6 +179,8 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
           assertionCount: request.assertions.length,
           invalid: false,
           contract: request.contract?.file ?? null,
+          url: request.url,
+          tags: request.tags,
         });
       }
     }

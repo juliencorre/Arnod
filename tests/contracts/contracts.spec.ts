@@ -57,7 +57,10 @@ function operationRows(wrapper: AppWrapper): string[] {
 describe("ajouter un contrat (C1 à C4)", () => {
   it("colle un contrat : refusé avec la raison, puis ajouté et ouvert", async () => {
     const { core } = await setup();
-    // Projet sans contrat : une ligne « Ajouter un contrat » à la place d'un texte d'aide (B4).
+    // Projet sans contrat : section repliée (lot D, R6) ; dépliée, une ligne « Ajouter un
+    // contrat » à la place d'un texte d'aide (B4).
+    expect(app?.find(".contracts__ghost").exists()).toBe(false);
+    await click(app as AppWrapper, ".contracts .section-head__toggle");
     expect(app?.get(".contracts__ghost").text()).toBe("+ Ajouter un contrat");
 
     await addMenu(app as AppWrapper, "Coller un contrat…");

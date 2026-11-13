@@ -623,7 +623,7 @@ describe("Fenêtres et zones", () => {
     await browser.$("aside nav").$("button*=boutique-tests").click();
     await waitForHeading(browser, "boutique-tests");
 
-    await browser.$("main").$("button=+ Nouvelle requête").click();
+    await browser.$("main").$("button=+ Requête").click();
     await waitForZoneTabs([["Nouvelle requête"]]);
     // « + » de la ligne du projet, puis « Nouvelle requête » (barre latérale du projet, B3).
     await browser.$('aside button[aria-label="Ajouter au projet boutique-tests"]').click();
@@ -1524,5 +1524,103 @@ describe("Premier usage : vérifications, run et statuts", () => {
     expect((await treeRow("Créer une commande"))?.status).toBe("✓, réussie");
     expect((await treeRow("Lister les commandes"))?.status).toBe("✓, réussie");
     expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
+  });
+});
+
+// --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) -----------------------------
+
+describe("Lot D - Barre latérale", () => {
+  /** Valeur saisie dans le champ, événement `input` compris (le filtre réagit à la frappe). */
+  async function typeFilter(value: string): Promise<void> {
+    await browser.execute((text) => {
+      const input = document.querySelector<HTMLInputElement>("aside .tree .filter input");
+      if (!input) throw new Error("filtre du référentiel introuvable");
+      input.focus();
+      input.value = text;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, value);
+  }
+
+  function filterState() {
+    return browser.execute(() => ({
+      count: document.querySelector("aside .tree .filter__count")?.textContent.trim() ?? "",
+      names: Array.from(document.querySelectorAll('aside .tree [role="treeitem"] .row__name')).map(
+        (n) => n.textContent.trim(),
+      ),
+      none: document.querySelector("aside .tree__none")?.textContent.trim() ?? "",
+    }));
+  }
+
+  it("filtre le référentiel : dossiers dépliés, compte affiché, Échap efface (1.2-e)", async () => {
+    await chooseWorkspace("E-commerce");
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await browser.$("aside .tree .filter input").waitForExist({ timeout: 10_000 });
+
+    await typeFilter("créer");
+    await browser.waitUntil(async () => (await filterState()).count.startsWith("1 sur"), {
+      timeoutMsg: "compte du filtre attendu",
+    });
+    expect((await filterState()).names).toEqual(["Commandes", "Créer une commande"]);
+    await screenshot(browser, "21-filtre-referentiel");
+
+    await typeFilter("introuvable");
+    await browser.waitUntil(async () => (await filterState()).none !== "", {
+      timeoutMsg: "« aucun résultat » attendu",
+    });
+    expect((await filterState()).none).toBe("Aucune requête ne correspond.");
+
+    await browser.keys("Escape");
+    await browser.waitUntil(async () => (await filterState()).count === "", {
+      timeoutMsg: "filtre effacé attendu",
+    });
+  });
+
+  it("le menu « + » du projet propose ses créations avec leurs raccourcis (1.2-a ter)", async () => {
+    await clickHidden('aside button[aria-label="Ajouter au projet boutique-tests"]');
+    const items = await browser.$$('aside [role="menuitem"]').map((i) => i.getText());
+    expect(items.some((t) => t.includes("Nouvelle requête") && t.includes("Ctrl+N"))).toBe(true);
+    expect(items.some((t) => t.includes("Nouveau dossier") && t.includes("Ctrl+Maj+N"))).toBe(true);
+    expect(items.some((t) => t.includes("Nouvel environnement"))).toBe(true);
+    await screenshot(browser, "22-menu-ajouter");
+    await browser.keys("Escape");
+  });
+
+  it("l'endpoint liste ses réponses attendues ; un clic ouvre la réponse (3.2-a3)", async () => {
+    const contract = browser.$('aside button[aria-label="Déplier le contrat Animalerie"]');
+    if (await contract.isExisting()) await contract.click();
+    await clickText("aside .crow__resource", "/pets");
+    const operation = browser.$('aside button[aria-label="Déplier GET /pets/{petId}"]');
+    await operation.waitForExist({ timeout: 10_000 });
+    await operation.click();
+    const rows = () =>
+      browser.execute(() =>
+        Array.from(document.querySelectorAll("aside .crow__example .crow__name")).map((n) =>
+          n.textContent.trim(),
+        ),
+      );
+    await browser.waitUntil(async () => (await rows()).includes("Un animal"), {
+      timeoutMsg: "réponses attendues sous l'endpoint attendues",
+    });
+    await clickText("aside .crow__example", "Un animal");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll<HTMLInputElement>(".expected input")).some(
+            (i) => i.value === "Un animal",
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "réponse attendue ouverte attendue" },
+    );
+    await screenshot(browser, "23-reponses-attendues-arborescence");
+  });
+
+  it("les cartes de projet disent leur nombre de contrats (1.1-a)", async () => {
+    await chooseWorkspace("E-commerce");
+    await waitForHeading(browser, "E-commerce");
+    const stats = browser.$("main article .card__stats");
+    await stats.waitForExist({ timeout: 10_000 });
+    expect(await stats.getText()).toMatch(/contrats? de service/);
+    await screenshot(browser, "24-cartes-contrats");
   });
 });
