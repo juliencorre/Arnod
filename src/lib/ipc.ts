@@ -72,6 +72,7 @@ import type {
   CreatedTest,
   TestView,
   VariableUser,
+  DynamicValue,
   Auth,
   CertificateInfo,
   CookieJarView,
@@ -576,6 +577,8 @@ export const ipc = {
   /** Requêtes du projet, hors `path`, qui lisent l'une des variables `names` (EX5). */
   requestVariableUsers: (project: string, path: string, names: string[]): Promise<VariableUser[]> =>
     call<VariableUser[]>("request_variable_users", { project, path, names }),
+  /** Valeurs dynamiques proposées à la frappe de `{{$`, avec un exemple (5.1-h). */
+  dynamicValues: (): Promise<DynamicValue[]> => call<DynamicValue[]>("dynamic_values"),
 
   // --- Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md) ----
   /** Préférences réseau du poste (1.6-e). */

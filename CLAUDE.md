@@ -578,6 +578,16 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
 - « Extraire dans une variable » du filtre JSONPath (`ResponseFilter.vue`, store `response`)
   ajoute l'extraction de la correspondance courante (`workbench.addExtraction`).
 
+## Valeurs dynamiques à la saisie
+
+Référence : écran `5.1-h` (liste ouverte à la frappe de `{{$`).
+
+- Le cœur fournit noms, descriptions et un exemple tiré (`dynamic_values`, `request::dynamic::catalog`,
+  ordre de `NAMES`) ; le store `input` les lit une fois (`loadDynamicValues`).
+- `DynamicValuesMenu.vue` (monté par `RequestEditor`) écoute les champs marqués par `v-variables`
+  (`data-variables`) : `lib/dynamicValues.ts` (pur, testé) repère la saisie au curseur, filtre et
+  insère `{{$nom}}`. Motif combobox : le champ garde le focus, ↑ ↓, Entrée ou Tab, Échap.
+
 ## Lot H - Réseau et authentification
 
 Référence : `docs/plan-mvp-h-reseau-auth.md` (cas PR1 à PR6, EC1 à EC6, OA1 à OA5, CK1 à CK4,

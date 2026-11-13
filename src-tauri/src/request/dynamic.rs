@@ -8,14 +8,20 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use uuid::Uuid;
 
-/// Noms reconnus et leur description, pour l'interface et la documentation.
-pub const NAMES: [(&str, &str); 29] = [
-    ("$guid", "Identifiant unique"),
-    ("$randomUUID", "Identifiant unique"),
-    ("$timestamp", "Secondes depuis 1970"),
+/// Noms reconnus et leur description, pour l'interface et la documentation ; les plus
+/// courants d'abord (ordre de la liste proposée à la frappe de `{{$`, 5.1-h).
+pub const NAMES: [(&str, &str); 30] = [
     ("$isoTimestamp", "Date et heure, ISO 8601"),
-    ("$date", "Date du jour ; décalée : $date:+3d, -1d, +2h"),
+    ("$timestamp", "Secondes depuis 1970"),
+    ("$randomUUID", "Identifiant unique"),
+    ("$date", "Date du jour"),
+    ("$date:+3d", "Date décalée : +3d, -1d, +2h, +30m"),
     ("$randomInt", "Nombre de 0 à 1 000"),
+    ("$randomEmail", "Adresse e-mail"),
+    ("$randomFirstName", "Prénom"),
+    ("$randomLastName", "Nom de famille"),
+    ("$randomFullName", "Prénom et nom"),
+    ("$guid", "Identifiant unique"),
     ("$randomFloat", "Nombre décimal de 0 à 1 000"),
     ("$randomBoolean", "true ou false"),
     ("$randomAlphaNumeric", "Lettre ou chiffre"),
@@ -24,11 +30,7 @@ pub const NAMES: [(&str, &str); 29] = [
     ("$randomIPV6", "Adresse IPv6"),
     ("$randomMACAddress", "Adresse MAC"),
     ("$randomPassword", "Mot de passe de 15 caractères"),
-    ("$randomFirstName", "Prénom"),
-    ("$randomLastName", "Nom de famille"),
-    ("$randomFullName", "Prénom et nom"),
     ("$randomUserName", "Identifiant d'utilisateur"),
-    ("$randomEmail", "Adresse e-mail"),
     ("$randomPhoneNumber", "Numéro de téléphone"),
     ("$randomCity", "Ville"),
     ("$randomCountry", "Pays"),
@@ -40,6 +42,28 @@ pub const NAMES: [(&str, &str); 29] = [
     ("$randomSemver", "Version x.y.z"),
     ("$randomPrice", "Prix, deux décimales"),
 ];
+
+/// Valeur dynamique proposée à la saisie (`dynamic_values`, 5.1-h) : nom, description et
+/// un exemple tiré maintenant (une autre valeur est tirée à chaque envoi).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DynamicValue {
+    pub name: String,
+    pub description: String,
+    pub example: String,
+}
+
+/// Toutes les valeurs dynamiques, dans l'ordre de [`NAMES`], chacune avec un exemple.
+pub fn catalog(dice: &mut Dice) -> Vec<DynamicValue> {
+    NAMES
+        .iter()
+        .map(|(name, description)| DynamicValue {
+            name: (*name).to_owned(),
+            description: (*description).to_owned(),
+            example: draw(name, dice).unwrap_or_default(),
+        })
+        .collect()
+}
 
 const FIRST_NAMES: [&str; 12] = [
     "Léa", "Hugo", "Chloé", "Louis", "Emma", "Jules", "Inès", "Gabriel", "Manon", "Arthur",
@@ -362,5 +386,26 @@ mod tests {
     fn la_meme_graine_donne_les_memes_valeurs() {
         let (mut a, mut b) = (dice(), dice());
         assert_eq!(draw("$randomUUID", &mut a), draw("$randomUUID", &mut b));
+    }
+
+    #[test]
+    fn h_catalogue_des_valeurs_proposees() {
+        let list = catalog(&mut dice());
+        assert_eq!(list.len(), NAMES.len());
+        let first = list.first().unwrap();
+        assert_eq!(first.name, "$isoTimestamp");
+        assert_eq!(first.example, "2026-11-12T15:02:11Z");
+        let shifted = list.iter().find(|v| v.name == "$date:+3d").unwrap();
+        assert_eq!(shifted.example, "2026-11-15");
+        assert!(list.iter().all(|v| !v.example.is_empty()));
+        let json = serde_json::to_value(first).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "name": "$isoTimestamp",
+                "description": "Date et heure, ISO 8601",
+                "example": "2026-11-12T15:02:11Z"
+            })
+        );
     }
 }

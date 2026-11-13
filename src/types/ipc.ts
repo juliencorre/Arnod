@@ -110,6 +110,8 @@ export type CommandName =
   | "tree_create_test"
   | "tree_add_step"
   | "request_variable_users"
+  // Valeurs dynamiques proposées à la saisie (5.1-h).
+  | "dynamic_values"
   // Lot H - Réseau et authentification.
   | "network_load"
   | "network_save"
@@ -1431,6 +1433,15 @@ export interface VariableUser {
   method: HttpMethod;
   url: string;
   variables: string[];
+}
+
+/** Valeur dynamique proposée à la frappe de `{{$` (`DynamicValue`, 5.1-h). */
+export interface DynamicValue {
+  /** Nom avec son `$` : `$randomUUID`, `$date:+3d`. */
+  name: string;
+  description: string;
+  /** Exemple tiré à la lecture ; une autre valeur est tirée à chaque envoi. */
+  example: string;
 }
 
 /*
