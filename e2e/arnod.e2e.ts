@@ -263,7 +263,7 @@ describe("Arnod, de bout en bout", () => {
     expect(await browser.$("main .try__form").$("button=Envoyer").isDisplayed()).toBe(true);
     // POST montre le type et le corps (champs conditionnels de la définition).
     await form.$("button=POST").click();
-    await form.$("textarea").waitForDisplayed();
+    await form.$("textarea[id$='-body']").waitForDisplayed();
     await screenshot(browser, "01b-accueil-rest");
 
     // Échap ferme le formulaire : les cartes reviennent.
@@ -1238,7 +1238,7 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
     });
     expect(await checked()).toEqual(["POST", "JSON"]);
     expect(await browser.$("main .try__input").getValue()).toBe(`${url}/commandes`);
-    await form.$("textarea").setValue('{"article":"T-shirt"}');
+    await form.$("textarea[id$='-body']").setValue('{"article":"T-shirt"}');
     await sendTrial("Essai 2");
 
     const contract = readFileSync(contractFile(), "utf8");
