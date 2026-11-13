@@ -2248,6 +2248,11 @@ describe("Lot F - onglets et clavier", () => {
     );
   }
 
+  /** Texte du DOM : WebKitGTK peut perdre les blancs entre éléments avec `getText`. */
+  async function textOf(selector: string): Promise<string> {
+    return browser.execute((css) => document.querySelector(css)?.textContent ?? "", selector);
+  }
+
   async function dblclickRow(name: string): Promise<void> {
     await browser.execute((label) => {
       const row = Array.from(
@@ -2319,15 +2324,11 @@ describe("Lot F - onglets et clavier", () => {
     await shortcut("Tab");
     const list = browser.$(".zone__switcher");
     await list.waitForDisplayed();
-    expect(await browser.$('.zone__switcher [aria-selected="true"]').getText()).toContain(
-      first ?? "",
-    );
+    expect(await textOf('.zone__switcher [aria-selected="true"]')).toContain(first ?? "");
     await screenshot(browser, "27-ctrl-tab");
     await shortcut("ControlLeft", "keyup");
     await browser.waitUntil(async () => !(await list.isExisting()));
-    expect(await browser.$('.zone__tab-button[aria-selected="true"]').getText()).toContain(
-      first ?? "",
-    );
+    expect(await textOf('.zone__tab-button[aria-selected="true"]')).toContain(first ?? "");
   });
 
   it("Ctrl+J met le résultat dessous, Ctrl+\\ masque la barre latérale (1.4-j)", async () => {

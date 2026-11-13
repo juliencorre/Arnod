@@ -160,49 +160,60 @@ function where(tab: ContentTab): string {
 
 // --- Onglets en trop (1.3-b) ----------------------------------------------------
 
-/** Onglets visibles dans la barre ; `null` : tous. */
-const visibleIds = ref<string[] | null>(null);
+/**
+ * Onglets cachés sous « +N », par identifiant. Un onglet que la dernière mesure ne connaît pas
+ * encore est visible : il sera rangé à la mesure suivante.
+ */
+const hiddenIds = ref<string[]>([]);
 /** Largeur du bouton « +N », mesurée quand il est affiché. */
 const moreWidth = ref(56);
 
 const hiddenTabs = computed(() =>
-  visibleIds.value === null
-    ? []
-    : props.zone.tabs.filter((tab) => !(visibleIds.value ?? []).includes(tab.id)),
+  props.zone.tabs.filter((tab) => hiddenIds.value.includes(tab.id)),
 );
 const shownTabs = computed(() =>
-  props.zone.tabs.filter((tab) => !hiddenTabs.value.some((hidden) => hidden.id === tab.id)),
+  props.zone.tabs.filter((tab) => !hiddenIds.value.includes(tab.id)),
 );
 
 function isHidden(tab: ContentTab): boolean {
-  return hiddenTabs.value.some((hidden) => hidden.id === tab.id);
+  return hiddenIds.value.includes(tab.id);
 }
 
 /** Mesure les onglets (les cachés restent mis en page, invisibles) et garde ceux qui tiennent. */
 function measure(): void {
   const container = wrap.value;
-  if (!container) return;
+  if (!container) {
+    hiddenIds.value = [];
+    return;
+  }
   const more = container.querySelector<HTMLElement>(".zone__more");
   if (more && more.offsetWidth > 0) moreWidth.value = more.offsetWidth;
   const widths = props.zone.tabs.map(
     (tab) => container.querySelector<HTMLElement>(`[data-tab-item="${tab.id}"]`)?.offsetWidth ?? 0,
   );
   const active = props.zone.tabs.findIndex((tab) => tab.id === props.zone.activeTab);
-  const fit = fitTabs(widths, container.clientWidth, moreWidth.value, active);
-  const ids = fit.map((index) => props.zone.tabs[index]?.id ?? "");
-  visibleIds.value = ids.length === props.zone.tabs.length ? null : ids;
+  const fit = new Set(fitTabs(widths, container.clientWidth, moreWidth.value, active));
+  hiddenIds.value = props.zone.tabs.filter((_, index) => !fit.has(index)).map((tab) => tab.id);
 }
 
+// La barre disparaît avec le dernier onglet et revient avec le suivant : on suit la nouvelle.
 let observer: ResizeObserver | null = null;
-onMounted(() => {
-  if (typeof ResizeObserver !== "undefined" && wrap.value) {
-    observer = new ResizeObserver(() => {
-      measure();
-    });
-    observer.observe(wrap.value);
-  }
-  measure();
-});
+watch(
+  wrap,
+  (element) => {
+    observer?.disconnect();
+    observer = null;
+    if (element && typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => {
+        measure();
+      });
+      observer.observe(element);
+    }
+    measure();
+  },
+  { flush: "post" },
+);
+onMounted(measure);
 onBeforeUnmount(() => observer?.disconnect());
 
 watch(

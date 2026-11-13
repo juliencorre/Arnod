@@ -168,6 +168,17 @@ describe("trop d'onglets (1.3-b)", () => {
     await flushPromises();
     expect(core.calls.find((c) => c.cmd === "layout_close_tabs")?.args.tabs).toHaveLength(2);
     expect(app.findAll(".zone__tab")).toHaveLength(1);
+
+    // Tout fermé puis rouvert : le nouvel onglet est visible, pas rangé sous « +N ».
+    await app.get(".zone__tab-button").trigger("keydown", { key: "F10", shiftKey: true });
+    await flushPromises();
+    await app
+      .findAll('[role="menuitem"]')
+      .find((i) => i.text() === "Fermer tout")
+      ?.trigger("click");
+    await flushPromises();
+    await clickRow(app, "Lister");
+    expect(tabs(app).map((t) => t.name)).toEqual(["Lister"]);
   });
 
   it("« Fermer tout » depuis le menu de l'onglet", async () => {
