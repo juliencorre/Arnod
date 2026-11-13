@@ -1,0 +1,38 @@
+<!-- @dsCard group="Actions" height=150 subtitle="BaseButton" -->
+<div class="demo">
+  <style>
+    .demo {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px;
+      font: 16px/1.5 var(--font-sans);
+      color: var(--color-text);
+      background: var(--color-bg);
+    }
+    .demo__row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+    .demo__label {
+      width: 100%;
+      font: 600 11px var(--font-mono);
+      letter-spacing: 0.05em;
+      color: var(--color-muted);
+    }
+  </style>
+  <div class="demo__row">
+    <span class="demo__label">VARIANTES</span>
+    <button type="button" class="button button--primary">Envoyer</button>
+    <button type="button" class="button button--secondary">Annuler</button>
+    <button type="button" class="button button--danger">Supprimer le contrat</button>
+    <button type="button" class="button button--link">+ Ajouter un projet</button>
+  </div>
+  <div class="demo__row">
+    <span class="demo__label">DÉSACTIVÉS</span>
+    <button type="button" class="button button--primary" disabled>Envoyer</button>
+    <button type="button" class="button button--secondary" disabled>Annuler</button>
+  </div>
+</div>

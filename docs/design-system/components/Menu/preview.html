@@ -1,0 +1,68 @@
+<!-- @dsCard group="Menus et fenêtres" height=290 subtitle="BaseMenu" -->
+<div class="demo">
+  <style>
+    .demo {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 16px;
+      font: 16px/1.5 var(--font-sans);
+      color: var(--color-text);
+      background: var(--color-bg);
+    }
+    .demo .menu__popover {
+      position: static;
+    }
+  </style>
+  <div class="menu__popover">
+    <p class="menu__heading">Environnement</p>
+    <ul role="menu" aria-label="Environnement" class="menu__list">
+      <li role="menuitemradio" aria-checked="true" class="menu__item menu__item--active">
+        <span class="menu__check" aria-hidden="true">✓</span>
+        <span class="menu__text"><span class="menu__label">Local</span></span>
+        <span class="menu__detail">localhost:8080</span>
+      </li>
+      <li role="menuitemradio" aria-checked="false" class="menu__item">
+        <span class="menu__check" aria-hidden="true"></span>
+        <span class="menu__text">
+          <span class="menu__label">Recette<span class="menu__tag">protégé</span></span>
+        </span>
+        <span class="menu__detail">recette.boutique.dev</span>
+      </li>
+      <li role="separator" class="menu__separator"></li>
+      <li role="menuitem" class="menu__item">
+        <span class="menu__text"><span class="menu__label">Gérer les environnements…</span></span>
+        <kbd class="menu__shortcut">Ctrl+Maj+E</kbd>
+      </li>
+    </ul>
+  </div>
+  <div class="menu__popover">
+    <ul role="menu" aria-label="Workspace Boutique" class="menu__list">
+      <li role="menuitem" class="menu__item">
+        <span class="menu__text"><span class="menu__label">Renommer</span></span>
+        <kbd class="menu__shortcut">F2</kbd>
+      </li>
+      <li role="menuitem" aria-haspopup="menu" aria-expanded="false" class="menu__item">
+        <span
+          class="menu__swatch"
+          style="background: var(--color-ws-teal)"
+          aria-hidden="true"
+        ></span>
+        <span class="menu__text">
+          <span class="menu__label">Couleur</span>
+          <span class="menu__hint">Turquoise</span>
+        </span>
+        <span class="menu__arrow" aria-hidden="true">▸</span>
+      </li>
+      <li role="menuitem" aria-disabled="true" class="menu__item">
+        <span class="menu__text"><span class="menu__label">Gérer les workspaces</span></span>
+      </li>
+      <li role="separator" class="menu__separator"></li>
+      <li role="menuitem" class="menu__item menu__item--danger">
+        <span class="menu__text"><span class="menu__label">Supprimer</span></span>
+        <kbd class="menu__shortcut">Suppr</kbd>
+      </li>
+    </ul>
+  </div>
+</div>

@@ -98,6 +98,9 @@ for (const [i, gap] of (doc.transverses ?? []).entries()) {
   gaps += 1;
   if (typeof gap?.texte !== "string" || gap.texte === "") fail(where, "texte manquant");
   if (!ALIGN.includes(gap?.aligner)) fail(where, `quoi aligner : ${ALIGN.join(", ")}`);
+  if (gap?.page !== undefined && !(String(gap.page) in doc.pages)) {
+    fail(where, `page inconnue « ${String(gap.page)} »`);
+  }
 }
 
 /** Fichiers Markdown du dépôt où un repère peut être cité. */

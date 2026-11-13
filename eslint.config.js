@@ -5,7 +5,8 @@ import pluginVue from "eslint-plugin-vue";
 export default defineConfigWithVueTs(
   {
     name: "arnod/ignores",
-    ignores: ["dist/**", "src-tauri/target/**", "src-tauri/gen/**", "coverage/**"],
+    // docs/design-system/ : types de documentation du design system, hors projet TypeScript.
+    ignores: ["dist/**", "src-tauri/target/**", "src-tauri/gen/**", "coverage/**", "docs/**"],
   },
   pluginVue.configs["flat/recommended"],
   vueTsConfigs.strictTypeChecked,

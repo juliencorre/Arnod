@@ -133,9 +133,11 @@ src-tauri/              Cœur Rust
   src/menu.rs           Menu natif (Fichier > Quitter, Fenêtre > Dispositions, détacher, rattacher)
   src/commands/         Commandes, un fichier par domaine
 docs/                   Plans, modèle de plan, maquettes, captures du README, schéma
-                        OpenCollection 1.0.0 (docs/opencollection/)
+                        OpenCollection 1.0.0 (docs/opencollection/), design system
+                        (docs/design-system/)
 scripts/                Mesure de taille, concordance des versions, tests de fumée (CI), état de
-                        la maquette (check-maquette.mjs, maquette-sync.py)
+                        la maquette (check-maquette.mjs, maquette-sync.py), design system
+                        (design-system.mjs)
 .github/                Modèles d'issue et de pull request, Dependabot
   workflows/            CI de build Windows et Linux, contrôle des titres de pull request
 ```
@@ -202,8 +204,8 @@ Linux : installer d'abord les dépendances système
   permission WebView). `reqwest`, `keyring`, `trash` et `tokio` sont des crates Rust, sans permission WebView.
 - Thème clair/sombre suivant le système via les variables de `src/styles.css` (palette des
   maquettes, accent orange) : utiliser `var(--color-*)`, jamais de couleur codée en dur dans
-  les composants. Tout nouveau jeton est défini pour les deux thèmes, en `#rrggbb` ;
-  `tests/theme.spec.ts` vérifie les contrastes.
+  les composants. Tout nouveau jeton est défini pour les deux thèmes, en `#rrggbb`, et reçoit sa
+  note d'usage dans `scripts/design-system.mjs` ; `tests/theme.spec.ts` vérifie les contrastes.
 - Police système uniquement : la CSP interdit les polices distantes des maquettes.
 - Hors périmètre actuel : SOAP (et donc WSDL), mocks, scripts, CLI, signature de code, updater. Les
   requêtes HTTP sont livrées (premier usage), les contrats OpenAPI aussi ; les secrets vont dans le
@@ -243,7 +245,7 @@ R8), maquettes `docs/maquettes/1e-requete-assertions-reponse.png` et `1f-run.png
 
 ## Maquette et état des écrans
 
-Référence : `docs/plan-suivi-maquette.md` (règles R1 à R8).
+Référence : `docs/plan-suivi-maquette.md` (règles R1 à R9).
 
 - La maquette (Claude Design) range ses pages par code (0 Cadre, 1 Espace de travail, 2 Démarrer,
   3 Services, 4 Tests, 5 Exécution, 6 Recette, 7 Équipe) ; un écran a un repère `3.2-a2` (page,
@@ -253,7 +255,14 @@ Référence : `docs/plan-suivi-maquette.md` (règles R1 à R8).
   à décider). Une pull request qui livre, modifie ou écarte un écran le met à jour ;
   `scripts/check-maquette.mjs` le vérifie (`npm run check`, CI).
 - Une capture citée existe dans `e2e/arnod.e2e.ts` (`screenshot(browser, "…")`) : un écran livré
-  visible gagne une capture e2e. La maquette est régénérée depuis le fichier après fusion.
+  visible gagne une capture e2e. La maquette est régénérée depuis le fichier après fusion
+  (`scripts/maquette-sync.py`, toutes les pages ou celles dont on donne le code).
+- Design system « Arnod » (`docs/design-system/`, publié sur claude.ai) : référence des couleurs,
+  typographie, espacements, rayons et composants pour la maquette et le code. Couleurs : le code
+  fait foi ; tailles de texte et rayons : l'échelle du design system (11 à 24 px ; 2, 6, 10 px).
+  `scripts/design-system.mjs` en génère les jetons, les styles des composants et les icônes
+  depuis le code ; `npm run check` échoue s'il n'est pas à jour. README, guides et aperçus des
+  composants s'écrivent à la main. La page 0.5 de la maquette est générée depuis ce dossier.
 
 ## Projets et workspaces
 
