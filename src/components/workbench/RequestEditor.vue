@@ -21,8 +21,10 @@ import {
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import AssertionsEditor from "@/components/workbench/AssertionsEditor.vue";
+import CookiesSection from "@/components/workbench/CookiesSection.vue";
 import AuthEditor from "@/components/workbench/AuthEditor.vue";
 import BodyEditor from "@/components/workbench/BodyEditor.vue";
+import DynamicValuesMenu from "@/components/workbench/DynamicValuesMenu.vue";
 import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
@@ -37,6 +39,8 @@ import { useWorkbenchStore } from "@/stores/workbench";
 import type { CurlCopy, HttpMethod, Pair, RequestDoc, UnknownVariable } from "@/types/ipc";
 
 const props = defineProps<{ editorKey: string }>();
+/** Racine de l'éditeur : la liste des valeurs dynamiques écoute ses champs (5.1-h). */
+const editorRoot = useTemplateRef<HTMLElement>("editorRoot");
 
 const workbench = useWorkbenchStore();
 const contracts = useContractsStore();
@@ -89,6 +93,10 @@ function unlinkContract(): void {
 // --- Enregistrement automatique (EP1) -------------------------------------------
 
 const saveLabel = computed(() => {
+  // Lot I : relue après une modification faite hors d'Arnod, sans brouillon (R3).
+  if (editor.value?.reloaded && editor.value.saveState === "saved") {
+    return "⟳ Rechargé depuis le disque";
+  }
   switch (editor.value?.saveState) {
     case "pending":
       return "Modifications en attente…";
@@ -303,7 +311,7 @@ watch(
 </script>
 
 <template>
-  <section v-if="request" class="editor" aria-label="Requête" @keydown="onKeydown">
+  <section v-if="request" ref="editorRoot" class="editor" aria-label="Requête" @keydown="onKeydown">
     <div class="editor__top">
       <p v-if="contract" class="editor__crumbs">
         <span>Contrats de service</span>
@@ -347,10 +355,6 @@ watch(
       <button type="button" class="link" @click="workbench.revertToSent(editorKey)">
         Revenir à la version envoyée
       </button>
-    </p>
-    <p v-if="editor?.changedElsewhere" class="editor__elsewhere" role="status">
-      Modifiée dans une autre fenêtre.
-      <button type="button" class="link" @click="workbench.reload(editorKey)">Recharger</button>
     </p>
 
     <form class="editor__line" @submit.prevent="workbench.send(editorKey)">
@@ -560,6 +564,8 @@ watch(
             Auth. « Envoyé » montre les valeurs réellement parties.
           </p>
         </template>
+        <!-- Lot H (3.4-g) : cookies gardés de l'environnement pour cet hôte. -->
+        <CookiesSection :editor-key="editorKey" />
       </div>
 
       <AuthEditor
@@ -606,6 +612,7 @@ watch(
       :start-new="false"
       @close="managingEnvironments = false"
     />
+    <DynamicValuesMenu :root="editorRoot" />
   </section>
 </template>
 
@@ -684,14 +691,6 @@ watch(
 .editor__unsent b {
   font: 700 var(--text-caption) var(--font-mono);
   color: var(--color-link);
-}
-
-.editor__elsewhere {
-  margin: 0;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-md);
-  font-size: var(--text-body);
-  background: var(--color-accent-soft);
 }
 
 /* Zone étroite (jusqu'à 280 px, Z4) : le bouton passe sous l'adresse. */

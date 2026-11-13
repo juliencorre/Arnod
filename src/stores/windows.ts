@@ -2,10 +2,12 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
 import { events, ipc } from "@/lib/ipc";
+import { byUse } from "@/lib/tabs";
 import { useToastStore } from "@/stores/toasts";
 import type {
   ActiveRequest,
   ContentRef,
+  MenuShortcut,
   ContentTab,
   LayoutNode,
   LayoutPreset,
@@ -39,6 +41,22 @@ export function splitAround(
     splitAround(inFirst ? node.first : node.second, zone, axis) ??
     (node.axis === axis ? node : null)
   );
+}
+
+/** Place du résultat montrée par l'onglet actif d'une zone, et celle de l'automatique. */
+export interface ShownPlacement {
+  shown: "right" | "below";
+  auto: "right" | "below";
+}
+
+/**
+ * Place suivante pour Ctrl+J (1.4-j) : l'autre côté que celui montré ; si c'est celui que
+ * donnerait l'automatique, retour à l'automatique (comme un clic sur la place active, F6).
+ */
+export function nextPlacement(current: Placement, view: ShownPlacement | undefined): Placement {
+  const shown = view?.shown ?? (current === "below" ? "below" : "right");
+  const next = shown === "below" ? "right" : "below";
+  return view?.auto === next ? "auto" : next;
 }
 
 /** Projet d'un contenu ; aucun pour le résultat, qui suit la requête active. */
@@ -98,6 +116,10 @@ export const useWindowsStore = defineStore("windows", () => {
   const activeRequest = ref<ActiveRequest | null>(null);
   /** Zone agrandie dans cette fenêtre (⤢), ou `null`. */
   const maximizedZone = ref<string | null>(null);
+  /** Place du résultat montrée dans chaque zone de cette fenêtre (affichage, Ctrl+J). */
+  const shownPlacements = ref<Record<string, ShownPlacement>>({});
+  /** Liste de Ctrl+Tab ouverte (1.3-c) : zone et onglet choisi dans l'ordre d'utilisation. */
+  const tabSwitcher = ref<{ zone: string; index: number } | null>(null);
   let subscribed = false;
 
   const me = computed<WindowView | null>(
@@ -157,6 +179,7 @@ export const useWindowsStore = defineStore("windows", () => {
       await events.onActiveRequest((active) => {
         activeRequest.value = active;
       });
+      await events.onShortcut(onShortcut);
     }
   }
 
@@ -182,6 +205,77 @@ export const useWindowsStore = defineStore("windows", () => {
 
   function zoneOf(tab: string): ZoneView | null {
     return zones.value.find((z) => z.tabs.some((t) => t.id === tab)) ?? null;
+  }
+
+  // --- Lot F : onglets et clavier ----------------------------------------------
+
+  /** Barre latérale de la fenêtre principale masquée (Ctrl+\, 1.4-j). */
+  const sidebarHidden = computed(() => main.value?.sidebarHidden ?? false);
+
+  /** Masque ou affiche la barre latérale (Ctrl+\) ; sans effet si elle est détachée. */
+  async function toggleSidebar(): Promise<boolean> {
+    if (kind.value !== "main" || main.value?.sidebarDetached === true) return false;
+    const hidden = !sidebarHidden.value;
+    if (!(await run(() => ipc.layoutSetSidebarHidden(hidden)))) return false;
+    if (hidden) {
+      toasts.show("Barre latérale masquée · Ctrl+\\ pour l'afficher", {
+        action: { label: "Afficher", run: () => toggleSidebar() },
+      });
+    }
+    return true;
+  }
+
+  /** La place montrée par l'onglet de requête actif de `zone` (RequestTab). */
+  function reportPlacement(zone: string, view: ShownPlacement | null): void {
+    const kept = Object.entries(shownPlacements.value).filter(([id]) => id !== zone);
+    shownPlacements.value = Object.fromEntries(view === null ? kept : [...kept, [zone, view]]);
+  }
+
+  /** Ctrl+J (1.4-j) : le résultat de la zone active passe dessous ou à côté. */
+  async function togglePlacement(zone: string | null = activeZone.value?.id ?? null) {
+    const found = zones.value.find((z) => z.id === zone);
+    if (!found) return false;
+    const next = nextPlacement(found.placement, shownPlacements.value[found.id]);
+    if (!(await run(() => ipc.layoutSetPlacement(found.id, next)))) return false;
+    return true;
+  }
+
+  /**
+   * Ctrl+Tab (`delta` = 1) ou Ctrl+Maj+Tab (-1) dans la zone active (1.3-c) : ouvre la liste
+   * sur l'onglet suivant dans l'ordre d'utilisation, ou avance dans la liste ouverte.
+   */
+  function stepTabSwitcher(delta: 1 | -1): boolean {
+    const zone = activeZone.value;
+    if (!zone || zone.tabs.length < 2) return false;
+    const count = zone.tabs.length;
+    const current = tabSwitcher.value;
+    const from = current?.zone === zone.id ? current.index : 0;
+    tabSwitcher.value = { zone: zone.id, index: (from + delta + count) % count };
+    return true;
+  }
+
+  /** Ctrl relâché, Entrée ou clic : l'onglet choisi devient actif. */
+  async function commitTabSwitcher(tab: string | null = null): Promise<void> {
+    const current = tabSwitcher.value;
+    tabSwitcher.value = null;
+    const zone = zones.value.find((z) => z.id === current?.zone);
+    if (!zone || !current) return;
+    const chosen = tab ?? byUse(zone.tabs, zone.recent)[current.index]?.id;
+    if (chosen !== undefined) await activate(zone.id, chosen);
+  }
+
+  function cancelTabSwitcher(): void {
+    tabSwitcher.value = null;
+  }
+
+  function activate(zone: string, tab: string): Promise<boolean> {
+    return run(() => ipc.layoutActivate(zone, tab));
+  }
+
+  /** Raccourci choisi dans le menu natif Fenêtre : comme au clavier (R7). */
+  function onShortcut(shortcut: MenuShortcut): void {
+    if (shortcut === "sidebar") void toggleSidebar();
+    else void togglePlacement();
   }
 
   /** Séparation à régler depuis la zone `zone` (Alt+Maj+flèches, F4). */
@@ -213,8 +307,9 @@ export const useWindowsStore = defineStore("windows", () => {
     splitAround: splitNear,
     open: (content: ContentRef, zone: string | null = null) =>
       run(() => ipc.layoutOpen(content, zone)),
-    openSelection: (content: ContentRef) => run(() => ipc.layoutOpenSelection(content)),
-    activate: (zone: string, tab: string) => run(() => ipc.layoutActivate(zone, tab)),
+    openSelection: (content: ContentRef, preview = false) =>
+      run(() => ipc.layoutOpenSelection(content, preview)),
+    activate,
     close: (tab: string) => run(() => ipc.layoutClose(tab)),
     move: (tab: string, toWindow: string, zone: string | null, index: number | null = null) =>
       run(() => ipc.layoutMove(tab, toWindow, zone, index)),
@@ -236,5 +331,18 @@ export const useWindowsStore = defineStore("windows", () => {
     toggleMaximize(zone: string): void {
       maximizedZone.value = maximizedZone.value === zone ? null : zone;
     },
+    // Lot F : onglets et clavier.
+    sidebarHidden,
+    shownPlacements,
+    pin: (tab: string) => run(() => ipc.layoutPin(tab)),
+    closeTabs: (tabs: string[]) => run(() => ipc.layoutCloseTabs(tabs)),
+    toggleSidebar,
+    tabSwitcher,
+    stepTabSwitcher,
+    commitTabSwitcher,
+    cancelTabSwitcher,
+    reportPlacement,
+    togglePlacement,
+    onShortcut,
   };
 });

@@ -58,7 +58,8 @@ const status = computed(() => workbench.statuses[props.projectId]?.[props.reques
         type="button"
         class="linked__main"
         :aria-current="selected ? 'page' : undefined"
-        @click="workbench.openRequest(projectId, request.path)"
+        @click="workbench.openRequest(projectId, request.path, true)"
+        @dblclick="workbench.openRequest(projectId, request.path)"
       >
         <span
           v-if="showMethod"

@@ -79,6 +79,13 @@ fn sent_texts(request: &Request) -> Vec<&str> {
         AuthKind::Basic => texts.extend([auth.username.as_str(), auth.password.as_str()]),
         AuthKind::Bearer => texts.push(&auth.token),
         AuthKind::ApiKey => texts.extend([auth.name.as_str(), auth.value.as_str()]),
+        // Lot H : OAuth 2 (docs/plan-mvp-h-reseau-auth.md).
+        AuthKind::OAuth2 => texts.extend([
+            auth.oauth2.access_token_url.as_str(),
+            auth.oauth2.client_id.as_str(),
+            auth.oauth2.client_secret.as_str(),
+            auth.oauth2.scope.as_str(),
+        ]),
         AuthKind::None | AuthKind::Inherit | AuthKind::Other => {}
     }
     match request.body.kind {

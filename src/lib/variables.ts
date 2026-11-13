@@ -130,6 +130,8 @@ export const vVariables: Directive<Field, ReadonlySet<string> | null> = {
     overlay.className = "variable-marks";
     overlay.setAttribute("aria-hidden", "true");
     overlay.hidden = true;
+    // Champ qui accepte `{{…}}` : la liste des valeurs dynamiques s'y ouvre (5.1-h).
+    field.dataset.variables = "";
     field.insertAdjacentElement("afterend", overlay);
     const parent = field.parentElement;
     if (parent && getComputedStyle(parent).position === "static") {

@@ -47,6 +47,7 @@ function newZone(tabs: ContentTab[] = []): ZoneNode {
     tabs,
     activeTab: tabs[0]?.id ?? null,
     placement: "auto",
+    recent: tabs.map((t) => t.id),
   };
 }
 
@@ -60,6 +61,7 @@ export function newWindow(kind: WindowView["kind"], tabs: ContentTab[] = []): Wi
     sidebarWidth: 260,
     sidebarDetached: false,
     bounds: null,
+    sidebarHidden: false,
   };
 }
 
@@ -75,8 +77,8 @@ export function zonesIn(node: LayoutNode): ZoneNode[] {
   return node.kind === "zone" ? [node] : [...zonesIn(node.first), ...zonesIn(node.second)];
 }
 
-export function tab(content: ContentRef): ContentTab {
-  return { id: nextId("onglet"), content };
+export function tab(content: ContentRef, preview = false): ContentTab {
+  return { id: nextId("onglet"), content, preview };
 }
 
 function same(a: ContentRef, b: ContentRef): boolean {
@@ -113,8 +115,35 @@ function zoneOfTab(layout: WindowLayout, id: string): ZoneNode {
 }
 
 function activate(layout: WindowLayout, zoneId: string, tabId: string): void {
-  zone(layout, zoneId).activeTab = tabId;
+  const target = zone(layout, zoneId);
+  target.activeTab = tabId;
+  target.recent = [tabId, ...target.recent.filter((id) => id !== tabId)];
   layout.activeZone = zoneId;
+}
+
+/** Ouvre en aperçu (lot F, R1) : l'aperçu de la zone est remplacé sur place. */
+function openPreview(layout: WindowLayout, zoneId: string, added: ContentTab): void {
+  for (const z of zonesIn(layout.root)) {
+    if (z.tabs.some((t) => same(t.content, added.content))) {
+      insert(layout, zoneId, added, null);
+      return;
+    }
+  }
+  const target = zone(layout, zoneId);
+  const index = target.tabs.findIndex((t) => t.preview);
+  if (index === -1) {
+    insert(layout, zoneId, added, null);
+    return;
+  }
+  const replaced = target.tabs[index]?.id;
+  target.tabs.splice(index, 1, added);
+  target.recent = target.recent.filter((id) => id !== replaced);
+  activate(layout, zoneId, added.id);
+}
+
+function pin(layout: WindowLayout, id: string): void {
+  const found = zoneOfTab(layout, id).tabs.find((t) => t.id === id);
+  if (found) found.preview = false;
 }
 
 /** Range un onglet ; un contenu déjà ouvert est seulement activé (Z3). */
@@ -129,6 +158,7 @@ function insert(
     const existing = z.tabs.find((t) => same(t.content, added.content));
     if (existing) {
       activate(layout, z.id, existing.id);
+      if (!added.preview) existing.preview = false;
       return;
     }
   }
@@ -159,6 +189,7 @@ function take(layout: WindowLayout, id: string): ContentTab {
   const source = zoneOfTab(layout, id);
   const index = source.tabs.findIndex((t) => t.id === id);
   const [removed] = source.tabs.splice(index, 1);
+  source.recent = source.recent.filter((t) => t !== id);
   if (source.activeTab === id) {
     source.activeTab = source.tabs[Math.min(index, source.tabs.length - 1)]?.id ?? null;
   }
@@ -355,7 +386,30 @@ export function handleWindows(
     }
     case "layout_open_selection": {
       const layout = layoutOf(fw, selectionTarget(fw));
-      insert(layout, layout.activeZone, tab(args.content as ContentRef), null);
+      const preview = args.preview === true;
+      const added = tab(args.content as ContentRef, preview);
+      if (preview) openPreview(layout, layout.activeZone, added);
+      else insert(layout, layout.activeZone, added, null);
+      return done();
+    }
+    // Lot F : onglets et clavier.
+    case "layout_pin":
+      pin(layoutOf(fw, me), str("tab"));
+      return done();
+    case "layout_close_tabs": {
+      const layout = layoutOf(fw, me);
+      const ids = (args.tabs as string[] | undefined) ?? [];
+      for (const id of ids) zoneOfTab(layout, id);
+      for (const id of ids) take(layout, id);
+      dropEmpty(fw);
+      return done();
+    }
+    case "layout_set_sidebar_hidden": {
+      const window = windowOf(fw, me);
+      if (window.kind !== "main") {
+        fail("invalidRequest", "Seule la fenêtre principale a une barre latérale.");
+      }
+      window.sidebarHidden = Boolean(args.hidden);
       return done();
     }
     case "layout_activate":
@@ -376,10 +430,10 @@ export function handleWindows(
         const z = zone(source, zoneId);
         const from = z.tabs.findIndex((t) => t.id === str("tab"));
         const [moved] = z.tabs.splice(from, 1);
-        if (moved) z.tabs.splice(index ?? z.tabs.length, 0, moved);
+        if (moved) z.tabs.splice(index ?? z.tabs.length, 0, { ...moved, preview: false });
         activate(source, zoneId, str("tab"));
       } else {
-        insert(target, zoneId, take(source, str("tab")), index);
+        insert(target, zoneId, { ...take(source, str("tab")), preview: false }, index);
       }
       dropEmpty(fw);
       return done();
@@ -401,7 +455,7 @@ export function handleWindows(
           "Seul onglet de sa zone : il n'y a rien à diviser. Glissez-le dans une autre zone.",
         );
       }
-      const added = newZone([take(layout, str("tab"))]);
+      const added = newZone([{ ...take(layout, str("tab")), preview: false }]);
       layout.root = wrap(layout.root, zoneId, args.side as Side, added);
       layout.activeZone = added.id;
       return done();
@@ -446,7 +500,7 @@ export function handleWindows(
       return done();
     }
     case "window_detach_tab":
-      add(fw, newWindow("content", [take(layoutOf(fw, me), str("tab"))]));
+      add(fw, newWindow("content", [{ ...take(layoutOf(fw, me), str("tab")), preview: false }]));
       dropEmpty(fw);
       return done();
     case "window_detach_sidebar":

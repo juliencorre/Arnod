@@ -7,8 +7,14 @@
  * (bord bas) ou dans la zone (centre) ; glissé hors de la fenêtre, il devient
  * une fenêtre à l'endroit du dépôt. Clavier : flèches entre les onglets,
  * Entrée pour l'ouvrir, Suppr pour le fermer, Maj+F10 pour son menu.
+ *
+ * Lot F (docs/plan-mvp-f-onglets-clavier.md) : l'onglet d'aperçu a son titre en
+ * italique et devient permanent au double-clic, à la modification ou au glisser
+ * (1.3-a) ; ◐ pendant une exécution ; les onglets qui ne tiennent pas dans la
+ * barre passent dans le menu « +N », avec « Fermer les autres » et « Fermer
+ * tout » (1.3-b) ; la liste de Ctrl+Tab s'affiche sur la zone active (1.3-c).
  */
-import { computed, nextTick, ref, useTemplateRef } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
@@ -31,6 +37,7 @@ import {
 import { useCatalogStore } from "@/stores/catalog";
 import { contractKey, useContractsStore } from "@/stores/contracts";
 import { useImportStore } from "@/stores/imports";
+import { byUse, fitTabs, isRunning } from "@/lib/tabs";
 import { useWindowsStore, zonesOf } from "@/stores/windows";
 import { findRequest, requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type { ContentTab, ZoneView } from "@/types/ipc";
@@ -46,6 +53,7 @@ const actions = useTabActions();
 const strip = useTemplateRef<HTMLElement>("strip");
 const body = useTemplateRef<HTMLElement>("body");
 const menu = useTemplateRef<InstanceType<typeof BaseMenu>>("menu");
+const wrap = useTemplateRef<HTMLElement>("wrap");
 
 const index = computed(() => windows.zones.findIndex((z) => z.id === props.zone.id));
 const isActiveZone = computed(() => windows.layout?.activeZone === props.zone.id);
@@ -113,6 +121,151 @@ function activate(tab: ContentTab): void {
   void windows.activate(props.zone.id, tab.id);
 }
 
+// --- Aperçu et exécution (1.3-a) ------------------------------------------------
+
+/** ◐ : le contenu de l'onglet s'exécute (envoi, run du test, du dossier ou du projet). */
+function running(tab: ContentTab): boolean {
+  return isRunning(tab.content, {
+    sending: (projectId, path) => workbench.editors[requestKey(projectId, path)]?.sending ?? false,
+    run: (projectId) => workbench.runs[projectId],
+  });
+}
+
+/** Double-clic, glisser : l'aperçu devient permanent (R3). */
+function pin(tab: ContentTab): void {
+  if (tab.preview) void windows.pin(tab.id);
+}
+
+// Une modification rend l'aperçu permanent : il ne sera pas remplacé (R3).
+watch(
+  () => props.zone.tabs.filter((tab) => tab.preview && info(tab).dirty).map((tab) => tab.id),
+  (modified) => {
+    for (const id of modified) void windows.pin(id);
+  },
+  { immediate: true },
+);
+
+/** Sous-titre d'un onglet : son dossier, ou son projet à la racine. */
+function where(tab: ContentTab): string {
+  const content = tab.content;
+  if (content.kind === "result") return "Requête active";
+  const project = catalog.projectById(content.projectId)?.name ?? "";
+  if (content.kind === "request" || content.kind === "test") {
+    const folder = content.path.split("/").slice(0, -1).join(" / ");
+    return folder === "" ? project : folder;
+  }
+  if (content.kind === "contract") return "Contrats de service";
+  return project;
+}
+
+// --- Onglets en trop (1.3-b) ----------------------------------------------------
+
+/**
+ * Onglets cachés sous « +N », par identifiant. Un onglet que la dernière mesure ne connaît pas
+ * encore est visible : il sera rangé à la mesure suivante.
+ */
+const hiddenIds = ref<string[]>([]);
+/** Largeur du bouton « +N », mesurée quand il est affiché. */
+const moreWidth = ref(56);
+
+const hiddenTabs = computed(() =>
+  props.zone.tabs.filter((tab) => hiddenIds.value.includes(tab.id)),
+);
+const shownTabs = computed(() =>
+  props.zone.tabs.filter((tab) => !hiddenIds.value.includes(tab.id)),
+);
+
+function isHidden(tab: ContentTab): boolean {
+  return hiddenIds.value.includes(tab.id);
+}
+
+/** Mesure les onglets (les cachés restent mis en page, invisibles) et garde ceux qui tiennent. */
+function measure(): void {
+  const container = wrap.value;
+  if (!container) {
+    hiddenIds.value = [];
+    return;
+  }
+  const more = container.querySelector<HTMLElement>(".zone__more");
+  if (more && more.offsetWidth > 0) moreWidth.value = more.offsetWidth;
+  const widths = props.zone.tabs.map(
+    (tab) => container.querySelector<HTMLElement>(`[data-tab-item="${tab.id}"]`)?.offsetWidth ?? 0,
+  );
+  const active = props.zone.tabs.findIndex((tab) => tab.id === props.zone.activeTab);
+  const fit = new Set(fitTabs(widths, container.clientWidth, moreWidth.value, active));
+  hiddenIds.value = props.zone.tabs.filter((_, index) => !fit.has(index)).map((tab) => tab.id);
+}
+
+// La barre disparaît avec le dernier onglet et revient avec le suivant : on suit la nouvelle.
+let observer: ResizeObserver | null = null;
+watch(
+  wrap,
+  (element) => {
+    observer?.disconnect();
+    observer = null;
+    if (element && typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => {
+        measure();
+      });
+      observer.observe(element);
+    }
+    measure();
+  },
+  { flush: "post" },
+);
+onMounted(measure);
+onBeforeUnmount(() => observer?.disconnect());
+
+watch(
+  () =>
+    props.zone.tabs.map(
+      (tab) =>
+        `${tab.id}:${info(tab).name}:${String(tab.preview)}:${String(info(tab).dirty)}:${String(running(tab))}:${String(tab.id === props.zone.activeTab)}`,
+    ),
+  () => {
+    void nextTick(measure);
+  },
+  { flush: "post" },
+);
+
+const overflowItems = computed<MenuItem[]>(() => [
+  ...hiddenTabs.value.map((tab) => ({
+    id: `tab:${tab.id}`,
+    label: info(tab).name,
+    badge: info(tab).badge,
+    hint: where(tab),
+    tag: running(tab) ? "◐ en cours" : info(tab).dirty ? "● modifié" : undefined,
+  })),
+  {
+    id: "close-others",
+    label: "Fermer les autres onglets",
+    separatorBefore: hiddenTabs.value.length > 0,
+    disabled: props.zone.tabs.length < 2,
+  },
+  { id: "close-all", label: "Fermer tous les onglets" },
+]);
+
+/** Fermer les autres onglets de la zone que `keep` (1.3-b, R6). */
+function closeOthers(keep: string | null): Promise<void> {
+  return actions.closeMany(props.zone.tabs.filter((t) => t.id !== keep).map((t) => t.id));
+}
+
+async function onOverflowSelect(id: string): Promise<void> {
+  if (id.startsWith("tab:")) {
+    await windows.activate(props.zone.id, id.slice(4));
+    await focusTab(id.slice(4));
+  } else if (id === "close-others") await closeOthers(props.zone.activeTab);
+  else if (id === "close-all") await closeOthers(null);
+}
+
+// --- Ctrl+Tab (1.3-c) -------------------------------------------------------------
+
+/** Liste de Ctrl+Tab ouverte sur cette zone : onglets dans l'ordre d'utilisation. */
+const switcher = computed(() =>
+  windows.tabSwitcher?.zone === props.zone.id ? windows.tabSwitcher : null,
+);
+const switcherTabs = computed(() => byUse(props.zone.tabs, props.zone.recent));
+
 /** Un clic dans une zone inactive la rend active (Ctrl+W, menu Fenêtre). */
 function focusZone(): void {
   if (!isActiveZone.value && props.zone.activeTab !== null) {
@@ -129,7 +282,7 @@ async function focusTab(id: string | undefined): Promise<void> {
 }
 
 function onTabKeydown(event: KeyboardEvent, tab: ContentTab): void {
-  const list = props.zone.tabs;
+  const list = shownTabs.value;
   const at = list.findIndex((t) => t.id === tab.id);
   const go = (target: ContentTab | undefined): void => {
     event.preventDefault();
@@ -216,6 +369,8 @@ const menuItems = computed<MenuItem[]>(() => {
       disabled: full.value || props.zone.tabs.length < 2,
     },
     { id: "close", label: "Fermer", shortcut: "Ctrl+W", separatorBefore: true },
+    { id: "close-others", label: "Fermer les autres", disabled: props.zone.tabs.length < 2 },
+    { id: "close-all", label: "Fermer tout" },
   ];
 });
 
@@ -239,6 +394,8 @@ async function onMenuSelect(id: string): Promise<void> {
   else if (id === "split-right") await actions.split(props.zone.id, tab.id, "right");
   else if (id === "split-bottom") await actions.split(props.zone.id, tab.id, "bottom");
   else if (id === "close") await actions.close(tab.id);
+  else if (id === "close-others") await closeOthers(tab.id);
+  else if (id === "close-all") await closeOthers(null);
   else if (id.startsWith("move:")) {
     const [, toWindow = "", zone = ""] = id.split(":");
     await actions.saveTab(tab.id);
@@ -254,6 +411,7 @@ const draggingFrom = ref<string | null>(null);
 function onDragStart(event: DragEvent, tab: ContentTab): void {
   startTabDrag(event, { window: windows.label, zone: props.zone.id, tab: tab.id });
   draggingFrom.value = tab.id;
+  pin(tab);
 }
 
 async function onDragEnd(event: DragEvent, tab: ContentTab): Promise<void> {
@@ -330,55 +488,91 @@ const welcome = computed(
     @pointerdown.capture="focusZone"
   >
     <header v-if="zone.tabs.length > 0" class="zone__bar">
-      <div
-        ref="strip"
-        class="zone__tabs"
-        role="tablist"
-        :aria-label="`Onglets de la zone ${index + 1}`"
-        @dragover="isTabDrag($event) && $event.preventDefault()"
-        @drop="onStripDrop"
-      >
+      <div ref="wrap" class="zone__strip">
         <div
-          v-for="tab in zone.tabs"
-          :key="tab.id"
-          class="zone__tab"
-          :class="{
-            'zone__tab--active': tab.id === zone.activeTab,
-            'zone__tab--dragging': draggingFrom === tab.id,
-          }"
+          ref="strip"
+          class="zone__tabs"
+          role="tablist"
+          :aria-label="`Onglets de la zone ${index + 1}`"
+          @dragover="isTabDrag($event) && $event.preventDefault()"
+          @drop="onStripDrop"
         >
-          <button
-            type="button"
-            role="tab"
-            class="zone__tab-button"
-            :data-tab="tab.id"
-            :aria-selected="tab.id === zone.activeTab"
-            :tabindex="tab.id === zone.activeTab ? 0 : -1"
-            :title="info(tab).name"
-            aria-haspopup="menu"
-            draggable="true"
-            @click="activate(tab)"
-            @keydown="onTabKeydown($event, tab)"
-            @contextmenu.prevent="openMenu(tab, $event)"
-            @dragstart="onDragStart($event, tab)"
-            @dragend="onDragEnd($event, tab)"
+          <div
+            v-for="tab in zone.tabs"
+            :key="tab.id"
+            class="zone__tab"
+            :data-tab-item="tab.id"
+            :aria-hidden="isHidden(tab) ? 'true' : undefined"
+            :class="{
+              'zone__tab--active': tab.id === zone.activeTab,
+              'zone__tab--dragging': draggingFrom === tab.id,
+              'zone__tab--preview': tab.preview,
+              'zone__tab--hidden': isHidden(tab),
+            }"
           >
-            <span class="zone__badge" :class="`zone__badge--${info(tab).badge.toLowerCase()}`">{{
-              info(tab).badge
-            }}</span>
-            <span class="zone__name">{{ info(tab).name }}</span>
-            <span v-if="info(tab).dirty" class="zone__dirty" aria-label="modifiée">●</span>
-          </button>
-          <button
-            type="button"
-            class="zone__close"
-            tabindex="-1"
-            :aria-label="`Fermer ${info(tab).name}`"
-            @click="actions.close(tab.id)"
-          >
-            ×
-          </button>
+            <button
+              type="button"
+              role="tab"
+              class="zone__tab-button"
+              :data-tab="tab.id"
+              :aria-selected="tab.id === zone.activeTab"
+              :tabindex="tab.id === zone.activeTab && !isHidden(tab) ? 0 : -1"
+              :title="
+                tab.preview
+                  ? `${info(tab).name} (aperçu : double-clic pour le garder)`
+                  : info(tab).name
+              "
+              aria-haspopup="menu"
+              draggable="true"
+              @click="activate(tab)"
+              @dblclick="pin(tab)"
+              @keydown="onTabKeydown($event, tab)"
+              @contextmenu.prevent="openMenu(tab, $event)"
+              @dragstart="onDragStart($event, tab)"
+              @dragend="onDragEnd($event, tab)"
+            >
+              <span class="zone__badge" :class="`zone__badge--${info(tab).badge.toLowerCase()}`">{{
+                info(tab).badge
+              }}</span>
+              <span class="zone__name">{{ info(tab).name }}</span>
+              <span v-if="tab.preview" class="zone__sr">(aperçu)</span>
+              <span v-if="running(tab)" class="zone__running" aria-label="en cours" title="En cours"
+                >◐</span
+              >
+              <span v-if="info(tab).dirty" class="zone__dirty" aria-label="modifiée">●</span>
+            </button>
+            <button
+              type="button"
+              class="zone__close"
+              tabindex="-1"
+              :aria-label="`Fermer ${info(tab).name}`"
+              @click="actions.close(tab.id)"
+            >
+              ×
+            </button>
+          </div>
         </div>
+        <BaseMenu
+          v-if="hiddenTabs.length > 0"
+          :items="overflowItems"
+          :label="`Autres onglets de la zone ${index + 1}`"
+          :heading="`Autres onglets ouverts · ${hiddenTabs.length}`"
+          align="end"
+          class="zone__more-menu"
+          @select="onOverflowSelect"
+        >
+          <template #trigger="{ attrs }">
+            <button
+              type="button"
+              class="zone__more"
+              v-bind="attrs"
+              :aria-label="`${hiddenTabs.length} autres onglets`"
+              :title="`${hiddenTabs.length} autres onglets ouverts`"
+            >
+              +{{ hiddenTabs.length }} <span aria-hidden="true">▾</span>
+            </button>
+          </template>
+        </BaseMenu>
       </div>
       <div class="zone__tools">
         <button
@@ -468,6 +662,47 @@ const welcome = computed(
     </div>
 
     <div
+      v-if="switcher"
+      class="zone__switcher"
+      role="dialog"
+      aria-modal="false"
+      aria-label="Onglets dans l'ordre d'utilisation"
+    >
+      <p class="zone__switcher-head">
+        <span>Onglets · dans l'ordre d'utilisation</span><kbd>Ctrl+Tab</kbd>
+      </p>
+      <ul class="zone__switcher-list" role="listbox" aria-label="Onglets">
+        <li
+          v-for="(tab, position) in switcherTabs"
+          :key="tab.id"
+          role="option"
+          class="zone__switcher-item"
+          :class="{ 'zone__switcher-item--active': position === switcher.index }"
+          :aria-selected="position === switcher.index"
+          @pointerdown.prevent
+          @click="windows.commitTabSwitcher(tab.id)"
+        >
+          <span class="zone__badge" :class="`zone__badge--${info(tab).badge.toLowerCase()}`">{{
+            info(tab).badge
+          }}</span>
+          <span class="zone__switcher-text">
+            <span
+              class="zone__switcher-name"
+              :class="{ 'zone__switcher-name--preview': tab.preview }"
+              >{{ info(tab).name }}</span
+            >
+            <span class="zone__switcher-where"
+              >{{ where(tab) }}{{ running(tab) ? " · en cours" : "" }}</span
+            >
+          </span>
+          <span v-if="running(tab)" class="zone__running" aria-hidden="true">◐</span>
+          <span v-if="info(tab).dirty" class="zone__dirty" aria-label="modifiée">●</span>
+        </li>
+      </ul>
+      <p class="zone__switcher-foot">Relâcher Ctrl pour ouvrir · Ctrl+Maj+Tab dans l'autre sens</p>
+    </div>
+
+    <div
       class="zone__context"
       :style="{ left: `${menuPosition.left}px`, top: `${menuPosition.top}px` }"
     >
@@ -507,20 +742,175 @@ const welcome = computed(
   background: var(--color-sidebar);
 }
 
-.zone__tabs {
+.zone__strip {
   display: flex;
   flex: 1;
+  align-items: center;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+}
+
+.zone__tabs {
+  position: relative;
+  display: flex;
+  flex: 0 1 auto;
+  align-self: stretch;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .zone__tab {
   display: flex;
   flex: none;
   align-items: center;
-  max-width: 16rem;
+  max-width: 12rem;
   border-right: 1px solid var(--color-border);
+}
+
+/* Onglet en trop (1.3-b) : mis en page pour être mesuré, invisible, listé dans « +N ». */
+.zone__tab--hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  height: 100%;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Aperçu (1.3-a) : titre en italique, remplacé par le prochain aperçu. */
+.zone__tab--preview .zone__name {
+  font-style: italic;
+}
+
+.zone__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.zone__running {
+  font-size: var(--text-small);
+  color: var(--color-link);
+}
+
+.zone__more {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
+  height: var(--control-sm);
+  margin: 0 0.375rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: var(--text-small);
+  color: var(--color-muted);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.zone__more:hover,
+.zone__more[aria-expanded="true"] {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
+.zone__more:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.zone__more-menu {
+  flex: none;
+}
+
+/* Liste de Ctrl+Tab (1.3-c), sur la zone active. */
+.zone__switcher {
+  position: absolute;
+  z-index: 25;
+  top: 3.25rem;
+  left: 50%;
+  width: min(27rem, calc(100% - 2rem));
+  padding: 0.375rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+  transform: translateX(-50%);
+}
+
+.zone__switcher-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0.25rem 0.625rem 0.375rem;
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.zone__switcher-head kbd {
+  font-family: inherit;
+  font-size: var(--text-small);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.zone__switcher-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zone__switcher-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.3125rem 0.625rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.zone__switcher-item .zone__badge {
+  min-width: 2.25rem;
+}
+
+.zone__switcher-item--active {
+  background: var(--color-accent-soft);
+}
+
+.zone__switcher-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.zone__switcher-name,
+.zone__switcher-where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zone__switcher-name--preview {
+  font-style: italic;
+}
+
+.zone__switcher-where {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+.zone__switcher-foot {
+  margin: 0.375rem 0.625rem 0.25rem;
+  font-size: var(--text-small);
+  color: var(--color-muted);
 }
 
 .zone__tab--active {

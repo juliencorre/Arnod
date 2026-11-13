@@ -1,9 +1,16 @@
 import { defineStore } from "pinia";
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 
 import { ipc } from "@/lib/ipc";
 import { useWorkbenchStore } from "@/stores/workbench";
-import type { CurlCopy, Pair, PairsFormat, PairsText, RequestInput } from "@/types/ipc";
+import type {
+  CurlCopy,
+  DynamicValue,
+  Pair,
+  PairsFormat,
+  PairsText,
+  RequestInput,
+} from "@/types/ipc";
 
 /**
  * Saisie d'une requête (docs/plan-mvp-b-saisie-curl.md) : variables connues et inconnues,
@@ -84,5 +91,32 @@ export const useInputStore = defineStore("input", () => {
     return ipc.pairsFromText(text, format, previous);
   }
 
-  return { inputs, inspect, forget, curl, addVariable, toText, fromText };
+  /** Valeurs dynamiques proposées à la frappe de `{{$` (5.1-h), lues une fois. */
+  const dynamicValues = ref<DynamicValue[]>([]);
+  let dynamicLoad: Promise<void> | null = null;
+
+  /** Lit la liste des valeurs dynamiques au premier besoin ; un échec sera retenté. */
+  function loadDynamicValues(): Promise<void> {
+    dynamicLoad ??= ipc
+      .dynamicValues()
+      .then((list) => {
+        dynamicValues.value = list;
+      })
+      .catch(() => {
+        dynamicLoad = null;
+      });
+    return dynamicLoad;
+  }
+
+  return {
+    inputs,
+    inspect,
+    forget,
+    curl,
+    addVariable,
+    toText,
+    fromText,
+    dynamicValues,
+    loadDynamicValues,
+  };
 });

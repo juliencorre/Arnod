@@ -29,6 +29,7 @@ function mockCore(options: {
       }
       if (cmd === "windows_load") return handleWindows(windows, cmd, {});
       if (cmd === "steps_catalog") return STEP_CATALOG;
+      if (cmd === "startup_status" || cmd === "window_ready") return null;
       if (cmd !== "catalog_load") throw new Error(`commande inattendue : ${cmd}`);
       if (options.failure) throw options.failure;
       return { snapshot: options.snapshot, warning: options.warning ?? null };
@@ -102,7 +103,7 @@ describe("App", () => {
     wrapper.unmount();
   });
 
-  it("bloque avec le message du cœur si l'état est inutilisable", async () => {
+  it("bloque avec le message du cœur sur une erreur imprévue au chargement", async () => {
     const failure: CommandError = {
       kind: "newerVersion",
       message: "L'état d'Arnod a été écrit par une version plus récente (format 2).",
@@ -115,5 +116,7 @@ describe("App", () => {
     expect(alert.text()).toContain("Arnod ne peut pas démarrer");
     expect(alert.text()).toContain(failure.message);
     expect(wrapper.find("aside").exists()).toBe(false);
+    // Même structure que toute erreur bloquante (lot G) : seule issue, « Quitter ».
+    expect(wrapper.get("main footer").text()).toContain("Quitter");
   });
 });

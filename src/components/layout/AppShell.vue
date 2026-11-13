@@ -6,6 +6,10 @@
  * d'où l'on ouvre un projet (2e, 2f). La gestion des workspaces et le catalogue des
  * étapes occupent toute la largeur (2d) : le sélecteur passe alors dans une rangée en
  * haut.
+ *
+ * Ctrl+\ (code de la touche, pour l'AZERTY) ou le menu Fenêtre masquent la barre
+ * latérale, gardé dans windows.json (lot F, 1.4-j) ; masquée, la rangée du haut porte
+ * le bouton qui la rouvre.
  */
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from "vue";
 
@@ -33,9 +37,19 @@ const projectView = computed(() => (navigation.view.kind === "project" ? navigat
 const manageView = computed(() => (navigation.view.kind === "manage" ? navigation.view : null));
 const stepsView = computed(() => navigation.view.kind === "steps");
 /** Pas de barre latérale dans la gestion, dans le catalogue des étapes, ni détachée. */
-const withSidebar = computed(
+const sidebarPossible = computed(
   () => !windows.main?.sidebarDetached && !manageView.value && !stepsView.value,
 );
+/** Barre latérale affichée : possible et pas masquée (Ctrl+\, 1.4-j). */
+const withSidebar = computed(() => sidebarPossible.value && !windows.sidebarHidden);
+
+/** Ctrl+\ masque ou affiche la barre latérale (1.4-j). */
+function onKeydown(event: KeyboardEvent): void {
+  if (event.defaultPrevented || !(event.ctrlKey || event.metaKey)) return;
+  if (event.altKey || event.shiftKey || event.code !== "Backslash") return;
+  event.preventDefault();
+  void windows.toggleSidebar();
+}
 
 const preview = ref<number | null>(null);
 const width = computed(() => preview.value ?? windows.main?.sidebarWidth ?? 260);
@@ -49,13 +63,17 @@ function measure(): void {
 }
 
 onMounted(() => {
+  window.addEventListener("keydown", onKeydown);
   measure();
   if (typeof ResizeObserver !== "undefined" && body.value) {
     observer = new ResizeObserver(measure);
     observer.observe(body.value);
   }
 });
-onBeforeUnmount(() => observer?.disconnect());
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  window.removeEventListener("keydown", onKeydown);
+});
 
 /** Proportion de la barre latérale dans la fenêtre, pour la séparation. */
 const ratio = computed(() => (bodyWidth.value > 0 ? width.value / bodyWidth.value : 0.2));
@@ -114,6 +132,20 @@ const detachHover = ref(false);
       </template>
       <div class="shell__column">
         <div v-if="!withSidebar" class="shell__switcher shell__switcher--top">
+          <button
+            v-if="sidebarPossible"
+            type="button"
+            class="shell__show-sidebar"
+            aria-label="Afficher la barre latérale"
+            title="Afficher la barre latérale (Ctrl+\)"
+            aria-keyshortcuts="Control+Backslash"
+            @click="windows.toggleSidebar()"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <rect x="1.5" y="2" width="11" height="10" rx="1.5" />
+              <path d="M5 2v10" />
+            </svg>
+          </button>
           <WorkspaceSwitcher />
         </div>
         <main class="shell__main">
@@ -207,6 +239,37 @@ const detachHover = ref(false);
 .shell__body--parting .shell__column {
   margin-left: 5px;
   box-shadow: var(--shadow-popover);
+}
+
+.shell__show-sidebar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  margin-right: 0.375rem;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  background: none;
+  cursor: pointer;
+}
+
+.shell__show-sidebar svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.shell__show-sidebar:hover {
+  color: var(--color-text);
+  background: var(--color-chip);
+}
+
+.shell__show-sidebar:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .shell__detach {
