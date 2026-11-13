@@ -1657,7 +1657,7 @@ describe("Lot B : saisie, texte et cURL", () => {
     await browser.waitUntil(
       async () =>
         (
-          await browser.execute(() => document.querySelector(".response__body")?.textContent ?? "")
+          await browser.execute(() => document.querySelector(".response")?.textContent ?? "")
         ).includes("arnod-tests"),
       { timeout: 10_000, timeoutMsg: "réponse avec l'en-tête X-Client attendue" },
     );
