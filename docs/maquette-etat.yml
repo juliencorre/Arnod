@@ -49,7 +49,7 @@ pages:
     journal:
       - "2026-11 : Décision : plus de suites de tests ; un test est un dossier d'étapes, une campagne joue une sélection de tests."
       - "2026-11-12 : Encart repris de « Tests et étapes » pour servir à toutes les pages."
-      - "2026-11-13 : Le dossier devient un test dans l'application : verdict, arrêt sur échec, valeurs extraites passées aux étapes suivantes, étapes numérotées (plan-mvp-e-tests-etapes)."
+      - "2026-11-13 : Le dossier devient un test dans l'application : verdict, arrêt sur échec, valeurs extraites passées aux étapes suivantes, étapes numérotées (plan-mvp-e-tests-etapes, PR #51)."
     ecrans: {}
   "0.3":
     nom: "Démarrage et erreurs"
@@ -423,7 +423,7 @@ pages:
       - "2026-11-09 : Arborescence livrée avec le premier usage."
       - "2026-11-11 : Devient le référentiel : les requêtes liées à un contrat sont rangées sous lui (PR #40)."
       - "2026-11-12 : Écrans du test (c, c bis, d) → 4.2."
-      - "2026-11-13 : « Nouveau test » crée le dossier et son étape 1, ouverte, curseur dans l'adresse ; « + Étape » ajoute la suivante (b, plan-mvp-e-tests-etapes)."
+      - "2026-11-13 : « Nouveau test » crée le dossier et son étape 1, ouverte, curseur dans l'adresse ; « + Étape » ajoute la suivante (b, plan-mvp-e-tests-etapes, PR #51)."
     ecrans:
       a: { etat: livré, pr: [27, 40, 42], captures: [19-verification-en-echec] }
       "a bis": { etat: livré, pr: [27] }
@@ -432,7 +432,7 @@ pages:
       b:
         {
           etat: livré,
-          pr: [27],
+          pr: [27, 51],
           captures: [24-nouveau-test],
           ecart:
             {
@@ -454,12 +454,12 @@ pages:
     reste: "secret proposé en variable locale (c)."
     journal:
       - "2026-11-12 : Encart de vocabulaire → 0.2 ; écrans repris du référentiel (c → b, c bis → b bis, d → c)."
-      - "2026-11-13 : Test = dossier d'étapes : verdict, arrêt à la première étape en échec, extractions OpenCollection passées aux étapes suivantes, onglet du test, onglet « Variables », « modifié, pas encore envoyé » (plan-mvp-e-tests-etapes)."
+      - "2026-11-13 : Test = dossier d'étapes : verdict, arrêt à la première étape en échec, extractions OpenCollection passées aux étapes suivantes, onglet du test, onglet « Variables », « modifié, pas encore envoyé » (plan-mvp-e-tests-etapes, PR #51)."
     ecrans:
       a:
         {
           etat: livré,
-          pr: [27],
+          pr: [27, 51],
           captures: [21-test-reussi, 22-test-arrete],
           ecart:
             {
@@ -470,7 +470,7 @@ pages:
       b:
         {
           etat: livré,
-          pr: [27, 42],
+          pr: [27, 42, 51],
           captures: [19-verification-en-echec],
           ecart:
             {
@@ -481,6 +481,7 @@ pages:
       "b bis":
         {
           etat: livré,
+          pr: [51],
           captures: [23-variables],
           ecart:
             {
@@ -592,7 +593,7 @@ pages:
     journal:
       - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
       - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
-      - "2026-11-13 : Valeurs dynamiques tirées à chaque envoi par le cœur, montrées dans « Envoyé », « Garder » en fait une extraction (h, plan-mvp-e-tests-etapes)."
+      - "2026-11-13 : Valeurs dynamiques tirées à chaque envoi par le cœur, montrées dans « Envoyé », « Garder » en fait une extraction (h, plan-mvp-e-tests-etapes, PR #51)."
     ecrans:
       a: { etat: livré, pr: [27] }
       b: { etat: livré, pr: [27, 42], captures: [19-verification-en-echec] }
@@ -604,6 +605,7 @@ pages:
       h:
         {
           etat: en partie,
+          pr: [51],
           ecart:
             {
               texte: "La liste des valeurs dynamiques ne s'ouvre pas encore à la frappe de {{$ dans le corps (saisie, lot B) ; « Envoyé » montre aussi les variables utilisées, les valeurs extraites et les en-têtes envoyés.",
