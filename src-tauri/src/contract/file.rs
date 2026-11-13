@@ -596,7 +596,10 @@ pub(crate) fn write_text(path: &Path, text: &str) -> Result<(), CommandError> {
     fs::rename(&tmp, path).map_err(|error| {
         let _ = fs::remove_file(&tmp);
         CommandError::io("Écriture impossible", path, &error)
-    })
+    })?;
+    // Écriture d'Arnod : son écho n'est pas un changement fait hors d'Arnod (lot I, R2).
+    crate::watch::record_write(path, text.as_bytes());
+    Ok(())
 }
 
 /// Enregistre la source d'un contrat, seulement si elle reste lisible (R10).
@@ -615,16 +618,19 @@ pub fn delete(root: &Path, path: &str, permanent: bool) -> Result<(), CommandErr
     if !absolute.exists() {
         return Ok(());
     }
-    if permanent {
-        return fs::remove_file(&absolute)
-            .map_err(|e| CommandError::io("Suppression impossible", &absolute, &e));
-    }
-    trash::delete(&absolute).map_err(|error| {
-        CommandError::new(
-            CommandErrorKind::Io,
-            format!("La corbeille du système n'est pas disponible ({error}). Vous pouvez supprimer définitivement."),
-        )
-    })
+    let result = if permanent {
+        fs::remove_file(&absolute)
+            .map_err(|e| CommandError::io("Suppression impossible", &absolute, &e))
+    } else {
+        trash::delete(&absolute).map_err(|error| {
+            CommandError::new(
+                CommandErrorKind::Io,
+                format!("La corbeille du système n'est pas disponible ({error}). Vous pouvez supprimer définitivement."),
+            )
+        })
+    };
+    crate::watch::settle(&absolute);
+    result
 }
 
 /// Dossier d'un nom à la racine, hors des dossiers réservés.

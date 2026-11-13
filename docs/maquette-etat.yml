@@ -55,16 +55,36 @@ pages:
   "0.3":
     nom: "Démarrage et erreurs"
     version: MVP
-    developpement: "Écran d'erreur minimal du socle (App.vue : « Arnod ne peut pas démarrer ») ; pas de plan."
+    etat: livré
+    plans:
+      - "plan-mvp-g-demarrage-erreurs (DL1, ER1–ER3, VR1, SU1, SU2)"
+    developpement: "Lot G : startup.rs (erreur classée et décrite par le cœur), StartupProblemScreen.vue, StartupSkeleton.vue, fenêtre créée cachée puis montrée prête (window_ready, 300 ms au plus)."
     liees: ["2.1"]
-    reste: "squelette au démarrage lent (a), issues proposées (b), fichier verrouillé (b bis), détails pour le support (b ter)."
     journal:
       - "2026-11-12 : Écrans repris de « Premier usage » (Démarrage → a, Erreur → b, Erreur bis → b bis, Erreur ter → b ter)."
+      - "2026-11-13 : Lot G livré (docs/plan-mvp-g-demarrage-erreurs.md) : squelette, erreur expliquée avec deux issues, verrou réessayé seul, détails pour le support et issue préremplie."
     ecrans:
-      a: { etat: à faire }
-      b: { etat: en partie, pr: [7] }
-      "b bis": { etat: à faire }
-      "b ter": { etat: à faire }
+      a:
+        etat: livré
+        pr: [53]
+        ecart:
+          texte: "La légende « Ouverture de « … »… » n'apparaît qu'une fois le catalogue lu ; avant, le squelette seul."
+          aligner: maquette
+      b:
+        etat: livré
+        pr: [7, 53]
+        captures: [0.3-b-illisible]
+        ecart:
+          texte: "La cause est un texte simple du cœur, sans gras sur la version ; le pied donne le système sans numéro (« Windows »)."
+          aligner: maquette
+      "b bis": { etat: livré, pr: [53] }
+      "b ter":
+        etat: livré
+        pr: [53]
+        captures: [0.3-b-ter-details]
+        ecart:
+          texte: "Pas de ligne « Journal » : Arnod n'écrit pas de journal."
+          aligner: maquette
   "0.4":
     nom: "Thème sombre"
     version: MVP
@@ -186,25 +206,57 @@ pages:
     version: MVP
     plans:
       - "plan-fenetres-zones (onglets des zones)"
+      - "plan-mvp-f-onglets-clavier (AP1–AP4, TO1, TO2, CT1, CT2)"
     liees: ["1.4"]
-    reste: "aperçu en italique (a), « +3 » pour les onglets en trop (b), Ctrl+Tab (c)."
     journal:
       - "2026-11-12 : Nom aligné sur le contenu (fichier « Récents »)."
+      - "2026-11-13 : Aperçu en italique et ◐, « +N » avec « Fermer les autres » et « Fermer tout », Ctrl+Tab dans l'ordre d'utilisation (plan-mvp-f-onglets-clavier, PR #57)."
     ecrans:
-      a: { etat: en partie, pr: [27] }
-      b: { etat: à faire }
-      c: { etat: à faire }
+      a:
+        {
+          etat: livré,
+          pr: [27, 57],
+          captures: [25-onglet-apercu],
+          ecart:
+            {
+              texte: "Les onglets restent dans la zone, sous la barre du système (barre de titre intégrée : écart transverse) ; pas d'onglets d'anomalie ni d'exigence (contenus à venir).",
+              aligner: maquette,
+            },
+        }
+      b:
+        {
+          etat: livré,
+          pr: [57],
+          captures: [26-onglets-en-trop],
+          ecart:
+            {
+              texte: "Chaque onglet caché montre son dossier, sans date d'ouverture (« hier ») ni statut ; pas de ligne « Ctrl+W ferme l'onglet actif » (le raccourci est dans le menu de l'onglet).",
+              aligner: maquette,
+            },
+        }
+      c:
+        {
+          etat: livré,
+          pr: [57],
+          captures: [27-ctrl-tab],
+          ecart:
+            {
+              texte: "Pas d'étoile ☆ (favoris, hors MVP) ; la liste s'ouvre au centre de la zone active.",
+              aligner: maquette,
+            },
+        }
   "1.4":
     nom: "Fenêtres et zones"
     version: MVP
     plans:
       - "plan-fenetres-zones (F1–F14)"
       - "plan-resultat-detachable (D1–D7)"
+      - "plan-mvp-f-onglets-clavier (CL1–CL3)"
     liees: ["1.3", "5.1"]
-    reste: "Ctrl+J et Ctrl+\\ (j)."
     journal:
       - "2026-11-09 : Fenêtres et zones (PR #27)."
       - "2026-11-10 : Résultat détachable, écran i (PR #34)."
+      - "2026-11-13 : Ctrl+J et Ctrl+\\, dans le menu Fenêtre et sur l'icône de l'en-tête du résultat, gardés par fenêtre (plan-mvp-f-onglets-clavier, PR #57)."
     ecrans:
       a: { etat: livré, pr: [27], captures: [06-zones] }
       b: { etat: livré, pr: [27], captures: [06-zones] }
@@ -221,7 +273,18 @@ pages:
           pr: [34],
           captures: [13-fenetre-requete, 14-fenetre-resultat, 15-fenetre-barre],
         }
-      j: { etat: à faire, version: MVP }
+      j:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [57],
+          captures: [28-clavier],
+          ecart:
+            {
+              texte: "Ctrl+J et Ctrl+\\ sont dans le menu natif « Fenêtre » (pas de menu du logo : barre du système) ; la barre masquée laisse une rangée en haut avec le bouton qui la rouvre et le sélecteur de workspace ; le rappel des raccourcis est une notification.",
+              aligner: maquette,
+            },
+        }
   "1.5":
     nom: "Recherche"
     version: V2
@@ -231,11 +294,25 @@ pages:
   "1.6":
     nom: "Préférences"
     version: [MVP, V1]
+    plans:
+      - "plan-mvp-h-reseau-auth (PR1–PR6)"
     liees: ["3.4"]
     journal:
       - "2026-11-12 : Écrans repris de « Authentification et Préférences » (e, f, f bis)."
+      - "2026-11-13 : Préférences (Ctrl+, et Fichier → Préférences…) → Réseau et certificats : proxy du système, aucun ou manuel, délai de connexion, autorités internes ajoutées après avoir montré leur empreinte (e, lot H, PR #58)."
     ecrans:
-      e: { etat: à faire, version: MVP }
+      e:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [58],
+          captures: [h1-preferences-reseau],
+          ecart:
+            {
+              texte: "Préférences en fenêtre modale (une seule section, « Réseau et certificats ») plutôt qu'en onglet ; « Celui de Windows » devient « Celui du système » ; ni configuration automatique (PAC) ni identification Windows auprès du proxy (V3) ; délai de réponse réglé par requête ou dossier ; la case « Vérifier les certificats » est une mention fixe : la vérification n'est jamais coupée.",
+              aligner: maquette,
+            },
+        }
       f: { etat: à faire, version: V1 }
       "f bis": { etat: à faire, version: V1 }
       g: { etat: à faire, version: MVP }
@@ -462,17 +539,41 @@ pages:
     plans:
       - "plan-premier-usage (§ 4.2, auth)"
       - "plan-configuration-endpoint (héritage)"
+      - "plan-mvp-h-reseau-auth (OA1–OA5, CK1–CK4)"
     liees: ["3.3", "1.6"]
-    reste: "OAuth 2 par identifiants client (a), cookies (g) ; certificats en V3 (d), WS-Security en V5 (c)."
+    reste: "certificats en V3 (d), WS-Security en V5 (c)."
     journal:
       - "2026-11-09 : Basic, Bearer, clé d'API et héritage des dossiers."
       - "2026-11-12 : Préférences (e, f, f bis) → 1.6."
+      - "2026-11-13 : OAuth 2 par identifiants client réglé au projet, jeton obtenu et renouvelé ; cookies gardés par environnement, listés et vidables (a, g, lot H, PR #58)."
     ecrans:
-      a: { etat: à faire, version: MVP }
+      a:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [58],
+          captures: [h3-reglages-projet],
+          ecart:
+            {
+              texte: "Réglages du projet en fenêtre modale, avec le seul onglet Authentification (Général et Critères de sortie viendront) ; « Enregistrer » au lieu d'un enregistrement seul ; le secret client saisi va au coffre de l'environnement et le fichier garde {{oauth2ClientSecret}} ; une nouvelle requête est « Aucune » et non « Hériter » : elle est comptée « sans authentification ».",
+              aligner: maquette,
+            },
+        }
       b: { etat: livré, pr: [27, 32] }
       c: { etat: à faire, version: V5 }
       d: { etat: à faire, version: V3 }
-      g: { etat: à faire, version: MVP }
+      g:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [58],
+          captures: [h4-cookies],
+          ecart:
+            {
+              texte: "Les cookies gardés sont listés sous les en-têtes de la requête, sans ligne « Cookie … automatique » parmi eux ; « gardé » marque le Set-Cookie dans les en-têtes de la réponse.",
+              aligner: maquette,
+            },
+        }
   "3.5":
     nom: "Mocks"
     version: V5
@@ -491,13 +592,15 @@ pages:
       - "plan-requetes-dans-contrats (R5)"
       - "plan-fin-premier-usage (ST1–ST4)"
       - "plan-mvp-e-tests-etapes (NT1, NT2)"
+      - "plan-mvp-i-fichiers-externes (FE1–FE7)"
     liees: ["4.2", "3.1"]
-    reste: "fichiers modifiés hors d'Arnod (e), glisser-déposer, copier et déplacer une requête (f, g), sélection multiple (a quater)."
+    reste: "glisser-déposer, copier et déplacer une requête (f, g), sélection multiple (a quater)."
     journal:
       - "2026-11-09 : Arborescence livrée avec le premier usage."
       - "2026-11-11 : Devient le référentiel : les requêtes liées à un contrat sont rangées sous lui (PR #40)."
       - "2026-11-12 : Écrans du test (c, c bis, d) → 4.2."
       - "2026-11-13 : « Nouveau test » crée le dossier et son étape 1, ouverte, curseur dans l'adresse ; « + Étape » ajoute la suivante (b, plan-mvp-e-tests-etapes, PR #51)."
+      - "2026-11-13 : Fichiers modifiés hors d'Arnod : dossier surveillé, arborescence et onglets rechargés, brouillon en conflit réglé élément par élément (e, plan-mvp-i-fichiers-externes, PR #54)."
     ecrans:
       a: { etat: livré, pr: [27, 40, 42], captures: [19-verification-en-echec] }
       "a bis": { etat: livré, pr: [27] }
@@ -514,7 +617,17 @@ pages:
               aligner: à décider,
             },
         }
-      e: { etat: à faire, version: MVP }
+      e:
+        {
+          etat: livré,
+          pr: [54],
+          captures: [25-recharge-depuis-le-disque, 26-conflit],
+          ecart:
+            {
+              texte: "Dit « Cette requête a changé » au lieu de « Ce test » (vocabulaire, lot K) ; pas de fil d'Ariane au-dessus du conflit ni de colonne « Sans conflit, rien à faire » (note de conception) ; un fichier illisible n'est pas ouvert en lecture avec sa ligne fautive : il est listé illisible et l'erreur du cœur la cite.",
+              aligner: maquette,
+            },
+        }
       f: { etat: à faire, version: MVP }
       g: { etat: à faire, version: MVP }
   "4.2":
@@ -664,8 +777,9 @@ pages:
       - "plan-mvp-a-reponse (F1–F8)"
       - "plan-mvp-b-saisie-curl (SA1–SA6, TX1–TX4)"
       - "plan-mvp-e-tests-etapes (VD1–VD4)"
+      - "plan-mvp-h-reseau-auth (EC1–EC6)"
     liees: ["5.2", "1.4"]
-    reste: "Ctrl+J (b bis, lot F), chronologie détaillée DNS, connexion, TLS (c), échec réseau expliqué (i) ; historique en V1 (c bis)."
+    reste: "chronologie détaillée DNS, connexion, TLS (c) ; historique en V1 (c bis)."
     journal:
       - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
       - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
@@ -673,6 +787,7 @@ pages:
       - "2026-11-13 : Variables inconnues, compteurs d'onglets, en-têtes ajoutés, édition en texte et copie en cURL (lot B, PR #49)."
       - "2026-11-13 : Valeurs dynamiques tirées à chaque envoi par le cœur, montrées dans « Envoyé », « Garder » en fait une extraction (h, plan-mvp-e-tests-etapes, PR #51)."
       - "2026-11-13 : Liste des valeurs dynamiques proposée à la frappe de {{$ dans tout champ à variables, avec description et exemple tirés par le cœur (h, PR #55)."
+      - "2026-11-13 : Échec réseau expliqué : certificat, proxy, nom, serveur, délai ; ce qui n'est pas parti et l'action qui règle le poste (i, lot H, PR #58)."
     ecrans:
       a: { etat: livré, pr: [27] }
       b: { etat: livré, pr: [27, 42], captures: [19-verification-en-echec] }
@@ -726,7 +841,18 @@ pages:
               aligner: maquette,
             },
         }
-      i: { etat: à faire, version: MVP }
+      i:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [58],
+          captures: [h2-echec-reseau],
+          ecart:
+            {
+              texte: "« Faire confiance… » est un bouton secondaire (un seul bouton plein par vue : « Envoyer ») et ouvre les préférences sur l'autorité à confirmer ; pas d'onglets Erreur, Envoyé, Chronologie pour un échec ; « Utiliser mon compte Windows » (407) attend l'identification Windows (V3).",
+              aligner: maquette,
+            },
+        }
   "5.2":
     nom: "Exécution d'un dossier"
     version: MVP

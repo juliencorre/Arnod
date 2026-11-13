@@ -67,6 +67,10 @@ impl Content {
 pub struct Tab {
     pub id: Uuid,
     pub content: Content,
+    /// Onglet d'aperçu (1.3-a, `docs/plan-mvp-f-onglets-clavier.md`, R1) : ouvert d'un
+    /// simple clic, il est remplacé par le prochain aperçu de sa zone.
+    #[serde(default)]
+    pub preview: bool,
 }
 
 impl Tab {
@@ -74,6 +78,7 @@ impl Tab {
         Self {
             id: Uuid::new_v4(),
             content,
+            preview: false,
         }
     }
 }
@@ -98,16 +103,23 @@ pub struct Zone {
     pub active_tab: Option<Uuid>,
     #[serde(default)]
     pub placement: Placement,
+    /// Onglets dans l'ordre d'utilisation, le plus récent d'abord (Ctrl+Tab, 1.3-c, R5).
+    /// Il contient toujours tous les onglets de la zone.
+    #[serde(default)]
+    pub recent: Vec<Uuid>,
 }
 
 impl Zone {
     fn new(tabs: Vec<Tab>) -> Self {
-        Self {
+        let mut zone = Self {
             id: Uuid::new_v4(),
             active_tab: tabs.first().map(|tab| tab.id),
+            recent: Vec::new(),
             tabs,
             placement: Placement::Auto,
-        }
+        };
+        zone.repair();
+        zone
     }
 
     /// Garde un onglet actif valide après un retrait.
@@ -120,6 +132,39 @@ impl Zone {
         }
         let index = removed_index.min(self.tabs.len().saturating_sub(1));
         self.active_tab = self.tabs.get(index).map(|tab| tab.id);
+        if let Some(id) = self.active_tab {
+            self.touch(id);
+        }
+    }
+
+    /// L'onglet `tab` vient d'être utilisé : il passe en tête de l'ordre d'utilisation (R5).
+    fn touch(&mut self, tab: Uuid) {
+        self.recent.retain(|id| *id != tab);
+        self.recent.insert(0, tab);
+    }
+
+    /// Remet la zone en ordre : ordre d'utilisation complet et sans intrus (R5), un seul
+    /// aperçu au plus (R2), onglet actif valide. Sert après une fusion et à la lecture
+    /// de `windows.json`.
+    fn repair(&mut self) {
+        let ids: Vec<Uuid> = self.tabs.iter().map(|tab| tab.id).collect();
+        self.recent.retain(|id| ids.contains(id));
+        let mut seen = std::collections::HashSet::new();
+        self.recent.retain(|id| seen.insert(*id));
+        for id in &ids {
+            if !self.recent.contains(id) {
+                self.recent.push(*id);
+            }
+        }
+        let mut preview_kept = false;
+        for tab in &mut self.tabs {
+            if tab.preview && std::mem::replace(&mut preview_kept, true) {
+                tab.preview = false;
+            }
+        }
+        if !self.active_tab.is_some_and(|id| ids.contains(&id)) {
+            self.active_tab = self.recent.first().copied();
+        }
     }
 }
 
@@ -182,6 +227,16 @@ impl Node {
         match self {
             Self::Zone(zone) => (zone.id == id).then_some(zone),
             Self::Split { first, second, .. } => first.zone_mut(id).or_else(|| second.zone_mut(id)),
+        }
+    }
+
+    fn for_each_zone_mut(&mut self, visit: &mut impl FnMut(&mut Zone)) {
+        match self {
+            Self::Zone(zone) => visit(zone),
+            Self::Split { first, second, .. } => {
+                first.for_each_zone_mut(visit);
+                second.for_each_zone_mut(visit);
+            }
         }
     }
 
@@ -361,24 +416,76 @@ impl Layout {
     /// Ouvre un contenu dans `zone` (ou la zone active) ; déjà ouvert, il est
     /// seulement activé (Z3). Renvoie l'onglet.
     pub fn open(&mut self, content: Content, zone: Option<Uuid>) -> Result<Uuid, CommandError> {
+        self.open_tab(content, zone, false)
+    }
+
+    /// Ouvre un contenu, en aperçu si `preview` (1.3-a) : l'aperçu de la zone est
+    /// remplacé sur place (R1). Un contenu déjà ouvert est activé ; ouvert sans
+    /// aperçu (double-clic), il devient permanent (R3).
+    pub fn open_tab(
+        &mut self,
+        content: Content,
+        zone: Option<Uuid>,
+        preview: bool,
+    ) -> Result<Uuid, CommandError> {
         if let Some((zone_id, tab_id)) = self.find_content(&content) {
             self.activate(zone_id, tab_id)?;
+            if !preview {
+                self.pin(tab_id)?;
+            }
             return Ok(tab_id);
         }
         let target = zone.unwrap_or(self.active_zone);
-        let tab = Tab::new(content);
+        let mut tab = Tab::new(content);
+        tab.preview = preview;
         let id = tab.id;
+        if preview {
+            let found = self.zone_mut(target)?;
+            if let Some(index) = found.tabs.iter().position(|t| t.preview) {
+                let replaced = std::mem::replace(&mut found.tabs[index], tab);
+                found.recent.retain(|t| *t != replaced.id);
+                found.active_tab = Some(id);
+                found.touch(id);
+                self.active_zone = target;
+                return Ok(id);
+            }
+        }
         self.insert(target, tab, None)?;
         Ok(id)
     }
 
-    /// Active un onglet et sa zone.
+    /// L'onglet devient permanent : double-clic, modification, glisser (R3).
+    pub fn pin(&mut self, tab: Uuid) -> Result<(), CommandError> {
+        let mut found = false;
+        self.root.for_each_zone_mut(&mut |zone| {
+            if let Some(t) = zone.tabs.iter_mut().find(|t| t.id == tab) {
+                t.preview = false;
+                found = true;
+            }
+        });
+        if found {
+            Ok(())
+        } else {
+            Err(not_found("Cet onglet n'existe plus."))
+        }
+    }
+
+    /// Remet chaque zone en ordre (lecture de `windows.json`).
+    pub fn repair(&mut self) {
+        self.root.for_each_zone_mut(&mut Zone::repair);
+        if self.zone(self.active_zone).is_err() {
+            self.active_zone = self.zones().first().map_or(self.active_zone, |z| z.id);
+        }
+    }
+
+    /// Active un onglet et sa zone ; il passe en tête de l'ordre d'utilisation (R5).
     pub fn activate(&mut self, zone: Uuid, tab: Uuid) -> Result<(), CommandError> {
         let target = self.zone_mut(zone)?;
         if !target.tabs.iter().any(|t| t.id == tab) {
             return Err(not_found("Cet onglet n'existe plus."));
         }
         target.active_tab = Some(tab);
+        target.touch(tab);
         self.active_zone = zone;
         Ok(())
     }
@@ -397,8 +504,11 @@ impl Layout {
         }
         let target = self.zone_mut(zone)?;
         let at = index.unwrap_or(target.tabs.len()).min(target.tabs.len());
-        target.active_tab = Some(tab.id);
+        let id = tab.id;
+        target.active_tab = Some(id);
         target.tabs.insert(at, tab);
+        target.touch(id);
+        target.repair();
         self.active_zone = zone;
         Ok(())
     }
@@ -415,6 +525,7 @@ impl Layout {
             .position(|t| t.id == tab)
             .ok_or_else(|| not_found("Cet onglet n'existe plus."))?;
         let removed = zone.tabs.remove(index);
+        zone.recent.retain(|id| *id != tab);
         zone.repair_active(index);
         if zone.tabs.is_empty() {
             self.remove_zone(zone_id);
@@ -446,7 +557,8 @@ impl Layout {
         self.take(tab).map(|_| ())
     }
 
-    /// Déplace un onglet de la fenêtre dans une autre de ses zones (F3).
+    /// Déplace un onglet de la fenêtre dans une autre de ses zones (F3) ; il
+    /// devient permanent (R3).
     pub fn move_tab(
         &mut self,
         tab: Uuid,
@@ -464,12 +576,14 @@ impl Layout {
                 .iter()
                 .position(|t| t.id == tab)
                 .ok_or_else(|| not_found("Cet onglet n'existe plus."))?;
-            let moved = target.tabs.remove(from);
+            let mut moved = target.tabs.remove(from);
+            moved.preview = false;
             let at = index.unwrap_or(target.tabs.len()).min(target.tabs.len());
             target.tabs.insert(at, moved);
             return self.activate(zone, tab);
         }
-        let moved = self.take(tab)?;
+        let mut moved = self.take(tab)?;
+        moved.preview = false;
         self.insert(zone, moved, index)
     }
 
@@ -490,7 +604,8 @@ impl Layout {
                 "Seul onglet de sa zone : il n'y a rien à diviser. Glissez-le dans une autre zone.",
             ));
         }
-        let moved = self.take(tab)?;
+        let mut moved = self.take(tab)?;
+        moved.preview = false;
         let added = Zone::new(vec![moved]);
         let added_id = added.id;
         if !self.root.wrap_zone(zone, side, added) {
@@ -532,9 +647,13 @@ impl Layout {
                 target.active_tab = zone.active_tab;
             }
             target.tabs.extend(zone.tabs);
+            target.recent.extend(zone.recent);
             if target.active_tab.is_none() {
                 target.active_tab = target.tabs.first().map(|tab| tab.id);
             }
+        }
+        for zone in &mut zones {
+            zone.repair();
         }
         self.active_zone = zones[0].id;
         let mut nodes = zones.into_iter().map(Node::Zone);
@@ -557,10 +676,12 @@ impl Layout {
         };
     }
 
-    /// Accueille des onglets dans la zone active, sans doublon (Z3, Z6).
+    /// Accueille des onglets dans la zone active, sans doublon (Z3, Z6) ; ils
+    /// deviennent permanents (R3).
     pub fn absorb(&mut self, tabs: Vec<Tab>) -> Result<(), CommandError> {
         let target = self.active_zone;
-        for tab in tabs {
+        for mut tab in tabs {
+            tab.preview = false;
             self.insert(target, tab, None)?;
         }
         Ok(())

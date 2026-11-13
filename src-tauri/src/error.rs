@@ -53,6 +53,8 @@ pub enum CommandErrorKind {
     SecretStore,
     /// Envoi sur un environnement protégé sans confirmation.
     ProtectedEnvironment,
+    /// Fichier modifié hors d'Arnod depuis sa dernière lecture : rien n'est écrasé (lot I).
+    ChangedOnDisk,
 }
 
 /// Erreur renvoyée par une commande : une nature et un message prêt à afficher.
@@ -63,6 +65,10 @@ pub struct CommandError {
     pub kind: CommandErrorKind,
     /// Message en français, destiné à l'utilisateur.
     pub message: String,
+    /// Lot H : échec réseau classé (cause, certificat, proxy), absent du JSON s'il est vide
+    /// (`docs/plan-mvp-h-reseau-auth.md`, 5.1-i).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failure: Option<Box<crate::network::failure::NetworkFailure>>,
 }
 
 impl CommandError {
@@ -71,7 +77,15 @@ impl CommandError {
         Self {
             kind,
             message: message.into(),
+            failure: None,
         }
+    }
+
+    /// Lot H : joint l'échec réseau classé.
+    #[must_use]
+    pub fn with_failure(mut self, failure: crate::network::failure::NetworkFailure) -> Self {
+        self.failure = Some(Box::new(failure));
+        self
     }
 
     /// Erreur d'entrée-sortie : `action` décrit ce qui a échoué
@@ -100,7 +114,7 @@ mod tests {
     use crate::ts_contract::{serialized_name, union_members};
 
     /// Toutes les natures, à compléter à chaque ajout de variante.
-    const ALL_KINDS: [CommandErrorKind; 17] = [
+    const ALL_KINDS: [CommandErrorKind; 18] = [
         CommandErrorKind::InvalidName,
         CommandErrorKind::NameTaken,
         CommandErrorKind::FolderNotEmpty,
@@ -118,6 +132,7 @@ mod tests {
         CommandErrorKind::Cancelled,
         CommandErrorKind::SecretStore,
         CommandErrorKind::ProtectedEnvironment,
+        CommandErrorKind::ChangedOnDisk,
     ];
 
     fn serialized_kind(kind: CommandErrorKind) -> String {

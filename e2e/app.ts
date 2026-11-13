@@ -79,8 +79,10 @@ export type SavedNode =
   | {
       kind: "zone";
       id: string;
-      tabs: { id: string; content: { kind: string; path?: string } }[];
+      tabs: { id: string; content: { kind: string; path?: string }; preview?: boolean }[];
       activeTab: string | null;
+      /** Lot F : place du résultat (F6, 1.4-j). */
+      placement?: "auto" | "right" | "below";
     }
   | { kind: "split"; axis: "row" | "column"; ratio: number; first: SavedNode; second: SavedNode };
 
@@ -93,6 +95,8 @@ export function readWindows(sandbox: Sandbox): {
     /** Fenêtre de contenu : suit la sélection de la barre latérale (F10). */
     follow: boolean;
     sidebarDetached: boolean;
+    /** Lot F : barre latérale masquée (Ctrl+\, 1.4-j). */
+    sidebarHidden?: boolean;
   }[];
 } {
   return JSON.parse(readFileSync(path.join(sandbox.dataDir, "windows.json"), "utf8")) as ReturnType<

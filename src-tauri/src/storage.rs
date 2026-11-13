@@ -2,21 +2,26 @@
 //!
 //! Le fichier vit dans `app_local_data_dir()`, local au poste car les chemins
 //! des projets le sont. Il est écrit de façon atomique : fichier temporaire
-//! dans le même dossier, puis renommage. Un fichier illisible est mis de côté,
-//! jamais écrasé ; un fichier écrit par une version plus récente d'Arnod n'est
-//! ni lu ni réécrit.
+//! dans le même dossier, puis renommage. Un fichier illisible ou écrit par une
+//! version plus récente d'Arnod n'est ni lu ni réécrit : le démarrage l'explique
+//! et l'utilisateur choisit de le mettre de côté (renommé) ou non (lot G).
 
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 use crate::catalog::model::{CatalogFile, CatalogFileV1};
 use crate::catalog::{Catalog, FILE_VERSION};
 use crate::error::{CommandError, CommandErrorKind};
+use crate::startup::{Cause, Failure, StateFile};
 
 /// Nom du fichier d'état dans le dossier de données.
 pub const STATE_FILE_NAME: &str = "arnod.json";
+
+/// Champ facultatif du fichier : version d'Arnod qui l'a écrit, montrée si une version plus
+/// ancienne ne peut pas le lire (lot G, 0.3-b). Ignoré à la lecture du catalogue.
+const WRITTEN_BY: &str = "writtenBy";
 
 /// Résultat de la lecture de l'état au démarrage.
 #[derive(Debug)]
@@ -25,12 +30,6 @@ pub enum Loaded {
     FirstLaunch(Catalog),
     /// Fichier lu.
     Existing(Catalog),
-    /// Fichier illisible, renommé en `backup` ; Arnod repart d'un état neuf.
-    Recovered {
-        catalog: Catalog,
-        backup: PathBuf,
-        reason: String,
-    },
 }
 
 /// Chemin du fichier d'état dans le dossier de données `dir`.
@@ -38,50 +37,54 @@ pub fn state_file(dir: &Path) -> PathBuf {
     dir.join(STATE_FILE_NAME)
 }
 
-/// Lit l'état. Échoue si le fichier ne peut pas être lu, s'il a été écrit par
-/// une version plus récente, ou si un fichier illisible ne peut pas être mis de côté.
-pub fn load(dir: &Path) -> Result<Loaded, CommandError> {
+/// Lit l'état. Échoue, sans rien écrire ni renommer, si le fichier ne peut pas être lu, s'il a
+/// été écrit par une version plus récente ou s'il est illisible : l'utilisateur choisit l'issue
+/// (`crate::startup`, lot G).
+pub fn load(dir: &Path) -> Result<Loaded, Failure> {
     let path = state_file(dir);
     let bytes = match fs::read(&path) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
             return Ok(Loaded::FirstLaunch(Catalog::first_launch()));
         }
-        Err(error) => {
-            return Err(CommandError::io(
-                "Lecture de l'état d'Arnod impossible",
-                &path,
-                &error,
-            ));
-        }
+        Err(error) => return Err(Failure::io(StateFile::Catalog, &path, &error)),
     };
-    match parse(&bytes) {
-        Ok(catalog) => Ok(Loaded::Existing(catalog)),
-        Err(Invalid::Newer(version)) => Err(CommandError::new(
-            CommandErrorKind::NewerVersion,
-            format!(
-                "L'état d'Arnod ({}) a été écrit par une version plus récente (format {version}). \
-                 Mettez Arnod à jour ; rien n'a été modifié.",
-                path.display()
-            ),
-        )),
-        Err(Invalid::Corrupt(reason)) => Ok(Loaded::Recovered {
-            catalog: Catalog::first_launch(),
-            backup: set_aside(&path)?,
-            reason,
-        }),
-    }
+    let cause = match parse(&bytes) {
+        Ok(catalog) => return Ok(Loaded::Existing(catalog)),
+        Err(Invalid::Newer { format, written_by }) => Cause::Newer {
+            format,
+            written_by,
+            modified: modified_secs(&path),
+        },
+        Err(Invalid::Corrupt(reason)) => Cause::Corrupt { reason },
+    };
+    Err(Failure {
+        file: StateFile::Catalog,
+        path,
+        cause,
+    })
+}
+
+/// Date de dernière modification d'un fichier, en secondes depuis 1970.
+pub fn modified_secs(path: &Path) -> Option<u64> {
+    let modified = fs::metadata(path).ok()?.modified().ok()?;
+    Some(modified.duration_since(UNIX_EPOCH).ok()?.as_secs())
 }
 
 /// Écrit l'état de façon atomique, en créant le dossier de données au besoin.
 pub fn save(dir: &Path, catalog: &Catalog) -> Result<(), CommandError> {
     let path = state_file(dir);
-    let json = serde_json::to_vec_pretty(&catalog.to_file()).map_err(|error| {
+    let encoding = |error: serde_json::Error| {
         CommandError::new(
             CommandErrorKind::Io,
             format!("Enregistrement de l'état d'Arnod impossible : {error}"),
         )
-    })?;
+    };
+    let mut value = serde_json::to_value(catalog.to_file()).map_err(encoding)?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert(WRITTEN_BY.to_owned(), env!("CARGO_PKG_VERSION").into());
+    }
+    let json = serde_json::to_vec_pretty(&value).map_err(encoding)?;
     fs::create_dir_all(dir).map_err(|error| {
         CommandError::io("Création du dossier de données impossible", dir, &error)
     })?;
@@ -101,8 +104,11 @@ pub fn save(dir: &Path, catalog: &Catalog) -> Result<(), CommandError> {
 
 /// Raison pour laquelle un fichier d'état n'est pas utilisable.
 enum Invalid {
-    /// Format plus récent que [`FILE_VERSION`].
-    Newer(u64),
+    /// Format plus récent que [`FILE_VERSION`], avec la version d'Arnod qui l'a écrit.
+    Newer {
+        format: u64,
+        written_by: Option<String>,
+    },
     /// Fichier illisible, avec la raison.
     Corrupt(String),
 }
@@ -115,7 +121,13 @@ fn parse(bytes: &[u8]) -> Result<Catalog, Invalid> {
         .and_then(serde_json::Value::as_u64)
         .ok_or_else(|| Invalid::Corrupt("version absente".to_owned()))?;
     if version > u64::from(FILE_VERSION) {
-        return Err(Invalid::Newer(version));
+        return Err(Invalid::Newer {
+            format: version,
+            written_by: value
+                .get(WRITTEN_BY)
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned),
+        });
     }
     let invalid =
         |error: serde_json::Error| Invalid::Corrupt(format!("contenu invalide : {error}"));
@@ -127,23 +139,6 @@ fn parse(bytes: &[u8]) -> Result<Catalog, Invalid> {
         _ => return Err(Invalid::Corrupt(format!("version {version} inconnue"))),
     };
     Catalog::from_file(file).map_err(Invalid::Corrupt)
-}
-
-/// Renomme un fichier d'état illisible en `arnod.json.corrompu-<horodatage>`.
-fn set_aside(path: &Path) -> Result<PathBuf, CommandError> {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_millis())
-        .unwrap_or_default();
-    let backup = path.with_file_name(format!("{STATE_FILE_NAME}.corrompu-{stamp}"));
-    fs::rename(path, &backup).map_err(|error| {
-        CommandError::io(
-            "Mise de côté de l'état illisible d'Arnod impossible",
-            path,
-            &error,
-        )
-    })?;
-    Ok(backup)
 }
 
 fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -166,9 +161,21 @@ mod tests {
         fs::write(state_file(dir), content).unwrap();
     }
 
-    fn expect_recovered(dir: &Path) -> (PathBuf, String) {
-        match load(dir).unwrap() {
-            Loaded::Recovered { backup, reason, .. } => (backup, reason),
+    fn expect_failure(dir: &Path) -> Failure {
+        match load(dir) {
+            Err(failure) => failure,
+            Ok(other) => panic!("échec attendu, obtenu {other:?}"),
+        }
+    }
+
+    fn expect_corrupt(dir: &Path) -> String {
+        let content = fs::read(state_file(dir)).unwrap();
+        let failure = expect_failure(dir);
+        // Rien n'est renommé ni réécrit : l'utilisateur choisit l'issue (lot G).
+        assert_eq!(fs::read(state_file(dir)).unwrap(), content);
+        assert_eq!(failure.file, StateFile::Catalog);
+        match failure.cause {
+            Cause::Corrupt { reason } => reason,
             other => panic!("fichier illisible attendu, obtenu {other:?}"),
         }
     }
@@ -249,43 +256,37 @@ mod tests {
     }
 
     #[test]
-    fn fichier_illisible_mis_de_cote() {
+    fn fichier_illisible_signale_sans_etre_touche() {
         let dir = data_dir();
         write_state(dir.path(), "pas du JSON");
 
-        let (backup, reason) = expect_recovered(dir.path());
+        let reason = expect_corrupt(dir.path());
 
         assert!(reason.starts_with("JSON invalide"), "{reason}");
-        assert!(!state_file(dir.path()).exists());
-        assert_eq!(fs::read_to_string(&backup).unwrap(), "pas du JSON");
-        let backup_name = backup.file_name().unwrap().to_string_lossy().into_owned();
-        assert!(
-            backup_name.starts_with("arnod.json.corrompu-"),
-            "{backup_name}"
-        );
+        let names: Vec<String> = fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, [STATE_FILE_NAME]);
     }
 
     #[test]
-    fn version_absente_ou_inconnue_mise_de_cote() {
+    fn version_absente_ou_inconnue_illisible() {
         for (content, expected) in [
             (r#"{ "projects": [] }"#, "version absente"),
             (r#"{ "version": 0 }"#, "version 0 inconnue"),
         ] {
             let dir = data_dir();
             write_state(dir.path(), content);
-            assert_eq!(expect_recovered(dir.path()).1, expected);
+            assert_eq!(expect_corrupt(dir.path()), expected);
         }
     }
 
     #[test]
-    fn contenu_ou_catalogue_invalide_mis_de_cote() {
+    fn contenu_ou_catalogue_invalide_illisible() {
         let dir = data_dir();
         write_state(dir.path(), r#"{ "version": 1, "projects": [] }"#);
-        assert!(
-            expect_recovered(dir.path())
-                .1
-                .starts_with("contenu invalide")
-        );
+        assert!(expect_corrupt(dir.path()).starts_with("contenu invalide"));
 
         let dir = data_dir();
         let mut catalog = Catalog::first_launch();
@@ -293,24 +294,66 @@ mod tests {
         let mut file = catalog.to_file();
         file.workspaces.push(file.workspaces[0].clone());
         write_state(dir.path(), &serde_json::to_string(&file).unwrap());
-        assert!(expect_recovered(dir.path()).1.contains("en double"));
+        assert!(expect_corrupt(dir.path()).contains("en double"));
     }
 
     #[test]
     fn version_plus_recente_ni_lue_ni_touchee() {
         let dir = data_dir();
-        let content = r#"{ "version": 3, "nouveau": true }"#;
+        let content = r#"{ "version": 3, "writtenBy": "1.0.2", "nouveau": true }"#;
         write_state(dir.path(), content);
 
-        let error = load(dir.path()).unwrap_err();
+        let failure = expect_failure(dir.path());
 
-        assert_eq!(error.kind, CommandErrorKind::NewerVersion);
-        assert!(
-            error.message.contains("version plus récente (format 3)"),
-            "{}",
-            error.message
+        assert_eq!(
+            failure.to_command_error().kind,
+            CommandErrorKind::NewerVersion
         );
+        let Cause::Newer {
+            format,
+            written_by,
+            modified,
+        } = failure.cause
+        else {
+            panic!("version plus récente attendue");
+        };
+        assert_eq!(format, 3);
+        assert_eq!(written_by.as_deref(), Some("1.0.2"));
+        assert!(modified.is_some());
         assert_eq!(fs::read_to_string(state_file(dir.path())).unwrap(), content);
+    }
+
+    #[test]
+    fn ecrit_la_version_d_arnod_qui_l_a_ecrit() {
+        let dir = data_dir();
+        save(dir.path(), &Catalog::first_launch()).unwrap();
+
+        let json: serde_json::Value =
+            serde_json::from_slice(&fs::read(state_file(dir.path())).unwrap()).unwrap();
+
+        assert_eq!(json["writtenBy"], env!("CARGO_PKG_VERSION"));
+        assert!(matches!(load(dir.path()), Ok(Loaded::Existing(_))));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fichier_sans_droit_de_lecture_classe_verrouille() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = data_dir();
+        save(dir.path(), &Catalog::first_launch()).unwrap();
+        let path = state_file(dir.path());
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+        if fs::read(&path).is_ok() {
+            // Administrateur : les droits ne s'appliquent pas.
+            return;
+        }
+
+        let failure = expect_failure(dir.path());
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(matches!(failure.cause, Cause::Locked { .. }), "{failure:?}");
+        assert_eq!(failure.path, path);
     }
 
     /// Fichier version 1 : « Mes projets » par défaut avec tous les projets,

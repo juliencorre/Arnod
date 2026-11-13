@@ -65,6 +65,9 @@ pub struct WindowState {
     /// Dernière position connue (fenêtres détachées), pour la restauration (F13).
     #[serde(default)]
     pub bounds: Option<Bounds>,
+    /// Fenêtre principale : barre latérale masquée (Ctrl+\, 1.4-j, R8).
+    #[serde(default)]
+    pub sidebar_hidden: bool,
 }
 
 fn default_sidebar_width() -> u32 {
@@ -81,6 +84,7 @@ impl WindowState {
             sidebar_width: DEFAULT_SIDEBAR_WIDTH,
             sidebar_detached: false,
             bounds: None,
+            sidebar_hidden: false,
         }
     }
 
@@ -94,6 +98,7 @@ impl WindowState {
             sidebar_width: DEFAULT_SIDEBAR_WIDTH,
             sidebar_detached: false,
             bounds,
+            sidebar_hidden: false,
         }
     }
 
@@ -189,6 +194,9 @@ impl Windows {
         main.sidebar_detached = others.iter().any(|w| w.kind == WindowKind::Sidebar);
         let mut windows = vec![main];
         windows.extend(others);
+        for layout in windows.iter_mut().filter_map(|w| w.layout.as_mut()) {
+            layout.repair();
+        }
         let recent = windows.iter().map(|w| w.label.clone()).collect();
         Self { windows, recent }
     }
@@ -258,11 +266,43 @@ impl Windows {
         self.windows.iter().filter(|w| w.takes_selection()).count()
     }
 
-    /// Ouvre la sélection de la barre latérale (Z5). Renvoie la fenêtre choisie.
-    pub fn open_selection(&mut self, content: Content) -> Result<String, CommandError> {
+    /// Ouvre la sélection de la barre latérale (Z5), en aperçu si `preview`
+    /// (1.3-a, R1). Renvoie la fenêtre choisie.
+    pub fn open_selection(
+        &mut self,
+        content: Content,
+        preview: bool,
+    ) -> Result<String, CommandError> {
         let target = self.selection_target();
-        self.layout_mut(&target)?.open(content, None)?;
+        self.layout_mut(&target)?.open_tab(content, None, preview)?;
         Ok(target)
+    }
+
+    /// Barre latérale de la fenêtre principale masquée ou affichée (1.4-j, R8).
+    pub fn set_sidebar_hidden(&mut self, label: &str, hidden: bool) -> Result<(), CommandError> {
+        let window = self.get_mut(label)?;
+        if window.kind != WindowKind::Main {
+            return Err(refused("Seule la fenêtre principale a une barre latérale."));
+        }
+        window.sidebar_hidden = hidden;
+        Ok(())
+    }
+
+    /// Ferme plusieurs onglets d'une fenêtre (« Fermer les autres », « Fermer tout »,
+    /// 1.3-b, R6). Un onglet inconnu refuse tout ; une fenêtre de contenu vidée se ferme.
+    pub fn close_tabs(&mut self, label: &str, tabs: &[Uuid]) -> Result<(), CommandError> {
+        let layout = self.layout_mut(label)?;
+        if tabs.iter().any(|tab| layout.zone_of(*tab).is_none()) {
+            return Err(CommandError::new(
+                CommandErrorKind::NotFound,
+                "Cet onglet n'existe plus.",
+            ));
+        }
+        for tab in tabs {
+            layout.close(*tab)?;
+        }
+        self.drop_empty();
+        Ok(())
     }
 
     /// Fenêtre de contenu suit la sélection ou reste épinglée (F10).
@@ -328,7 +368,8 @@ impl Windows {
             layout.zone(target)?;
             target
         };
-        let moved = self.layout_mut(from)?.take(tab)?;
+        let mut moved = self.layout_mut(from)?.take(tab)?;
+        moved.preview = false;
         self.layout_mut(to)?.insert(target, moved, index)?;
         self.drop_empty();
         Ok(())
@@ -365,7 +406,8 @@ impl Windows {
         tab: Uuid,
         bounds: Option<Bounds>,
     ) -> Result<String, CommandError> {
-        let taken: Tab = self.layout_mut(label)?.take(tab)?;
+        let mut taken: Tab = self.layout_mut(label)?.take(tab)?;
+        taken.preview = false;
         let detached = WindowState::detached(
             WindowKind::Content,
             Some(Layout::single(vec![taken])),

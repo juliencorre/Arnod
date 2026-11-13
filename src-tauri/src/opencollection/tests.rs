@@ -717,6 +717,7 @@ fn unions_typescript_concordantes() {
             AuthKind::ApiKey,
             AuthKind::Inherit,
             AuthKind::Other,
+            AuthKind::OAuth2,
         ])
     );
     assert_eq!(
@@ -1214,4 +1215,46 @@ runtime:
         value.pointer("/runtime/actions/3/selector/expression"),
         Some(&json!("res.cookies.session"))
     );
+}
+
+// Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md, R8).
+
+#[test]
+fn lot_h_r8_oauth2_identifiants_client_aller_retour_conforme() {
+    use crate::request::model::{Auth, AuthKind, CredentialsPlacement, OAuth2, TokenPlacement};
+    let dir = project();
+    let path = dir.path().join("commandes.yml");
+    let mut request = Request::new("Lister");
+    request.auth = Auth {
+        kind: AuthKind::OAuth2,
+        oauth2: OAuth2 {
+            access_token_url: "{{authUrl}}/oauth/token".into(),
+            client_id: "{{oauthClientId}}".into(),
+            client_secret: "{{oauth2ClientSecret}}".into(),
+            scope: "orders:read orders:write".into(),
+            credentials: CredentialsPlacement::Body,
+            token_placement: TokenPlacement::Query,
+            token_name: "access_token".into(),
+        },
+        ..Auth::default()
+    };
+    file::write(&path, &request).unwrap();
+    assert_valid(Part::HttpRequest, &path);
+    let written = read(&path);
+    let auth = written.pointer("/http/auth").unwrap();
+    assert_eq!(auth["type"], "oauth2");
+    assert_eq!(auth["flow"], "client_credentials");
+    assert_eq!(auth["accessTokenUrl"], "{{authUrl}}/oauth/token");
+    assert_eq!(auth["credentials"]["placement"], "body");
+    assert_eq!(auth["tokenConfig"]["placement"]["query"], "access_token");
+    assert_eq!(file::read(&path).unwrap().auth, request.auth);
+
+    // Un autre flux OAuth 2 reste conservé, non géré (R8).
+    let other = super::request::auth_from(Some(&json!({
+        "type": "oauth2",
+        "flow": "password",
+        "accessTokenUrl": "https://a.test/token",
+    })));
+    assert_eq!(other.kind, AuthKind::Other);
+    assert_eq!(other.other, "oauth2");
 }

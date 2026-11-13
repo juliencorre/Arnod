@@ -19,12 +19,15 @@ pub mod input;
 pub mod layout;
 pub mod local;
 pub mod manifest;
+// Lot H - Réseau et authentification.
 mod menu;
+pub mod network;
 pub mod opencollection;
 pub mod request;
 pub mod response;
 pub mod results;
 pub mod secrets;
+pub mod startup;
 pub mod state;
 pub mod statuses;
 pub mod steps;
@@ -33,6 +36,7 @@ pub mod tree;
 pub mod trial;
 #[cfg(test)]
 mod ts_contract;
+pub mod watch;
 pub mod windows;
 pub mod workbench;
 
@@ -43,6 +47,7 @@ use tauri::Manager;
 use crate::results::ResultBook;
 use crate::secrets::SystemSecretStore;
 use crate::state::{AppState, DEFAULT_LOCATION_DIR};
+use crate::watch::service::Watchers;
 use crate::windows::WindowsState;
 use crate::workbench::Workbench;
 
@@ -59,17 +64,39 @@ pub fn run() {
             let default_location = app.path().home_dir()?.join(DEFAULT_LOCATION_DIR);
             app.manage(AppState::load(data_dir.clone(), default_location));
             let bench = Arc::new(Workbench::new(Arc::new(SystemSecretStore)));
+            // Lot H : préférences réseau du poste et cookies persistants (network.json).
+            bench.network().attach(&data_dir);
             // Avancement des runs et statuts des requêtes diffusés aux fenêtres (R3, R4).
             bench.set_notifier(Arc::new(windows::EventNotifier::new(app.handle().clone())));
             app.manage(bench);
             app.manage(WindowsState::load(data_dir));
             app.manage(Mutex::new(ResultBook::default()));
+            // Dossiers des projets ouverts surveillés : changements faits hors d'Arnod diffusés
+            // aux fenêtres (lot I).
+            app.manage(Watchers::new(Arc::new(watch::app::AppSink::new(
+                app.handle().clone(),
+            ))));
             // Chaque modification du catalogue est diffusée à toutes les fenêtres (F11).
             let handle = app.handle().clone();
             app.state::<AppState>().on_change(Box::new(move |snapshot| {
-                windows::catalog_changed(&handle, snapshot)
+                windows::catalog_changed(&handle, snapshot);
+                // Projet oublié ou dossier introuvable : plus de surveillance (lot I).
+                handle.state::<Watchers>().retain(|id| {
+                    snapshot.projects.iter().any(|project| {
+                        project.id == id && project.status == catalog::snapshot::ProjectStatus::Ok
+                    })
+                });
             }));
-            windows::restore(app.handle());
+            // Lot G : une erreur de démarrage s'explique d'abord ; les fenêtres détachées
+            // reviennent une fois réglée (`startup_retry`, `startup_start_empty`).
+            app.manage(commands::startup::StartupAttempts::default());
+            if app.state::<AppState>().failure().is_none()
+                && app.state::<WindowsState>().failure().is_none()
+            {
+                windows::restore(app.handle());
+            }
+            // Fenêtre créée cachée, montrée prête (`window_ready`) ou après 300 ms (0.3-a).
+            windows::show_later(app.handle(), windows::MAIN_LABEL);
             Ok(())
         })
         .on_window_event(windows::on_window_event)
@@ -174,6 +201,33 @@ pub fn run() {
             commands::test_steps::request_variable_users,
             // Valeurs dynamiques proposées à la saisie (5.1-h).
             commands::input::dynamic_values,
+            // Lot H - Réseau et authentification.
+            commands::network::network_load,
+            commands::network::network_save,
+            commands::network::network_pick_authority,
+            commands::network::network_add_authority,
+            commands::network::network_remove_authority,
+            commands::network::project_auth_load,
+            commands::network::project_auth_save,
+            commands::network::oauth2_token_renew,
+            commands::network::oauth2_token_forget,
+            commands::network::cookies_list,
+            commands::network::cookies_clear,
+            commands::network::cookies_set_sending,
+            // Lot F : onglets et clavier.
+            commands::window::layout_pin,
+            commands::window::layout_close_tabs,
+            commands::window::layout_set_sidebar_hidden,
+            // Lot I - Fichiers modifiés hors d'Arnod.
+            commands::files::request_conflict,
+            commands::files::request_conflict_resolve,
+            // Lot G - Démarrage et erreurs.
+            commands::startup::startup_status,
+            commands::startup::startup_retry,
+            commands::startup::startup_start_empty,
+            commands::startup::startup_open,
+            commands::startup::startup_quit,
+            commands::startup::window_ready,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

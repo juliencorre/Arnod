@@ -13,6 +13,8 @@ use crate::request::model::{
     DEFAULT_MAX_DURATION_MS, Example, ExampleBodyKind, Extraction, Method, Operator, Origin, Pair,
     ParamKind, Request, ResponseHeader, Scalar, Settings,
 };
+// Lot H : OAuth 2 par identifiants client (docs/plan-mvp-h-reseau-auth.md, R8).
+use crate::request::model::{CredentialsPlacement, OAuth2, TokenPlacement};
 
 /// Préfixe de l'étiquette qui lie une requête à une opération de contrat (S7).
 pub const CONTRACT_TAG: &str = "contract:";
@@ -261,12 +263,107 @@ pub(crate) fn auth_from(value: Option<&Value>) -> Auth {
             },
             ..Auth::default()
         },
+        "oauth2" if value.get("flow").and_then(Value::as_str) == Some("client_credentials") => {
+            Auth {
+                kind: AuthKind::OAuth2,
+                oauth2: oauth2_from(value),
+                ..Auth::default()
+            }
+        }
         other => Auth {
             kind: AuthKind::Other,
             other: other.to_owned(),
             ..Auth::default()
         },
     }
+}
+
+/// Lot H : flux `client_credentials` du schéma (R8).
+fn oauth2_from(value: &Value) -> OAuth2 {
+    let credentials = value.get("credentials");
+    let placement = value.pointer("/tokenConfig/placement");
+    let (token_placement, token_name) = match placement {
+        Some(p) if p.get("query").is_some() => (TokenPlacement::Query, text(p.get("query"))),
+        Some(p) if p.get("header").is_some() => (TokenPlacement::Header, text(p.get("header"))),
+        _ => (TokenPlacement::Header, "Authorization".to_owned()),
+    };
+    OAuth2 {
+        access_token_url: text(value.get("accessTokenUrl")),
+        client_id: text(credentials.and_then(|c| c.get("clientId"))),
+        client_secret: text(credentials.and_then(|c| c.get("clientSecret"))),
+        scope: text(value.get("scope")),
+        credentials: if credentials
+            .and_then(|c| c.get("placement"))
+            .and_then(Value::as_str)
+            == Some("body")
+        {
+            CredentialsPlacement::Body
+        } else {
+            CredentialsPlacement::BasicAuthHeader
+        },
+        token_placement,
+        token_name,
+    }
+}
+
+/// Lot H : flux `client_credentials` écrit au format du schéma ; les champs non gérés d'un
+/// OAuth 2 existant (`refreshTokenUrl`, `additionalParameters`, `tokenConfig.id`…) sont gardés.
+pub(crate) fn oauth2_value(o: &OAuth2, previous: Option<&Value>) -> Value {
+    let mut out = match previous {
+        Some(Value::Object(map))
+            if map.get("type").and_then(Value::as_str) == Some("oauth2")
+                && map.get("flow").and_then(Value::as_str) == Some("client_credentials") =>
+        {
+            map.clone()
+        }
+        _ => Map::new(),
+    };
+    out.insert("type".into(), json!("oauth2"));
+    out.insert("flow".into(), json!("client_credentials"));
+    out.insert("accessTokenUrl".into(), json!(o.access_token_url));
+    let mut credentials = out
+        .get("credentials")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    credentials.insert("clientId".into(), json!(o.client_id));
+    credentials.insert("clientSecret".into(), json!(o.client_secret));
+    credentials.insert(
+        "placement".into(),
+        json!(match o.credentials {
+            CredentialsPlacement::BasicAuthHeader => "basic_auth_header",
+            CredentialsPlacement::Body => "body",
+        }),
+    );
+    out.insert("credentials".into(), Value::Object(credentials));
+    if o.scope.trim().is_empty() {
+        out.remove("scope");
+    } else {
+        out.insert("scope".into(), json!(o.scope.trim()));
+    }
+    let mut token = out
+        .get("tokenConfig")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let name = match (o.token_placement, o.token_name.trim()) {
+        (TokenPlacement::Header, "") => "Authorization",
+        (TokenPlacement::Query, "") => "access_token",
+        (_, name) => name,
+    };
+    token.insert(
+        "placement".into(),
+        match o.token_placement {
+            TokenPlacement::Header => json!({ "header": name }),
+            TokenPlacement::Query => json!({ "query": name }),
+        },
+    );
+    out.insert("tokenConfig".into(), Value::Object(token));
+    out.insert(
+        "settings".into(),
+        json!({ "autoFetchToken": true, "autoRefreshToken": true }),
+    );
+    Value::Object(out)
 }
 
 /// Type et contenu d'un corps OpenCollection simple.
@@ -769,7 +866,7 @@ fn pair_values(list: &[Pair], previous: Option<&Value>, params: bool) -> Option<
     Some(Value::Array(items))
 }
 
-fn auth_value(auth: &Auth, previous: Option<&Value>) -> Option<Value> {
+pub(crate) fn auth_value(auth: &Auth, previous: Option<&Value>) -> Option<Value> {
     match auth.kind {
         AuthKind::None => None,
         AuthKind::Inherit => Some(Value::from("inherit")),
@@ -780,6 +877,7 @@ fn auth_value(auth: &Auth, previous: Option<&Value>) -> Option<Value> {
             "password": auth.password,
         })),
         AuthKind::Bearer => Some(json!({ "type": "bearer", "token": auth.token })),
+        AuthKind::OAuth2 => Some(oauth2_value(&auth.oauth2, previous)),
         AuthKind::ApiKey => Some(json!({
             "type": "apikey",
             "key": auth.name,
