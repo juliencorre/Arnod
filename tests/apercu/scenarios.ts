@@ -89,3 +89,87 @@ export const SCENARIOS: Record<string, Scenario> = {
     },
   },
 };
+
+// --- Lot A - Réponse (5.1-b bis, docs/plan-mvp-a-reponse.md) ---------------------------------
+
+const COMMANDE =
+  '{"id":"ord_8F2kQ","status":"pending","customerId":"cus_31","items":[{"sku":"TSH-BLU-M","qty":2,"price":19.9},{"sku":"MUG-NOIR","qty":1,"price":12.5}],"coupon":"BIENVENUE","total":47.82}';
+
+/** Projet ouvert, « Créer une commande » envoyée avec la réponse `body` de type `type`. */
+function commande(body: string, type: string, status = 201, statusText = "Created"): FakeCore {
+  const core = boutique();
+  core.workbench.folders.add("Commandes");
+  core.workbench.requests.set(
+    "Commandes/creer.yml",
+    newRequest("Créer une commande", { method: "POST", url: "{{baseUrl}}/orders" }),
+  );
+  core.workbench.nextSend = okOutcome({
+    response: {
+      status,
+      statusText,
+      headers: [["content-type", type]],
+      body,
+      truncated: false,
+      sizeBytes: new TextEncoder().encode(body).length,
+      waitMs: 38,
+      receiveMs: 4,
+      totalMs: 42,
+    },
+  });
+  return core;
+}
+
+async function envoyerCommande(g: Gestes): Promise<void> {
+  await ouvrirProjet(g);
+  await g.cliquer('[role="treeitem"]', "Créer une commande");
+  await g.cliquer(".editor__line button[type='submit']");
+  await g.attendre(100);
+}
+
+async function filtrer(g: Gestes, expression: string): Promise<void> {
+  await g.saisir(".filter__input", expression);
+  await g.attendre(300);
+}
+
+Object.assign(SCENARIOS, {
+  "5.1-b-bis": {
+    description: "Réponse JSON, filtre JSONPath actif et valeurs surlignées (5.1-b bis)",
+    setup: () => commande(COMMANDE, "application/json"),
+    play: async (g: Gestes) => {
+      await envoyerCommande(g);
+      await filtrer(g, "$.items[*].sku");
+    },
+  },
+  "5.1-b-bis-filtre-invalide": {
+    description: "Filtre JSONPath invalide, expliqué en français (5.1-b bis)",
+    setup: () => commande(COMMANDE, "application/json"),
+    play: async (g: Gestes) => {
+      await envoyerCommande(g);
+      await filtrer(g, "$.items[0");
+    },
+  },
+  "5.1-b-bis-xml": {
+    description: "Réponse XML mise en forme (5.1-b bis)",
+    setup: () =>
+      commande(
+        '<?xml version="1.0" encoding="UTF-8"?><commande id="ord_8F2kQ" statut="pending"><client>cus_31</client><articles><article sku="TSH-BLU-M" qte="2">19.90</article><article sku="MUG-NOIR" qte="1">12.50</article></articles><!-- total TTC --><total devise="EUR">47.82</total></commande>',
+        "application/xml",
+      ),
+    play: envoyerCommande,
+  },
+  "5.1-b-bis-html": {
+    description: "Réponse HTML en aperçu, sans script (5.1-b bis)",
+    setup: () =>
+      commande(
+        "<!DOCTYPE html><html><head><title>Erreur</title><script>alert(1)</script></head><body><h1>502 Bad Gateway</h1><p>Le serveur amont ne répond pas.</p></body></html>",
+        "text/html; charset=utf-8",
+        502,
+        "Bad Gateway",
+      ),
+    play: async (g: Gestes) => {
+      await envoyerCommande(g);
+      await g.cliquer(".body__bar [role='switch']");
+      await g.attendre(100);
+    },
+  },
+} satisfies Record<string, Scenario>);

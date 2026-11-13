@@ -41,6 +41,10 @@ trash = "5"
 base64 = "0.23"
 # Encodage des paramètres d'adresse et des formulaires.
 percent-encoding = "2"
+# Filtre JSONPath de la réponse (RFC 9535, chemins normalisés des correspondances) : `regex` est
+# déjà tiré par Tauri ; écrire un sous-ensemble à la main perdrait les filtres `?()` et les
+# fonctions de la norme (docs/plan-mvp-a-reponse.md).
+serde_json_path = "0.7"
 
 [dev-dependencies]
 tempfile = "3"

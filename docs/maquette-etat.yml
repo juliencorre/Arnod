@@ -552,15 +552,28 @@ pages:
     version: [MVP, V1]
     plans:
       - "plan-premier-usage (X1–X5)"
+      - "plan-mvp-a-reponse (F1–F8)"
     liees: ["5.2", "1.4"]
-    reste: "format, aperçu et filtre (b bis), variables inconnues (b ter), édition en texte et cURL (b quater), chronologie détaillée DNS, connexion, TLS (c), valeurs dynamiques (h), échec réseau expliqué (i) ; historique en V1 (c bis)."
+    reste: "résultat du filtre en variable (b bis, lot E), Ctrl+J (b bis, lot F), variables inconnues (b ter), édition en texte et cURL (b quater), chronologie détaillée DNS, connexion, TLS (c), valeurs dynamiques (h), échec réseau expliqué (i) ; historique en V1 (c bis)."
     journal:
       - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
       - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
+      - "2026-11-13 : Corps de la réponse (b bis) : format, aperçu HTML, copier, enregistrer, effacer, filtre JSONPath et vérification tirée d'un résultat (lot A)."
     ecrans:
       a: { etat: livré, pr: [27] }
       b: { etat: livré, pr: [27, 42], captures: [19-verification-en-echec] }
-      "b bis": { etat: à faire, version: MVP }
+      "b bis":
+        {
+          etat: en partie,
+          version: MVP,
+          pr: [47],
+          captures: [a1-reponse-filtre, a2-reponse-apercu-html],
+          ecart:
+            {
+              texte: "« + Assertion » devient « + Vérification » (vocabulaire, lot K) et porte sur la correspondance courante (body.items[0].sku égal à …, ↑ ↓ ou Entrée pour changer) au lieu de body.items[*].sku contient … : une vérification ne lit pas de joker ; l'interrupteur « Aperçu » ne rend qu'un corps HTML ; « Extraire dans une variable » attend le lot E et l'icône Ctrl+J le lot F.",
+              aligner: maquette,
+            },
+        }
       "b ter": { etat: à faire, version: MVP }
       "b quater": { etat: à faire, version: MVP }
       c: { etat: en partie, pr: [27] }

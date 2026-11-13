@@ -51,6 +51,12 @@
   --color-family-files-bg: #f6f7e7;
   --color-family-files-border: #c6c89b;
   --color-family-files-text: #515100;
+  --color-code-string: #2a6e44;
+  --color-code-number: #1f5fa8;
+  --color-code-keyword: #7a3fb0;
+  --color-code-tag: #a1361d;
+  --color-code-attr: #875300;
+  --color-match: #fcebc6;
   --backdrop: rgba(29, 27, 24, 0.32);
   --shadow-popover: 0 8px 24px rgba(29, 27, 24, 0.14), 0 1px 3px rgba(29, 27, 24, 0.1);
   --shadow-dialog: 0 24px 64px rgba(29, 27, 24, 0.22);
@@ -107,6 +113,12 @@
   --color-family-files-bg: #2f3017;
   --color-family-files-border: #606130;
   --color-family-files-text: #d4d699;
+  --color-code-string: #6cc28b;
+  --color-code-number: #82b4f2;
+  --color-code-keyword: #c9a8f7;
+  --color-code-tag: #f2a08d;
+  --color-code-attr: #e2c04a;
+  --color-match: #45341a;
   --backdrop: rgba(0, 0, 0, 0.55);
   --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55);

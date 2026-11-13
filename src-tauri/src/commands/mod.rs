@@ -19,6 +19,8 @@ pub mod tree;
 pub mod trial;
 pub mod window;
 pub mod workspaces;
+// Lot A - Réponse (docs/plan-mvp-a-reponse.md).
+pub mod response;
 
 #[cfg(test)]
 mod tests {
