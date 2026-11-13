@@ -1533,7 +1533,7 @@ describe("Lot D - Barre latérale", () => {
   /** Valeur saisie dans le champ, événement `input` compris (le filtre réagit à la frappe). */
   async function typeFilter(value: string): Promise<void> {
     await browser.execute((text) => {
-      const input = document.querySelector<HTMLInputElement>("aside .tree .filter input");
+      const input = document.querySelector<HTMLInputElement>("aside .tree .tree-filter input");
       if (!input) throw new Error("filtre du référentiel introuvable");
       input.focus();
       input.value = text;
@@ -1543,7 +1543,7 @@ describe("Lot D - Barre latérale", () => {
 
   function filterState() {
     return browser.execute(() => ({
-      count: document.querySelector("aside .tree .filter__count")?.textContent.trim() ?? "",
+      count: document.querySelector("aside .tree .tree-filter__count")?.textContent.trim() ?? "",
       names: Array.from(document.querySelectorAll('aside .tree [role="treeitem"] .row__name')).map(
         (n) => n.textContent.trim(),
       ),
@@ -1555,7 +1555,7 @@ describe("Lot D - Barre latérale", () => {
     await chooseWorkspace("E-commerce");
     const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
     if (await expand.isExisting()) await expand.click();
-    await browser.$("aside .tree .filter input").waitForExist({ timeout: 10_000 });
+    await browser.$("aside .tree .tree-filter input").waitForExist({ timeout: 10_000 });
 
     await typeFilter("créer");
     await browser.waitUntil(async () => (await filterState()).count.startsWith("1 sur"), {

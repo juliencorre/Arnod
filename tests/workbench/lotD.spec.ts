@@ -61,7 +61,7 @@ function treeNames(): string[] {
 }
 
 function filterInput() {
-  return wrapper().get(".tree .filter input");
+  return wrapper().get(".tree .tree-filter input");
 }
 
 describe("filtrer le référentiel (1.2-e, F1 à F5)", () => {
@@ -73,7 +73,7 @@ describe("filtrer le référentiel (1.2-e, F1 à F5)", () => {
 
     await filterInput().setValue("stat");
     await flushPromises();
-    expect(wrapper().get(".tree .filter__count").text()).toBe("2 sur 5");
+    expect(wrapper().get(".tree .tree-filter__count").text()).toBe("2 sur 5");
     expect(treeNames().sort()).toEqual(
       ["Changer le statut", "Lister les commandes", "commandes", "v2"].sort(),
     );
@@ -89,7 +89,7 @@ describe("filtrer le référentiel (1.2-e, F1 à F5)", () => {
     await filterInput().trigger("keydown", { key: "Escape" });
     await flushPromises();
     expect((filterInput().element as HTMLInputElement).value).toBe("");
-    expect(wrapper().find(".tree .filter__count").exists()).toBe(false);
+    expect(wrapper().find(".tree .tree-filter__count").exists()).toBe(false);
     expect(treeNames()).not.toContain("Changer le statut");
   });
 
@@ -106,9 +106,9 @@ describe("filtrer le référentiel (1.2-e, F1 à F5)", () => {
     await filterInput().setValue("introuvable");
     await flushPromises();
     expect(wrapper().get(".tree__none").text()).toBe("Aucune requête ne correspond.");
-    expect(wrapper().get(".tree .filter__count").text()).toBe("0 sur 5");
+    expect(wrapper().get(".tree .tree-filter__count").text()).toBe("0 sur 5");
 
-    await click(wrapper(), ".tree .filter__clear");
+    await click(wrapper(), ".tree .tree-filter__clear");
     expect((filterInput().element as HTMLInputElement).value).toBe("");
     expect(document.activeElement).toBe(filterInput().element);
   });

@@ -210,7 +210,7 @@ export const SCENARIOS: Record<string, Scenario> = {
     play: async (g) => {
       await ouvrirProjet(g);
       await g.cliquer('[role="treeitem"]', "Changer le statut");
-      await g.saisir(".tree .filter input", "stat");
+      await g.saisir(".tree .tree-filter input", "stat");
     },
   },
   "1.2-d": {
@@ -268,7 +268,7 @@ export const SCENARIOS: Record<string, Scenario> = {
       await g.cliquer('[aria-label="Déplier le contrat API Commandes"]');
       await g.cliquer(".crow__resource", "/orders");
       await g.cliquer('[aria-label="Déplier POST /orders"]');
-      await g.saisir(".tree .filter input", "stat");
+      await g.saisir(".tree .tree-filter input", "stat");
     },
   },
 };
