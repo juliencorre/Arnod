@@ -245,23 +245,51 @@ fn annuler_une_suppression_puis_jeton_expire() {
 }
 
 #[test]
-fn fichier_illisible_signale_une_seule_fois() {
+fn fichier_illisible_bloque_puis_repart_une_fois_mis_de_cote() {
     let fixture = Fixture::new();
     fs::create_dir_all(fixture.data_dir()).unwrap();
-    fs::write(state_file(&fixture.data_dir()), "pas du JSON").unwrap();
+    let path = state_file(&fixture.data_dir());
+    fs::write(&path, "pas du JSON").unwrap();
 
     let state = fixture.load();
 
-    let warning = state.load_catalog().unwrap().warning.unwrap();
-    assert_eq!(warning.kind, CommandErrorKind::CorruptState);
-    assert!(
-        warning
-            .message
-            .starts_with("L'état d'Arnod était illisible (JSON invalide")
-    );
-    assert!(state.load_catalog().unwrap().warning.is_none());
-    // Un état neuf et valide a remplacé le fichier mis de côté.
-    assert!(fixture.load().load_catalog().unwrap().warning.is_none());
+    assert_eq!(kind(state.load_catalog()), CommandErrorKind::CorruptState);
+    let failure = state.failure().unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), "pas du JSON");
+    // Réessayer sans rien changer : toujours illisible, toujours intact.
+    assert_eq!(state.reload(), Some(failure.clone()));
+
+    // Lot G : l'utilisateur choisit de repartir d'un état vide.
+    let aside = crate::startup::set_aside(&path, "illisible").unwrap();
+    assert_eq!(state.reload(), None);
+    state.set_warning(CommandError::new(
+        CommandErrorKind::CorruptState,
+        "mis de côté",
+    ));
+
+    let loaded = state.load_catalog().unwrap();
+    assert!(loaded.snapshot.projects.is_empty());
+    assert_eq!(loaded.warning.unwrap().message, "mis de côté");
+    assert_eq!(fs::read_to_string(aside).unwrap(), "pas du JSON");
+    assert!(path.is_file(), "un état neuf est enregistré");
+    assert_eq!(state.reload(), None, "sans échec, rien n'est relu");
+}
+
+#[test]
+fn dossier_de_donnees_impossible_a_creer_bloque() {
+    let fixture = Fixture::new();
+    // Un fichier à la place du dossier de données.
+    fs::write(fixture.data_dir(), "").unwrap();
+
+    let state = fixture.load();
+
+    let failure = state.failure().unwrap();
+    assert!(failure.path.starts_with(fixture.data_dir()), "{failure:?}");
+    assert!(matches!(
+        failure.cause,
+        crate::startup::Cause::Inaccessible { .. }
+    ));
+    assert_eq!(kind(state.load_catalog()), CommandErrorKind::Io);
 }
 
 #[test]

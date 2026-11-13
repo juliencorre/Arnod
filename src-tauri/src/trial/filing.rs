@@ -45,6 +45,7 @@ impl Undo {
             if path.exists() {
                 fs::remove_file(path)
                     .map_err(|e| CommandError::io("Annulation impossible", path, &e))?;
+                crate::watch::settle(path);
             }
         }
         for (path, text) in &self.restored {
@@ -181,6 +182,8 @@ pub fn file_into(
         undo.created.push(to.clone());
         fs::remove_file(&from)
             .map_err(|e| CommandError::io("Déplacement impossible", &from, &e))?;
+        // Suppression faite par Arnod : pas une modification hors d'Arnod (lot I).
+        crate::watch::settle(&from);
         undo.restored.push((from, original));
         let relative = format!(
             "{folder}/{}",
@@ -201,6 +204,7 @@ pub fn file_into(
     if left.is_empty() {
         fs::remove_file(&source)
             .map_err(|e| CommandError::io("Retrait du contrat impossible", &source, &e))?;
+        crate::watch::settle(&source);
         undo.restored.push((source, source_text));
     }
     Ok((

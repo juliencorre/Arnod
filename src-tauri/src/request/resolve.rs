@@ -12,7 +12,8 @@ use serde_json::Value;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::request::dynamic::{self, Dice};
 use crate::request::model::{
-    ApiKeyLocation, Auth, AuthKind, BodyKind, Method, Pair, ParamKind, Request,
+    ApiKeyLocation, Auth, AuthKind, BodyKind, CredentialsPlacement, Method, Pair, ParamKind,
+    Request, TokenPlacement,
 };
 
 /// Texte affiché à la place d'un secret (R9).
@@ -52,6 +53,18 @@ impl Variables {
         values
     }
 
+    /// Lot H : ajoute des valeurs à masquer partout (jeton OAuth 2, cookies `HttpOnly`).
+    #[must_use]
+    pub fn hiding(&self, values: &[String]) -> Self {
+        let mut hidden = self.clone();
+        for (index, value) in values.iter().enumerate() {
+            let name = format!("\u{0}lot-h-{index}");
+            hidden.values.insert(name.clone(), value.clone());
+            hidden.secrets.insert(name);
+        }
+        hidden
+    }
+
     /// Remplace chaque valeur secrète de `text` par `••••` (R9).
     pub fn mask(&self, text: &str) -> String {
         self.mask_owned(text.to_owned())
@@ -84,6 +97,22 @@ pub struct Prepared {
     pub drawn: Vec<DrawnValue>,
     /// Variables lues, sans doublon, dans l'ordre de première lecture.
     pub used: Vec<String>,
+    /// Lot H : jeton OAuth 2 à obtenir avant l'envoi (`docs/plan-mvp-h-reseau-auth.md`, R8).
+    pub oauth2: Option<OAuth2Grant>,
+    /// Lot H : valeurs ajoutées à l'envoi (jeton, cookies `HttpOnly`) à masquer partout.
+    pub hidden: Vec<String>,
+}
+
+/// Lot H : demande de jeton OAuth 2, variables résolues (R8, R11).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OAuth2Grant {
+    pub token_url: String,
+    pub client_id: String,
+    pub client_secret: String,
+    pub scope: String,
+    pub credentials: CredentialsPlacement,
+    pub placement: TokenPlacement,
+    pub token_name: String,
 }
 
 /// Valeur dynamique tirée à un envoi (R9, R10).
@@ -394,6 +423,7 @@ pub fn prepare_with(
             .map_or(&request.auth, |inherited| &inherited.auth),
         _ => &request.auth,
     };
+    let mut oauth2 = None;
     match auth.kind {
         // Aucune, héritée sans source, ou autre (non gérée) : rien n'est envoyé.
         AuthKind::None | AuthKind::Inherit | AuthKind::Other => {}
@@ -421,6 +451,19 @@ pub fn prepare_with(
             }
         },
         AuthKind::ApiKey => {}
+        // Lot H : le jeton est demandé par `network` juste avant l'envoi (R9).
+        AuthKind::OAuth2 => {
+            let o = &auth.oauth2;
+            oauth2 = Some(OAuth2Grant {
+                token_url: sub(&o.access_token_url).trim().to_owned(),
+                client_id: sub(&o.client_id),
+                client_secret: sub(&o.client_secret),
+                scope: sub(&o.scope).trim().to_owned(),
+                credentials: o.credentials,
+                placement: o.token_placement,
+                token_name: o.token_name.trim().to_owned(),
+            });
+        }
     }
 
     // Seule la variante sélectionnée part (R2).
@@ -505,6 +548,8 @@ pub fn prepare_with(
         },
         drawn,
         used,
+        oauth2,
+        hidden: Vec::new(),
     })
 }
 

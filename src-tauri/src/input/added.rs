@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::Serialize;
 
 use crate::http::USER_AGENT;
-use crate::request::model::{ApiKeyLocation, AuthKind, BodyKind, Request};
+use crate::request::model::{ApiKeyLocation, AuthKind, BodyKind, Request, TokenPlacement};
 use crate::request::resolve::{MASK, variable_names};
 
 /// D'où vient un en-tête ajouté.
@@ -92,6 +92,17 @@ pub fn added_headers(request: &Request, values: &BTreeMap<String, String>) -> Ve
     let header = match auth.kind {
         AuthKind::Basic => Some(("Authorization".to_owned(), format!("Basic {MASK}"))),
         AuthKind::Bearer => Some(("Authorization".to_owned(), format!("Bearer {MASK}"))),
+        // Lot H : jeton OAuth 2 obtenu à l'envoi (R11).
+        AuthKind::OAuth2 if auth.oauth2.token_placement == TokenPlacement::Header => {
+            let name = auth.oauth2.token_name.trim();
+            Some(
+                if name.is_empty() || name.eq_ignore_ascii_case("authorization") {
+                    ("Authorization".to_owned(), format!("Bearer {MASK}"))
+                } else {
+                    (name.to_owned(), MASK.to_owned())
+                },
+            )
+        }
         AuthKind::ApiKey
             if auth.location == ApiKeyLocation::Header && !auth.name.trim().is_empty() =>
         {

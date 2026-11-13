@@ -121,6 +121,7 @@ describe("filtrer le référentiel (1.2-e, F1 à F5)", () => {
     await click(wrapper(), '.tree [role="treeitem"]', "Changer le statut");
     expect(core.calls.filter((c) => c.cmd === "layout_open_selection").at(-1)?.args).toEqual({
       content: { kind: "request", projectId: expect.any(String), path: "commandes/v2/changer.yml" },
+      preview: true,
     });
     expect((filterInput().element as HTMLInputElement).value).toBe("stat");
   });

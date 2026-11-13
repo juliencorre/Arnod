@@ -117,7 +117,36 @@ export type CommandName =
   | "trial_transfer"
   // Essais rangés dans un projet (2.2-d).
   | "trial_file"
-  | "trial_file_undo";
+  | "trial_file_undo"
+  // Valeurs dynamiques proposées à la saisie (5.1-h).
+  | "dynamic_values"
+  // Lot H - Réseau et authentification.
+  | "network_load"
+  | "network_save"
+  | "network_pick_authority"
+  | "network_add_authority"
+  | "network_remove_authority"
+  | "project_auth_load"
+  | "project_auth_save"
+  | "oauth2_token_renew"
+  | "oauth2_token_forget"
+  | "cookies_list"
+  | "cookies_clear"
+  | "cookies_set_sending"
+  // Lot F : onglets et clavier (docs/plan-mvp-f-onglets-clavier.md).
+  | "layout_pin"
+  | "layout_close_tabs"
+  | "layout_set_sidebar_hidden"
+  // Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md).
+  | "request_conflict"
+  | "request_conflict_resolve"
+  // Lot G - Démarrage et erreurs.
+  | "startup_status"
+  | "startup_retry"
+  | "startup_start_empty"
+  | "startup_open"
+  | "startup_quit"
+  | "window_ready";
 
 /**
  * Nature d'une erreur de commande.
@@ -143,7 +172,8 @@ export type CommandErrorKind =
   | "timeout" // Délai dépassé.
   | "cancelled" // Exécution annulée par l'utilisateur.
   | "secretStore" // Le coffre du système est indisponible.
-  | "protectedEnvironment"; // Envoi sur un environnement protégé sans confirmation.
+  | "protectedEnvironment" // Envoi sur un environnement protégé sans confirmation.
+  | "changedOnDisk"; // Fichier modifié hors d'Arnod depuis sa lecture, rien n'est écrasé (lot I).
 
 /**
  * Erreur renvoyée par une commande Rust qui échoue : la promesse d'`invoke` est
@@ -156,6 +186,8 @@ export interface CommandError {
   kind: CommandErrorKind;
   /** Message en français, prêt à afficher. */
   message: string;
+  /** Lot H : échec réseau classé (absent sinon). */
+  failure?: NetworkFailure;
 }
 
 /**
@@ -328,7 +360,7 @@ export interface Pair {
  * Type d'authentification. `inherit` (héritée du dossier) et `other` (digest, OAuth…)
  * sont conservés dans le fichier mais rien n'est envoyé.
  */
-export type AuthKind = "none" | "basic" | "bearer" | "apiKey" | "inherit" | "other";
+export type AuthKind = "none" | "basic" | "bearer" | "apiKey" | "inherit" | "other" | "oauth2";
 export type ApiKeyLocation = "header" | "query";
 
 /** Authentification (`Auth` en Rust, structure plate). */
@@ -342,6 +374,26 @@ export interface Auth {
   location: ApiKeyLocation;
   /** Type OpenCollection d'une authentification `other` (`oauth2`…). */
   other: string;
+  /** Lot H : OAuth 2 par identifiants client (`type: oauth2`). */
+  oauth2: OAuth2;
+}
+
+/** Lot H : où le client présente ses identifiants au serveur de jetons. */
+export type CredentialsPlacement = "basicAuthHeader" | "body";
+/** Lot H : où part le jeton OAuth 2. */
+export type TokenPlacement = "header" | "query";
+
+/** Lot H : OAuth 2 par identifiants client (`OAuth2` en Rust, R8). */
+export interface OAuth2 {
+  accessTokenUrl: string;
+  clientId: string;
+  /** Référence `{{oauth2ClientSecret}}` : la valeur est au coffre (R10). */
+  clientSecret: string;
+  scope: string;
+  credentials: CredentialsPlacement;
+  tokenPlacement: TokenPlacement;
+  /** Nom de l'en-tête ou du paramètre. */
+  tokenName: string;
 }
 
 /** Type de corps, commun aux variantes ; `other` (multipart, fichier…) est conservé mais pas envoyé. */
@@ -678,6 +730,8 @@ export type ContentRef =
 export interface ContentTab {
   id: string;
   content: ContentRef;
+  /** Onglet d'aperçu (1.3-a) : ouvert d'un simple clic, remplacé par le prochain aperçu. */
+  preview: boolean;
 }
 
 /** Place du résultat d'une requête dans sa zone (F6). */
@@ -698,6 +752,8 @@ export interface ZoneView {
   tabs: ContentTab[];
   activeTab: string | null;
   placement: Placement;
+  /** Onglets dans l'ordre d'utilisation, le plus récent d'abord (Ctrl+Tab, 1.3-c). */
+  recent: string[];
 }
 
 /** Nœud de la disposition : une zone ou une séparation (`Node`). */
@@ -743,6 +799,8 @@ export interface WindowView {
   /** Fenêtre principale : barre latérale détachée. */
   sidebarDetached: boolean;
   bounds: WindowBounds | null;
+  /** Fenêtre principale : barre latérale masquée (Ctrl+\, 1.4-j). */
+  sidebarHidden: boolean;
 }
 
 /** Toutes les fenêtres (`WindowsFile`), aussi diffusé par `arnod://fenetres`. */
@@ -772,6 +830,8 @@ export interface RequestResult {
   sending: boolean;
   outcome: SendOutcome | null;
   error: string | null;
+  /** Lot H : échec réseau classé (5.1-i). */
+  failure?: NetworkFailure;
   /** Réception de la réponse, en millisecondes depuis l'époque Unix. */
   receivedAt: number | null;
   /** Requête telle qu'envoyée (lot E, R12), `null` avant le premier envoi réussi. */
@@ -1417,4 +1477,275 @@ export interface FiledTrials {
   contractName: string;
   /** Jeton de « Annuler » (`trial_file_undo`). */
   undoToken: string;
+}
+
+/** Valeur dynamique proposée à la frappe de `{{$` (`DynamicValue`, 5.1-h). */
+export interface DynamicValue {
+  /** Nom avec son `$` : `$randomUUID`, `$date:+3d`. */
+  name: string;
+  description: string;
+  /** Exemple tiré à la lecture ; une autre valeur est tirée à chaque envoi. */
+  example: string;
+}
+
+/*
+ * Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md).
+ * Équivalents Rust dans `src-tauri/src/network/` et `src-tauri/src/commands/network.rs`.
+ */
+
+/** Mode de proxy (`ProxyMode`). */
+export type ProxyMode = "system" | "none" | "manual";
+/** Origine du proxy du système (`ProxySource`). */
+export type ProxySource = "environment" | "windows";
+
+export interface ManualProxy {
+  url: string;
+  noProxy: string;
+  username: string;
+}
+
+export interface ProxyPrefs {
+  mode: ProxyMode;
+  manual: ManualProxy;
+}
+
+/** Proxy du système détecté (`SystemProxy`). */
+export interface SystemProxy {
+  http: string | null;
+  https: string | null;
+  noProxy: string;
+  source: ProxySource | null;
+  /** Script de configuration automatique, non pris en charge. */
+  autoConfig: string | null;
+}
+
+/** Certificat montré à l'utilisateur (`CertificateInfo`). */
+export interface CertificateInfo {
+  subject: string;
+  issuer: string;
+  notBefore: string;
+  notAfter: string;
+  fingerprint: string;
+  names: string[];
+  authority: boolean;
+  selfSigned: boolean;
+  pem: string;
+}
+
+/** Autorité interne ajoutée (`AuthorityView`). */
+export interface AuthorityView extends CertificateInfo {
+  addedAt: number;
+}
+
+/** Préférences réseau (`NetworkView`, 1.6-e). */
+export interface NetworkView {
+  proxy: ProxyPrefs;
+  hasProxyPassword: boolean;
+  system: SystemProxy;
+  connectTimeoutMs: number;
+  systemAuthorities: number;
+  authorities: AuthorityView[];
+}
+
+/** Préférences modifiées (`NetworkPrefsInput`). */
+export interface NetworkPrefsInput {
+  proxy: ProxyPrefs;
+  /** `null` : inchangé ; vide : retiré du coffre. */
+  proxyPassword: string | null;
+  connectTimeoutMs: number;
+}
+
+/** Cause d'un échec réseau (`FailureCause`, R5). */
+export type FailureCause =
+  "certificate" | "proxy" | "proxyAuth" | "dns" | "unreachable" | "timeout" | "tls" | "other";
+
+/** Problème d'un certificat refusé (`CertificateProblem`). */
+export type CertificateProblem =
+  "unknownIssuer" | "expired" | "notYetValid" | "wrongName" | "revoked" | "other";
+
+export interface CertificateFailure {
+  problem: CertificateProblem;
+  server: CertificateInfo;
+  /** Autorité à laquelle « Faire confiance » (R7). */
+  authority: CertificateInfo | null;
+}
+
+/** Échec réseau expliqué (`NetworkFailure`, 5.1-i). */
+export interface NetworkFailure {
+  cause: FailureCause;
+  title: string;
+  explanation: string;
+  notSent: boolean;
+  host: string;
+  port: number;
+  proxy: string | null;
+  connectTimeoutMs: number;
+  elapsedMs: number;
+  certificate: CertificateFailure | null;
+}
+
+/** État d'un jeton OAuth 2, sans sa valeur (`TokenStatus`). */
+export interface TokenStatus {
+  obtainedAt: number;
+  expiresAt: number | null;
+}
+
+/** Ce qui remplace l'authentification du projet (`AuthOverride`, OA4). */
+export interface AuthOverride {
+  /** Vide : requêtes sans authentification. */
+  label: string;
+  path: string;
+  type: AuthKind;
+  other: string;
+  count: number;
+}
+
+export interface AuthUsage {
+  inheriting: number;
+  overrides: AuthOverride[];
+}
+
+/** Authentification du projet (`ProjectAuthView`, 3.4-a). */
+export interface ProjectAuthView {
+  auth: Auth;
+  environment: string;
+  token: TokenStatus | null;
+  hasClientSecret: boolean;
+  usage: AuthUsage;
+}
+
+/** Cookie gardé, valeur masquée ou abrégée (`CookieView`, R14). */
+export interface CookieView {
+  name: string;
+  value: string;
+  path: string;
+  expiresAt: number | null;
+  httpOnly: boolean;
+  secure: boolean;
+  receivedFrom: string;
+}
+
+export interface CookieDomain {
+  domain: string;
+  sending: boolean;
+  cookies: CookieView[];
+}
+
+/** Cookies gardés d'un environnement (`CookieJarView`, 3.4-g). */
+export interface CookieJarView {
+  environment: string;
+  host: string | null;
+  domains: CookieDomain[];
+}
+
+// Lot F : onglets et clavier (docs/plan-mvp-f-onglets-clavier.md).
+
+/** Raccourci choisi dans le menu natif Fenêtre (`Shortcut`), reçu par `arnod://raccourci`. */
+export type MenuShortcut = "placement" | "sidebar";
+
+// --- Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md) ---
+
+/** Requête renommée ou déplacée hors d'Arnod (`Renamed`, R5). */
+export interface RenamedFile {
+  from: string;
+  to: string;
+}
+
+/** Changements d'un projet faits hors d'Arnod, diffusés par `arnod://fichiers` (`FilesChange`). */
+export interface FilesChange {
+  projectId: string;
+  /** Requêtes ajoutées, modifiées, supprimées (chemins relatifs au projet). */
+  added: string[];
+  modified: string[];
+  removed: string[];
+  renamed: RenamedFile[];
+  tree: boolean;
+  environments: boolean;
+  contracts: boolean;
+}
+
+/** Version gardée pour un élément en conflit (`ConflictSide`). */
+export type ConflictSide = "disk" | "draft";
+
+/** Élément d'une requête en conflit avec le disque (`ConflictItem`, R9, R10). */
+export interface ConflictItem {
+  /** Clé stable (`url`, `headers:x-request-id#0`). */
+  key: string;
+  /** Libellé en français (« En-tête X-Request-Id »). */
+  label: string;
+  /** Valeur sur le disque, prête à afficher ; `null` : absent sur le disque. */
+  disk: string | null;
+  /** Valeur du brouillon ; `null` : absent du brouillon. */
+  draft: string | null;
+  /** Même valeur des deux côtés, changée de la même façon. */
+  identical: boolean;
+  /** Version proposée : celle qui seule a changé. */
+  suggested: ConflictSide | null;
+}
+
+/** Conflit d'une requête ouverte (`RequestConflict`). */
+export interface RequestConflict {
+  items: ConflictItem[];
+  /** Date de modification du fichier (ms depuis l'époque Unix). */
+  modifiedAt: number | null;
+}
+
+// Lot G - Démarrage et erreurs (docs/plan-mvp-g-demarrage-erreurs.md).
+
+/** Nature d'une erreur bloquante au démarrage (`startup::ProblemNature`). */
+export type ProblemNature = "newerVersion" | "corruptState" | "locked" | "inaccessible";
+
+/** Issue proposée par l'écran d'erreur (`startup::StartupAction`). */
+export type StartupAction = "openReleases" | "startEmpty" | "retry" | "openFolder";
+
+/** Ce que `startup_open` ouvre avec le programme du système (`startup::StartupTarget`). */
+export type StartupTarget = "folder" | "releases" | "issue";
+
+/** Une issue et ses conséquences (`startup::StartupOption`). */
+export interface StartupOption {
+  action: StartupAction;
+  title: string;
+  description: string;
+  button: string;
+  /** La recommandée, toujours en premier. */
+  recommended: boolean;
+  /** Ligne de plus : essais automatiques épuisés. */
+  note: string | null;
+}
+
+/** Prochain essai automatique d'un fichier verrouillé (`startup::RetryPlan`). */
+export interface RetryPlan {
+  attempt: number;
+  maxAttempts: number;
+  delaySeconds: number;
+}
+
+/** Ligne des détails pour le support (`startup::DetailRow`). */
+export interface DetailRow {
+  label: string;
+  value: string;
+}
+
+/** Erreur bloquante décrite par le cœur (`startup::StartupProblem`). */
+export interface StartupProblem {
+  nature: ProblemNature;
+  /** `arnod.json` ou `windows.json`. */
+  file: string;
+  title: string;
+  /** La cause en clair. */
+  message: string;
+  /** Ce qui est intact : début en gras, puis la suite. */
+  intactLead: string;
+  intactText: string;
+  /** Deux issues, la recommandée en premier. */
+  options: StartupOption[];
+  pathLabel: string;
+  path: string;
+  retry: RetryPlan | null;
+  details: DetailRow[];
+  /** Détails en texte, pour « Copier le détail ». */
+  supportText: string;
+  /** Issue GitHub préremplie : rien n'est envoyé sans l'utilisateur. */
+  issueUrl: string;
+  footer: string;
 }

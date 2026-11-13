@@ -84,6 +84,7 @@ pub fn render(value: &Value) -> Result<String, CommandError> {
 pub fn write(path: &Path, value: &Value) -> Result<(), CommandError> {
     let text = render(value)?;
     if fs::read_to_string(path).is_ok_and(|current| current == text) {
+        crate::watch::record_write(path, text.as_bytes());
         return Ok(());
     }
     let tmp = path.with_extension("yml.tmp");
@@ -92,5 +93,8 @@ pub fn write(path: &Path, value: &Value) -> Result<(), CommandError> {
     fs::rename(&tmp, path).map_err(|error| {
         let _ = fs::remove_file(&tmp);
         CommandError::io("Écriture impossible", path, &error)
-    })
+    })?;
+    // Écriture d'Arnod : son écho n'est pas un changement fait hors d'Arnod (lot I, R2).
+    crate::watch::record_write(path, text.as_bytes());
+    Ok(())
 }

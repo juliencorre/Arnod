@@ -78,7 +78,18 @@ pub fn render(request: &Request) -> Result<String, CommandError> {
 /// Écrit une requête : seuls les champs gérés par Arnod remplacent ceux du
 /// fichier existant (R3) ; rien n'est réécrit si le contenu n'a pas changé.
 pub fn write(path: &Path, request: &Request) -> Result<(), CommandError> {
-    let value = into_value(request, existing(path).as_ref());
+    let base = existing(path);
+    // Un fichier illisible (YAML cassé, non conforme) n'est jamais réécrit (lot I, R12).
+    if base.is_none() && path.exists() {
+        return Err(CommandError::new(
+            CommandErrorKind::InvalidRequest,
+            format!(
+                "Le fichier {} est illisible : il ne sera pas réécrit tant qu'il n'est pas réparé.",
+                path.display()
+            ),
+        ));
+    }
+    let value = into_value(request, base.as_ref());
     write_value(path, &value, &request.name)
 }
 

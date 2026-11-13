@@ -2289,4 +2289,530 @@ describe("Lot E - tests et étapes", () => {
     ).toBe(true);
     await screenshot(browser, "24-nouveau-test");
   });
+
+  it("la liste des valeurs dynamiques s'ouvre à la frappe de {{$ et insère la valeur choisie (5.1-h)", async () => {
+    // Le curseur est resté dans l'adresse de l'étape 1 (4.1-b) : on tape à la suite.
+    const value = () =>
+      browser.execute(() => (document.activeElement as HTMLInputElement | null)?.value ?? "");
+    // Deux « { » envoyés d'un coup se fondent en un sous WebKitGTK : une touche par appel.
+    for (const key of ["End", "{", "{", "$", "r", "a", "n", "d"]) await browser.keys([key]);
+    await browser.waitUntil(() => browser.$(".dynamic-values").isExisting(), {
+      timeoutMsg: "liste des valeurs dynamiques attendue",
+    });
+    await screenshot(browser, "25-valeurs-dynamiques");
+    await browser.keys(["ArrowDown", "Enter"]);
+    await browser.waitUntil(async () => (await value()).endsWith("{{$randomInt}}"), {
+      timeoutMsg: "valeur dynamique insérée attendue",
+    });
+    expect(await browser.$(".dynamic-values").isExisting()).toBe(false);
+  });
+
+  it("une étiquette du projet est proposée avec son nombre de requêtes (4.9-a)", async () => {
+    const file = (name: string) => path.join(project(), "Créer puis lire", name);
+    /** Ouvre une requête de la barre latérale et attend son éditeur. */
+    const open = async (name: string): Promise<void> => {
+      await clickText('aside [role="treeitem"]', name);
+      await browser.waitUntil(
+        () =>
+          browser.execute(
+            (n) =>
+              Array.from(
+                document.querySelectorAll<HTMLInputElement>(".request-tab .meta__input"),
+              ).some((input) => input.value === n) &&
+              document.querySelector(".request-tab .tag__add") !== null,
+            name,
+          ),
+        { timeoutMsg: `éditeur de « ${name} » attendu` },
+      );
+    };
+    await open("Lire le client");
+    await clickText(".request-tab .tag__add", "+ Étiquette");
+    await browser.keys([..."parcours".split(""), "Enter"]);
+    await browser.waitUntil(() => readFileSync(file("lire.yml"), "utf8").includes("parcours"), {
+      timeoutMsg: "étiquette enregistrée attendue",
+    });
+    await open("Supprimer le client");
+    await clickText(".request-tab .tag__add", "+ Étiquette");
+    await browser.keys("par".split(""));
+    await browser.waitUntil(
+      async () =>
+        (await browser.$(".tag-list").isExisting()) &&
+        (await browser.$(".tag-list").getText()).includes("parcours"),
+      { timeoutMsg: "étiquette du projet proposée attendue" },
+    );
+    await screenshot(browser, "26-etiquettes");
+    await browser.keys(["Enter"]);
+    await browser.waitUntil(
+      () => readFileSync(file("supprimer.yml"), "utf8").includes("parcours"),
+      { timeoutMsg: "étiquette proposée ajoutée attendue" },
+    );
+    expect(readFileSync(file("supprimer.yml"), "utf8")).toContain("parcours");
+  });
+});
+
+describe("Lot H - Réseau et authentification", () => {
+  let server: Server;
+  let url = "";
+  /** Dernier en-tête Cookie reçu par le serveur. */
+  let received: string | null = null;
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      if (request.url === "/login") {
+        response.writeHead(200, {
+          "Content-Type": "application/json",
+          "Set-Cookie": "session=lot-h-1234; Path=/; HttpOnly; Max-Age=1800",
+        });
+        response.end('{"ok":true}');
+      } else {
+        // Garde le cookie reçu : la requête suivante doit l'avoir.
+        received = request.headers.cookie ?? null;
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ cookie: received }));
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /** Ouvre « Lister les commandes » et l'envoie à `target`. */
+  async function sendTo(target: string): Promise<void> {
+    await browser.execute(() => {
+      const row = Array.from(
+        document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'),
+      ).find(
+        (item) => item.querySelector(".row__name")?.textContent.trim() === "Lister les commandes",
+      );
+      if (!row) throw new Error("requête « Lister les commandes » introuvable");
+      row.click();
+    });
+    await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+    await browser.execute((address) => {
+      const input = document.querySelector<HTMLInputElement>(".request-tab .editor__url");
+      if (!input) throw new Error("adresse introuvable");
+      input.value = address;
+      input.dispatchEvent(new Event("input"));
+    }, target);
+    await clickText(".request-tab button", "Envoyer");
+  }
+
+  it("Ctrl+, ouvre les préférences : proxy et autorités du poste (1.6-e)", async () => {
+    await browser.execute(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ctrlKey: true }));
+    });
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForExist({ timeout: 10_000 });
+    await browser.waitUntil(async () => (await dialog.getText()).includes("Autorités racines"), {
+      timeoutMsg: "section Certificats attendue",
+    });
+    expect(await dialog.getText()).toContain("Celui du système");
+    await screenshot(browser, "h1-preferences-reseau");
+    await browser.keys("Escape");
+    await browser.$("dialog[open]").waitForExist({ reverse: true, timeout: 5_000 });
+  });
+
+  it("un serveur injoignable est expliqué : la requête n'est pas partie (5.1-i)", async () => {
+    await sendTo("http://127.0.0.1:1/commandes");
+    const panel = browser.$(".net-failure");
+    await panel.waitForExist({ timeout: 30_000 });
+    const text = await panel.getText();
+    expect(text).toContain("127.0.0.1:1");
+    expect(text).toContain("La requête n'est pas partie");
+    expect(text).not.toContain("Ignorer");
+    await screenshot(browser, "h2-echec-reseau");
+  });
+
+  it("un cookie reçu est gardé pour l'environnement et renvoyé (3.4-g)", async () => {
+    await sendTo(`${url}/login`);
+    await browser.waitUntil(
+      async () => (await browser.$(".response__status").getText()).startsWith("200"),
+      { timeout: 15_000, timeoutMsg: "réponse 200 attendue" },
+    );
+    await sendTo(`${url}/moi`);
+    await browser.waitUntil(() => received === "session=lot-h-1234", {
+      timeout: 15_000,
+      timeoutMsg: "le cookie gardé doit repartir",
+    });
+    // HttpOnly : sa valeur reste masquée dans la réponse affichée.
+    await browser.waitUntil(
+      async () => (await browser.$(".code").getText()).includes("session=••••"),
+      {
+        timeout: 10_000,
+        timeoutMsg: "valeur du cookie masquée attendue",
+      },
+    );
+    await clickText(".request-tab .editor__tab", "En-têtes");
+    const cookies = browser.$('[aria-label="Cookies gardés de 127.0.0.1"]');
+    await cookies.waitForExist({ timeout: 10_000 });
+    expect(await cookies.getText()).toContain("GET /login");
+    await screenshot(browser, "h4-cookies");
+    await clickText(".cookies button", "Vider");
+    await cookies.waitForExist({ reverse: true, timeout: 10_000 });
+  });
+
+  it("les réglages du projet règlent OAuth 2 et disent qui l'hérite (3.4-a)", async () => {
+    await clickHidden(`aside button[aria-label="Plus d'actions sur boutique-tests"]`);
+    await clickText('[role="menuitem"]', "Réglages du projet…");
+    // Le texte est lu dans le DOM : WebKitGTK ne rend pas toute la fenêtre visible d'un coup.
+    const settingsText = () =>
+      browser.execute(() => document.querySelector("dialog[open]")?.textContent ?? "");
+    await browser.waitUntil(async () => (await settingsText()).includes("Qui l'utilise"), {
+      timeout: 10_000,
+      timeoutMsg: "réglages du projet attendus",
+    });
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>("dialog[open] select");
+      if (!select) throw new Error("type introuvable");
+      select.value = "oauth2";
+      select.dispatchEvent(new Event("change"));
+    });
+    await browser.$("dialog[open] .oauth2").waitForExist({ timeout: 5_000 });
+    expect(await settingsText()).toContain("URL du jeton");
+    await screenshot(browser, "h3-reglages-projet");
+    await clickText("dialog[open] button", "Fermer");
+  });
+});
+
+describe("Lot F - onglets et clavier", () => {
+  /** Onglets de la zone active : nom et aperçu (titre en italique). */
+  async function activeZoneTabs(): Promise<{ name: string; preview: boolean }[]> {
+    return browser.execute(() =>
+      Array.from(document.querySelectorAll(".zone__tab:not(.zone__tab--hidden)")).map((tab) => ({
+        name: tab.querySelector(".zone__name")?.textContent.trim() ?? "",
+        preview: tab.classList.contains("zone__tab--preview"),
+      })),
+    );
+  }
+
+  async function waitForTabs(expected: { name: string; preview: boolean }[]): Promise<void> {
+    const norm = (tabs: { name: string; preview: boolean }[]) =>
+      JSON.stringify(
+        tabs.map((t) => ({
+          name: t.name.normalize("NFC").replace(/\s+/g, " "),
+          preview: t.preview,
+        })),
+      );
+    let last: unknown = null;
+    try {
+      await browser.waitUntil(
+        async () => {
+          const tabs = await activeZoneTabs();
+          last = tabs;
+          return norm(tabs) === norm(expected);
+        },
+        { timeout: 10_000 },
+      );
+    } catch (error) {
+      console.error("activeZoneTabs", JSON.stringify(last), String(error));
+      // Diagnostic : tous les onglets du DOM (cachés compris) et les zones enregistrées.
+      const dom = await browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab")).map(
+          (tab) => `${tab.className}:${tab.querySelector(".zone__name")?.textContent ?? ""}`,
+        ),
+      );
+      const saved = readWindows(sandbox).windows.map((w) =>
+        w.layout ? zonesOf(w.layout.root).map((z) => z.tabs) : w.kind,
+      );
+      throw new Error(
+        `onglets ${JSON.stringify(expected)} attendus, lus ${JSON.stringify(last)} ; DOM ${JSON.stringify(dom)} ; windows.json ${JSON.stringify(saved)}`,
+      );
+    }
+  }
+
+  /** Raccourci émis dans la WebView, par le code de la touche (AZERTY compris). */
+  async function shortcut(code: string, type = "keydown", shift = false): Promise<void> {
+    await browser.execute(
+      (keyCode, eventType, withShift) => {
+        const key = keyCode === "Tab" ? "Tab" : keyCode === "ControlLeft" ? "Control" : keyCode;
+        window.dispatchEvent(
+          new KeyboardEvent(eventType, {
+            code: keyCode,
+            key,
+            ctrlKey: eventType === "keydown",
+            shiftKey: withShift,
+            bubbles: true,
+          }),
+        );
+      },
+      code,
+      type,
+      shift,
+    );
+  }
+
+  /** Texte du DOM : WebKitGTK peut perdre les blancs entre éléments avec `getText`. */
+  async function textOf(selector: string): Promise<string> {
+    return browser.execute((css) => document.querySelector(css)?.textContent ?? "", selector);
+  }
+
+  async function dblclickRow(name: string): Promise<void> {
+    await browser.execute((label) => {
+      const row = Array.from(
+        document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'),
+      ).find((r) => r.textContent.includes(label));
+      if (!row) throw new Error(`« ${label} » introuvable`);
+      row.click();
+      row.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    }, name);
+  }
+
+  it("ferme tout, puis un simple clic ouvre en aperçu, remplacé au suivant (1.3-a, 1.3-b)", async () => {
+    if ((await activeZoneTabs()).length > 0) {
+      await browser.execute(() => {
+        document
+          .querySelector('.zone__tab-button[aria-selected="true"]')
+          ?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+      });
+      await browser.$('[role="menu"]').waitForDisplayed();
+      await clickText('[role="menuitem"]', "Fermer tout");
+    }
+    await waitForTabs([]);
+
+    await clickText('aside [role="treeitem"]', "Créer le client");
+    await waitForTabs([{ name: "Créer le client", preview: true }]);
+    await clickText('aside [role="treeitem"]', "Lire le client");
+    await waitForTabs([{ name: "Lire le client", preview: true }]);
+    await dblclickRow("Supprimer le client");
+    await waitForTabs([{ name: "Supprimer le client", preview: false }]);
+    await clickText('aside [role="treeitem"]', "Lire le client");
+    await waitForTabs([
+      { name: "Supprimer le client", preview: false },
+      { name: "Lire le client", preview: true },
+    ]);
+    expect(await activeZoneTabs()).toHaveLength(2);
+    await screenshot(browser, "25-onglet-apercu");
+  });
+
+  it("« +N » liste les onglets en trop et ferme les autres (1.3-b)", async () => {
+    const requests: string[] = await browser.execute(() =>
+      Array.from(document.querySelectorAll('aside [role="treeitem"]:not([aria-expanded])')).map(
+        (r) => r.querySelector(".row__name")?.textContent.trim() ?? "",
+      ),
+    );
+    for (const name of requests) {
+      if (await browser.$(".zone__more").isExisting()) break;
+      if (name !== "") await dblclickRow(name);
+    }
+    const more = browser.$(".zone__more");
+    await more.waitForExist({ timeout: 10_000, timeoutMsg: "bouton « +N » attendu" });
+    await more.click();
+    const menu = browser.$('[role="menu"][aria-label^="Autres onglets"]');
+    await menu.waitForDisplayed();
+    expect(await menu.getText()).toContain("Fermer les autres onglets");
+    await screenshot(browser, "26-onglets-en-trop");
+
+    await clickText('[role="menuitem"]', "Fermer les autres onglets");
+    await browser.waitUntil(async () => (await activeZoneTabs()).length === 1, {
+      timeoutMsg: "un seul onglet attendu",
+    });
+    expect(await browser.$(".zone__more").isExisting()).toBe(false);
+  });
+
+  it("Ctrl+Tab passe à l'onglet utilisé juste avant (1.3-c)", async () => {
+    const [first] = (await activeZoneTabs()).map((t) => t.name);
+    await dblclickRow(first === "Lire le client" ? "Créer le client" : "Lire le client");
+    await browser.waitUntil(async () => (await activeZoneTabs()).length === 2);
+
+    await shortcut("Tab");
+    const list = browser.$(".zone__switcher");
+    await list.waitForDisplayed();
+    expect(await textOf('.zone__switcher [aria-selected="true"]')).toContain(first ?? "");
+    await screenshot(browser, "27-ctrl-tab");
+    await shortcut("ControlLeft", "keyup");
+    await browser.waitUntil(async () => !(await list.isExisting()));
+    expect(await textOf('.zone__tab-button[aria-selected="true"]')).toContain(first ?? "");
+  });
+
+  it("Ctrl+J met le résultat dessous, Ctrl+\\ masque la barre latérale (1.4-j)", async () => {
+    await dblclickRow("Lire le client");
+    await browser.$(".request-tab").waitForDisplayed();
+    const below = () => browser.$(".request-tab--below").isExisting();
+    const before = await below();
+    await shortcut("KeyJ");
+    await browser.waitUntil(async () => (await below()) !== before, {
+      timeoutMsg: "place du résultat changée attendue",
+    });
+
+    await shortcut("Backslash");
+    await browser.waitUntil(async () => !(await browser.$("aside").isExisting()), {
+      timeoutMsg: "barre latérale masquée attendue",
+    });
+    await browser.waitUntil(() => readWindows(sandbox).windows[0]?.sidebarHidden === true);
+    expect(readWindows(sandbox).windows[0]?.sidebarHidden).toBe(true);
+    await screenshot(browser, "28-clavier");
+
+    // Gardé par la fenêtre : rouvert après un redémarrage, masqué.
+    await restart();
+    await browser.$('[aria-label="Afficher la barre latérale"]').waitForDisplayed();
+    await browser.$('[aria-label="Afficher la barre latérale"]').click();
+    await browser.$("aside").waitForDisplayed();
+    expect(readWindows(sandbox).windows[0]?.sidebarHidden).toBe(false);
+    await shortcut("KeyJ");
+    await browser.waitUntil(async () => (await below()) === before);
+  });
+});
+
+describe("Lot I - Fichiers modifiés hors d'Arnod (4.1-e)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const file = () => path.join(project(), "surveille.yml");
+
+  /** Écrit la requête comme un éditeur ou un `git pull`, application lancée. */
+  function writeOutside(url: string): void {
+    writeFileSync(
+      file(),
+      `info:\n  name: Fichier surveillé\n  type: http\nhttp:\n  method: GET\n  url: ${url}\n`,
+    );
+  }
+
+  /** Adresse de l'onglet de la requête surveillée, s'il est affiché. */
+  function shownUrl(): Promise<string> {
+    return browser.execute(() => {
+      const fields = Array.from(document.querySelectorAll<HTMLInputElement>(".editor__url"));
+      return fields.find((f) => f.offsetParent !== null)?.value ?? "";
+    });
+  }
+
+  it("une requête ajoutée sur disque apparaît, puis son onglet suit le fichier (R3)", async () => {
+    writeOutside("http://localhost/v1");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll('aside [role="treeitem"]')).some((i) =>
+            i.textContent.includes("Fichier surveillé"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "requête ajoutée hors d'Arnod attendue dans l'arborescence" },
+    );
+    await clickText('aside [role="treeitem"]', "Fichier surveillé");
+    await browser.waitUntil(async () => (await shownUrl()) === "http://localhost/v1", {
+      timeoutMsg: "onglet de la requête attendu",
+    });
+
+    writeOutside("http://localhost/v2");
+    await browser.waitUntil(async () => (await shownUrl()) === "http://localhost/v2", {
+      timeout: 10_000,
+      timeoutMsg: "onglet relu après la modification sur disque attendu",
+    });
+    expect(await shownUrl()).toBe("http://localhost/v2");
+    await screenshot(browser, "25-recharge-depuis-le-disque");
+  });
+
+  it("un brouillon en conflit n'est pas écrasé et se règle élément par élément (R9 à R11)", async () => {
+    await browser.execute(() => {
+      const field = Array.from(document.querySelectorAll<HTMLInputElement>(".editor__url")).find(
+        (f) => f.offsetParent !== null,
+      );
+      if (!field) throw new Error("adresse introuvable");
+      field.value = "http://localhost/brouillon";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    // Écrit avant l'enregistrement automatique (600 ms) : le brouillon est en conflit.
+    writeOutside("http://localhost/v3");
+    await browser.$(".conflict").waitForDisplayed({ timeout: 10_000 });
+    expect(readFileSync(file(), "utf8")).toContain("http://localhost/v3");
+    await screenshot(browser, "26-conflit");
+
+    await clickText(".conflict__actions button", "Tout garder de mon brouillon");
+    await clickText(".conflict__actions button", "Appliquer et enregistrer");
+    await browser.waitUntil(
+      () => readFileSync(file(), "utf8").includes("http://localhost/brouillon"),
+      { timeout: 10_000, timeoutMsg: "brouillon écrit une seule fois après le choix" },
+    );
+    expect(await browser.$(".conflict").isExisting()).toBe(false);
+  });
+
+  it("une requête supprimée sur disque ferme son onglet (R4)", async () => {
+    rmSync(file());
+    await browser.waitUntil(async () => (await shownUrl()) !== "http://localhost/brouillon", {
+      timeout: 10_000,
+      timeoutMsg: "onglet fermé attendu",
+    });
+    expect(
+      await browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab-button")).some((t) =>
+          t.textContent.includes("Fichier surveillé"),
+        ),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("Lot G - Démarrage et erreurs (0.3)", () => {
+  const statePath = () => path.join(sandbox.dataDir, "arnod.json");
+
+  /** Texte d'un élément du DOM (WebKitGTK peut perdre les blancs entre éléments). */
+  function textOf(selector: string): Promise<string> {
+    return browser.execute(
+      (s) => document.querySelector(s)?.textContent.replace(/\s+/g, " ").trim() ?? "",
+      selector,
+    );
+  }
+
+  it("un arnod.json illisible s'explique, intact, avec deux issues (0.3-b, 0.3-b ter)", async () => {
+    const original = readFileSync(statePath(), "utf8");
+    await browser.deleteSession();
+    writeFileSync(statePath(), "{ pas du JSON");
+    browser = await launchApp();
+
+    await browser.$(".startup-problem").waitForDisplayed({ timeout: 10_000 });
+    expect(await heading(browser)).toBe("L'état d'Arnod est illisible");
+    expect(await textOf(".startup-problem__intact")).toContain("Rien n'a été modifié.");
+    const buttons = await browser.execute(() =>
+      Array.from(document.querySelectorAll(".startup-problem__option-button")).map((b) =>
+        b.textContent.trim(),
+      ),
+    );
+    expect(buttons).toEqual(["Repartir d'un état vide", "Réessayer"]);
+    // Rien n'est écrit tant que l'utilisateur n'a pas choisi.
+    expect(readFileSync(statePath(), "utf8")).toBe("{ pas du JSON");
+    await screenshot(browser, "0.3-b-illisible");
+
+    await browser.$(".startup-problem__toggle").click();
+    await browser.$("#startup-problem-details").waitForDisplayed();
+    expect(await textOf("#startup-problem-details")).toContain("corruptState");
+    await screenshot(browser, "0.3-b-ter-details");
+
+    await browser.$(".startup-problem__option-button*=Repartir").click();
+    await browser.$(".startup-problem").waitForExist({ reverse: true, timeout: 10_000 });
+    expect(await toastText(browser)).toContain("arnod.json.illisible");
+    expect(readFileSync(path.join(sandbox.dataDir, "arnod.json.illisible"), "utf8")).toBe(
+      "{ pas du JSON",
+    );
+    expect(readState(sandbox).projects).toEqual([]);
+
+    // L'état d'origine remis en place, les projets reviennent.
+    await browser.deleteSession();
+    writeFileSync(statePath(), original);
+    browser = await launchApp();
+    expect(await browser.$(".startup-problem").isExisting()).toBe(false);
+    expect(readState(sandbox).projects.length).toBeGreaterThan(0);
+  });
+
+  it("un état d'une version plus récente n'est ni lu ni réécrit (0.3-b)", async () => {
+    const original = readFileSync(statePath(), "utf8");
+    const newer = JSON.stringify({ version: 99, writtenBy: "9.0.0" });
+    await browser.deleteSession();
+    writeFileSync(statePath(), newer);
+    browser = await launchApp();
+
+    await browser.$(".startup-problem").waitForDisplayed({ timeout: 10_000 });
+    expect(await heading(browser)).toBe("Cet état vient d'une version plus récente d'Arnod");
+    expect(await textOf(".startup-problem__option--recommended h3")).toContain(
+      "Installer Arnod 9.0.0 ou plus récent",
+    );
+
+    await browser.deleteSession();
+    expect(readFileSync(statePath(), "utf8")).toBe(newer);
+    writeFileSync(statePath(), original);
+    browser = await launchApp();
+    expect(await browser.$(".startup-problem").isExisting()).toBe(false);
+  });
 });

@@ -11,6 +11,10 @@ import { PETSTORE_SOURCE } from "../fakeContracts";
 import { AUTH_SSO, BOUTIQUE_TESTS, boutiqueSnapshot, firstRunSnapshot } from "../fixtures";
 import type { Example } from "@/types/ipc";
 import { brunoSource } from "../fakeImports";
+// Lot H - Réseau et authentification.
+import { certificateFailureLotH, certificateLotH } from "../fakeNetwork";
+import { fichierVerrouilleLotG, versionPlusRecenteLotG } from "../fakeStartup";
+import type { StartupProblem } from "@/types/ipc";
 
 /** Gestes dans la page, par sélecteur CSS et texte visible. */
 export interface Gestes {
@@ -22,6 +26,8 @@ export interface Gestes {
   touche: (cle: string, options?: KeyboardEventInit & { selecteur?: string }) => Promise<void>;
   /** Attend que les promesses et le rendu se terminent. */
   attendre: (ms?: number) => Promise<void>;
+  /** Lot F : double-clique le premier élément qui correspond (et contient `texte`). */
+  doubleCliquer?: (selecteur: string, texte?: string) => Promise<void>;
 }
 
 export interface Scenario {
@@ -706,10 +712,474 @@ Object.assign(SCENARIOS, {
       await g.attendre(100);
     },
   },
+  // --- Lot F - Onglets et clavier (docs/plan-mvp-f-onglets-clavier.md) --------------
+  "1.3-a": {
+    description: "Onglets : aperçu en italique et ◐ pendant un envoi (1.3-a)",
+    setup: ongletsLotF,
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, ["Créer un client", "Santé", "Lire une commande"]);
+      await g.cliquer('[role="treeitem"]', "Lister les commandes");
+      await g.attendre(150);
+    },
+  },
+  "1.3-b": {
+    description: "Trop d'onglets : le menu « +N » ouvert (1.3-b)",
+    setup: ongletsLotF,
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, [
+        "Créer un client",
+        "Santé",
+        "Lire une commande",
+        "Changer le statut",
+        "Annuler une commande",
+        "Lister les clients",
+      ]);
+      await g.cliquer('[role="treeitem"]', "Lister les commandes");
+      await g.attendre(150);
+      await g.cliquer(".zone__more");
+      await g.attendre(100);
+    },
+  },
+  "1.3-c": {
+    description: "Ctrl+Tab : les onglets dans l'ordre d'utilisation (1.3-c)",
+    setup: ongletsLotF,
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, ["Lire une commande", "Santé", "Changer le statut"]);
+      await g.cliquer('[role="treeitem"]', "Créer un client");
+      await g.touche("Tab", { code: "Tab", ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
+  "1.4-j": {
+    description: "Ctrl+J : résultat dessous, Ctrl+\\ : barre latérale masquée (1.4-j)",
+    setup: () => {
+      const core = ongletsLotF();
+      core.workbench.nextSend = okOutcome();
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, ["Lire une commande", "Changer le statut", "Créer un client"]);
+      await g.cliquer(".editor__line button[type='submit']");
+      await g.attendre(100);
+      await g.touche("j", { code: "KeyJ", ctrlKey: true });
+      await g.touche("\\", { code: "Backslash", ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
+  // Lot G - Démarrage et erreurs (0.3).
+  "0.3-a": {
+    description: "Démarrage lent : squelette de l'écran attendu (0.3-a)",
+    setup: () => {
+      const core = installFakeCore(boutiqueSnapshot());
+      core.startup.slow = true;
+      return core;
+    },
+  },
+  "0.3-b": {
+    description: "Erreur au démarrage, deux issues dont la recommandée (0.3-b)",
+    setup: () => erreurLotG(versionPlusRecenteLotG()),
+  },
+  "0.3-b-bis": {
+    description: "Fichier d'état verrouillé, essai automatique (0.3-b bis)",
+    setup: () => erreurLotG(fichierVerrouilleLotG()),
+  },
+  "0.3-b-ter": {
+    description: "Détails pour le support dépliés (0.3-b ter)",
+    setup: () => erreurLotG(versionPlusRecenteLotG()),
+    play: async (g: Gestes) => {
+      await g.cliquer(".startup-problem__toggle");
+    },
+  },
 } satisfies Record<string, Scenario>);
+
+/** Lot F : référentiel « commandes/v2 », et un envoi de « Santé » en cours (◐). */
+function ongletsLotF(): FakeCore {
+  const core = largeur(commandes(), 320);
+  core.workbench.results.set("sante.yml", {
+    projectId: BOUTIQUE_TESTS,
+    path: "sante.yml",
+    sending: true,
+    outcome: null,
+    error: null,
+    receivedAt: null,
+    request: null,
+  });
+  return core;
+}
+
+/** Lot F : ouvre le projet puis ces requêtes en onglets permanents (double-clic). */
+async function ouvrirOngletsLotF(g: Gestes, noms: string[]): Promise<void> {
+  await ouvrirProjet(g);
+  for (const nom of noms) await g.doubleCliquer?.('[role="treeitem"]', nom);
+}
 
 /** Collection Bruno des scénarios d'import. */
 const BRUNO_DIR = "/home/julien/bruno/boutique-api";
+
+// --- Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md) -----------
+
+/** Lot H : « Créer une commande » sur « Recette fonctionnelle », comme la maquette. */
+function commandeLotH(): FakeCore {
+  const core = installFakeCore(boutiqueSnapshot());
+  const wb = core.workbench;
+  wb.envs = [
+    {
+      name: "Recette fonctionnelle",
+      color: "orange",
+      variables: [
+        { name: "baseUrl", value: "https://recette.boutique.dev" },
+        { name: "authUrl", value: "https://auth.boutique.dev" },
+        { name: "oauthClientId", value: "boutique-tests" },
+      ],
+      locals: ["oauth2ClientSecret"],
+    },
+  ];
+  wb.active = "Recette fonctionnelle";
+  wb.folders.add("commandes");
+  wb.requests.set(
+    "commandes/creer.yml",
+    newRequest("Créer une commande", {
+      method: "POST",
+      url: "{{baseUrl}}/orders",
+      headers: [
+        {
+          name: "Content-Type",
+          value: "application/json",
+          enabled: true,
+          kind: "query",
+          description: "",
+        },
+        {
+          name: "Accept",
+          value: "application/json",
+          enabled: true,
+          kind: "query",
+          description: "",
+        },
+      ],
+      body: {
+        kind: "json",
+        variants: [
+          {
+            title: "",
+            content:
+              '{\n  "customerId": "cus_31",\n  "items": [{ "sku": "TSH-BLU-M", "qty": 2 }],\n  "coupon": "BIENVENUE"\n}',
+            form: [],
+          },
+        ],
+        selected: 0,
+        other: "",
+      },
+    }),
+  );
+  wb.requests.set("commandes/lister.yml", newRequest("Lister les commandes"));
+  return core;
+}
+
+async function ouvrirCommandeLotH(g: Gestes): Promise<void> {
+  await ouvrirProjet(g);
+  await g.cliquer('[role="treeitem"]', "Créer une commande");
+}
+
+Object.assign(SCENARIOS, {
+  "1.6-e": {
+    description: "Préférences → Réseau et certificats : proxy et autorités du poste (1.6-e)",
+    setup: () => {
+      const core = commandeLotH();
+      core.network.view.authorities = [{ ...certificateLotH("Entreprise Root CA"), addedAt: 1 }];
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.touche(",", { ctrlKey: true });
+      await g.attendre(150);
+    },
+  },
+  "5.1-i": {
+    description: "Échec réseau : certificat non reconnu, cause et action (5.1-i)",
+    setup: () => {
+      const core = commandeLotH();
+      core.workbench.nextSend = certificateFailureLotH();
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirCommandeLotH(g);
+      await g.cliquer(".editor__tab", "Corps");
+      await g.cliquer(".editor__line button[type='submit']");
+      await g.attendre(150);
+    },
+  },
+  "3.4-a": {
+    description: "Réglages du projet → Authentification : OAuth 2 et jeton (3.4-a)",
+    setup: () => {
+      const core = commandeLotH();
+      const auth = newRequest("x").auth;
+      auth.type = "oauth2";
+      auth.oauth2 = {
+        accessTokenUrl: "{{authUrl}}/oauth/token",
+        clientId: "{{oauthClientId}}",
+        clientSecret: "{{oauth2ClientSecret}}",
+        scope: "orders:read orders:write payments:write",
+        credentials: "basicAuthHeader",
+        tokenPlacement: "header",
+        tokenName: "Authorization",
+      };
+      core.network.auth.set(BOUTIQUE_TESTS, auth);
+      core.network.hasClientSecret = true;
+      core.network.token = {
+        obtainedAt: new Date(2026, 10, 6, 11, 42).getTime(),
+        expiresAt: new Date(2026, 10, 6, 12, 42).getTime(),
+      };
+      core.network.usage = {
+        inheriting: 52,
+        overrides: [
+          { label: "dossier « v1-legacy »", path: "v1-legacy", type: "basic", other: "", count: 5 },
+        ],
+      };
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[aria-label="Plus d\'actions sur boutique-tests"]');
+      await g.cliquer('[role="menuitem"]', "Réglages du projet…");
+      await g.attendre(150);
+    },
+  },
+  "3.4-g": {
+    description: "Cookies gardés de l'environnement, sous les en-têtes (3.4-g)",
+    setup: () => {
+      const core = commandeLotH();
+      const now = Date.now();
+      core.network.cookies.set("Recette fonctionnelle", {
+        environment: "Recette fonctionnelle",
+        host: "recette.boutique.dev",
+        domains: [
+          {
+            domain: "recette.boutique.dev",
+            sending: true,
+            cookies: [
+              {
+                name: "session",
+                value: "••••••••",
+                path: "/",
+                expiresAt: now + 28 * 60_000,
+                httpOnly: true,
+                secure: true,
+                receivedFrom: "POST /login",
+              },
+              {
+                name: "csrf",
+                value: "9f2c…e1",
+                path: "/",
+                expiresAt: null,
+                httpOnly: false,
+                secure: true,
+                receivedFrom: "POST /login",
+              },
+            ],
+          },
+        ],
+      });
+      core.workbench.nextSend = okOutcome({
+        response: {
+          status: 201,
+          statusText: "Created",
+          headers: [
+            ["content-type", "application/json"],
+            ["set-cookie", "cart=c_71f2…; Path=/; HttpOnly"],
+            ["x-request-id", "a41f…c9"],
+          ],
+          body: '{"id":"ord_8F2kQ"}',
+          truncated: false,
+          sizeBytes: 612,
+          waitMs: 40,
+          receiveMs: 2,
+          totalMs: 42,
+        },
+      });
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirCommandeLotH(g);
+      await g.cliquer(".editor__line button[type='submit']");
+      await g.attendre(100);
+      await g.cliquer(".editor__tab", "En-têtes");
+      await g.cliquer(".response__tab", "En-têtes");
+      await g.attendre(150);
+    },
+  },
+} satisfies Record<string, Scenario>);
+// --- Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md) ------------
+
+/** Lot I : « commandes/v2/Créer une commande » de l'écran 4.1-e. */
+function commandesLotI(): FakeCore {
+  const core = largeur(commandes(), 320);
+  core.workbench.requests.set(
+    "commandes/v2/creer-une-commande.yml",
+    newRequest("Créer une commande", {
+      method: "POST",
+      url: "{{baseUrl}}/orders",
+      body: {
+        kind: "json",
+        variants: [{ title: "", content: '{ "coupon": "BIENVENUE" }', form: [] }],
+        selected: 0,
+        other: "",
+      },
+      assertions: [
+        {
+          id: "statut",
+          target: "status",
+          operator: "equals",
+          value: 200,
+          origin: "manual",
+          enabled: true,
+        },
+        {
+          id: "total",
+          target: "body.total",
+          operator: "equals",
+          value: 59.8,
+          origin: "manual",
+          enabled: true,
+        },
+      ],
+    }),
+  );
+  return core;
+}
+
+/**
+ * Lot I : brouillon commencé ici (coupon, statut 201), puis le fichier change sur le disque (en-tête
+ * ajouté, vérification retirée, même statut) : l'onglet montre le conflit.
+ */
+async function conflitLotI(g: Gestes, core: FakeCore): Promise<void> {
+  await ouvrirProjet(g);
+  await g.cliquer('[role="treeitem"]', "Créer une commande");
+  await g.attendre(100);
+  const { useWorkbenchStore } = await import("@/stores/workbench");
+  const editor = Object.values(useWorkbenchStore().editors).find((e) =>
+    e.path.endsWith("creer-une-commande.yml"),
+  );
+  const draft = editor?.draft;
+  if (!draft) throw new Error("brouillon introuvable");
+  const variant = draft.body.variants[0];
+  if (variant) variant.content = '{ "coupon": "NOEL26" }';
+  const status = draft.assertions.find((a) => a.target === "status");
+  if (status) status.value = 201;
+  const disk = core.workbench.requests.get("commandes/v2/creer-une-commande.yml");
+  if (disk) {
+    disk.headers.push({
+      name: "X-Request-Id",
+      value: "{{$randomUUID}}",
+      enabled: true,
+      kind: "query",
+      description: "",
+    });
+    disk.assertions = disk.assertions
+      .filter((a) => a.target !== "body.total")
+      .map((a) => (a.target === "status" ? { ...a, value: 201 } : a));
+  }
+  await core.emit("arnod://projet", {
+    projectId: BOUTIQUE_TESTS,
+    scope: "request",
+    path: "commandes/v2/creer-une-commande.yml",
+    origin: "",
+  });
+  await g.attendre(200);
+}
+
+Object.assign(SCENARIOS, {
+  "4.1-e": {
+    description: "Brouillon en conflit avec le disque, réglé élément par élément (4.1-e)",
+    setup: commandesLotI,
+    play: conflitLotI,
+  },
+  "4.1-e-supprime": {
+    description: "Requête supprimée hors d'Arnod avec un brouillon : Restaurer ou Fermer (4.1-e)",
+    setup: commandesLotI,
+    play: async (g: Gestes, core: FakeCore) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Créer une commande");
+      await g.saisir(".editor__url", "{{baseUrl}}/v2/orders");
+      core.workbench.requests.delete("commandes/v2/creer-une-commande.yml");
+      await core.emit("arnod://fichiers", {
+        projectId: BOUTIQUE_TESTS,
+        added: [],
+        modified: [],
+        removed: ["commandes/v2/creer-une-commande.yml"],
+        renamed: [],
+        tree: true,
+        environments: false,
+        contracts: false,
+      });
+      await g.attendre(200);
+    },
+  },
+} satisfies Record<string, Scenario>);
+/** Lot G : erreur bloquante servie par le faux cœur au démarrage. */
+function erreurLotG(problem: StartupProblem): FakeCore {
+  const core = installFakeCore(firstRunSnapshot());
+  core.startup.problem = problem;
+  return core;
+}
+
+/** Liste des valeurs dynamiques proposée à la frappe de `{{$` (5.1-h). */
+Object.assign(SCENARIOS, {
+  "5.1-h-liste": {
+    description: "Liste des valeurs dynamiques ouverte à la frappe de {{$ dans le corps (5.1-h)",
+    setup: commandesLotE,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Créer une commande");
+      await g.cliquer(".editor__line button[type='submit']");
+      await g.attendre(100);
+      await g.cliquer(".response__tab", "Envoyé");
+      await g.cliquer(".editor__tab", "Corps");
+      await g.saisir(
+        ".body__content",
+        '{\n  "externalRef": "{{$randomUUID}}",\n  "customerId": "cus_31",\n  "customerEmail": "{{$randomEmail}}",\n  "deliveryDate": "{{$date:+3d}}",\n  "requestedAt": "{{$',
+      );
+      await g.attendre(200);
+    },
+  },
+} satisfies Record<string, Scenario>);
+
+/** Étiquettes proposées avec leur nombre à la saisie (4.9-a). */
+Object.assign(SCENARIOS, {
+  "4.9-a": {
+    description: "Étiquette en cours de saisie : propositions du projet avec leur nombre (4.9-a)",
+    setup: () => {
+      const core = installFakeCore(boutiqueSnapshot());
+      const wb = core.workbench;
+      wb.folders.add("commandes");
+      wb.requests.set(
+        "commandes/creer.yml",
+        newRequest("Créer une commande", {
+          method: "POST",
+          url: "{{baseUrl}}/orders",
+          tags: ["smoke", "paiement"],
+        }),
+      );
+      const tagged: [string, string, string[]][] = [
+        ["lister", "Lister les commandes", ["non-régression", "nominal"]],
+        ["lire", "Lire une commande", ["non-régression", "nominal"]],
+        ["statut", "Changer le statut", ["non-régression"]],
+        ["annuler", "Annuler une commande", ["non-régression", "smoke"]],
+      ];
+      for (const [file, name, tags] of tagged) {
+        wb.requests.set(`commandes/${file}.yml`, newRequest(name, { tags }));
+      }
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Créer une commande");
+      await g.cliquer(".tag__add");
+      await g.saisir(".tag__input", "no");
+      await g.attendre(150);
+    },
+  },
+} satisfies Record<string, Scenario>);
 
 /** « Non classés » et l'essai 3 `GET /orders/42/tracking` de son contrat déduit (2.2-b, 2.2-c). */
 function essaisNonClasses(): FakeCore {

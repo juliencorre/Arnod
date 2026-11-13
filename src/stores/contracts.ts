@@ -166,9 +166,9 @@ export const useContractsStore = defineStore("contracts", () => {
     return false;
   }
 
-  /** Ouvre un contrat en onglet, dans la fenêtre qui suit la sélection (Z5). */
-  function show(projectId: string, path: string): Promise<boolean> {
-    return windows.openSelection({ kind: "contract", projectId, path });
+  /** Ouvre un contrat en onglet, dans la fenêtre qui suit la sélection (Z5) ; en aperçu si `preview`. */
+  function show(projectId: string, path: string, preview = false): Promise<boolean> {
+    return windows.openSelection({ kind: "contract", projectId, path }, preview);
   }
 
   function isDirty(key: string): boolean {

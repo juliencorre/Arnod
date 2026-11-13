@@ -158,6 +158,8 @@ describe("ouvrir et créer depuis une opération (RC2 à RC4)", () => {
         projectId: BOUTIQUE_TESTS,
         path: "Petstore/animaux/a-lister.yml",
       },
+      // Simple clic : aperçu (lot F, 1.3-a).
+      preview: true,
     });
     // L'opération a deux requêtes : elle se déplie ; sa ligne, l'endpoint, est sélectionnée.
     expect(wrapper().get('[aria-label="Replier GET /pets"]').attributes("aria-expanded")).toBe(

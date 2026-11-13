@@ -21,13 +21,16 @@ import {
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import AssertionsEditor from "@/components/workbench/AssertionsEditor.vue";
+import CookiesSection from "@/components/workbench/CookiesSection.vue";
 import AuthEditor from "@/components/workbench/AuthEditor.vue";
 import BodyEditor from "@/components/workbench/BodyEditor.vue";
+import DynamicValuesMenu from "@/components/workbench/DynamicValuesMenu.vue";
 import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
 import TrialGeneralize from "@/components/workbench/TrialGeneralize.vue";
 import TrialTransfer from "@/components/workbench/TrialTransfer.vue";
+import TagsEditor from "@/components/workbench/TagsEditor.vue";
 import VariablesEditor from "@/components/workbench/VariablesEditor.vue";
 import { pathParamNames } from "@/lib/url";
 import { KNOWN_VARIABLES, vVariables } from "@/lib/variables";
@@ -39,6 +42,8 @@ import { useWorkbenchStore } from "@/stores/workbench";
 import type { CurlCopy, HttpMethod, Pair, RequestDoc, UnknownVariable } from "@/types/ipc";
 
 const props = defineProps<{ editorKey: string }>();
+/** Racine de l'éditeur : la liste des valeurs dynamiques écoute ses champs (5.1-h). */
+const editorRoot = useTemplateRef<HTMLElement>("editorRoot");
 
 const workbench = useWorkbenchStore();
 const contracts = useContractsStore();
@@ -92,6 +97,10 @@ function unlinkContract(): void {
 // --- Enregistrement automatique (EP1) -------------------------------------------
 
 const saveLabel = computed(() => {
+  // Lot I : relue après une modification faite hors d'Arnod, sans brouillon (R3).
+  if (editor.value?.reloaded && editor.value.saveState === "saved") {
+    return "⟳ Rechargé depuis le disque";
+  }
   switch (editor.value?.saveState) {
     case "pending":
       return "Modifications en attente…";
@@ -106,33 +115,6 @@ const saveLabel = computed(() => {
 
 function retrySave(): void {
   void workbench.save(props.editorKey).catch(() => undefined);
-}
-
-// --- Étiquettes (EP1) -------------------------------------------------------------
-
-const addingTag = ref(false);
-const newTag = ref("");
-const tagInput = useTemplateRef<HTMLInputElement>("tagInput");
-
-async function startTag(): Promise<void> {
-  addingTag.value = true;
-  newTag.value = "";
-  await nextTick();
-  tagInput.value?.focus();
-}
-
-function commitTag(): void {
-  const tag = newTag.value.trim();
-  const tags = request.value?.tags;
-  if (tags && tag !== "" && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) {
-    tags.push(tag);
-  }
-  addingTag.value = false;
-  newTag.value = "";
-}
-
-function removeTag(index: number): void {
-  request.value?.tags.splice(index, 1);
 }
 
 // --- Paramètres de chemin (EP2, R1) ---------------------------------------------
@@ -333,7 +315,7 @@ watch(
 </script>
 
 <template>
-  <section v-if="request" class="editor" aria-label="Requête" @keydown="onKeydown">
+  <section v-if="request" ref="editorRoot" class="editor" aria-label="Requête" @keydown="onKeydown">
     <div class="editor__top">
       <p v-if="contract" class="editor__crumbs">
         <span>Contrats de service</span>
@@ -377,10 +359,6 @@ watch(
       <button type="button" class="link" @click="workbench.revertToSent(editorKey)">
         Revenir à la version envoyée
       </button>
-    </p>
-    <p v-if="editor?.changedElsewhere" class="editor__elsewhere" role="status">
-      Modifiée dans une autre fenêtre.
-      <button type="button" class="link" @click="workbench.reload(editorKey)">Recharger</button>
     </p>
 
     <form class="editor__line" @submit.prevent="workbench.send(editorKey)">
@@ -487,33 +465,11 @@ watch(
       </div>
       <div class="meta">
         <span :id="ids.tags">Étiquettes</span>
-        <ul class="tags" :aria-labelledby="ids.tags">
-          <li v-for="(tag, index) in request.tags" :key="tag" class="tag">
-            {{ tag }}
-            <button
-              type="button"
-              class="tag__remove"
-              :aria-label="`Retirer l'étiquette ${tag}`"
-              @click="removeTag(index)"
-            >
-              ×
-            </button>
-          </li>
-          <li>
-            <input
-              v-if="addingTag"
-              ref="tagInput"
-              v-model="newTag"
-              class="tag__input"
-              type="text"
-              aria-label="Nouvelle étiquette"
-              @keydown.enter.prevent="commitTag"
-              @keydown.escape.prevent="addingTag = false"
-              @blur="commitTag"
-            />
-            <button v-else type="button" class="tag__add" @click="startTag">+ Étiquette</button>
-          </li>
-        </ul>
+        <TagsEditor
+          v-model="request.tags"
+          :project-id="editor?.projectId ?? ''"
+          :labelledby="ids.tags"
+        />
       </div>
     </div>
 
@@ -613,6 +569,8 @@ watch(
             Auth. « Envoyé » montre les valeurs réellement parties.
           </p>
         </template>
+        <!-- Lot H (3.4-g) : cookies gardés de l'environnement pour cet hôte. -->
+        <CookiesSection :editor-key="editorKey" />
       </div>
 
       <AuthEditor
@@ -664,6 +622,7 @@ watch(
       :start-new="false"
       @close="managingEnvironments = false"
     />
+    <DynamicValuesMenu :root="editorRoot" />
   </section>
 </template>
 
@@ -744,14 +703,6 @@ watch(
   color: var(--color-link);
 }
 
-.editor__elsewhere {
-  margin: 0;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-md);
-  font-size: var(--text-body);
-  background: var(--color-accent-soft);
-}
-
 /* Zone étroite (jusqu'à 280 px, Z4) : le bouton passe sous l'adresse. */
 .editor__line {
   display: flex;
@@ -763,8 +714,7 @@ watch(
 .editor__url,
 .meta__input,
 .editor__docs,
-.path-param__input,
-.tag__input {
+.path-param__input {
   box-sizing: border-box;
   min-height: var(--control-md);
   padding: 0.3125rem 0.625rem;
@@ -985,56 +935,6 @@ watch(
   font-size: var(--text-body);
 }
 
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--radius-pill);
-  font-size: var(--text-body);
-  color: var(--color-text);
-  background: var(--color-chip);
-}
-
-.tag__remove,
-.tag__add {
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-}
-
-.tag__remove {
-  padding: 0 0.125rem;
-  color: var(--color-muted);
-}
-
-.tag__add {
-  min-height: var(--control-sm);
-  padding: 0 0.625rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  font-size: var(--text-body);
-  color: var(--color-text);
-  background: var(--color-surface);
-}
-
-.tag__input {
-  width: 9rem;
-  min-height: var(--control-sm);
-  padding: 0.1875rem 0.5rem;
-  font-size: var(--text-body);
-}
-
 /* Zone étroite : les onglets passent à la ligne, aucun n'est caché. */
 .editor__tabs {
   display: flex;
@@ -1202,9 +1102,6 @@ watch(
   .meta__input,
   .editor__docs,
   .path-param__input,
-  .tag__input,
-  .tag__remove,
-  .tag__add,
   .editor__tab,
   .editor__contract,
   .editor__curl-button,

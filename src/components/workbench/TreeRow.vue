@@ -130,14 +130,18 @@ function onSelect(id: string): void {
   else emit("action", id, props.node);
 }
 
-function activate(): void {
+/**
+ * Simple clic : la requête ou le test s'ouvre en aperçu ; double-clic : l'onglet reste
+ * (lot F, 1.3-a).
+ */
+function activate(preview = true): void {
   // Un test s'ouvre dans son onglet ; son chevron le replie (lot E, TE1).
-  if (isTest.value) void workbench.openTest(props.projectId, props.node.path);
+  if (isTest.value) void workbench.openTest(props.projectId, props.node.path, preview);
   else if (props.node.kind === "folder") {
     // Pendant un filtre, les dossiers restent dépliés (F3).
-    if ((props.filter ?? null) === null)
+    if (preview && (props.filter ?? null) === null)
       void workbench.toggleFolder(props.projectId, props.node.path);
-  } else void workbench.openRequest(props.projectId, props.node.path);
+  } else void workbench.openRequest(props.projectId, props.node.path, preview);
 }
 </script>
 
@@ -151,7 +155,8 @@ function activate(): void {
         :aria-expanded="node.kind === 'folder' ? isOpen : undefined"
         :aria-selected="isSelected"
         :aria-level="depth + 1"
-        @click="activate"
+        @click="activate()"
+        @dblclick="activate(false)"
         @keydown.right="isTest && !isOpen && workbench.toggleFolder(projectId, node.path)"
         @keydown.left="isTest && isOpen && workbench.toggleFolder(projectId, node.path)"
       >

@@ -251,11 +251,18 @@ function creatable(contract: ContractSummary, operation: OperationNode): boolean
   return operation.supported && contract.error === null;
 }
 
-/** Ouvre l'endpoint de l'opération (RC2), ou crée sa requête (RC3). */
-async function onOperation(contract: ContractSummary, operation: OperationNode): Promise<void> {
+/**
+ * Ouvre l'endpoint de l'opération (RC2), en aperçu sur un simple clic (lot F, 1.3-a), ou crée
+ * sa requête (RC3).
+ */
+async function onOperation(
+  contract: ContractSummary,
+  operation: OperationNode,
+  preview = true,
+): Promise<void> {
   const endpoint = operation.requests[0];
-  if (endpoint) await workbench.openRequest(props.projectId, endpoint.path);
-  else if (creatable(contract, operation)) {
+  if (endpoint) await workbench.openRequest(props.projectId, endpoint.path, preview);
+  else if (preview && creatable(contract, operation)) {
     await contracts.createForOperation(props.projectId, contract.path, operation.key);
   }
 }
@@ -348,7 +355,8 @@ async function rename(name: string): Promise<void> {
             class="contract-row__main"
             :aria-current="contractSelected(contract) ? 'page' : undefined"
             :title="contract.error ?? `${contract.operationCount} opération(s)`"
-            @click="contracts.show(projectId, contract.path)"
+            @click="contracts.show(projectId, contract.path, true)"
+            @dblclick="contracts.show(projectId, contract.path)"
           >
             <span class="contract-row__badge" aria-hidden="true">API</span>
             <span class="contract-row__name">{{ contract.name }}</span>
@@ -448,6 +456,9 @@ async function rename(name: string): Promise<void> {
                     :title="operation.summary ?? `${operation.method} ${operation.path}`"
                     :disabled="operation.requests.length === 0 && !creatable(contract, operation)"
                     @click="onOperation(contract, operation)"
+                    @dblclick="
+                      operation.requests.length > 0 && onOperation(contract, operation, false)
+                    "
                   >
                     <span
                       class="crow__lead crow__method"

@@ -15,8 +15,9 @@ use uuid::Uuid;
 use crate::contract::file as contract_file;
 use crate::environment::{self, Environment};
 use crate::error::{CommandError, CommandErrorKind};
-use crate::http::{self, Cancel, HttpResponse};
+use crate::http::{Cancel, HttpResponse};
 use crate::local::{self, LocalData, LocalVar};
+use crate::network::{Network, Session};
 use crate::request::assertions::{self, AssertionResult, DEFAULT_LIMIT, ResponseData};
 use crate::request::extract::{self, ExtractedValue};
 use crate::request::model::{Method, Request};
@@ -437,6 +438,8 @@ pub struct Workbench {
     notifier: Mutex<Option<Arc<dyn Notifier>>>,
     /// Variables d'exécution de chaque projet pour la session (R6) : jamais écrites.
     runtime: Mutex<HashMap<Uuid, BTreeMap<String, String>>>,
+    /// Lot H : client HTTP du poste (proxy, autorités), jetons OAuth 2 et cookies.
+    network: Arc<Network>,
 }
 
 fn now_ms() -> u64 {
@@ -462,6 +465,10 @@ fn secret_key(ctx: &ProjectCtx, environment: &str, name: &str) -> String {
 
 impl Workbench {
     pub fn new(secrets: Arc<dyn SecretStore>) -> Self {
+        let network = Arc::new(Network::new(
+            secrets.clone(),
+            Box::new(crate::network::proxy::OsProxySource),
+        ));
         Self {
             secrets,
             executions: Mutex::new(HashMap::new()),
@@ -469,7 +476,13 @@ impl Workbench {
             statuses: Mutex::new(HashMap::new()),
             notifier: Mutex::new(None),
             runtime: Mutex::new(HashMap::new()),
+            network,
         }
+    }
+
+    /// Lot H : réseau du poste, partagé avec les commandes des préférences.
+    pub fn network(&self) -> &Arc<Network> {
+        &self.network
     }
 
     /// Branche la diffusion des changements (événements des fenêtres).
@@ -806,13 +819,22 @@ impl Workbench {
         Self::check_protected(&environment, &[request.method], confirmed)?;
         let runtime = self.runtime_variables(ctx.id);
         let variables = Self::with_runtime(&variables, &runtime);
-        let prepared = resolve::prepare(&request, &variables)?;
+        let mut prepared = resolve::prepare(&request, &variables)?;
         let cancel = Arc::new(Cancel::new());
         self.executions
             .lock()
             .map_err(|_| busy())?
             .insert(exec_id, cancel.clone());
-        let result = http::send(&prepared, &cancel).await;
+        let session = Session {
+            project: ctx.id,
+            environment: environment.name.clone(),
+        };
+        let result = self
+            .network
+            .send(&mut prepared, Some(&session), &cancel)
+            .await;
+        // Jeton et cookies ajoutés à l'envoi : masqués comme les secrets (lot H).
+        let variables = variables.hiding(&prepared.hidden);
         self.executions.lock().map_err(|_| busy())?.remove(&exec_id);
         let raw = result.map_err(|mut e| {
             e.message = variables.mask(&e.message);
@@ -840,13 +862,13 @@ impl Workbench {
             environment: environment::LOCAL.to_owned(),
             ..Variables::default()
         };
-        let prepared = resolve::prepare(request, &variables)?;
+        let mut prepared = resolve::prepare(request, &variables)?;
         let cancel = Arc::new(Cancel::new());
         self.executions
             .lock()
             .map_err(|_| busy())?
             .insert(exec_id, cancel.clone());
-        let result = http::send(&prepared, &cancel).await;
+        let result = self.network.send(&mut prepared, None, &cancel).await;
         self.executions.lock().map_err(|_| busy())?.remove(&exec_id);
         result
     }
@@ -1186,7 +1208,7 @@ impl Workbench {
                 let prepared = resolve::prepare(&request, variables)?;
                 Ok((request, prepared))
             });
-        let (request, prepared) = match prepared {
+        let (request, mut prepared) = match prepared {
             Ok(ok) => ok,
             Err(error) => {
                 let message = variables.mask(&error.message);
@@ -1197,7 +1219,16 @@ impl Workbench {
                 return false;
             }
         };
-        let result = http::send(&prepared, &handle.cancel).await;
+        let session = Session {
+            project: ctx.id,
+            environment: variables.environment.clone(),
+        };
+        let result = self
+            .network
+            .send(&mut prepared, Some(&session), &handle.cancel)
+            .await;
+        // Jeton et cookies ajoutés à l'envoi : masqués comme les secrets (lot H).
+        let variables = &variables.hiding(&prepared.hidden);
         match result {
             Ok(response) => {
                 let extracted = extract::apply(
