@@ -301,6 +301,7 @@ pages:
         {
           etat: livré,
           version: MVP,
+          pr: [59],
           captures: [28-transferer-au-referentiel],
           ecart:
             {
@@ -312,7 +313,7 @@ pages:
         {
           etat: livré,
           version: MVP,
-          pr: [35],
+          pr: [35, 59],
           captures: [27-essai-chemin-generalise],
           ecart:
             {
