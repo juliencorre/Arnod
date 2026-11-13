@@ -2318,10 +2318,12 @@ describe("Lot H - Réseau et authentification", () => {
   });
 
   it("les réglages du projet règlent OAuth 2 et disent qui l'hérite (3.4-a)", async () => {
-    await browser.$(`[aria-label="Plus d'actions sur boutique-tests"]`).click();
+    await clickHidden(`aside button[aria-label="Plus d'actions sur boutique-tests"]`);
     await clickText('[role="menuitem"]', "Réglages du projet…");
-    const dialog = browser.$("dialog[open]");
-    await browser.waitUntil(async () => (await dialog.getText()).includes("Qui l'utilise"), {
+    // Le texte est lu dans le DOM : WebKitGTK ne rend pas toute la fenêtre visible d'un coup.
+    const settingsText = () =>
+      browser.execute(() => document.querySelector("dialog[open]")?.textContent ?? "");
+    await browser.waitUntil(async () => (await settingsText()).includes("Qui l'utilise"), {
       timeout: 10_000,
       timeoutMsg: "réglages du projet attendus",
     });
@@ -2332,7 +2334,7 @@ describe("Lot H - Réseau et authentification", () => {
       select.dispatchEvent(new Event("change"));
     });
     await browser.$("dialog[open] .oauth2").waitForExist({ timeout: 5_000 });
-    expect(await dialog.getText()).toContain("URL du jeton");
+    expect(await settingsText()).toContain("URL du jeton");
     await screenshot(browser, "h3-reglages-projet");
     await clickText("dialog[open] button", "Fermer");
   });
