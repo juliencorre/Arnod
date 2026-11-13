@@ -135,6 +135,25 @@ impl ResultBook {
         Ok(entry.clone())
     }
 
+    /// Efface la réponse affichée d'une requête (`docs/plan-mvp-a-reponse.md`, R9) : le résultat
+    /// est oublié ; un envoi en cours n'est pas touché.
+    pub fn clear(&mut self, project_id: Uuid, path: &str) -> RequestResult {
+        let sending = self.get(project_id, path).is_some_and(|r| r.sending);
+        let cleared = RequestResult {
+            project_id,
+            path: path.to_owned(),
+            sending,
+            outcome: None,
+            error: None,
+            received_at: None,
+        };
+        self.take(project_id, path);
+        if sending {
+            return self.put(cleared);
+        }
+        cleared
+    }
+
     /// Une requête renommée ou déplacée garde son résultat.
     pub fn rename(&mut self, project_id: Uuid, from: &str, to: &str) {
         for entry in &mut self.entries {
@@ -308,5 +327,22 @@ mod tests {
                 "origin": "main"
             })
         );
+    }
+
+    #[test]
+    fn effacer_oublie_la_reponse_sans_toucher_un_envoi_en_cours() {
+        let mut book = ResultBook::default();
+        book.finish(P, "a.yml", &Ok(outcome(200)), 1);
+        let cleared = book.clear(P, "a.yml");
+        assert!(cleared.outcome.is_none() && !cleared.sending);
+        assert!(book.get(P, "a.yml").is_none());
+
+        book.finish(P, "b.yml", &Ok(outcome(200)), 1);
+        book.start(P, "b.yml");
+        let cleared = book.clear(P, "b.yml");
+        assert!(cleared.sending && cleared.outcome.is_none());
+        assert!(book.get(P, "b.yml").is_some_and(|r| r.sending));
+        // Une requête sans résultat s'efface sans erreur.
+        assert!(book.clear(P, "c.yml").outcome.is_none());
     }
 }

@@ -175,6 +175,8 @@ fn r11_numero_d_essai_libre() {
             assertion_count: 0,
             invalid: false,
             contract: None,
+            url: String::new(),
+            tags: Vec::new(),
         },
         TreeNode::Folder {
             name: "d".to_owned(),
@@ -186,6 +188,8 @@ fn r11_numero_d_essai_libre() {
                 assertion_count: 0,
                 invalid: false,
                 contract: None,
+                url: String::new(),
+                tags: Vec::new(),
             }],
             request_count: 1,
         },
@@ -196,6 +200,8 @@ fn r11_numero_d_essai_libre() {
             assertion_count: 0,
             invalid: false,
             contract: None,
+            url: String::new(),
+            tags: Vec::new(),
         },
     ];
     assert_eq!(next_number(&nodes), 8);

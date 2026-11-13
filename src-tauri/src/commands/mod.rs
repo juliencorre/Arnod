@@ -21,6 +21,8 @@ pub mod window;
 pub mod workspaces;
 // Lot B : saisie, texte et cURL.
 pub mod input;
+// Lot A - Réponse (docs/plan-mvp-a-reponse.md).
+pub mod response;
 
 #[cfg(test)]
 mod tests {

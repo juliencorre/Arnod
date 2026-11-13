@@ -481,3 +481,42 @@ R13), écrans `5.1-b ter`, `5.1-b quater`, `2.1-a sexies`.
   `headers`, `bodyType`, `body`) : le jeton sort du texte (`{{token}}`), reste en mémoire dans
   l'interface et ne va au coffre (variable locale secrète de « Local » de « Non classés ») qu'à
   l'envoi de l'essai (`trial_send`, `secrets`), réponse masquée.
+
+## Lot D - Barre latérale
+
+Référence : `docs/plan-mvp-d-barre-laterale.md` (cas F1 à F5, D1, D2, M1, M2, E1 à E3, W1, règles
+R1 à R6), écrans 1.2-e, 1.2-d, 1.2-a ter, 3.2-a3 et 1.1-a.
+
+- Filtre du référentiel (`TreeFilter.vue`, `lib/treeFilter.ts`, pur et testé) : filtre d'affichage
+  fait dans l'interface (Q4 du plan d'ensemble), sur `TreeNode` (`url`, `tags` fournis par le cœur).
+  Termes cumulés : `#mot` (début d'étiquette), méthode en capitales, sinon nom ou adresse sans casse
+  ni accents. Pendant un filtre, les dossiers sont dépliés sans toucher à l'état replié enregistré.
+  Ctrl+F ne vaut que quand la barre latérale a le focus.
+- État d'affichage propre à la fenêtre dans le store `sidebar` : texte du filtre par projet,
+  sections dépliées, réponse attendue à ouvrir (`openExample`, servie par `ResultSide` et
+  `ExpectedResponses`), nombre de contrats des cartes (`contract_count`, sans lire les contrats).
+- `SectionHeading` avec `expanded` : section repliable ; une section vide est repliée par défaut,
+  dépliée elle montre sa ligne d'ajout ; le nombre n'est montré que replié.
+- Sous un contrat, la ligne d'une opération **est** son endpoint (première requête liée) : clic,
+  statut, nombre de réponses attendues (`LinkedView.examples`) et menu ⋯ ; dépliée, ses réponses
+  attendues par code, puis les autres requêtes de l'opération.
+- Projet vide (ni requête ni contrat) : `ProjectWelcome` montre quatre points de départ ; l'ajout
+  d'un contrat passe par `useContractAdd`, partagé avec `ContractsSection`.
+- Menu « + » du projet : Nouvelle requête (Ctrl+N), Nouveau dossier (Ctrl+Maj+N), Ajouter un
+  contrat ▸, Nouvel environnement… ; une création déplie la section concernée.
+
+## Corps de la réponse
+
+Référence : `docs/plan-mvp-a-reponse.md` (lot A, cas F1 à F8, règles R1 à R10), écran `5.1-b bis`.
+
+- Le cœur met en forme et filtre (`src-tauri/src/response/`, pur) : format détecté d'après
+  `content-type` (`response_render`), aperçu HTML en arbre de balises sûres sans attribut
+  (`response_preview`, ni `v-html` ni cadre), filtre JSONPath RFC 9535 (`response_filter`, crate
+  `serde_json_path`) dont une expression invalide revient en français dans `FilterResult.error`.
+- Chaque valeur JSON mise en forme et chaque correspondance portent le même chemin canonique
+  (`$.items[0].sku`) : l'interface surligne en comparant des chemins, jamais en relisant le JSON.
+- Une correspondance porte la vérification qu'elle donne (`FilterMatch.assertion`, cible
+  `body.…` sans joker) ; le store `response` l'ajoute au brouillon, qui s'enregistre seul.
+- Enregistrer passe par `response_save` (sélecteur natif appelé depuis Rust) ; effacer par
+  `response_clear` (`ResultBook::clear`, diffusé par `arnod://resultat`). Un corps tronqué à 5 Mo
+  est signalé à la copie et à l'enregistrement.

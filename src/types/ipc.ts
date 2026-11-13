@@ -92,7 +92,13 @@ export type CommandName =
   | "request_input"
   | "request_curl"
   | "pairs_to_text"
-  | "pairs_from_text";
+  | "pairs_from_text"
+  | "response_render"
+  | "response_preview"
+  | "response_filter"
+  | "response_save"
+  | "response_clear"
+  | "contract_count";
 
 /**
  * Nature d'une erreur de commande.
@@ -260,6 +266,10 @@ export type TreeNode =
       invalid: boolean;
       /** Contrat lié (`contracts/petstore.yaml`), d'après l'étiquette `contract:`. */
       contract: string | null;
+      /** Adresse, pour le filtre (docs/plan-mvp-d-barre-laterale.md, R1) ; vide si illisible. */
+      url: string;
+      /** Étiquettes, sans celle du lien au contrat (R1). */
+      tags: string[];
     };
 
 /** Arborescence et dossiers repliés (`TreeView`). */
@@ -787,6 +797,16 @@ export interface LinkedView {
   path: string;
   name: string;
   method: HttpMethod;
+  /** Réponses attendues, dans l'ordre du fichier (docs/plan-mvp-d-barre-laterale.md, R2). */
+  examples: ExampleRef[];
+}
+
+/** Réponse attendue d'une requête liée, pour la barre latérale (`ExampleRef`, 3.2-a3). */
+export interface ExampleRef {
+  /** Position dans `examples` de la requête. */
+  index: number;
+  status: number | null;
+  name: string;
 }
 
 /** Opération affichée dans l'onglet du contrat (`OperationView`). */
@@ -1043,4 +1063,66 @@ export interface CurlIgnored {
 export interface CurlImport {
   secrets: CurlSecret[];
   ignored: CurlIgnored[];
+}
+
+// --- Lot A - Réponse (docs/plan-mvp-a-reponse.md, écran 5.1-b bis) -------------------------
+
+/**
+ * Format d'affichage d'un corps de réponse, détecté d'après `content-type` (R1).
+ *
+ * Équivalent Rust : `ResponseFormat` (`src-tauri/src/response/format.rs`).
+ */
+export type ResponseFormat = "json" | "xml" | "html" | "text";
+
+/** Nature d'un jeton de la mise en forme, pour sa couleur (`TokenKind`). */
+export type TokenKind =
+  | "key"
+  | "string"
+  | "number"
+  | "literal"
+  | "punct"
+  | "tag"
+  | "attr"
+  | "attrValue"
+  | "comment"
+  | "text";
+
+/** Morceau d'une ligne mise en forme (`Token`). */
+export interface BodyToken {
+  text: string;
+  kind: TokenKind;
+  /** Chemin canonique de la valeur JSON (`$.items[0].sku`), comme ceux du filtre. */
+  path?: string;
+}
+
+/** Réponse de `response_render` (`RenderedBody`). */
+export interface RenderedBody {
+  /** Format appliqué : celui choisi, sinon celui détecté. */
+  format: ResponseFormat;
+  detected: ResponseFormat;
+  lines: BodyToken[][];
+  /** Pourquoi le corps est montré sans mise en forme. */
+  notice: string | null;
+}
+
+/** Nœud de l'aperçu HTML (`HtmlNode`) : balises sûres, sans attribut. */
+export type HtmlNode =
+  { kind: "text"; text: string } | { kind: "element"; tag: string; children: HtmlNode[] };
+
+/** Correspondance du filtre JSONPath (`FilterMatch`). */
+export interface FilterMatch {
+  path: string;
+  /** Valeur en JSON compact, raccourcie au-delà de 200 caractères. */
+  value: string;
+  /** Vérification tirée de la valeur ; absente pour un nom qui ne s'écrit pas en notation pointée. */
+  assertion: Assertion | null;
+}
+
+/** Réponse de `response_filter` (`FilterResult`). */
+export interface FilterResult {
+  matches: FilterMatch[];
+  /** Nombre total de correspondances (500 renvoyées au plus). */
+  total: number;
+  /** Expression invalide ou corps non JSON, en français. */
+  error: string | null;
 }

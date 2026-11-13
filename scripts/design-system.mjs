@@ -49,6 +49,14 @@ const COLOR_NOTES = {
   "color-toast-text": "Texte des notifications, 4,5:1 sur color-toast-bg.",
   "color-toast-action": "Action d'une notification (« Annuler »), 4,5:1 sur color-toast-bg.",
   backdrop: "Voile derrière une fenêtre modale (::backdrop de BaseDialog).",
+  "color-code-string":
+    "Corps de réponse : chaînes JSON et valeurs d'attribut, 4,5:1 sur color-surface, color-bg et color-match.",
+  "color-code-number": "Corps de réponse : nombres JSON, 4,5:1 sur les mêmes fonds.",
+  "color-code-keyword": "Corps de réponse : true, false et null, 4,5:1 sur les mêmes fonds.",
+  "color-code-tag": "Corps de réponse : noms de balise XML et HTML, 4,5:1 sur les mêmes fonds.",
+  "color-code-attr": "Corps de réponse : noms d'attribut XML et HTML, 4,5:1 sur les mêmes fonds.",
+  "color-match":
+    "Valeur trouvée par le filtre JSONPath ; la correspondance courante ajoute un contour color-accent.",
 };
 const WORKSPACES = {
   gray: "Gris",

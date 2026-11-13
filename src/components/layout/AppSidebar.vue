@@ -6,9 +6,11 @@
  * docs/plan-barre-laterale-projet.md) ; « + Ajouter un projet » (W6), ou
  * « + Ouvrir un projet » hors workspace ; un dossier introuvable est signalé (P10).
  * Sur « Tous les projets » (2e, 2f), un rappel dit comment en sortir. Ctrl+N crée une
- * requête et Ctrl+Maj+E ouvre les environnements du projet sélectionné (B6).
+ * requête, Ctrl+Maj+N un dossier et Ctrl+Maj+E ouvre les environnements du projet sélectionné
+ * (B6, M2 du lot D) ; Ctrl+F, quand la barre latérale a le focus, met le focus dans le filtre de
+ * son référentiel (F5).
  */
-import { computed, onBeforeUnmount, onMounted, useId, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, useId, useTemplateRef, watch } from "vue";
 
 import SidebarProject from "@/components/layout/SidebarProject.vue";
 import { useProjectActions } from "@/composables/useProjectActions";
@@ -74,17 +76,33 @@ function selectedProject(): string | null {
   return candidates.find((id) => id !== undefined && id !== null && blocks.has(id)) ?? null;
 }
 
+const aside = useTemplateRef<HTMLElement>("aside");
+
+type Shortcut = "request" | "folder" | "env" | "filter";
+
+/** Raccourci voulu ; le code de la touche sert pour la disposition AZERTY. */
+function shortcutOf(event: KeyboardEvent): Shortcut | null {
+  const key = event.key.toLowerCase();
+  const is = (letter: string): boolean =>
+    key === letter || event.code === `Key${letter.toUpperCase()}`;
+  if (is("n")) return event.shiftKey ? "folder" : "request";
+  if (is("e") && event.shiftKey) return "env";
+  // Ctrl+F ne vaut que dans la barre latérale : ailleurs, il reste au navigateur ou à l'éditeur.
+  if (is("f") && !event.shiftKey && aside.value?.contains(document.activeElement)) return "filter";
+  return null;
+}
+
 function onKeydown(event: KeyboardEvent): void {
   if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-  const key = event.key.toLowerCase();
-  const wanted =
-    key === "n" && !event.shiftKey ? "request" : key === "e" && event.shiftKey ? "env" : null;
+  const wanted = shortcutOf(event);
   if (wanted === null) return;
   const projectId = selectedProject();
   const block = projectId === null ? undefined : blocks.get(projectId);
   if (!block) return;
   event.preventDefault();
   if (wanted === "request") void block.newRequest();
+  else if (wanted === "folder") void block.newFolder();
+  else if (wanted === "filter") void block.focusFilter();
   else void block.manageEnvironments();
 }
 
@@ -97,7 +115,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <aside class="sidebar" aria-label="Barre latérale">
+  <aside ref="aside" class="sidebar" aria-label="Barre latérale">
     <p v-if="catalog.isFirstRun" class="sidebar__empty">Aucun projet pour l'instant.</p>
     <nav v-else class="sidebar__section" :aria-labelledby="projectsLabelId">
       <h2 :id="projectsLabelId" class="sidebar__label">
