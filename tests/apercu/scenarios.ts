@@ -22,6 +22,8 @@ export interface Gestes {
   touche: (cle: string, options?: KeyboardEventInit & { selecteur?: string }) => Promise<void>;
   /** Attend que les promesses et le rendu se terminent. */
   attendre: (ms?: number) => Promise<void>;
+  /** Lot F : double-clique le premier élément qui correspond (et contient `texte`). */
+  doubleCliquer?: (selecteur: string, texte?: string) => Promise<void>;
 }
 
 export interface Scenario {
@@ -706,7 +708,82 @@ Object.assign(SCENARIOS, {
       await g.attendre(100);
     },
   },
+  // --- Lot F - Onglets et clavier (docs/plan-mvp-f-onglets-clavier.md) --------------
+  "1.3-a": {
+    description: "Onglets : aperçu en italique et ◐ pendant un envoi (1.3-a)",
+    setup: ongletsLotF,
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, ["Créer un client", "Santé", "Lire une commande"]);
+      await g.cliquer('[role="treeitem"]', "Lister les commandes");
+      await g.attendre(150);
+    },
+  },
+  "1.3-b": {
+    description: "Trop d'onglets : le menu « +N » ouvert (1.3-b)",
+    setup: ongletsLotF,
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, [
+        "Créer un client",
+        "Santé",
+        "Lire une commande",
+        "Changer le statut",
+        "Annuler une commande",
+        "Lister les clients",
+      ]);
+      await g.cliquer('[role="treeitem"]', "Lister les commandes");
+      await g.attendre(150);
+      await g.cliquer(".zone__more");
+      await g.attendre(100);
+    },
+  },
+  "1.3-c": {
+    description: "Ctrl+Tab : les onglets dans l'ordre d'utilisation (1.3-c)",
+    setup: ongletsLotF,
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, ["Lire une commande", "Santé", "Changer le statut"]);
+      await g.cliquer('[role="treeitem"]', "Créer un client");
+      await g.touche("Tab", { code: "Tab", ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
+  "1.4-j": {
+    description: "Ctrl+J : résultat dessous, Ctrl+\\ : barre latérale masquée (1.4-j)",
+    setup: () => {
+      const core = ongletsLotF();
+      core.workbench.nextSend = okOutcome();
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await ouvrirOngletsLotF(g, ["Lire une commande", "Changer le statut", "Créer un client"]);
+      await g.cliquer(".editor__line button[type='submit']");
+      await g.attendre(100);
+      await g.touche("j", { code: "KeyJ", ctrlKey: true });
+      await g.touche("\\", { code: "Backslash", ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
 } satisfies Record<string, Scenario>);
+
+/** Lot F : référentiel « commandes/v2 », et un envoi de « Santé » en cours (◐). */
+function ongletsLotF(): FakeCore {
+  const core = largeur(commandes(), 320);
+  core.workbench.results.set("sante.yml", {
+    projectId: BOUTIQUE_TESTS,
+    path: "sante.yml",
+    sending: true,
+    outcome: null,
+    error: null,
+    receivedAt: null,
+    request: null,
+  });
+  return core;
+}
+
+/** Lot F : ouvre le projet puis ces requêtes en onglets permanents (double-clic). */
+async function ouvrirOngletsLotF(g: Gestes, noms: string[]): Promise<void> {
+  await ouvrirProjet(g);
+  for (const nom of noms) await g.doubleCliquer?.('[role="treeitem"]', nom);
+}
 
 /** Collection Bruno des scénarios d'import. */
 const BRUNO_DIR = "/home/julien/bruno/boutique-api";

@@ -186,25 +186,55 @@ pages:
     version: MVP
     plans:
       - "plan-fenetres-zones (onglets des zones)"
+      - "plan-mvp-f-onglets-clavier (AP1–AP4, TO1, TO2, CT1, CT2)"
     liees: ["1.4"]
-    reste: "aperçu en italique (a), « +3 » pour les onglets en trop (b), Ctrl+Tab (c)."
     journal:
       - "2026-11-12 : Nom aligné sur le contenu (fichier « Récents »)."
+      - "2026-11-13 : Aperçu en italique et ◐, « +N » avec « Fermer les autres » et « Fermer tout », Ctrl+Tab dans l'ordre d'utilisation (plan-mvp-f-onglets-clavier, lot F)."
     ecrans:
-      a: { etat: en partie, pr: [27] }
-      b: { etat: à faire }
-      c: { etat: à faire }
+      a:
+        {
+          etat: livré,
+          pr: [27],
+          captures: [25-onglet-apercu],
+          ecart:
+            {
+              texte: "Les onglets restent dans la zone, sous la barre du système (barre de titre intégrée : écart transverse) ; pas d'onglets d'anomalie ni d'exigence (contenus à venir).",
+              aligner: maquette,
+            },
+        }
+      b:
+        {
+          etat: livré,
+          captures: [26-onglets-en-trop],
+          ecart:
+            {
+              texte: "Chaque onglet caché montre son dossier, sans date d'ouverture (« hier ») ni statut ; pas de ligne « Ctrl+W ferme l'onglet actif » (le raccourci est dans le menu de l'onglet).",
+              aligner: maquette,
+            },
+        }
+      c:
+        {
+          etat: livré,
+          captures: [27-ctrl-tab],
+          ecart:
+            {
+              texte: "Pas d'étoile ☆ (favoris, hors MVP) ; la liste s'ouvre au centre de la zone active.",
+              aligner: maquette,
+            },
+        }
   "1.4":
     nom: "Fenêtres et zones"
     version: MVP
     plans:
       - "plan-fenetres-zones (F1–F14)"
       - "plan-resultat-detachable (D1–D7)"
+      - "plan-mvp-f-onglets-clavier (CL1–CL3)"
     liees: ["1.3", "5.1"]
-    reste: "Ctrl+J et Ctrl+\\ (j)."
     journal:
       - "2026-11-09 : Fenêtres et zones (PR #27)."
       - "2026-11-10 : Résultat détachable, écran i (PR #34)."
+      - "2026-11-13 : Ctrl+J et Ctrl+\\, dans le menu Fenêtre et sur l'icône de l'en-tête du résultat, gardés par fenêtre (plan-mvp-f-onglets-clavier, lot F)."
     ecrans:
       a: { etat: livré, pr: [27], captures: [06-zones] }
       b: { etat: livré, pr: [27], captures: [06-zones] }
@@ -221,7 +251,17 @@ pages:
           pr: [34],
           captures: [13-fenetre-requete, 14-fenetre-resultat, 15-fenetre-barre],
         }
-      j: { etat: à faire, version: MVP }
+      j:
+        {
+          etat: livré,
+          version: MVP,
+          captures: [28-clavier],
+          ecart:
+            {
+              texte: "Ctrl+J et Ctrl+\\ sont dans le menu natif « Fenêtre » (pas de menu du logo : barre du système) ; la barre masquée laisse une rangée en haut avec le bouton qui la rouvre et le sélecteur de workspace ; le rappel des raccourcis est une notification.",
+              aligner: maquette,
+            },
+        }
   "1.5":
     nom: "Recherche"
     version: V2

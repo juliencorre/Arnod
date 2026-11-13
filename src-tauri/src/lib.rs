@@ -172,6 +172,10 @@ pub fn run() {
             commands::test_steps::tree_create_test,
             commands::test_steps::tree_add_step,
             commands::test_steps::request_variable_users,
+            // Lot F : onglets et clavier.
+            commands::window::layout_pin,
+            commands::window::layout_close_tabs,
+            commands::window::layout_set_sidebar_hidden,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

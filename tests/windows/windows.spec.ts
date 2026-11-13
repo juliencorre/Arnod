@@ -148,6 +148,7 @@ describe("barre latérale détachée (F9, Z5)", () => {
 
     expect(core.calls.find((c) => c.cmd === "layout_open_selection")?.args).toEqual({
       content: { kind: "request", projectId: BOUTIQUE_TESTS, path: "sante.yml" },
+      preview: true,
     });
     expect(mainContents(core)).toEqual(["sante.yml"]);
   });

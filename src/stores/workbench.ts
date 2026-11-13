@@ -503,9 +503,9 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return view;
   }
 
-  /** Ouvre l'onglet d'un test (TE1). */
-  function openTest(projectId: string, path: string): Promise<boolean> {
-    return windows.openSelection({ kind: "test", projectId, path });
+  /** Ouvre l'onglet d'un test (TE1) ; en aperçu sur un simple clic (lot F, 1.3-a). */
+  function openTest(projectId: string, path: string, preview = false): Promise<boolean> {
+    return windows.openSelection({ kind: "test", projectId, path }, preview);
   }
 
   /** Déplie un dossier replié de la barre latérale. */
@@ -574,9 +574,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
 
   // --- Arborescence ----------------------------------------------------------
 
-  /** Ouvre une requête depuis la barre latérale, dans la fenêtre qui suit la sélection (Z5). */
-  function openRequest(projectId: string, path: string): Promise<boolean> {
-    return windows.openSelection({ kind: "request", projectId, path });
+  /**
+   * Ouvre une requête depuis la barre latérale, dans la fenêtre qui suit la sélection (Z5) ; en
+   * aperçu sur un simple clic (lot F, 1.3-a).
+   */
+  function openRequest(projectId: string, path: string, preview = false): Promise<boolean> {
+    return windows.openSelection({ kind: "request", projectId, path }, preview);
   }
 
   async function createRequest(

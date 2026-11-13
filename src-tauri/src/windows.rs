@@ -47,6 +47,9 @@ pub mod events {
     pub const RUN: &str = "arnod://run";
     /// Statuts des requêtes d'un projet (`StatusesChange`, R4).
     pub const STATUSES: &str = "arnod://statuts";
+    /// Raccourci choisi dans le menu natif (`Shortcut`) : la fenêtre visée agit
+    /// comme au clavier (lot F, R7).
+    pub const SHORTCUT: &str = "arnod://raccourci";
 }
 
 /// Statuts des requêtes d'un projet, diffusés à chaque changement (R4, R5).
