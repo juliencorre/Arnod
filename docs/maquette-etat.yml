@@ -651,13 +651,13 @@ pages:
     reste: "filtrer, composer une campagne, ligne de commande (b, c, d)."
     journal:
       - "2026-11-09 : Étiquettes libres d'une requête (PR #32)."
-      - "2026-11-13 : Étiquettes du projet proposées avec leur nombre de requêtes à la saisie, puis « + Créer » (a)."
+      - "2026-11-13 : Étiquettes du projet proposées avec leur nombre de requêtes à la saisie, puis « + Créer » (a, PR #56)."
     ecrans:
       a:
         {
           etat: livré,
           version: MVP,
-          pr: [32],
+          pr: [32, 56],
           captures: [26-etiquettes],
           ecart:
             {
