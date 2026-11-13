@@ -54,7 +54,14 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
       workspaceId: null,
     });
     expect(wrapper.get("main h1").text()).toBe("boutique-tests");
-    expect(wrapper.get("main").text()).toContain("Aucune requête.");
+    // Projet vide : quatre points de départ (1.2-d, lot D).
+    expect(wrapper.get("main").text()).toContain("Par où commencer ?");
+    expect(wrapper.findAll("main .start__card h3").map((h) => h.text())).toEqual([
+      "Reprendre l'existant",
+      "Décrire un contrat de service",
+      "Écrire une requête",
+      "Configurer un environnement",
+    ]);
     const toast = wrapper.get(".toast");
     expect(toast.text()).toContain(
       "✓ « boutique-tests » créé · visible dans « Tous les projets ».",

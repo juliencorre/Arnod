@@ -3,25 +3,44 @@
  * Éditeur d'un endpoint (docs/plan-configuration-endpoint.md, EP1 à EP7) : tout se modifie sur
  * place et s'enregistre seul. En-tête (contrat lié, méthode, adresse, nom, description,
  * étiquettes), puis la requête par onglets, comme dans Bruno.
+ *
+ * Saisie (docs/plan-mvp-b-saisie-curl.md) : variables inconnues soulignées et signalées sous
+ * l'adresse, un nombre ou un point par onglet rempli, en-têtes ajoutés à l'envoi listés,
+ * `</>` et Ctrl+Maj+C pour copier la requête en cURL.
  */
-import { computed, nextTick, ref, useId, useTemplateRef, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  provide,
+  ref,
+  useId,
+  useTemplateRef,
+  watch,
+} from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import AssertionsEditor from "@/components/workbench/AssertionsEditor.vue";
 import AuthEditor from "@/components/workbench/AuthEditor.vue";
 import BodyEditor from "@/components/workbench/BodyEditor.vue";
+import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
 import VariablesEditor from "@/components/workbench/VariablesEditor.vue";
 import { pathParamNames } from "@/lib/url";
+import { KNOWN_VARIABLES, vVariables } from "@/lib/variables";
 import { useContractsStore } from "@/stores/contracts";
+import { useInputStore } from "@/stores/input";
+import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
-import type { HttpMethod, Pair, RequestDoc } from "@/types/ipc";
+import type { CurlCopy, HttpMethod, Pair, RequestDoc, UnknownVariable } from "@/types/ipc";
 
 const props = defineProps<{ editorKey: string }>();
 
 const workbench = useWorkbenchStore();
 const contracts = useContractsStore();
+const inputs = useInputStore();
+const toasts = useToastStore();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
 const request = computed<RequestDoc | null>(() => editor.value?.draft ?? null);
 const folder = computed(() => {
@@ -38,6 +57,7 @@ const ids = {
   desc: useId(),
   tags: useId(),
   docs: useId(),
+  unknown: useId(),
 };
 
 // --- Contrat lié (C7) ------------------------------------------------------
@@ -130,21 +150,162 @@ function setPathParam(name: string, field: "value" | "description", text: string
   pair[field] = text;
 }
 
+// --- Saisie : variables connues, inconnues, en-têtes ajoutés (5.1-b ter) ------------
+
+const input = computed(() => inputs.inputs.get(props.editorKey) ?? null);
+const known = computed<ReadonlySet<string> | null>(() =>
+  input.value ? new Set(input.value.known) : null,
+);
+provide(KNOWN_VARIABLES, known);
+const unknown = computed<UnknownVariable[]>(() => input.value?.unknown ?? []);
+const added = computed(() => input.value?.added ?? []);
+const activeEnvironment = computed(() =>
+  editor.value ? workbench.activeEnvironment(editor.value.projectId) : null,
+);
+
+/** Attente après la dernière frappe avant de relire les variables. */
+const INSPECT_MS = 250;
+let inspectTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  [
+    request,
+    activeEnvironment,
+    () => editor.value && workbench.environments[editor.value.projectId],
+  ],
+  () => {
+    clearTimeout(inspectTimer);
+    inspectTimer = setTimeout(() => {
+      void inputs.inspect(props.editorKey);
+    }, INSPECT_MS);
+  },
+  { deep: true, immediate: true },
+);
+onBeforeUnmount(() => {
+  clearTimeout(inspectTimer);
+  inputs.forget(props.editorKey);
+});
+
+/** « définie dans Local (v2) », ou rien. */
+function definedIn(variable: UnknownVariable): string {
+  const places = variable.definedIn.map((source) =>
+    source.value === null
+      ? `${source.environment} (locale)`
+      : source.value === ""
+        ? source.environment
+        : `${source.environment} (${source.value})`,
+  );
+  return places.length === 0 ? "" : ` ; définie dans ${places.join(", ")}`;
+}
+
+async function addVariable(variable: UnknownVariable): Promise<void> {
+  if (!editor.value) return;
+  const value = variable.definedIn.find((source) => source.value !== null)?.value ?? "";
+  try {
+    const env = await inputs.addVariable(editor.value.projectId, variable.name, value);
+    toasts.show(`✓ Variable « ${variable.name} » ajoutée à ${env}.`);
+  } catch (cause) {
+    toasts.showError(cause);
+  }
+}
+
+const managingEnvironments = ref(false);
+
+// --- Copier en cURL (5.1-b quater) -------------------------------------------------
+
+const curlOpen = ref(false);
+const curl = ref<CurlCopy | null>(null);
+const curlError = ref<string | null>(null);
+const curlBox = useTemplateRef<HTMLElement>("curlBox");
+const curlButton = useTemplateRef<HTMLButtonElement>("curlButton");
+
+/** Morceaux de la commande : les variables du shell (`$TOKEN`) sont mises en évidence. */
+const curlParts = computed(() =>
+  (curl.value?.command ?? "")
+    .split(/(\$\{?[A-Z_][A-Z0-9_]*\}?)/)
+    .map((text) => ({ text, variable: /^\$\{?[A-Z_]/.test(text) })),
+);
+const curlVariables = computed(() =>
+  curlParts.value.filter((p) => p.variable).map((p) => p.text.replace(/[{}]/g, "")),
+);
+
+/** Place de la fenêtre cURL : posée sous `</>`, hors de la zone (qui coupe ce qui déborde). */
+const curlPlace = ref<{ top: string; left: string }>({ top: "0", left: "0" });
+
+function placeCurl(): void {
+  const rect = curlButton.value?.getBoundingClientRect();
+  if (!rect) return;
+  const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const width = Math.min(30 * rem, window.innerWidth - 2 * rem);
+  const left = Math.max(rem, Math.min(rect.left - 0.75 * rem, window.innerWidth - width - rem));
+  curlPlace.value = { top: `${String(rect.bottom + 6)}px`, left: `${String(left)}px` };
+}
+
+async function openCurl(copy: boolean): Promise<void> {
+  curlError.value = null;
+  placeCurl();
+  curlOpen.value = true;
+  try {
+    curl.value = await inputs.curl(props.editorKey);
+  } catch (cause) {
+    curl.value = null;
+    curlError.value = cause instanceof Error ? cause.message : String(cause);
+    return;
+  }
+  if (copy) await copyCurl();
+  await nextTick();
+  curlBox.value?.focus();
+}
+
+async function copyCurl(): Promise<void> {
+  if (!curl.value) return;
+  try {
+    await navigator.clipboard.writeText(curl.value.command);
+    toasts.show("✓ Requête copiée en cURL.");
+  } catch {
+    toasts.show("Copie impossible : sélectionnez la commande, puis Ctrl+C.");
+  }
+}
+
+function closeCurl(): void {
+  curlOpen.value = false;
+  void nextTick(() => curlButton.value?.focus());
+}
+
+function onCurlFocusOut(event: FocusEvent): void {
+  const next = event.relatedTarget as Node | null;
+  if (next && (curlBox.value?.contains(next) || curlButton.value?.contains(next))) return;
+  if (next) curlOpen.value = false;
+}
+
+/** Ctrl+Maj+C dans l'éditeur : copie la requête en cURL (code de la touche, pour l'AZERTY). */
+function onKeydown(event: KeyboardEvent): void {
+  if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyC") {
+    event.preventDefault();
+    void openCurl(true);
+  }
+}
+
 // --- Onglets ---------------------------------------------------------------------
 
 type Tab =
   "params" | "body" | "headers" | "auth" | "docs" | "settings" | "variables" | "assertions";
 const tab = ref<Tab>("params");
-const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
+/** Un nombre pour une liste, un point pour un onglet rempli d'une seule valeur. */
+const tabs = computed<{ id: Tab; label: string; count?: number; filled?: boolean }[]>(() => {
   const r = request.value;
   const activeQuery = r?.params.filter((p) => p.kind === "query" && p.enabled).length ?? 0;
+  const settings = r ? Object.values(r.settings).some((value) => value !== null) : false;
   return [
     { id: "params", label: "Paramètres", count: activeQuery + pathNames.value.length },
-    { id: "body", label: "Corps" },
+    { id: "body", label: "Corps", filled: r !== null && r.body.kind !== "none" },
     { id: "headers", label: "En-têtes", count: r?.headers.filter((h) => h.enabled).length },
-    { id: "auth", label: "Auth" },
-    { id: "docs", label: "Docs" },
-    { id: "settings", label: "Réglages" },
+    {
+      id: "auth",
+      label: "Auth",
+      filled: r !== null && r.auth.type !== "none" && r.auth.type !== "inherit",
+    },
+    { id: "docs", label: "Docs", filled: r !== null && r.docs.trim() !== "" },
+    { id: "settings", label: "Réglages", filled: settings },
     { id: "variables", label: "Variables", count: r?.extractions.length },
     { id: "assertions", label: "Vérifications", count: r?.assertions.length },
   ];
@@ -168,7 +329,7 @@ watch(
 </script>
 
 <template>
-  <section v-if="request" class="editor" aria-label="Requête">
+  <section v-if="request" class="editor" aria-label="Requête" @keydown="onKeydown">
     <div class="editor__top">
       <p v-if="contract" class="editor__crumbs">
         <span>Contrats de service</span>
@@ -224,16 +385,67 @@ watch(
         <option v-for="m in METHODS" :key="m" :value="m">{{ m }}</option>
       </select>
       <label :for="ids.url" class="sr-only">Adresse</label>
-      <input
-        :id="ids.url"
-        ref="urlInput"
-        v-model="request.url"
-        class="editor__url"
-        type="text"
-        spellcheck="false"
-        autocomplete="off"
-        :placeholder="URL_PLACEHOLDER"
-      />
+      <span class="editor__url-box">
+        <input
+          :id="ids.url"
+          ref="urlInput"
+          v-model="request.url"
+          v-variables="known"
+          class="editor__url"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          :placeholder="URL_PLACEHOLDER"
+          :aria-describedby="unknown.length > 0 ? ids.unknown : undefined"
+        />
+      </span>
+      <span class="editor__curl">
+        <button
+          ref="curlButton"
+          type="button"
+          class="editor__curl-button"
+          aria-label="Copier la requête en cURL"
+          title="Copier en cURL (Ctrl+Maj+C)"
+          aria-haspopup="dialog"
+          :aria-expanded="curlOpen"
+          @click="curlOpen ? closeCurl() : openCurl(false)"
+        >
+          &lt;/&gt;
+        </button>
+        <div
+          v-if="curlOpen"
+          ref="curlBox"
+          class="curl"
+          :style="curlPlace"
+          role="dialog"
+          aria-label="Copier la requête en cURL"
+          tabindex="-1"
+          @keydown.escape.stop.prevent="closeCurl"
+          @focusout="onCurlFocusOut"
+        >
+          <div class="curl__head">
+            <span class="curl__title">Copier la requête <span class="curl__tag">cURL</span></span>
+            <span v-if="curl" class="curl__env">variables de {{ curl.environment }}</span>
+          </div>
+          <p v-if="curlError" class="curl__error" role="alert">{{ curlError }}</p>
+          <pre
+            v-else
+            class="curl__command"
+          ><template v-for="(part, i) in curlParts" :key="i"><b v-if="part.variable" class="curl__variable">{{ part.text }}</b><template v-else>{{ part.text }}</template></template></pre>
+          <div class="curl__foot">
+            <p class="curl__note">
+              <template v-if="curlVariables.length === 1 && curlVariables[0] === '$TOKEN'">
+                Le jeton est remplacé par $TOKEN : aucun secret ne quitte Arnod.
+              </template>
+              <template v-else-if="curlVariables.length > 0">
+                Secrets remplacés par {{ curlVariables.join(", ") }} : aucun secret ne quitte Arnod.
+              </template>
+              <template v-else>Variables résolues, aucun secret dans la commande.</template>
+            </p>
+            <BaseButton :disabled="curl === null" @click="copyCurl">Copier</BaseButton>
+          </div>
+        </div>
+      </span>
       <BaseButton v-if="editor?.sending" @click="workbench.cancelSend(editorKey)">
         Annuler
       </BaseButton>
@@ -241,6 +453,23 @@ watch(
         Envoyer
       </BaseButton>
     </form>
+    <div v-if="unknown.length > 0" :id="ids.unknown" class="unknown" role="status">
+      <span class="unknown__icon" aria-hidden="true">!</span>
+      <ul class="unknown__list">
+        <li v-for="variable in unknown" :key="variable.name" class="unknown__item">
+          <span>
+            <code class="unknown__name">{{ variable.name }}</code> est inconnue dans
+            {{ input?.environment }}{{ definedIn(variable) }}.
+          </span>
+          <button type="button" class="link" @click="addVariable(variable)">
+            Ajouter<span class="sr-only"> {{ variable.name }} à {{ input?.environment }}</span>
+          </button>
+        </li>
+      </ul>
+      <button type="button" class="link unknown__manage" @click="managingEnvironments = true">
+        Environnements…
+      </button>
+    </div>
 
     <div class="editor__meta">
       <div class="meta">
@@ -297,16 +526,20 @@ watch(
       >
         {{ t.label }}
         <span v-if="t.count" class="editor__badge">{{ t.count }}</span>
+        <span v-else-if="t.filled" class="editor__dot">
+          <span aria-hidden="true">●</span><span class="sr-only">, rempli</span>
+        </span>
       </button>
     </div>
 
     <div :id="`panel-${tab}`" role="tabpanel" :aria-labelledby="`tab-${tab}`" class="editor__panel">
       <div v-if="tab === 'params'" class="stack">
-        <h3 class="section">Paramètres de requête</h3>
         <PairsEditor
           v-model="request.params"
           kind="query"
           label="Paramètres de requête"
+          title="Paramètres de requête"
+          text-format="query"
           add-label="+ Paramètre"
           value-title="Valeur d'exemple"
         />
@@ -317,6 +550,7 @@ watch(
         <div v-for="name in pathNames" :key="name" class="path-param">
           <span class="path-param__name"><span aria-hidden="true">{ }</span> {{ name }}</span>
           <input
+            v-variables="known"
             class="path-param__input"
             type="text"
             spellcheck="false"
@@ -339,15 +573,40 @@ watch(
       <BodyEditor v-else-if="tab === 'body'" v-model="request.body" />
 
       <div v-else-if="tab === 'headers'" class="stack">
-        <PairsEditor v-model="request.headers" label="En-têtes" add-label="+ En-tête" />
+        <PairsEditor
+          v-model="request.headers"
+          label="En-têtes de cette requête"
+          title="De cette requête"
+          text-format="header"
+          add-label="+ En-tête"
+        />
         <template v-if="request.inherited.headers.length > 0">
-          <h3 class="section">Hérités</h3>
-          <ul class="inherited">
-            <li v-for="h in request.inherited.headers" :key="h.name">
-              <code>{{ h.name }}: {{ h.value }}</code>
-              <span class="inherited__source">{{ h.source }}</span>
+          <h3 class="caption">Hérités · {{ request.inherited.headers.length }}</h3>
+          <ul class="sent">
+            <li v-for="h in request.inherited.headers" :key="h.name" class="sent__row">
+              <code class="sent__name">{{ h.name }}</code>
+              <code class="sent__value">{{ h.value }}</code>
+              <span class="sent__source">{{ h.source }}</span>
             </li>
           </ul>
+        </template>
+        <template v-if="added.length > 0">
+          <h3 class="caption">
+            Ajoutés à l'envoi · {{ added.length }} <span class="caption__by">par Arnod</span>
+          </h3>
+          <ul class="sent sent--added" aria-label="En-têtes ajoutés par Arnod à l'envoi">
+            <li v-for="h in added" :key="h.name" class="sent__row">
+              <code class="sent__name">{{ h.name }}</code>
+              <code class="sent__value">{{ h.value }}</code>
+              <span v-if="h.origin !== 'client'" class="sent__source">
+                {{ h.origin === "auth" ? (h.source ?? "Auth") : "Corps" }}
+              </span>
+            </li>
+          </ul>
+          <p class="hint">
+            Un en-tête du même nom saisi plus haut remplace celui d'Arnod, sauf celui de l'onglet
+            Auth. « Envoyé » montre les valeurs réellement parties.
+          </p>
         </template>
       </div>
 
@@ -388,6 +647,13 @@ watch(
     <p v-if="request.preserved.length > 0" class="editor__preserved" role="note">
       Conservé dans le fichier sans être modifié par Arnod : {{ request.preserved.join(", ") }}.
     </p>
+    <EnvironmentsDialog
+      v-if="managingEnvironments && editor"
+      :open="managingEnvironments"
+      :project-id="editor.projectId"
+      :start-new="false"
+      @close="managingEnvironments = false"
+    />
   </section>
 </template>
 
@@ -510,11 +776,183 @@ watch(
   font-weight: 600;
 }
 
-.editor__url {
+.editor__url-box {
+  display: flex;
   flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.editor__url {
+  flex: 1;
+  width: 100%;
   min-width: 0;
   font-family: var(--font-mono);
   font-size: var(--text-body-large);
+}
+
+/* `</>` : copier en cURL, et sa fenêtre posée sous le bouton. */
+.editor__curl {
+  position: relative;
+  display: flex;
+}
+
+.editor__curl-button {
+  box-sizing: border-box;
+  width: var(--control-lg);
+  min-height: var(--control-lg);
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font: 600 var(--text-body) var(--font-mono);
+  color: var(--color-link);
+  background-color: var(--color-surface);
+  cursor: pointer;
+}
+
+.editor__curl-button[aria-expanded="true"] {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-soft);
+}
+
+.curl {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: min(30rem, calc(100vw - 2rem));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+
+.curl:focus {
+  outline: none;
+}
+
+.curl__head,
+.curl__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+}
+
+.curl__head {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.curl__foot {
+  flex-wrap: nowrap;
+  border-top: 1px solid var(--color-border);
+}
+
+.curl__title {
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.curl__tag {
+  margin-left: 0.25rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: var(--radius-pill);
+  font: 600 var(--text-small) var(--font-mono);
+  background-color: var(--color-chip);
+}
+
+.curl__env,
+.curl__note {
+  margin: 0;
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+.curl__command {
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  max-height: 16rem;
+  overflow: auto;
+  font: var(--text-body) / 1.6 var(--font-mono);
+  white-space: pre;
+  user-select: text;
+}
+
+.curl__variable {
+  font-weight: 600;
+  color: var(--color-link);
+}
+
+.curl__error {
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  font-size: var(--text-body);
+  color: var(--color-danger);
+}
+
+/* Variables inconnues de l'environnement actif (5.1-b ter). */
+.unknown {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  background-color: var(--color-danger-soft);
+}
+
+.unknown__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.0625rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-surface);
+  background-color: var(--color-danger);
+}
+
+.unknown__list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.unknown__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+}
+
+.unknown__item > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.unknown__item > .link {
+  flex: none;
+}
+
+.unknown__name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.unknown__manage {
+  flex: none;
 }
 
 .editor__meta {
@@ -613,6 +1051,12 @@ watch(
   color: var(--color-text);
 }
 
+.editor__dot {
+  margin-left: 0.25rem;
+  font-size: var(--text-caption);
+  color: var(--color-accent);
+}
+
 .editor__badge {
   margin-left: 0.25rem;
   padding: 0 0.375rem;
@@ -664,19 +1108,59 @@ watch(
   font-size: var(--text-small);
 }
 
-.inherited {
+/* En-têtes hérités et ajoutés à l'envoi : lus, pas modifiables ici. */
+.caption {
+  margin: 0.5rem 0 0;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.caption__by {
+  margin-left: 0.25rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sent {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
   margin: 0;
   padding: 0;
   list-style: none;
   font-size: var(--text-body);
 }
 
-.inherited__source {
-  margin-left: 0.5rem;
+.sent__row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 2fr) minmax(0, 3fr) auto;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.375rem 0 0.375rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sent__name,
+.sent__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+}
+
+.sent--added .sent__name,
+.sent--added .sent__value {
+  color: var(--color-subtle);
+}
+
+.sent__source {
+  padding: 0 0.375rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
   color: var(--color-muted);
+  background-color: var(--color-chip);
 }
 
 .editor__docs {
@@ -713,6 +1197,7 @@ watch(
   .tag__add,
   .editor__tab,
   .editor__contract,
+  .editor__curl-button,
   .link
 ):focus-visible {
   outline: 2px solid var(--color-focus);

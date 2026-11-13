@@ -226,6 +226,29 @@ pub fn add_step(root: &Path, test: &str) -> Result<String, CommandError> {
     write_step(root, &dir, &name, last.floor() + 1.0)
 }
 
+/// Variables extraites par les étapes qui précèdent `path` dans son test
+/// (`docs/plan-mvp-e-tests-etapes.md`, R5) : connues de l'étape, jamais inconnues.
+pub fn extracted_before(root: &Path, path: &str) -> Vec<String> {
+    let Some((folder, _)) = path.rsplit_once('/') else {
+        return Vec::new();
+    };
+    let Ok(view) = test_view(root, folder) else {
+        return Vec::new();
+    };
+    if !view.test {
+        return Vec::new();
+    }
+    let mut names: Vec<String> = Vec::new();
+    for step in view.steps.iter().take_while(|s| s.path != path) {
+        for name in &step.extractions {
+            if !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+    }
+    names
+}
+
 /// Textes d'une requête où une variable peut être lue.
 fn texts(request: &Request) -> Vec<&str> {
     let mut out = vec![request.url.as_str()];

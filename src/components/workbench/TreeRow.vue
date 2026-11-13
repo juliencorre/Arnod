@@ -4,6 +4,9 @@
  * les lignes suivent la grille de la barre latérale (`--tree-*`, défini par `AppSidebar`) :
  * une colonne de tête (chevron et dossier, ou méthode), puis le nom ; chaque profondeur
  * décale de la largeur du chevron, si bien qu'un enfant s'aligne sur l'icône de son dossier.
+ * Pendant un filtre (docs/plan-mvp-d-barre-laterale.md, F2, F3), les dossiers sont dépliés sans
+ * changer leur état enregistré, la partie trouvée du nom est surlignée et une requête trouvée
+ * par son adresse le dit.
  */
 import { computed } from "vue";
 
@@ -13,6 +16,7 @@ import StatusCount from "@/components/workbench/StatusCount.vue";
 import StatusMark from "@/components/workbench/StatusMark.vue";
 import { SECTION_ICONS } from "@/components/ui/sectionIcons";
 import { countStatuses, requestPaths } from "@/lib/status";
+import { highlight, matchedByUrl, type TreeFilter } from "@/lib/treeFilter";
 import { useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
@@ -24,6 +28,8 @@ const props = defineProps<{
   projectId: string;
   /** Numéro de l'étape, pour une requête d'un test (lot E, R1). */
   step?: number;
+  /** Filtre actif du référentiel (lot D), ou `null`. */
+  filter?: TreeFilter | null;
 }>();
 
 /** Fiole d'un test (lot E) : l'icône de la section « Référentiel de tests ». */
@@ -35,7 +41,18 @@ const workbench = useWorkbenchStore();
 const windows = useWindowsStore();
 
 const isOpen = computed(
-  () => !(workbench.trees[props.projectId]?.collapsed ?? []).includes(props.node.path),
+  () =>
+    (props.filter ?? null) !== null ||
+    !(workbench.trees[props.projectId]?.collapsed ?? []).includes(props.node.path),
+);
+/** Nom découpé pour le surlignage du filtre (F2). */
+const nameParts = computed(() => highlight(props.node.name, props.filter ?? null));
+/** Requête retenue par son adresse seulement (F2). */
+const byUrl = computed(
+  () =>
+    props.node.kind === "request" &&
+    (props.filter ?? null) !== null &&
+    matchedByUrl(props.node, props.filter as TreeFilter),
 );
 /** Requête (ou test) affiché dans l'onglet actif de cette fenêtre. */
 const isSelected = computed(() => {
@@ -116,9 +133,11 @@ function onSelect(id: string): void {
 function activate(): void {
   // Un test s'ouvre dans son onglet ; son chevron le replie (lot E, TE1).
   if (isTest.value) void workbench.openTest(props.projectId, props.node.path);
-  else if (props.node.kind === "folder")
-    void workbench.toggleFolder(props.projectId, props.node.path);
-  else void workbench.openRequest(props.projectId, props.node.path);
+  else if (props.node.kind === "folder") {
+    // Pendant un filtre, les dossiers restent dépliés (F3).
+    if ((props.filter ?? null) === null)
+      void workbench.toggleFolder(props.projectId, props.node.path);
+  } else void workbench.openRequest(props.projectId, props.node.path);
 }
 </script>
 
@@ -158,7 +177,13 @@ function activate(): void {
             {{ node.method }}
           </span>
           <span v-if="step" class="row__step" :aria-label="`Étape ${step}`">{{ step }}</span>
-          <span class="row__name">{{ node.name }}</span>
+          <span class="row__name"
+            ><template v-for="(part, index) in nameParts" :key="index"
+              ><mark v-if="part.hit" class="row__hit">{{ part.text }}</mark
+              ><template v-else>{{ part.text }}</template></template
+            ></span
+          >
+          <span v-if="byUrl" class="row__via">adresse</span>
           <span class="row__end">
             <span v-if="dirty" class="row__dirty" title="Modifiée, non enregistrée">●</span>
             <span v-if="node.invalid" class="row__invalid" title="Fichier illisible">⚠</span>
@@ -184,10 +209,11 @@ function activate(): void {
         v-for="(child, index) in node.children"
         :key="child.path"
         :node="child"
-        :step="node.test && child.kind === 'request' ? index + 1 : undefined"
+        :step="node.test && child.kind === 'request' && !filter ? index + 1 : undefined"
         :depth="depth + 1"
         :folders="folders"
         :project-id="projectId"
+        :filter="filter"
         @action="(id, n, target) => emit('action', id, n, target)"
       />
     </ul>
@@ -278,6 +304,28 @@ function activate(): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.row__hit {
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  box-shadow: inset 0 -2px var(--color-accent);
+}
+
+/* Requête trouvée par son adresse seulement (F2) : le nom cède sa place en premier. */
+.row__via {
+  flex: 0 0.2 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 0.375rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-caption);
+  color: var(--color-muted);
+  background: var(--color-chip);
 }
 
 .row__count {

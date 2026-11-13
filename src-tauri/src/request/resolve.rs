@@ -122,7 +122,8 @@ impl Resolver<'_> {
             };
             let name = after[..end].trim();
             let raw = &rest[start..start + 2 + end + 2];
-            if dynamic::is_dynamic(name) {
+            // Une valeur dynamique donnée par l'appelant (copie cURL : laissée telle quelle) prime.
+            if dynamic::is_dynamic(name) && !self.variables.values.contains_key(name) {
                 // Inconnue, elle part telle quelle : jamais signalée (R1 du plan d'ensemble).
                 match dynamic::draw(name, self.dice) {
                     Some(value) => {

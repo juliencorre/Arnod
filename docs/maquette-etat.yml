@@ -100,22 +100,14 @@ pages:
       - "plan-projets-workspaces (P1–P12, W1–W11)"
       - "plan-workspaces-onglets (O1–O12)"
       - "plan-selecteur-workspace (S1–S9)"
+      - "plan-mvp-d-barre-laterale (W1)"
     liees: ["1.2", "2.2"]
     journal:
       - "2026-11-09 : Workspaces en onglets."
       - "2026-11-10 : Sélecteur de workspace à la place des onglets (PR #36)."
+      - "2026-11-13 : Nombre de contrats de service sur les cartes de projet (lot D, PR #48)."
     ecrans:
-      a:
-        {
-          etat: livré,
-          pr: [9, 27],
-          captures: [03-workspace-boutique],
-          ecart:
-            {
-              texte: "Les cartes de projet n'affichent pas leur nombre de contrats de service.",
-              aligner: code,
-            },
-        }
+      a: { etat: livré, pr: [9, 27, 48], captures: [03-workspace-boutique, 24-cartes-contrats] }
       "a bis": { etat: livré, pr: [27] }
       b: { etat: livré, pr: [36], captures: [02b-selecteur-workspace] }
       "b bis": { etat: livré, pr: [36], captures: [02b-selecteur-workspace] }
@@ -139,32 +131,55 @@ pages:
       - "plan-barre-laterale-projet (B1–B6)"
       - "plan-requetes-dans-contrats (RC6)"
       - "plan-selecteur-workspace (I1, I2)"
+      - "plan-mvp-d-barre-laterale (F1–F5, D1, D2, M1, M2)"
     liees: ["3.3", "3.1", "4.1"]
-    reste: "filtre de l'arborescence (e), quatre points de départ (d), menu « + » complet (a ter) ; « Plus » en V4 (d bis)."
+    reste: "« Nouveau test » et « Requête libre » du menu « + » avec le modèle test = dossier d'étapes (lots E, K) ; « Plus » en V4 (d bis)."
     journal:
       - "2026-11-10 : Option a retenue et livrée (PR #33) ; b et c restent des variantes."
       - "2026-11-11 : Sections « Contrats de service » puis « Référentiel de tests » (PR #40)."
       - "2026-11-12 : Page ajoutée à la liste ; écrans repris de « Premier usage » (b → d, b bis → d bis)."
+      - "2026-11-13 : Filtre du référentiel, sections repliables, quatre points de départ, menu « + » avec raccourcis (lot D, PR #48)."
     ecrans:
       "0": { etat: remplacé }
       a: { etat: livré, pr: [33], captures: [03-workspace-boutique] }
       "a bis": { etat: livré, pr: [33], captures: [08b-menu-environnement] }
-      "a ter": { etat: en partie, pr: [33] }
+      "a ter":
+        {
+          etat: en partie,
+          pr: [33, 48],
+          captures: [22-menu-ajouter],
+          ecart:
+            {
+              texte: "Le menu « + » dit « Nouvelle requête » (Ctrl+N) et « Nouveau dossier » (Ctrl+Maj+N), sans « Nouveau test » ni « Requête libre » (vocabulaire inchangé, R4 du plan de finalisation) ; « Ajouter un contrat » ouvre ses quatre façons dans un sous-menu.",
+              aligner: code,
+            },
+        }
       b: { etat: variante }
       c: { etat: variante }
       d:
         {
-          etat: en partie,
-          pr: [36, 40],
+          etat: livré,
+          pr: [36, 40, 48],
           captures: [02-projet-cree],
           ecart:
             {
-              texte: "Le projet ouvert montre un texte et « + Nouvelle requête » au lieu des quatre points de départ ; sections vides suivies d'une ligne d'ajout (comme 1.2-a ter) au lieu de sections repliées.",
+              texte: "« Écrire une requête » et « + Requête » au lieu de « Écrire un test » et « + Test » (R4) ; « Reprendre l'existant » importe un fichier OpenAPI, les collections Bruno viennent du lot C (2.3-b).",
               aligner: code,
             },
         }
       "d bis": { etat: à faire, version: V4 }
-      e: { etat: à faire, version: MVP }
+      e:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [48],
+          captures: [21-filtre-referentiel],
+          ecart:
+            {
+              texte: "Passage trouvé souligné et en gras (pas de fond) ; dossiers avec leur nombre de requêtes non filtré ; le filtre ne porte pas sur les requêtes rangées sous les contrats (la maquette ne le montre que sur le référentiel).",
+              aligner: maquette,
+            },
+        }
   "1.3":
     nom: "Onglets"
     version: MVP
@@ -229,18 +244,31 @@ pages:
     plans:
       - "plan-accueil-non-classes (A1–A4)"
       - "plan-workspaces-onglets (O8)"
+      - "plan-mvp-b-saisie-curl (CU1–CU4)"
     liees: ["2.2", "4.4", "0.3"]
-    reste: "natures autres que REST (a ter à a quinquies), commande cURL collée (a sexies)."
+    reste: "natures autres que REST (a ter à a quinquies)."
     journal:
       - "2026-11-10 : Accueil « Essayer une étape », REST seule (PR #35)."
       - "2026-11-12 : Ancienne page « Premier usage » : démarrage et erreurs → 0.3, projet créé → 1.2, Non classés → 2.2."
+      - "2026-11-13 : Commande cURL collée reconnue REST, jeton au coffre (lot B, PR #49)."
     ecrans:
       a: { etat: livré, pr: [8, 35], captures: [01-premier-lancement] }
       "a bis": { etat: livré, pr: [27] }
       "a ter": { etat: en partie, pr: [35], captures: [01b-accueil-rest] }
       "a quater": { etat: en partie, pr: [35] }
       "a quinquies": { etat: en partie, pr: [35] }
-      "a sexies": { etat: à faire, version: MVP }
+      "a sexies":
+        {
+          etat: livré,
+          version: MVP,
+          pr: [49],
+          captures: [21-curl-collee],
+          ecart:
+            {
+              texte: "L'entrée garde l'adresse, pas la commande collée ; les en-têtes sont une zone de texte « Nom: valeur » où le jeton paraît en {{token}}, sans ligne masquée ni pastille « gardé dans le coffre » (une note sous le formulaire le dit) ; l'adresse reste dans l'entrée, sans champ Adresse dans le formulaire.",
+              aligner: maquette,
+            },
+        }
   "2.2":
     nom: "Non classés"
     version: MVP
@@ -277,16 +305,48 @@ pages:
     plans:
       - "plan-opencollection (S1–S8)"
       - "plan-projets-workspaces (P12)"
+      - "plan-mvp-c-import-bruno (IM1–IM6)"
     liees: ["3.1"]
-    reste: "collections Bruno .bru (a) et leur rapport d'import (f), « Reprendre l'existant » (b) ; Postman en V4, SoapUI en V5."
+    reste: "Postman en V4 (d), SoapUI en V5 (e)."
     journal:
       - "2026-11-09 : Un projet Bruno au format OpenCollection s'ouvre (PR #29)."
+      - "2026-11-13 : Collections Bruno .bru converties en OpenCollection, rapport d'import, « Reprendre l'existant » (PR #50)."
     ecrans:
-      a: { etat: en partie, pr: [11, 29] }
-      b: { etat: à faire, version: MVP }
+      a:
+        {
+          etat: livré,
+          pr: [11, 29, 50],
+          ecart:
+            {
+              texte: "La carte « Importer… » propose « Choisir un dossier… » et « ou un fichier… » (le sélecteur natif ne choisit pas les deux à la fois) ; pas de dépôt d'un dossier (glisser-déposer natif désactivé) ; Postman n'est pas cité avant V4.",
+              aligner: maquette,
+            },
+        }
+      b:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [50],
+          ecart:
+            {
+              texte: "« Reprendre l'existant » est seul sous « Par où commencer ? » tant que les trois autres points de départ (1.2-d, lot D) ne sont pas livrés ; la fenêtre « Importer » ne montre pas la correspondance des environnements ni la case des secrets (ils vont toujours en variables locales).",
+              aligner: code,
+            },
+        }
       d: { etat: à faire, version: V4 }
       e: { etat: à faire, version: V5 }
-      f: { etat: à faire, version: MVP }
+      f:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [50],
+          captures: [c1-rapport-import],
+          ecart:
+            {
+              texte: "Sans « Remplacer par une assertion… » ni « Accepter sans ce script » : un script Bruno reste dans le fichier, signalé ; « vérifications » au lieu d'« assertions » (vocabulaire, lot K) ; le rapport se rouvre par son onglet tant qu'il est ouvert, pas depuis la barre latérale.",
+              aligner: code,
+            },
+        }
   "3.1":
     nom: "Contrats de service"
     version: MVP
@@ -327,11 +387,13 @@ pages:
     version: [MVP, V4]
     plans:
       - "plan-configuration-endpoint (EP1–EP10)"
+      - "plan-mvp-d-barre-laterale (E1–E3)"
     liees: ["3.1", "4.2", "4.8"]
-    reste: "réponses attendues dans l'arborescence (a3), test transféré au référentiel ou aux templates (b, c, d)."
+    reste: "test transféré au référentiel ou aux templates (b, c, d)."
     journal:
       - "2026-11-09 : Configuration d'un endpoint (PR #32)."
       - "2026-11-12 : Page « Contrats de service » (fichier « Endpoints ») recentrée sur l'endpoint ; e, f, g → 3.1."
+      - "2026-11-13 : Réponses attendues listées sous l'endpoint dans la barre latérale (lot D, PR #48)."
     ecrans:
       a:
         {
@@ -345,7 +407,18 @@ pages:
             },
         }
       a2: { etat: livré, pr: [32], captures: [12-endpoint] }
-      a3: { etat: à faire, version: MVP }
+      a3:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [48],
+          captures: [23-reponses-attendues-arborescence],
+          ecart:
+            {
+              texte: "La ligne de l'opération est l'endpoint : son ⋯ (renommer, dupliquer, corbeille) et son statut ; dépliée, elle liste ses réponses attendues puis les autres requêtes de l'opération (essais, copies).",
+              aligner: maquette,
+            },
+        }
       b:
         {
           etat: en partie,
@@ -485,7 +558,7 @@ pages:
           captures: [23-variables],
           ecart:
             {
-              texte: "Un clic sur une valeur de la réponse ne propose pas encore « Extraire dans une variable » (réponse, lot A) ; la portée est toujours « le test » (variable d'exécution).",
+              texte: "« Extraire dans une variable » part d'un résultat du filtre JSONPath de la réponse, pas d'un clic sur la valeur dans le corps ; la portée est toujours « le test » (variable d'exécution).",
               aligner: code,
             },
         }
@@ -587,19 +660,56 @@ pages:
     version: [MVP, V1]
     plans:
       - "plan-premier-usage (X1–X5)"
+      - "plan-mvp-a-reponse (F1–F8)"
+      - "plan-mvp-b-saisie-curl (SA1–SA6, TX1–TX4)"
       - "plan-mvp-e-tests-etapes (VD1–VD4)"
     liees: ["5.2", "1.4"]
-    reste: "format, aperçu et filtre (b bis), variables inconnues (b ter), édition en texte et cURL (b quater), chronologie détaillée DNS, connexion, TLS (c), liste des valeurs dynamiques à la frappe de {{$ (h), échec réseau expliqué (i) ; historique en V1 (c bis)."
+    reste: "Ctrl+J (b bis, lot F), chronologie détaillée DNS, connexion, TLS (c), liste des valeurs dynamiques à la frappe de {{$ (h), échec réseau expliqué (i) ; historique en V1 (c bis)."
     journal:
       - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
       - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
+      - "2026-11-13 : Corps de la réponse (b bis) : format, aperçu HTML, copier, enregistrer, effacer, filtre JSONPath et vérification tirée d'un résultat (lot A)."
+      - "2026-11-13 : Variables inconnues, compteurs d'onglets, en-têtes ajoutés, édition en texte et copie en cURL (lot B, PR #49)."
       - "2026-11-13 : Valeurs dynamiques tirées à chaque envoi par le cœur, montrées dans « Envoyé », « Garder » en fait une extraction (h, plan-mvp-e-tests-etapes, PR #51)."
     ecrans:
       a: { etat: livré, pr: [27] }
       b: { etat: livré, pr: [27, 42], captures: [19-verification-en-echec] }
-      "b bis": { etat: à faire, version: MVP }
-      "b ter": { etat: à faire, version: MVP }
-      "b quater": { etat: à faire, version: MVP }
+      "b bis":
+        {
+          etat: en partie,
+          version: MVP,
+          pr: [47, 51],
+          captures: [a1-reponse-filtre, a2-reponse-apercu-html],
+          ecart:
+            {
+              texte: "« + Assertion » devient « + Vérification » (vocabulaire, lot K) et porte sur la correspondance courante (body.items[0].sku égal à …, ↑ ↓ ou Entrée pour changer) au lieu de body.items[*].sku contient … : une vérification ne lit pas de joker ; l'interrupteur « Aperçu » ne rend qu'un corps HTML ; « Extraire dans une variable » range la correspondance courante dans une extraction (lot E, PR #51) ; l'icône Ctrl+J attend le lot F.",
+              aligner: maquette,
+            },
+        }
+      "b ter":
+        {
+          etat: livré,
+          version: MVP,
+          pr: [49],
+          captures: [22-variable-inconnue],
+          ecart:
+            {
+              texte: "Le nom inconnu est souligné sans être écrit en rouge (un champ ne colore pas une partie de son texte) ; l'Authorization de l'onglet Auth est listée dans « Ajoutés à l'envoi » avec sa source, pas dans « Hérités » ; Accept-Encoding n'est pas listé : le client HTTP ne demande pas de compression.",
+              aligner: maquette,
+            },
+        }
+      "b quater":
+        {
+          etat: livré,
+          version: MVP,
+          pr: [49],
+          captures: [23-en-tetes-en-texte],
+          ecart:
+            {
+              texte: "« Copier » de la fenêtre cURL est un bouton secondaire (un seul bouton plein par vue : « Envoyer ») ; la ligne illisible est marquée dans la gouttière, pas surlignée ; pas encore de liste de variables à éditer en texte (onglet Variables du lot E).",
+              aligner: maquette,
+            },
+        }
       c: { etat: en partie, pr: [27] }
       "c bis": { etat: à faire, version: V1 }
       h:

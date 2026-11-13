@@ -2,11 +2,13 @@
 /**
  * Réponse reçue (V1 à V6) : statut, durées, corps, en-têtes et résultat des vérifications. Les
  * vérifications en échec sont détaillées sous la réponse, ignorables pour ce résultat ou
- * retirables de la requête (`docs/plan-fin-premier-usage.md`, VT1 à VT3).
+ * retirables de la requête (`docs/plan-fin-premier-usage.md`, VT1 à VT3). Le corps (format,
+ * aperçu, filtre JSONPath) est dans `ResponseBody` (`docs/plan-mvp-a-reponse.md`).
  */
 import { computed, ref } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import ResponseBody from "@/components/workbench/ResponseBody.vue";
 import SentPanel from "@/components/workbench/SentPanel.vue";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -18,16 +20,6 @@ const workbench = useWorkbenchStore();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
 const outcome = computed(() => editor.value?.outcome ?? null);
 const view = ref<"body" | "headers" | "checks" | "sent">("body");
-
-/** Corps JSON réindenté pour la lecture ; texte brut sinon. */
-const prettyBody = computed(() => {
-  const body = outcome.value?.response.body ?? "";
-  try {
-    return JSON.stringify(JSON.parse(body), null, 2);
-  } catch {
-    return body;
-  }
-});
 
 /** Identifiant du résultat de conformité au contrat lié (`CONTRACT_CHECK`, R8). */
 const CONTRACT_CHECK = "contrat";
@@ -86,9 +78,6 @@ function removable(check: AssertionResult): boolean {
         Attente {{ formatDuration(outcome.response.waitMs) }} · Réception
         {{ formatDuration(outcome.response.receiveMs) }}
       </p>
-      <p v-if="outcome.response.truncated" class="response__info">
-        Le corps dépasse 5 Mo : seul le début est affiché.
-      </p>
       <div role="tablist" aria-label="Contenu de la réponse" class="response__tabs">
         <button
           v-for="[id, label] in [
@@ -107,14 +96,10 @@ function removable(check: AssertionResult): boolean {
           {{ label }}
         </button>
       </div>
-      <!-- Panneau de l'onglet « Corps », focalisable pour défiler au clavier. -->
-      <pre
-        v-if="view === 'body'"
-        class="response__body"
-        role="tabpanel"
-        aria-label="Corps de la réponse"
-        tabindex="0"
-        >{{ prettyBody }}</pre>
+      <!-- Corps : format, aperçu, actions et filtre JSONPath (docs/plan-mvp-a-reponse.md). -->
+      <div v-if="view === 'body'">
+        <ResponseBody :editor-key="editorKey" />
+      </div>
       <dl v-else-if="view === 'headers'" class="response__headers">
         <template v-for="[name, value] in outcome.response.headers" :key="name + value">
           <dt>{{ name }}</dt>
@@ -246,24 +231,9 @@ function removable(check: AssertionResult): boolean {
   color: var(--color-text);
 }
 
-.response__tab:focus-visible,
-.response__body:focus-visible {
+.response__tab:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;
-}
-
-.response__body {
-  max-height: 24rem;
-  margin: 0;
-  padding: 0.75rem;
-  overflow: auto;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font: var(--text-body) var(--font-mono);
-  color: var(--color-text);
-  background: var(--color-sidebar);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .response__headers {

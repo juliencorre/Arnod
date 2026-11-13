@@ -78,7 +78,19 @@ pub enum Rule {
     Prefix { text: String },
     /// Texte qui finit par `text` (`?wsdl`).
     Suffix { text: String },
+    /// Commande cURL (`curl …`), lue par le cœur : méthode, en-têtes, type du
+    /// corps et corps vont dans les champs `method`, `headers`, `bodyType` et
+    /// `body` (`docs/plan-mvp-b-saisie-curl.md`, R4).
+    Curl,
 }
+
+/// Champs que remplit une règle « curl », et leur nature.
+pub const CURL_FIELDS: [(&str, FieldKind); 4] = [
+    ("method", FieldKind::Choice),
+    ("headers", FieldKind::Multiline),
+    ("bodyType", FieldKind::Choice),
+    ("body", FieldKind::Multiline),
+];
 
 /// Nature d'un champ du formulaire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -269,6 +281,15 @@ pub fn validate(definition: &Definition) -> Result<(), String> {
             }
             Rule::Prefix { text } | Rule::Suffix { text } if text.trim().is_empty() => {
                 return Err("règle de préfixe ou de suffixe vide".to_owned());
+            }
+            Rule::Curl => {
+                for (key, kind) in CURL_FIELDS {
+                    if definition.field(key).is_none_or(|f| f.kind != kind) {
+                        return Err(format!(
+                            "règle « curl » : champ « {key} » absent ou d'une autre nature"
+                        ));
+                    }
+                }
             }
             _ => {}
         }

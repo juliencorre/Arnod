@@ -6,15 +6,22 @@
  * onglet, dans la fenêtre qui suit la sélection (Z5). Les créations partent du « + » de la ligne
  * du projet ou de l'en-tête de la section (`newRequest`, `newFolder`) ; un référentiel vide montre
  * la ligne « Nouvelle requête » (plan de la barre latérale du projet, B4).
+ *
+ * Lot D (docs/plan-mvp-d-barre-laterale.md) : la section se replie, vide elle l'est par défaut
+ * (D1, R6) ; un champ en tête filtre l'arborescence par nom, adresse, `#étiquette` ou méthode,
+ * dossiers des résultats dépliés et compte affiché (F1 à F5, `lib/treeFilter.ts`).
  */
-import { computed, ref } from "vue";
+import { computed, nextTick, ref, useTemplateRef } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import SectionHeading from "@/components/ui/SectionHeading.vue";
 import NameDialog from "@/components/workbench/NameDialog.vue";
+import TreeFilter from "@/components/workbench/TreeFilter.vue";
 import TreeRow from "@/components/workbench/TreeRow.vue";
+import { filterTree, parseFilter } from "@/lib/treeFilter";
 import { useCatalogStore } from "@/stores/catalog";
+import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
@@ -26,6 +33,45 @@ const workbench = useWorkbenchStore();
 const nodes = computed(() => workbench.trees[props.projectId]?.tests ?? []);
 const projectName = computed(() => useCatalogStore().projectById(props.projectId)?.name ?? "");
 const toasts = useToastStore();
+const sidebar = useSidebarStore();
+
+// --- Section repliable et filtre (lot D) ---------------------------------------
+
+const open = computed(() =>
+  sidebar.isSectionOpen(props.projectId, "tests", nodes.value.length === 0),
+);
+const filterText = computed({
+  get: () => sidebar.filterOf(props.projectId),
+  set: (text: string) => {
+    sidebar.setFilter(props.projectId, text);
+  },
+});
+const filter = computed(() => parseFilter(filterText.value));
+const filtered = computed(() => (filter.value ? filterTree(nodes.value, filter.value) : null));
+const shown = computed(() => filtered.value?.nodes ?? nodes.value);
+const filterCount = computed(() =>
+  filtered.value ? `${String(filtered.value.matched)} sur ${String(filtered.value.total)}` : null,
+);
+const filterFocused = ref(false);
+const filterField = useTemplateRef<InstanceType<typeof TreeFilter>>("filterField");
+
+function toggleSection(): void {
+  sidebar.setSectionOpen(props.projectId, "tests", !open.value);
+}
+
+/** Déplie la section, pour y montrer une création ou le filtre. */
+function reveal(): void {
+  if (!open.value) sidebar.setSectionOpen(props.projectId, "tests", true);
+}
+
+/** Ctrl+F : focus dans le filtre (F5) ; `false` si le référentiel n'a rien à filtrer. */
+async function focusFilter(): Promise<boolean> {
+  if (requestCount.value === 0) return false;
+  reveal();
+  await nextTick();
+  filterField.value?.focus();
+  return true;
+}
 
 type NameAction =
   | { kind: "new-folder"; parent: string }
@@ -44,7 +90,7 @@ const requestCount = computed(() => {
 
 const ADD_ITEMS: MenuItem[] = [
   { id: "request", label: "Nouvelle requête", shortcut: "Ctrl+N" },
-  { id: "folder", label: "Nouveau dossier" },
+  { id: "folder", label: "Nouveau dossier", shortcut: "Ctrl+Maj+N" },
   // Lot E (4.1-b) : le dossier du test et son étape 1.
   { id: "test", label: "Nouveau test" },
 ];
@@ -143,14 +189,16 @@ async function onAction(id: string, node: TreeNode, target?: string): Promise<vo
 
 /** Nouvelle requête ou nouveau dossier à la racine du projet (menu « + » du projet). */
 function newRequest(): void {
+  reveal();
   openName({ kind: "new-request", folder: "" });
 }
 
 function newFolder(): void {
+  reveal();
   openName({ kind: "new-folder", parent: "" });
 }
 
-defineExpose({ newRequest, newFolder });
+defineExpose({ newRequest, newFolder, focusFilter });
 
 async function submitName(name: string): Promise<void> {
   const action = nameAction.value;
@@ -170,7 +218,13 @@ async function submitName(name: string): Promise<void> {
 
 <template>
   <div class="tree">
-    <SectionHeading icon="tests" title="Référentiel de tests" :count="requestCount">
+    <SectionHeading
+      icon="tests"
+      title="Référentiel de tests"
+      :count="requestCount"
+      :expanded="open"
+      @toggle="toggleSection"
+    >
       <BaseMenu
         :items="ADD_ITEMS"
         :label="`Ajouter au référentiel de tests de ${projectName}`"
@@ -192,26 +246,42 @@ async function submitName(name: string): Promise<void> {
         </template>
       </BaseMenu>
     </SectionHeading>
-    <ul
-      v-if="nodes.length > 0"
-      role="tree"
-      class="tree__list"
-      :aria-label="`Référentiel de tests de ${projectName}`"
-    >
-      <TreeRow
-        v-for="node in nodes"
-        :key="node.path"
-        :node="node"
-        :depth="0"
-        :folders="folders"
-        :project-id="projectId"
-        @action="onAction"
+    <template v-if="open">
+      <TreeFilter
+        v-if="requestCount > 0"
+        ref="filterField"
+        v-model="filterText"
+        :label="`Filtrer le référentiel de tests de ${projectName}`"
+        :count="filterCount"
+        @focus="filterFocused = true"
+        @blur="filterFocused = false"
       />
-    </ul>
-    <button v-else type="button" class="tree__ghost" @click="newRequest">
-      <span class="tree__lead" aria-hidden="true">+</span>
-      Nouvelle requête
-    </button>
+      <ul
+        v-if="shown.length > 0"
+        role="tree"
+        class="tree__list"
+        :aria-label="`Référentiel de tests de ${projectName}`"
+      >
+        <TreeRow
+          v-for="node in shown"
+          :key="node.path"
+          :node="node"
+          :depth="0"
+          :folders="folders"
+          :project-id="projectId"
+          :filter="filter"
+          @action="onAction"
+        />
+      </ul>
+      <p v-else-if="filter" class="tree__none">Aucune requête ne correspond.</p>
+      <button v-else type="button" class="tree__ghost" @click="newRequest">
+        <span class="tree__lead" aria-hidden="true">+</span>
+        Nouvelle requête
+      </button>
+      <p v-if="requestCount > 0 && (filterFocused || filter)" class="tree__help">
+        Nom, adresse, #étiquette, méthode · Échap efface
+      </p>
+    </template>
     <NameDialog
       :open="nameAction !== null"
       :title="dialog.title"
@@ -292,6 +362,20 @@ async function submitName(name: string): Promise<void> {
 .tree__ghost:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -2px;
+}
+
+.tree__none,
+.tree__help {
+  margin: 0;
+  padding: 0.25rem var(--tree-pad) 0.25rem
+    calc(var(--tree-pad) + var(--tree-indent) + var(--tree-lead) + var(--tree-gap));
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+.tree__help {
+  padding-left: calc(var(--tree-pad) + var(--tree-indent));
+  color: var(--color-subtle);
 }
 
 .tree__lead {

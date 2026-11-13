@@ -47,6 +47,11 @@ pub enum TreeNode {
         invalid: bool,
         /// Contrat lié (`contracts/petstore.yaml`), d'après l'étiquette `contract:`.
         contract: Option<String>,
+        /// Adresse de la requête, pour le filtre de la barre latérale
+        /// (docs/plan-mvp-d-barre-laterale.md, R1) ; vide pour un fichier illisible.
+        url: String,
+        /// Étiquettes, sans celle du lien au contrat (R1).
+        tags: Vec<String>,
     },
 }
 
@@ -143,6 +148,8 @@ fn read_dir(
                         assertion_count: request.assertions.len(),
                         invalid: false,
                         contract: request.contract.map(|link| link.file),
+                        url: request.url,
+                        tags: request.tags,
                     },
                 ),
                 Err(_) => (
@@ -154,6 +161,8 @@ fn read_dir(
                         assertion_count: 0,
                         invalid: true,
                         contract: None,
+                        url: String::new(),
+                        tags: Vec::new(),
                     },
                 ),
             });
@@ -572,8 +581,8 @@ pub fn requests_in(root: &Path, folder: &str) -> Result<Vec<String>, CommandErro
 
 mod test;
 pub use test::{
-    CreatedTest, StepView, TestView, VariableUser, add_step, create_test, is_test, test_view,
-    variable_users,
+    CreatedTest, StepView, TestView, VariableUser, add_step, create_test, extracted_before,
+    is_test, test_view, variable_users,
 };
 
 #[cfg(test)]

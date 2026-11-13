@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::input::{PairsFormat, from_text};
 use crate::request::model::{Body, BodyKind, Method, Request};
 
 use super::detect::is_url;
@@ -39,6 +40,15 @@ pub fn request(
     let mut request = Request::new(name);
     request.method = method;
     request.url = url.to_owned();
+    // En-têtes, une ligne `Nom: valeur` chacun (`docs/plan-mvp-b-saisie-curl.md`, R4).
+    if let Some(text) = values.get("headers") {
+        let read = from_text(text, PairsFormat::Header, &[]);
+        if let Some(error) = read.errors.first() {
+            let message = error.message.replacen("Ligne", "ligne", 1);
+            return Err(format!("en-têtes, {}", message.trim_end_matches('.')));
+        }
+        request.headers = read.pairs;
+    }
     if let Some(body) = values.get("body").filter(|b| !b.trim().is_empty()) {
         let kind = values
             .get("bodyType")
@@ -46,4 +56,25 @@ pub fn request(
         request.body = Body::raw(kind, body.clone());
     }
     Ok(request)
+}
+
+/// Copie de `request` où les variables `secrets` sont remplacées par leur
+/// valeur, pour l'envoi d'un essai (R5) ; la requête enregistrée garde `{{nom}}`.
+pub fn with_secrets(request: &Request, secrets: &BTreeMap<String, String>) -> Request {
+    let fill = |text: &str| {
+        let mut out = text.to_owned();
+        for (name, value) in secrets {
+            out = out.replace(&format!("{{{{{name}}}}}"), value);
+        }
+        out
+    };
+    let mut sent = request.clone();
+    sent.url = fill(&sent.url);
+    for pair in sent.headers.iter_mut().chain(sent.params.iter_mut()) {
+        pair.value = fill(&pair.value);
+    }
+    for variant in &mut sent.body.variants {
+        variant.content = fill(&variant.content);
+    }
+    sent
 }

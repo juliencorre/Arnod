@@ -87,6 +87,20 @@ const PAIRS: { foreground: string[]; background: string[]; minimum: number }[] =
     background: [`--color-family-${family}-bg`, "--color-surface"],
     minimum: 4.5,
   })),
+  // Corps d'une réponse (lot A) : coloration sur le fond du corps et sur une valeur trouvée.
+  {
+    foreground: [
+      "--color-text",
+      "--color-muted",
+      "--color-code-string",
+      "--color-code-number",
+      "--color-code-keyword",
+      "--color-code-tag",
+      "--color-code-attr",
+    ],
+    background: ["--color-surface", "--color-bg", "--color-match"],
+    minimum: 4.5,
+  },
   {
     foreground: ["--color-subtle", "--color-focus"],
     background: ["--color-bg", "--color-surface", "--color-sidebar"],

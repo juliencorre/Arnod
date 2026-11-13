@@ -44,7 +44,7 @@ describe("barre latérale du projet", () => {
     await flushPromises();
     expect(menuTexts(app)).toEqual([
       "Nouvelle requêteCtrl+N",
-      "Nouveau dossier",
+      "Nouveau dossierCtrl+Maj+N",
       "Ajouter un contrat▸",
       "Nouvel environnement…",
     ]);
@@ -83,6 +83,9 @@ describe("barre latérale du projet", () => {
       core.workbench.folders.clear();
       core.workbench.requests.clear();
     }));
+    // Sections vides repliées (1.2-d, lot D) ; dépliée, la ligne d'ajout (1.2-a ter).
+    expect(app.find(".tree__ghost").exists()).toBe(false);
+    await click(app, ".tree .section-head__toggle");
     const ghost = app.get(".tree__ghost");
     expect(ghost.text()).toBe("+ Nouvelle requête");
     expect(app.get('[aria-label^="Exécuter"]').attributes("aria-label")).toBe(
@@ -148,7 +151,11 @@ describe("sections d'un projet", () => {
     expect(heads.map((h) => h.get("svg").attributes("aria-hidden"))).toEqual(["true", "true"]);
     // Aucun contrat : pas de nombre, la ligne d'ajout suffit.
     expect(heads[0]?.find(".section-head__count").exists()).toBe(false);
-    expect(heads[1]?.get(".section-head__count").text()).toBe("3");
+    // Déplié, le référentiel montre ses requêtes : le nombre ne s'affiche que replié (lot D).
+    expect(heads[1]?.find(".section-head__count").exists()).toBe(false);
+    await heads[1]?.get(".section-head__toggle").trigger("click");
+    await flushPromises();
+    expect(app.findAll(".section-head")[1]?.get(".section-head__count").text()).toBe("3");
   });
 
   it("le « + » du référentiel de tests crée une requête ou un dossier, au clavier", async () => {
@@ -157,7 +164,11 @@ describe("sections d'un projet", () => {
     const add = app.get('[aria-label="Ajouter au référentiel de tests de boutique-tests"]');
     await add.trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
-    expect(menuTexts(app)).toEqual(["Nouvelle requêteCtrl+N", "Nouveau dossier", "Nouveau test"]);
+    expect(menuTexts(app)).toEqual([
+      "Nouvelle requêteCtrl+N",
+      "Nouveau dossierCtrl+Maj+N",
+      "Nouveau test",
+    ]);
     await app.findAll('[role="menuitem"]')[0]?.trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
     await app.findAll('[role="menuitem"]')[1]?.trigger("keydown", { key: "Enter" });

@@ -100,7 +100,13 @@ describe("contrats et référentiel de tests (RC1, RC6)", () => {
       "Contrats de service",
       "Référentiel de tests",
     ]);
-    expect(heads[1]?.get(".section-head__count").text()).toBe("3");
+    // Le nombre est montré section repliée (lot D).
+    expect(heads[1]?.find(".section-head__count").exists()).toBe(false);
+    await heads[1]?.get(".section-head__toggle").trigger("click");
+    await flushPromises();
+    expect(wrapper().findAll(".section-head")[1]?.get(".section-head__count").text()).toBe("3");
+    await wrapper().findAll(".section-head__toggle")[1]?.trigger("click");
+    await flushPromises();
     expect(testItems().some((t) => t.includes("Clients"))).toBe(true);
     expect(testItems().some((t) => t.includes("Santé"))).toBe(true);
     // Le dossier « Petstore » n'avait que des requêtes liées : il n'y figure pas.
@@ -123,16 +129,17 @@ describe("contrats et référentiel de tests (RC1, RC6)", () => {
     expect(texts(".crow__resource .crow__count")).toEqual(["2", "1", "1"]);
 
     await click(wrapper(), ".crow__resource", "/pets");
-    // L'opération avec requêtes en donne le nombre ; celle sans requête est estompée.
+    // La ligne de l'opération est son endpoint (lot D, Q4) : sans réponse attendue, pas de
+    // nombre ; celle sans requête est estompée.
     const get = wrapper().get('[aria-label="Ouvrir GET /pets"]');
-    expect(get.get(".crow__count").text()).toBe("2");
+    expect(get.find(".crow__examples").exists()).toBe(false);
     const post = wrapper().get('[aria-label="Créer la requête de POST /pets"]');
     expect(post.classes()).toContain("crow__main--empty");
     expect(post.get(".crow__hint").text()).toBe("Créer");
 
-    // L'endpoint d'abord, puis l'essai, dans l'ordre de l'arborescence.
+    // Dépliée, l'opération liste les autres requêtes : l'endpoint est la ligne elle-même.
     await press('[aria-label="Déplier GET /pets"]');
-    expect(texts(".linked__name")).toEqual(["Lister les animaux", "Page 2"]);
+    expect(texts(".linked__name")).toEqual(["Page 2"]);
 
     await click(wrapper(), ".crow__resource", "Hors contrat");
     expect(texts(".linked__method")).toEqual(["DELETE"]);
@@ -152,8 +159,11 @@ describe("ouvrir et créer depuis une opération (RC2 à RC4)", () => {
         path: "Petstore/animaux/a-lister.yml",
       },
     });
-    // L'opération a deux requêtes : elle se déplie sur l'endpoint, sélectionné.
-    expect(wrapper().get(".linked__row--selected").text()).toContain("Lister les animaux");
+    // L'opération a deux requêtes : elle se déplie ; sa ligne, l'endpoint, est sélectionnée.
+    expect(wrapper().get('[aria-label="Replier GET /pets"]').attributes("aria-expanded")).toBe(
+      "true",
+    );
+    expect(wrapper().get(".crow--selected").text()).toContain("GET");
 
     // Repliée, l'opération porte la sélection ; replié, le contrat aussi.
     await press('[aria-label="Replier GET /pets"]');
@@ -198,7 +208,7 @@ describe("ouvrir et créer depuis une opération (RC2 à RC4)", () => {
     expect(wrapper().get('[aria-label="Replier GET /pets"]').attributes("aria-expanded")).toBe(
       "true",
     );
-    expect(wrapper().get(".linked__row--selected").text()).toContain("Lister les animaux");
+    expect(wrapper().get(".crow--selected").text()).toContain("/pets");
   });
 });
 
@@ -233,15 +243,17 @@ describe("agir sur une requête liée (RC5, R6)", () => {
       path: "Petstore/animaux/b-page-2.yml",
       name: "Deuxième page",
     });
-    expect(texts(".linked__name")).toEqual(["Lister les animaux", "Deuxième page"]);
+    expect(texts(".linked__name")).toEqual(["Deuxième page"]);
 
-    // Dupliquer : un essai de plus sur l'opération, ouvert.
+    // Dupliquer l'endpoint, depuis le ⋯ de la ligne de l'opération : un essai de plus, ouvert.
     await action("Lister les animaux", "Dupliquer");
     expect(core.calls.find((c) => c.cmd === "tree_duplicate")?.args).toMatchObject({
       path: "Petstore/animaux/a-lister.yml",
     });
-    expect(texts(".linked__name")).toHaveLength(3);
-    expect(wrapper().get(".linked__row--selected").text()).toContain("Lister les animaux (copie)");
+    expect(texts(".linked__name")).toHaveLength(2);
+    // La copie est ouverte (le faux cœur la range par chemin, avant l'original).
+    const opened = lastOpened(core) as { content: { path: string } };
+    expect(opened.content.path).not.toBe("Petstore/animaux/a-lister.yml");
 
     await action("Deuxième page", "Mettre à la corbeille");
     expect(core.calls.find((c) => c.cmd === "tree_delete")?.args).toMatchObject({
@@ -301,13 +313,14 @@ describe("statuts des requêtes liées (ST1, ST2)", () => {
       .findAll(".crow__resource")
       .find((r) => r.text().includes("/pets"));
     expect(pets?.get(".crow__count [aria-hidden='true']").text()).toBe("1/2");
-    expect(wrapper().get('[aria-label="Ouvrir GET /pets"]').get(".crow__count").text()).toContain(
-      "1/2",
+    // La ligne de l'opération porte le statut de son endpoint (lot D, Q4).
+    expect(wrapper().get('[aria-label="Ouvrir GET /pets"]').get(".crow__mark").text()).toContain(
+      "✓",
     );
     await press('[aria-label="Déplier GET /pets"]');
     const marks = wrapper()
       .findAll(".linked")
       .map((l) => l.find(".linked__status").text());
-    expect(marks).toEqual(["✓, réussie", "✕, en échec"]);
+    expect(marks).toEqual(["✕, en échec"]);
   });
 });

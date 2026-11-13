@@ -10,6 +10,7 @@ import type {
   ContractView,
   GenerateReport,
   HttpMethod,
+  ExampleRef,
   LinkedView,
   OperationView,
   ResourceView,
@@ -32,6 +33,8 @@ export interface FakeContract {
 export interface FakeContracts {
   /** Contrats par chemin (`contracts/petstore.yaml`). */
   files: Map<string, FakeContract>;
+  /** Lot D : nombre de contrats par projet pour `contract_count` ; sinon `files.size`. */
+  counts?: Record<string, number>;
   /** Réponse du sélecteur de fichier : texte du fichier choisi, ou `null` (annulé). */
   pickedFile: string | null;
 }
@@ -131,6 +134,7 @@ interface Link {
   name: string;
   method: HttpMethod;
   operation: string;
+  examples: ExampleRef[];
 }
 
 function linkedRequests(wb: FakeWorkbench, path: string): Link[] {
@@ -142,6 +146,11 @@ function linkedRequests(wb: FakeWorkbench, path: string): Link[] {
       name: request.name,
       method: request.method,
       operation: request.contract?.operation ?? "",
+      examples: request.examples.map((example, index) => ({
+        index,
+        status: example.status,
+        name: example.name,
+      })),
     }));
 }
 
@@ -150,7 +159,12 @@ function resources(
   contract: FakeContract,
   links: Link[],
 ): Pick<ContractSummary, "resources" | "unplaced"> {
-  const view = ({ path, name, method }: Link): LinkedView => ({ path, name, method });
+  const view = ({ path, name, method, examples }: Link): LinkedView => ({
+    path,
+    name,
+    method,
+    examples,
+  });
   const out: ResourceView[] = [];
   for (const operation of contract.operations) {
     const resource = `/${operation.path.replace(/^\//, "").split("/")[0] ?? ""}`;
@@ -327,6 +341,9 @@ export function handleContracts(
       wb.lastRun = run;
       return structuredClone(run);
     }
+    // Lot D - Barre latérale
+    case "contract_count":
+      return fc.counts?.[String(args.project)] ?? fc.files.size;
     default:
       return undefined;
   }

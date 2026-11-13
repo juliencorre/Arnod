@@ -458,6 +458,91 @@ l'étude `docs/etude-catalogue-etapes.md` (catalogue synchronisé, non implémen
 - Couleurs des familles : jetons `--color-family-*` (texte, fond, bord) des deux thèmes, contrastes
   vérifiés dans `tests/theme.spec.ts`.
 
+## Corps de la réponse
+
+Référence : `docs/plan-mvp-a-reponse.md` (lot A, cas F1 à F8, règles R1 à R10), écran `5.1-b bis`.
+
+- Le cœur met en forme et filtre (`src-tauri/src/response/`, pur) : format détecté d'après
+  `content-type` (`response_render`), aperçu HTML en arbre de balises sûres sans attribut
+  (`response_preview`, ni `v-html` ni cadre), filtre JSONPath RFC 9535 (`response_filter`, crate
+  `serde_json_path`) dont une expression invalide revient en français dans `FilterResult.error`.
+- Chaque valeur JSON mise en forme et chaque correspondance portent le même chemin canonique
+  (`$.items[0].sku`) : l'interface surligne en comparant des chemins, jamais en relisant le JSON.
+- Une correspondance porte la vérification qu'elle donne (`FilterMatch.assertion`, cible
+  `body.…` sans joker) ; le store `response` l'ajoute au brouillon, qui s'enregistre seul.
+- Enregistrer passe par `response_save` (sélecteur natif appelé depuis Rust) ; effacer par
+  `response_clear` (`ResultBook::clear`, diffusé par `arnod://resultat`). Un corps tronqué à 5 Mo
+  est signalé à la copie et à l'enregistrement.
+
+## Lot D - Barre latérale
+
+Référence : `docs/plan-mvp-d-barre-laterale.md` (cas F1 à F5, D1, D2, M1, M2, E1 à E3, W1, règles
+R1 à R6), écrans 1.2-e, 1.2-d, 1.2-a ter, 3.2-a3 et 1.1-a.
+
+- Filtre du référentiel (`TreeFilter.vue`, `lib/treeFilter.ts`, pur et testé) : filtre d'affichage
+  fait dans l'interface (Q4 du plan d'ensemble), sur `TreeNode` (`url`, `tags` fournis par le cœur).
+  Termes cumulés : `#mot` (début d'étiquette), méthode en capitales, sinon nom ou adresse sans casse
+  ni accents. Pendant un filtre, les dossiers sont dépliés sans toucher à l'état replié enregistré.
+  Ctrl+F ne vaut que quand la barre latérale a le focus.
+- État d'affichage propre à la fenêtre dans le store `sidebar` : texte du filtre par projet,
+  sections dépliées, réponse attendue à ouvrir (`openExample`, servie par `ResultSide` et
+  `ExpectedResponses`), nombre de contrats des cartes (`contract_count`, sans lire les contrats).
+- `SectionHeading` avec `expanded` : section repliable ; une section vide est repliée par défaut,
+  dépliée elle montre sa ligne d'ajout ; le nombre n'est montré que replié.
+- Sous un contrat, la ligne d'une opération **est** son endpoint (première requête liée) : clic,
+  statut, nombre de réponses attendues (`LinkedView.examples`) et menu ⋯ ; dépliée, ses réponses
+  attendues par code, puis les autres requêtes de l'opération.
+- Projet vide (ni requête ni contrat) : `ProjectWelcome` montre quatre points de départ ; l'ajout
+  d'un contrat passe par `useContractAdd`, partagé avec `ContractsSection`.
+- Menu « + » du projet : Nouvelle requête (Ctrl+N), Nouveau dossier (Ctrl+Maj+N), Ajouter un
+  contrat ▸, Nouvel environnement… ; une création déplie la section concernée.
+
+## Saisie, texte et cURL
+
+Référence : `docs/plan-mvp-b-saisie-curl.md` (cas SA1 à SA6, TX1 à TX4, CU1 à CU4, règles R1 à
+R13), écrans `5.1-b ter`, `5.1-b quater`, `2.1-a sexies`.
+
+- Le cœur décide : `input/` (pur) calcule variables connues et inconnues, en-têtes ajoutés à l'envoi
+  et listes en texte ; `curl/` (pur) lit une commande cURL (syntaxe bash) et écrit celle d'une
+  requête. L'interface ne fait que souligner (`lib/variables.ts`, directive `v-variables`, calque
+  transparent sur le champ) et compter.
+- `request_input` est appelée 250 ms après une frappe : elle lit environnements et `local.json`,
+  jamais le coffre. `request_curl` lit le coffre pour remplacer chaque secret par une variable du
+  shell (`$TOKEN`, `$API_KEY`, `-u "user:$PASSWORD"`) : aucun secret dans une commande copiée.
+- Une valeur dynamique `{{$…}}` n'est jamais inconnue. Les variables de dossier et de collection
+  sont connues ; leur remplacement à l'envoi relève de `request/resolve.rs`.
+- Les variables connues passent de `RequestEditor` aux éditeurs par `provide(KNOWN_VARIABLES)` ; un
+  nouveau champ de requête qui accepte `{{…}}` lit `useKnownVariables()` et prend `v-variables`.
+- `PairsEditor` avec `text-format` (`header`, `query`) offre « Éditer en texte » : lecture et écriture
+  par `pairs_from_text` / `pairs_to_text`, descriptions gardées par nom, une ligne illisible bloque
+  le retour au tableau.
+- Une commande cURL collée est reconnue par la règle `curl` de la définition REST (champs `method`,
+  `headers`, `bodyType`, `body`) : le jeton sort du texte (`{{token}}`), reste en mémoire dans
+  l'interface et ne va au coffre (variable locale secrète de « Local » de « Non classés ») qu'à
+  l'envoi de l'essai (`trial_send`, `secrets`), réponse masquée.
+
+## Import Bruno
+
+Référence : `docs/plan-mvp-c-import-bruno.md` (cas IM1 à IM6, règles R1 à R11), écrans `2.3-a`,
+`2.3-b` et `2.3-f`.
+
+- Un seul « Importer » : le cœur reconnaît le format (`import::detect`, sans écriture) : collection
+  Bruno en `.bru` (dossier avec `bruno.json`), projet Arnod ou OpenCollection (ajouté tel quel),
+  contrat OpenAPI (rangé dans `contracts/`). L'interface ne demande jamais d'où vient l'utilisateur.
+- Les fichiers d'origine ne sont jamais écrits : une collection Bruno devient un nouveau projet
+  (`AppState::create_project_with`, dossier retiré en cas d'échec) ou un nouveau dossier, au nom
+  libre, d'un projet (réglages de la collection dans son `folder.yml`, environnements complétés).
+- `src-tauri/src/bruno/` : `parse` (analyseur `.bru` écrit à la main, blocs inconnus gardés bruts),
+  `read` (disque, `.env`), `convert` (pur : fichiers OpenCollection validés contre le schéma et
+  rapport) ; tests sur la collection d'exemple `bruno/fixtures/boutique/`. Un bloc ou une option
+  sans équivalent est signalé, jamais inventé.
+- Correspondances fixes : `vars:post-response` → action `set-variable` `after-response` (sélecteur
+  `jsonq`, expression de Bruno telle quelle) ; scripts et `tests` → `runtime.scripts`, jamais
+  exécutés ; `{{$…}}` gardé ; `vars:secret` et `{{process.env.X}}` → variables locales sans valeur,
+  une valeur lue dans `.env` va au coffre.
+- Rapport : `ImportReport` gardé sur le poste (`projects/<id>/import.json`), montré dans l'onglet
+  `importReport` (`ImportReportTab`) ; chaque élément signalé cite son fichier et son bloc d'origine.
+
 ## Tests, étapes et variables
 
 Référence : `docs/plan-mvp-e-tests-etapes.md` (lot E : cas TE1 à TE5, EX1 à EX5, VD1 à VD4, NT1, NT2,
@@ -487,3 +572,8 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
 - Onglets : contenu `test` (`TestTab.vue`), barre des étapes au-dessus d'une étape (`StepBar.vue`),
   onglet « Variables » de l'éditeur (`VariablesEditor.vue`, « Utilisée par » :
   `request_variable_users`).
+- Les variables extraites par les étapes précédentes du test (`tree::extracted_before`) et les
+  variables d'exécution de la session sont connues de `request_input` : jamais soulignées
+  inconnues. Une valeur `$…` fournie par l'appelant (copie cURL) n'est pas tirée.
+- « Extraire dans une variable » du filtre JSONPath (`ResponseFilter.vue`, store `response`)
+  ajoute l'extraction de la correspondance courante (`workbench.addExtraction`).

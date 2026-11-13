@@ -60,6 +60,9 @@ export function sameContent(a: ContentRef, b: ContentRef): boolean {
   if (a.kind === "run" || b.kind === "run") {
     return a.kind === b.kind && a.projectId === b.projectId;
   }
+  if (a.kind === "importReport" || b.kind === "importReport") {
+    return a.kind === b.kind && a.projectId === b.projectId;
+  }
   return a.kind === b.kind && a.projectId === b.projectId && a.path === b.path;
 }
 
@@ -74,6 +77,8 @@ export function contentKey(content: ContentRef): string {
       return `${content.projectId}::contrat::${content.path}`;
     case "result":
       return "resultat";
+    case "importReport":
+      return `${content.projectId}::import`;
     case "test":
       return `${content.projectId}::test::${content.path}`;
   }

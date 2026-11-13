@@ -1,0 +1,20 @@
+meta {
+  name: Lire une commande
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/orders/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{orderId}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: eq {{orderId}}
+}

@@ -252,3 +252,11 @@ pub fn contract_run(
     windows::run_started(&window, project, &run);
     Ok(run)
 }
+
+// --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) ---------------
+
+/// Nombre de contrats du projet, pour sa carte dans un workspace (W1, R5).
+#[tauri::command]
+pub fn contract_count(state: State<'_, AppState>, project: Uuid) -> Result<usize, CommandError> {
+    Ok(file::count(&root(&state, project)?))
+}

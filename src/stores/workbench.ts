@@ -538,12 +538,20 @@ export const useWorkbenchStore = defineStore("workbench", () => {
    * place (`externalRef`), range la valeur dans une variable du test.
    */
   function keepDrawn(key: string, drawn: DrawnValue): string | null {
+    return drawn.source === null ? null : addExtraction(key, drawn.source);
+  }
+
+  /**
+   * Ajoute l'extraction de `source` (`body.items[0].sku`) au brouillon, nommée d'après sa place
+   * (`sku`) ; renvoie le nom de la variable, celle qui existait déjà pour cette source.
+   */
+  function addExtraction(key: string, source: string): string | null {
     const draft = editors[key]?.draft;
-    if (!draft || drawn.source === null) return null;
-    const existing = draft.extractions.find((e) => e.source === drawn.source);
+    if (!draft) return null;
+    const existing = draft.extractions.find((e) => e.source === source);
     if (existing) return existing.name;
     const base =
-      drawn.source
+      source
         .split(/[.[\]]/)
         .filter(Boolean)
         .at(-1) ?? "valeur";
@@ -551,7 +559,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     for (let n = 2; draft.extractions.some((e) => e.name === name); n += 1) {
       name = `${base}${String(n)}`;
     }
-    draft.extractions.push({ name, source: drawn.source, enabled: true });
+    draft.extractions.push({ name, source, enabled: true });
     return name;
   }
 
@@ -898,6 +906,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     createTest,
     addStep,
     keepDrawn,
+    addExtraction,
     variableUsers,
     isChangedSinceSent,
     revertToSent,

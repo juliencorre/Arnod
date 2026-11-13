@@ -18,7 +18,7 @@
 import type { ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -263,7 +263,7 @@ describe("Arnod, de bout en bout", () => {
     expect(await browser.$("main .try__form").$("button=Envoyer").isDisplayed()).toBe(true);
     // POST montre le type et le corps (champs conditionnels de la définition).
     await form.$("button=POST").click();
-    await form.$("textarea").waitForDisplayed();
+    await form.$("textarea[id$='-body']").waitForDisplayed();
     await screenshot(browser, "01b-accueil-rest");
 
     // Échap ferme le formulaire : les cartes reviennent.
@@ -623,7 +623,7 @@ describe("Fenêtres et zones", () => {
     await browser.$("aside nav").$("button*=boutique-tests").click();
     await waitForHeading(browser, "boutique-tests");
 
-    await browser.$("main").$("button=+ Nouvelle requête").click();
+    await browser.$("main").$("button=+ Requête").click();
     await waitForZoneTabs([["Nouvelle requête"]]);
     // « + » de la ligne du projet, puis « Nouvelle requête » (barre latérale du projet, B3).
     await browser.$('aside button[aria-label="Ajouter au projet boutique-tests"]').click();
@@ -1238,7 +1238,7 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
     });
     expect(await checked()).toEqual(["POST", "JSON"]);
     expect(await browser.$("main .try__input").getValue()).toBe(`${url}/commandes`);
-    await form.$("textarea").setValue('{"article":"T-shirt"}');
+    await form.$("textarea[id$='-body']").setValue('{"article":"T-shirt"}');
     await sendTrial("Essai 2");
 
     const contract = readFileSync(contractFile(), "utf8");
@@ -1525,6 +1525,517 @@ describe("Premier usage : vérifications, run et statuts", () => {
     expect((await treeRow("Créer une commande"))?.status).toBe("✓, réussie");
     expect((await treeRow("Lister les commandes"))?.status).toBe("✓, réussie");
     expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
+  });
+});
+
+describe("Lot A - Réponse : format, aperçu, filtre JSONPath (5.1-b bis)", () => {
+  let server: Server;
+  let url = "";
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      if (request.url === "/commande") {
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(
+          JSON.stringify({
+            id: "ord_8F2kQ",
+            items: [
+              { sku: "TSH-BLU-M", qty: 2 },
+              { sku: "MUG-NOIR", qty: 1 },
+            ],
+            total: 47.82,
+          }),
+        );
+      } else {
+        response.writeHead(502, { "Content-Type": "text/html; charset=utf-8" });
+        response.end(
+          '<html><head><script>document.title="piégé"</script></head><body><h1>Panne</h1><img src="https://example.com/x.png" alt="Logo"><p>Réessayez.</p></body></html>',
+        );
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /** Onglet de la requête « Lister les commandes » (premier usage), ouvert depuis la barre. */
+  async function openRequest(): Promise<void> {
+    await browser.execute(() => {
+      const row = Array.from(
+        document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'),
+      ).find(
+        (item) => item.querySelector(".row__name")?.textContent.trim() === "Lister les commandes",
+      );
+      if (!row) throw new Error("requête « Lister les commandes » introuvable");
+      row.click();
+    });
+    await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+  }
+
+  /** Envoie la requête ouverte à `target` et attend la réponse. */
+  async function sendTo(target: string, status: string): Promise<void> {
+    await browser.execute((address) => {
+      const input = document.querySelector<HTMLInputElement>(".request-tab .editor__url");
+      if (!input) throw new Error("adresse introuvable");
+      input.value = address;
+      input.dispatchEvent(new Event("input"));
+    }, target);
+    await clickText(".request-tab button", "Envoyer");
+    await browser.waitUntil(
+      async () => (await browser.$(".response__status").getText()).startsWith(status),
+      { timeout: 15_000, timeoutMsg: `réponse ${status} attendue` },
+    );
+  }
+
+  it("met en forme le JSON, filtre en JSONPath et ajoute une vérification (F1 à F4)", async () => {
+    await openRequest();
+    await sendTo(`${url}/commande`, "200");
+    expect(await browser.$('select[aria-label="Format du corps"]').getValue()).toBe("json");
+    await browser.waitUntil(async () => (await browser.$(".code").getText()).includes("MUG-NOIR"));
+
+    await browser.$(".filter__input").setValue("$.items[*].sku");
+    await browser.waitUntil(
+      async () => (await browser.$(".filter__count").getText()) === "2 résultats",
+      { timeoutMsg: "deux résultats attendus" },
+    );
+    const marks = await browser.$$(".tok--match").map((m) => m.getText());
+    expect(marks).toEqual(['"TSH-BLU-M"', '"MUG-NOIR"']);
+    await screenshot(browser, "a1-reponse-filtre");
+
+    await browser.$(".filter__input").setValue("$.items[0");
+    await browser.waitUntil(async () =>
+      (await browser.$(".filter [role='alert']").getText()).includes("Crochet « [ » non fermé"),
+    );
+
+    await browser.$(".filter__input").setValue("$.items[1].sku");
+    await browser.waitUntil(
+      async () => (await browser.$(".filter__count").getText()) === "1 résultat",
+    );
+    await clickText(".filter__actions button", "+ Vérification");
+    const file = path.join(project(), "Commandes", "lister-les-commandes.yml");
+    await browser.waitUntil(() => readFileSync(file, "utf8").includes("res.body.items[1].sku"), {
+      timeout: 10_000,
+      timeoutMsg: "vérification écrite dans le fichier attendue",
+    });
+  });
+
+  it("montre un HTML en aperçu sans script ni image distante, puis efface la réponse (R4, R9)", async () => {
+    await sendTo(`${url}/page`, "502");
+    expect(await browser.$('select[aria-label="Format du corps"]').getValue()).toBe("html");
+    await browser.$(".body__bar [role='switch']").click();
+    const preview = browser.$(".preview");
+    await preview.waitForExist({ timeout: 10_000 });
+    expect(await preview.$("h1").getText()).toBe("Panne");
+    expect(await preview.getText()).toContain("[image : Logo]");
+    expect(await preview.$("script").isExisting()).toBe(false);
+    expect(await preview.$("img").isExisting()).toBe(false);
+    expect(await browser.getTitle()).not.toBe("piégé");
+    await screenshot(browser, "a2-reponse-apercu-html");
+
+    await browser.$('button[aria-label="Effacer la réponse"]').click();
+    await browser.waitUntil(async () =>
+      (await browser.$(".response").getText()).includes("Envoyez la requête pour voir la réponse."),
+    );
+  });
+});
+
+// --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) -----------------------------
+
+describe("Lot D - Barre latérale", () => {
+  /** Valeur saisie dans le champ, événement `input` compris (le filtre réagit à la frappe). */
+  async function typeFilter(value: string): Promise<void> {
+    await browser.execute((text) => {
+      const input = document.querySelector<HTMLInputElement>("aside .tree .tree-filter input");
+      if (!input) throw new Error("filtre du référentiel introuvable");
+      input.focus();
+      input.value = text;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, value);
+  }
+
+  function filterState() {
+    return browser.execute(() => ({
+      count: document.querySelector("aside .tree .tree-filter__count")?.textContent.trim() ?? "",
+      names: Array.from(document.querySelectorAll('aside .tree [role="treeitem"] .row__name')).map(
+        (n) => n.textContent.trim(),
+      ),
+      none: document.querySelector("aside .tree__none")?.textContent.trim() ?? "",
+    }));
+  }
+
+  it("filtre le référentiel : dossiers dépliés, compte affiché, Échap efface (1.2-e)", async () => {
+    await chooseWorkspace("E-commerce");
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await browser.$("aside .tree .tree-filter input").waitForExist({ timeout: 10_000 });
+
+    await typeFilter("créer");
+    await browser.waitUntil(async () => (await filterState()).count.startsWith("1 sur"), {
+      timeoutMsg: "compte du filtre attendu",
+    });
+    expect((await filterState()).names).toEqual(["Commandes", "Créer une commande"]);
+    await screenshot(browser, "21-filtre-referentiel");
+
+    await typeFilter("introuvable");
+    await browser.waitUntil(async () => (await filterState()).none !== "", {
+      timeoutMsg: "« aucun résultat » attendu",
+    });
+    expect((await filterState()).none).toBe("Aucune requête ne correspond.");
+
+    await browser.keys("Escape");
+    await browser.waitUntil(async () => (await filterState()).count === "", {
+      timeoutMsg: "filtre effacé attendu",
+    });
+  });
+
+  it("le menu « + » du projet propose ses créations avec leurs raccourcis (1.2-a ter)", async () => {
+    await clickHidden('aside button[aria-label="Ajouter au projet boutique-tests"]');
+    const items = await browser.$$('aside [role="menuitem"]').map((i) => i.getText());
+    expect(items.some((t) => t.includes("Nouvelle requête") && t.includes("Ctrl+N"))).toBe(true);
+    expect(items.some((t) => t.includes("Nouveau dossier") && t.includes("Ctrl+Maj+N"))).toBe(true);
+    expect(items.some((t) => t.includes("Nouvel environnement"))).toBe(true);
+    await screenshot(browser, "22-menu-ajouter");
+    await browser.keys("Escape");
+  });
+
+  it("l'endpoint liste ses réponses attendues ; un clic ouvre la réponse (3.2-a3)", async () => {
+    const contract = browser.$('aside button[aria-label="Déplier le contrat Animalerie"]');
+    if (await contract.isExisting()) await contract.click();
+    await clickText("aside .crow__resource", "/pets");
+    const operation = browser.$('aside button[aria-label="Déplier GET /pets/{petId}"]');
+    await operation.waitForExist({ timeout: 10_000 });
+    await operation.click();
+    const rows = () =>
+      browser.execute(() =>
+        Array.from(document.querySelectorAll("aside .crow__example .crow__name")).map((n) =>
+          n.textContent.trim(),
+        ),
+      );
+    await browser.waitUntil(async () => (await rows()).includes("Un animal"), {
+      timeoutMsg: "réponses attendues sous l'endpoint attendues",
+    });
+    expect(await rows()).toContain("Un animal");
+    await clickText("aside .crow__example", "Un animal");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll<HTMLInputElement>(".expected input")).some(
+            (i) => i.value === "Un animal",
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "réponse attendue ouverte attendue" },
+    );
+    await screenshot(browser, "23-reponses-attendues-arborescence");
+  });
+
+  it("les cartes de projet disent leur nombre de contrats (1.1-a)", async () => {
+    await chooseWorkspace("E-commerce");
+    await waitForHeading(browser, "E-commerce");
+    // Une carte par projet du workspace : chacune dit son nombre de contrats.
+    await browser.waitUntil(
+      async () => (await browser.$$("main article .card__stats")).length > 0,
+      {
+        timeout: 10_000,
+        timeoutMsg: "cartes de projet attendues",
+      },
+    );
+    const stats = await browser.$$("main article .card__stats").map((s) => s.getText());
+    expect(stats.length).toBeGreaterThan(0);
+    for (const text of stats) expect(text).toMatch(/contrats? de service/);
+    await screenshot(browser, "24-cartes-contrats");
+  });
+});
+
+describe("Lot B : saisie, texte et cURL", () => {
+  // docs/plan-mvp-b-saisie-curl.md : 2.1-a sexies, 5.1-b ter, 5.1-b quater.
+  let server: Server;
+  let url = "";
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      response.writeHead(request.method === "POST" ? 201 : 200, {
+        "Content-Type": "application/json",
+      });
+      response.end(JSON.stringify({ id: 7, recu: request.headers["x-client"] ?? null }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /** Colle `text` d'un bloc dans l'entrée « Essayer une étape », comme un Ctrl+V. */
+  async function paste(text: string): Promise<void> {
+    await browser.execute((value) => {
+      const input = document.querySelector<HTMLInputElement>("main .try__input");
+      if (!input) throw new Error("entrée « Essayer une étape » introuvable");
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, text);
+  }
+
+  /** Agit dans l'onglet de la requête dont le nom est `name` et renvoie ce qu'il montre. */
+  function inEditor(
+    name: string,
+    action:
+      | { kind: "url"; value: string }
+      | { kind: "click"; value: string }
+      | { kind: "text"; value: string }
+      | { kind: "state" },
+  ) {
+    return browser.execute(
+      (label, step) => {
+        const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find(
+          (t) => t.querySelector<HTMLInputElement>(".meta__input")?.value === label,
+        );
+        if (!tab) throw new Error(`onglet « ${label} » introuvable`);
+        const set = (field: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
+          field.value = value;
+          field.dispatchEvent(new Event("input", { bubbles: true }));
+        };
+        if (step.kind === "url") {
+          const field = tab.querySelector<HTMLInputElement>(".editor__url");
+          if (field) set(field, step.value);
+        } else if (step.kind === "text") {
+          const field = tab.querySelector<HTMLTextAreaElement>(".pairs__textarea");
+          if (field) set(field, step.value);
+        } else if (step.kind === "click") {
+          const button = Array.from(tab.querySelectorAll<HTMLElement>("button")).find(
+            (b) =>
+              b.textContent.trim().startsWith(step.value) ||
+              b.getAttribute("aria-label") === step.value,
+          );
+          if (!button) throw new Error(`bouton « ${step.value} » introuvable`);
+          button.click();
+        }
+        return {
+          unknown: tab.querySelector(".unknown")?.textContent.replace(/\s+/g, " ").trim() ?? "",
+          marked: tab.querySelector(".editor__url")?.getAttribute("data-unknown-variables") ?? "",
+          tabs: Array.from(tab.querySelectorAll('[role="tab"]')).map((t) =>
+            t.textContent.replace(/\s+/g, " ").trim(),
+          ),
+          added: Array.from(tab.querySelectorAll(".sent--added .sent__name")).map((n) =>
+            n.textContent.trim(),
+          ),
+          text: tab.querySelector<HTMLTextAreaElement>(".pairs__textarea")?.value ?? null,
+          rows: tab.querySelectorAll(".pairs__row").length,
+          curl: document.querySelector(".curl__command")?.textContent ?? "",
+        };
+      },
+      name,
+      action,
+    );
+  }
+
+  let essai = "";
+
+  it("une commande cURL collée devient une requête REST ; l'option sans équivalent est signalée (2.1-a sexies)", async () => {
+    await chooseWorkspace("Tous les projets");
+    // Un jeton collé ne reste pas dans le texte (le coffre n'est rempli qu'à l'envoi).
+    await paste(`curl ${url}/moi -H 'Authorization: Bearer eyJ.e2e'`);
+    await browser.waitUntil(
+      async () =>
+        (
+          await browser
+            .$("main .try__import")
+            .getText()
+            .catch(() => "")
+        ).includes("{{token}}"),
+      { timeoutMsg: "jeton retiré attendu" },
+    );
+    const headers = await browser.$("main .try__form textarea").getValue();
+    expect(headers).toBe("Authorization: Bearer {{token}}");
+    await browser.keys("Escape");
+
+    const before = (await zoneTabs()).flat();
+    await paste(
+      `curl -X POST ${url}/orders \\\n  -H 'Content-Type: application/json' \\\n  -H 'X-Client: arnod-tests' \\\n  --data '{"sku":"TSH-BLU-M"}' --compressed`,
+    );
+    const note = browser.$("main .try__import");
+    await note.waitForDisplayed({ timeoutMsg: "commande cURL non reconnue" });
+    expect(await browser.$("main .try__input").getValue()).toBe(`${url}/orders`);
+    expect(await browser.$("main .try__note").getText()).toBe("Reconnu : une commande cURL.");
+    expect(await note.getText()).toContain("--compressed est ignorée");
+    await screenshot(browser, "21-curl-collee");
+
+    await browser.$("main .try__form").$("button=Envoyer").click();
+    await browser.waitUntil(
+      async () =>
+        (await zoneTabs()).flat().some((t) => /^Essai \d+$/.test(t) && !before.includes(t)),
+      { timeout: 15_000, timeoutMsg: "onglet de l'essai attendu" },
+    );
+    // L'essai envoyé est l'onglet de requête affiché (son numéro dépend des essais précédents).
+    await browser.waitUntil(
+      async () =>
+        /^Essai \d+$/.test(
+          await browser.execute(
+            () =>
+              document.querySelector<HTMLInputElement>(".request-tab .meta__input")?.value ?? "",
+          ),
+        ),
+      { timeout: 15_000, timeoutMsg: "onglet de l'essai envoyé attendu" },
+    );
+    essai = await browser.execute(
+      () => document.querySelector<HTMLInputElement>(".request-tab .meta__input")?.value ?? "",
+    );
+    // Le serveur a reçu les en-têtes de la commande.
+    await browser.waitUntil(
+      async () =>
+        (
+          await browser.execute(() => document.querySelector(".response")?.textContent ?? "")
+        ).includes("arnod-tests"),
+      { timeout: 10_000, timeoutMsg: "réponse avec l'en-tête X-Client attendue" },
+    );
+  });
+
+  it("une variable inconnue est soulignée et signalée ; compteurs et en-têtes ajoutés (5.1-b ter)", async () => {
+    await inEditor(essai, { kind: "url", value: `${url}/{{apiVersion}}/orders` });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).unknown !== "", {
+      timeoutMsg: "variable inconnue signalée attendue",
+    });
+    const state = await inEditor(essai, { kind: "state" });
+    expect(state.unknown).toContain("apiVersion est inconnue dans Local");
+    expect(state.marked).toBe("{{apiVersion}}");
+    expect(state.tabs).toContain("En-têtes 2");
+    expect(state.tabs.some((t) => t.startsWith("Corps ●"))).toBe(true);
+
+    await inEditor(essai, { kind: "click", value: "En-têtes" });
+    await browser.waitUntil(
+      async () => (await inEditor(essai, { kind: "state" })).added.length > 0,
+      {
+        timeoutMsg: "en-têtes ajoutés attendus",
+      },
+    );
+    expect((await inEditor(essai, { kind: "state" })).added).toEqual([
+      "User-Agent",
+      "Accept",
+      "Content-Length",
+      "Host",
+    ]);
+    await screenshot(browser, "22-variable-inconnue");
+  });
+
+  it("les en-têtes s'éditent en texte ; </> copie la requête en cURL (5.1-b quater)", async () => {
+    await inEditor(essai, { kind: "click", value: "Éditer en texte" });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).text !== null, {
+      timeoutMsg: "zone de texte attendue",
+    });
+    expect((await inEditor(essai, { kind: "state" })).text).toBe(
+      "Content-Type: application/json\nX-Client: arnod-tests",
+    );
+    await inEditor(essai, {
+      kind: "text",
+      value:
+        "Content-Type: application/json\nX-Client: arnod-tests\n# X-Debug: true\nAccept-Language: fr-FR",
+    });
+    await screenshot(browser, "23-en-tetes-en-texte");
+    await inEditor(essai, { kind: "click", value: "Revenir au tableau" });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).rows === 4, {
+      timeoutMsg: "quatre lignes attendues",
+    });
+
+    await inEditor(essai, { kind: "url", value: `${url}/orders` });
+    await inEditor(essai, { kind: "click", value: "Copier la requête en cURL" });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).curl !== "", {
+      timeoutMsg: "commande cURL attendue",
+    });
+    const command = (await inEditor(essai, { kind: "state" })).curl;
+    expect(command).toContain(`curl -X POST '${url}/orders'`);
+    expect(command).toContain("-H 'X-Client: arnod-tests'");
+    expect(command).not.toContain("X-Debug");
+    await browser.keys("Escape");
+  });
+});
+
+// Lot C - Import Bruno (docs/plan-mvp-c-import-bruno.md).
+describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
+  const source = () => path.join(sandbox.home, "bruno", "boutique-api");
+  const project = () => path.join(sandbox.home, "arnod", "Boutique API");
+
+  function invoke(cmd: string, args: unknown): Promise<unknown> {
+    return browser.execute(
+      (name, payload) =>
+        (
+          window as unknown as {
+            __TAURI_INTERNALS__: { invoke: (cmd: string, args: unknown) => Promise<unknown> };
+          }
+        ).__TAURI_INTERNALS__.invoke(name, payload),
+      cmd,
+      args,
+    );
+  }
+
+  beforeAll(() => {
+    cpSync(
+      path.join(import.meta.dirname, "..", "src-tauri", "src", "bruno", "fixtures", "boutique"),
+      source(),
+      {
+        recursive: true,
+      },
+    );
+  });
+
+  it("reconnaît la collection .bru sans rien écrire (2.3-a)", async () => {
+    const detected = (await invoke("import_detect", { path: source() })) as {
+      format: string;
+      name: string;
+      counts: { requests: number };
+    };
+    expect(detected.format).toBe("bruno");
+    expect(detected.name).toBe("Boutique API");
+    expect(detected.counts.requests).toBe(6);
+    expect(existsSync(project())).toBe(false);
+  });
+
+  it("crée le projet OpenCollection à côté, ouvre le rapport, les .bru restent intacts (2.3-f)", async () => {
+    const before = readFileSync(path.join(source(), "Commandes", "Créer une commande.bru"), "utf8");
+    // Le sélecteur natif ne se pilote pas : on appelle la commande Rust réelle.
+    const done = (await invoke("import_run", {
+      path: source(),
+      target: { kind: "newProject", location: path.join(sandbox.home, "arnod"), workspaceId: null },
+    })) as { projectId: string };
+    await invoke("layout_open_selection", {
+      content: { kind: "importReport", projectId: done.projectId },
+    });
+
+    await browser.waitUntil(async () => await browser.$(".report h1").isExisting(), {
+      timeout: 15_000,
+      timeoutMsg: "rapport d'import attendu",
+    });
+    expect(await browser.$(".report h1").getText()).toContain("Boutique API importée");
+    // WebKitGTK rend le nombre et son libellé sans séparateur : on compare sans les blancs.
+    const stats = await browser.$$(".report__stat").map((s) => s.getText());
+    expect(stats.map((s) => s.replace(/\s/g, ""))).toContain("6requêtes");
+    await screenshot(browser, "c1-rapport-import");
+
+    expect(readFileSync(path.join(source(), "Commandes", "Créer une commande.bru"), "utf8")).toBe(
+      before,
+    );
+    const root = readFileSync(path.join(project(), "opencollection.yml"), "utf8");
+    expect(root).toContain("name: Boutique API");
+    const request = readFileSync(
+      path.join(project(), "Commandes", "creer-une-commande.yml"),
+      "utf8",
+    );
+    expect(request).toContain("set-variable");
+    expect(request).toContain("{{$randomUUID}}");
+    expect(readFileSync(path.join(project(), "environments", "recette.yml"), "utf8")).not.toContain(
+      "ne-pas-lire",
+    );
   });
 });
 

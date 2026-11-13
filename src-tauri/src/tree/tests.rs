@@ -278,6 +278,8 @@ fn request(name: &str, path: &str, contract: Option<&str>) -> TreeNode {
         assertion_count: 0,
         invalid: false,
         contract: contract.map(str::to_owned),
+        url: String::new(),
+        tags: Vec::new(),
     }
 }
 
@@ -463,4 +465,56 @@ fn lot_e_variables_lues_par_les_autres_requetes() {
     assert_eq!(users[0].path, second);
     assert_eq!(users[0].variables, ["client.id"]);
     assert!(variable_users(dir.path(), &first, &[]).unwrap().is_empty());
+}
+
+// --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) ---------------
+
+#[test]
+fn lot_d_r1_adresse_et_etiquettes_des_requetes() {
+    let dir = project();
+    let path = create_request(dir.path(), "", Some("Lister")).unwrap();
+    let absolute = dir.path().join(&path);
+    let mut request = file::read(&absolute).unwrap();
+    request.url = "{{baseUrl}}/orders".to_owned();
+    request.tags = vec!["critique".to_owned(), "smoke".to_owned()];
+    file::write(&absolute, &request).unwrap();
+    fs::write(dir.path().join("casse.yml"), "::: pas du yaml").unwrap();
+
+    let nodes = read(dir.path()).unwrap();
+    let json = serde_json::to_value(&nodes).unwrap();
+    let lister = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["name"] == "Lister")
+        .unwrap();
+    assert_eq!(lister["url"], "{{baseUrl}}/orders");
+    assert_eq!(lister["tags"], serde_json::json!(["critique", "smoke"]));
+    // Fichier illisible : ni adresse ni étiquettes.
+    let casse = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["name"] == "casse")
+        .unwrap();
+    assert_eq!(casse["url"], "");
+    assert_eq!(casse["tags"], serde_json::json!([]));
+}
+
+#[test]
+fn lot_e_variables_extraites_par_les_etapes_precedentes() {
+    let dir = project();
+    let created = create_test(dir.path(), "").unwrap();
+    let path = resolve(dir.path(), &created.step).unwrap();
+    let mut first = file::read(&path).unwrap();
+    first.extractions.push(crate::request::model::Extraction {
+        name: "client.id".into(),
+        source: "body.id".into(),
+        enabled: true,
+    });
+    file::write(&path, &first).unwrap();
+    let second = add_step(dir.path(), &created.folder).unwrap();
+    assert_eq!(extracted_before(dir.path(), &second), ["client.id"]);
+    assert!(extracted_before(dir.path(), &created.step).is_empty());
+    assert!(extracted_before(dir.path(), "libre.yml").is_empty());
 }

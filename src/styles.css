@@ -74,6 +74,14 @@
   --color-family-files-border: #c6c89b;
   --color-family-files-text: #515100;
 
+  /* Corps d'une réponse mis en forme (lot A) : coloration et valeurs trouvées par le filtre */
+  --color-code-string: #2a6e44;
+  --color-code-number: #1f5fa8;
+  --color-code-keyword: #7a3fb0;
+  --color-code-tag: #a1361d;
+  --color-code-attr: #875300;
+  --color-match: #fcebc6;
+
   /* Effets (hors palette : transparences) */
   --shadow-popover: 0 8px 24px rgb(29 27 24 / 14%), 0 1px 3px rgb(29 27 24 / 10%);
   --shadow-dialog: 0 24px 64px rgb(29 27 24 / 22%);
@@ -181,6 +189,13 @@
     --color-family-files-border: #606130;
     --color-family-files-text: #d4d699;
 
+    --color-code-string: #6cc28b;
+    --color-code-number: #82b4f2;
+    --color-code-keyword: #c9a8f7;
+    --color-code-tag: #f2a08d;
+    --color-code-attr: #e2c04a;
+    --color-match: #45341a;
+
     --shadow-popover: 0 8px 24px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
     --shadow-dialog: 0 24px 64px rgb(0 0 0 / 55%);
     --backdrop: rgb(0 0 0 / 55%);
@@ -283,4 +298,29 @@ select:focus-visible {
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/*
+ * Variable inconnue d'un champ (directive v-variables, src/lib/variables.ts) : calque posé sur
+ * le champ, texte transparent, seul le soulignement ondulé se voit.
+ */
+.variable-marks {
+  position: absolute;
+  z-index: 1;
+  margin: 0;
+  overflow: hidden;
+  border-style: solid;
+  border-color: transparent;
+  color: transparent;
+  background: none;
+  pointer-events: none;
+}
+
+.variable-marks mark {
+  color: transparent;
+  background: none;
+  text-decoration: underline wavy var(--color-danger);
+  text-decoration-skip-ink: none;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.25em;
 }

@@ -96,8 +96,7 @@ Noms des valeurs dynamiques (ceux de Bruno, plus `$date`) : `$guid`, `$randomUUI
 ## 5. Hors périmètre
 
 - Réglage « Continuer » si une étape échoue (V4, décision Q2 du plan d'ensemble).
-- Clic sur une valeur de la réponse pour l'extraire (`4.2-b bis`, réponse du lot A) : l'onglet
-  « Variables » suffit ; le lot A pourra appeler l'ajout d'extraction du store.
+- Clic sur une valeur dans le corps de la réponse pour l'extraire (`4.2-b bis`) : à l'intégration de la vague 1, « Extraire dans une variable » s'ajoute au filtre JSONPath du lot A (`ResponseFilter.vue`) ; le clic direct dans le corps reste à faire.
 - Liste des valeurs dynamiques à la frappe de `{{$` et soulignement d'un nom inconnu (lot B).
 - Glisser une requête sur la liste des étapes (`4.1-f`, lot J), campagnes (6.3), réglages du test.
 - Renommage général « requête » → « étape » (lot K, R4 commun).
