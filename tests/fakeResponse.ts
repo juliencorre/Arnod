@@ -328,6 +328,7 @@ export function handleResponse(
         outcome: null,
         error: null,
         receivedAt: null,
+        request: null,
       } satisfies RequestResult;
     }
     default:

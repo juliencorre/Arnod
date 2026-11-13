@@ -16,10 +16,19 @@ const props = defineProps<{ projectId: string }>();
 
 const workbench = useWorkbenchStore();
 const run = computed(() => workbench.runs[props.projectId] ?? null);
+/** Le run exécute un test seul (lot E) : son verdict en tête. */
+const soleTest = computed(() => {
+  const current = run.value;
+  return current?.tests.length === 1 && current.tests[0]?.path === current.folder
+    ? current.tests[0]
+    : null;
+});
+
 const heading = computed(() => {
   const current = run.value;
   if (!current) return "";
   if (current.contract) return `Run du contrat « ${current.contract} »`;
+  if (soleTest.value) return `Test « ${soleTest.value.name} »`;
   return `Run de ${current.folder === "" ? "tout le projet" : current.folder}`;
 });
 
@@ -30,6 +39,7 @@ const LABELS: Record<RunItemStatus, string> = {
   failed: "Échec",
   error: "Erreur",
   cancelled: "Annulée",
+  skipped: "Non jouée",
 };
 
 const MARKS: Record<RunItemStatus, string> = {
@@ -39,6 +49,7 @@ const MARKS: Record<RunItemStatus, string> = {
   failed: "✕",
   error: "✕",
   cancelled: "–",
+  skipped: "–",
 };
 
 /** Identifiant du résultat de conformité au contrat lié (`CONTRACT_CHECK`). */
@@ -53,6 +64,7 @@ const counts = computed(() => {
     done: items.filter((i) => !["pending", "running"].includes(i.status)).length,
     passed: items.filter((i) => i.status === "passed").length,
     bad: items.filter(isBad).length,
+    skipped: items.filter((i) => i.status === "skipped").length,
     slow: items.filter((i) => i.slow).length,
   };
 });
@@ -67,6 +79,19 @@ const summary = computed(() => {
   if (!current) return "";
   if (!current.finished) return `En cours · ${String(done)}/${String(total)}`;
   if (current.cancelled) return `Annulé · ${String(done)}/${String(total)}`;
+  const test = soleTest.value;
+  if (test && test.failedStep !== null) {
+    return `Test en échec à l'étape ${String(test.failedStep)} · ${String(test.passed)}/${String(test.steps)} étapes`;
+  }
+  if (test?.status === "passed") {
+    return `Test réussi · ${String(test.passed)}/${String(test.steps)} étapes`;
+  }
+  if (test) {
+    return `${String(test.passed)}/${String(test.steps)} étapes réussies · ${plural(counts.value.skipped, "non jouée")}`;
+  }
+  if (bad === 0 && counts.value.skipped > 0) {
+    return `${plural(passed, "réussi")} · ${plural(counts.value.skipped, "non jouée")}`;
+  }
   if (bad === 0) return `${plural(passed, "réussi")} · tout est réussi`;
   return `${plural(passed, "réussi")}, ${String(bad)} en échec`;
 });
@@ -216,7 +241,7 @@ const EMPTY: Record<View, string> = {
         <p class="run__meta">{{ meta }}</p>
         <h2 class="run__title">{{ heading }}</h2>
         <p class="run__progress" role="status">
-          <template v-if="run.finished && !run.cancelled && counts.bad > 0">
+          <template v-if="run.finished && !run.cancelled && counts.bad > 0 && !soleTest">
             {{ plural(counts.passed, "réussi") }},
             <span class="run__bad">{{ counts.bad }} en échec</span>
           </template>
@@ -282,6 +307,12 @@ const EMPTY: Record<View, string> = {
               >
                 <div class="run__line">
                   <span class="run__mark" aria-hidden="true">{{ MARKS[item.status] }}</span>
+                  <span
+                    v-if="item.step !== null"
+                    class="run__step"
+                    :aria-label="`Étape ${item.step}`"
+                    >{{ item.step }}</span
+                  >
                   <span class="run__method" :class="`run__method--${item.method.toLowerCase()}`">
                     {{ item.method }}
                   </span>
@@ -330,6 +361,30 @@ const EMPTY: Record<View, string> = {
       </div>
 
       <aside class="run__groups" aria-labelledby="run-groups-title">
+        <template v-if="run.tests.length > 0">
+          <h3 class="run__groups-title">Résultat par test</h3>
+          <ul class="run__group-list run__tests">
+            <li v-for="t in run.tests" :key="t.path" class="run__test">
+              <span
+                class="run__test-mark"
+                :class="{
+                  'run__test-mark--ok': t.status === 'passed',
+                  'run__test-mark--ko': t.status === 'failed',
+                }"
+                aria-hidden="true"
+                >{{ MARKS[t.status] }}</span
+              >
+              <span class="run__test-name" :title="t.path">{{ t.name }}</span>
+              <span
+                class="run__test-count"
+                :class="{ 'run__test-count--bad': t.failedStep !== null }"
+              >
+                {{ t.failedStep !== null ? `étape ${t.failedStep}` : `${t.passed}/${t.steps}` }}
+              </span>
+              <span class="visually-hidden">, {{ LABELS[t.status] }}</span>
+            </li>
+          </ul>
+        </template>
         <h3 id="run-groups-title" class="run__groups-title">Résultat par dossier</h3>
         <ul class="run__group-list">
           <li v-for="g in run.groups" :key="g.path">
@@ -711,6 +766,60 @@ const EMPTY: Record<View, string> = {
 }
 
 .run__group-count--bad {
+  color: var(--color-danger);
+}
+
+/* Tests et étapes (lot E) : numéro d'étape, étape non jouée, verdict par test. */
+.run__step {
+  min-width: 0.75rem;
+  font: var(--text-caption) var(--font-mono);
+  text-align: right;
+  color: var(--color-muted);
+}
+
+.run__item--skipped .run__name,
+.run__item--skipped .run__status {
+  color: var(--color-muted);
+}
+
+.run__tests {
+  margin-bottom: 0.75rem;
+}
+
+.run__test {
+  display: grid;
+  grid-template-columns: 1rem minmax(5rem, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  font-size: var(--text-body);
+}
+
+.run__test-mark {
+  font-weight: 700;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.run__test-mark--ok {
+  color: var(--color-success);
+}
+
+.run__test-mark--ko {
+  color: var(--color-danger);
+}
+
+.run__test-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run__test-count {
+  font: var(--text-body) var(--font-mono);
+}
+
+.run__test-count--bad {
   color: var(--color-danger);
 }
 

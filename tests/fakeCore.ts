@@ -313,6 +313,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
             outcome,
             error: null,
             receivedAt: 1_700_000_000_000,
+            request: null,
           });
           return {
             snapshot: normalize(),

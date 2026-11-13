@@ -91,10 +91,13 @@ const requestCount = computed(() => {
 const ADD_ITEMS: MenuItem[] = [
   { id: "request", label: "Nouvelle requête", shortcut: "Ctrl+N" },
   { id: "folder", label: "Nouveau dossier", shortcut: "Ctrl+Maj+N" },
+  // Lot E (4.1-b) : le dossier du test et son étape 1.
+  { id: "test", label: "Nouveau test" },
 ];
 
 function onAdd(id: string): void {
   if (id === "request") newRequest();
+  else if (id === "test") void guard(() => workbench.createTest(props.projectId, ""));
   else newFolder();
 }
 
@@ -168,6 +171,12 @@ async function onAction(id: string, node: TreeNode, target?: string): Promise<vo
       break;
     case "run":
       await guard(() => workbench.runFolder(props.projectId, node.path));
+      break;
+    case "new-test":
+      await guard(() => workbench.createTest(props.projectId, node.path));
+      break;
+    case "add-step":
+      await guard(() => workbench.addStep(props.projectId, node.path));
       break;
     case "delete":
       await guard(async () => {

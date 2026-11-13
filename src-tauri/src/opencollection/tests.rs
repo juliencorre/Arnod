@@ -17,7 +17,7 @@ use super::{ROOT_FILE, yaml};
 use crate::contract::file as contract_file;
 use crate::environment::{self, Environment, Variable};
 use crate::request::file;
-use crate::request::model::{Method, Operator, Origin, ParamKind, Scalar};
+use crate::request::model::{Extraction, Method, Operator, Origin, ParamKind, Request, Scalar};
 use crate::request::resolve::{Variables, prepare};
 use crate::tree::{self, TreeNode};
 
@@ -971,4 +971,247 @@ fn ep_r8_endpoint_d_un_contrat_valide_avec_ses_exemples() {
     assert_eq!(request.params[0].value, "7");
     assert_eq!(request.examples[0].status, Some(200));
     assert_eq!(request.examples[0].name, "ok");
+}
+
+// Lot E (docs/plan-mvp-e-tests-etapes.md, R8) : extractions lues et écrites,
+// les autres actions conservées.
+
+const ACTIONS: &str = r#"info:
+  name: Créer le client
+  type: http
+http:
+  method: POST
+  url: "{{baseUrl}}/customers"
+runtime:
+  actions:
+    - type: set-variable
+      phase: before-request
+      selector:
+        expression: res.body.avant
+        method: jsonq
+      variable:
+        name: avant
+        scope: request
+    - type: set-variable
+      description: Identifiant du client créé
+      phase: after-response
+      selector:
+        expression: res.body.id
+        method: jsonq
+      variable:
+        name: client.id
+        scope: collection
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.headers["location"]
+        method: jsonq
+      variable:
+        name: lieu
+        scope: runtime
+      disabled: true
+"#;
+
+#[test]
+fn lot_e_r8_extractions_lues_ecrites_et_autres_actions_gardees() {
+    let dir = project();
+    let path = dir.path().join("creer.yml");
+    fs::write(&path, ACTIONS).unwrap();
+    let mut request = file::read(&path).unwrap();
+    assert_eq!(
+        request.extractions,
+        [
+            Extraction {
+                name: "client.id".into(),
+                source: "body.id".into(),
+                enabled: true
+            },
+            Extraction {
+                name: "lieu".into(),
+                source: "headers.location".into(),
+                enabled: false
+            },
+        ]
+    );
+    // L'action avant la requête n'est pas une extraction : seule elle reste « conservée ».
+    assert_eq!(request.preserved, ["actions"]);
+
+    request.extractions[1].enabled = true;
+    request.extractions.push(Extraction {
+        name: "ref".into(),
+        source: "request.body.externalRef".into(),
+        enabled: true,
+    });
+    file::write(&path, &request).unwrap();
+    assert_valid(Part::HttpRequest, &path);
+    let value = read(&path);
+    let actions = value.pointer("/runtime/actions").unwrap();
+    assert_eq!(actions.as_array().unwrap().len(), 4);
+    assert_eq!(actions[0]["phase"], json!("before-request"));
+    assert_eq!(
+        actions[1],
+        json!({
+            "type": "set-variable",
+            "description": "Identifiant du client créé",
+            "phase": "after-response",
+            "selector": { "expression": "res.body.id", "method": "jsonq" },
+            "variable": { "name": "client.id", "scope": "collection" }
+        })
+    );
+    assert!(actions[2].get("disabled").is_none());
+    assert_eq!(
+        actions[3]["selector"]["expression"],
+        json!("req.body.externalRef")
+    );
+    assert_eq!(actions[3]["variable"]["scope"], json!("runtime"));
+    assert_eq!(file::read(&path).unwrap().extractions, {
+        let mut list = request.extractions.clone();
+        list[1].enabled = true;
+        list
+    });
+}
+
+#[test]
+fn lot_e_r8_sans_extraction_les_actions_disparaissent_et_seq_est_ecrit() {
+    let dir = project();
+    let path = dir.path().join("simple.yml");
+    let mut request = Request::new("Étape 1");
+    request.extractions.push(Extraction {
+        name: "id".into(),
+        source: "body.id".into(),
+        enabled: true,
+    });
+    request.seq = Some(2.0);
+    file::write(&path, &request).unwrap();
+    let value = read(&path);
+    assert_eq!(value.pointer("/info/seq"), Some(&json!(2)));
+    assert!(file::read(&path).unwrap().preserved.is_empty());
+    request.extractions.clear();
+    request.seq = None;
+    file::write(&path, &request).unwrap();
+    let value = read(&path);
+    assert!(value.pointer("/runtime/actions").is_none());
+    // Sans rang dans le brouillon, celui du fichier reste.
+    assert_eq!(value.pointer("/info/seq"), Some(&json!(2)));
+    assert_eq!(file::read(&path).unwrap().seq, Some(2.0));
+}
+
+#[test]
+fn lot_e_expressions_des_extractions() {
+    use crate::opencollection::request::{extraction_expression, extraction_source};
+    for (source, expression) in [
+        ("body.id", "res.body.id"),
+        ("headers.Location", "res.headers[\"location\"]"),
+        ("status", "res.status"),
+        ("request.body.ref", "req.body.ref"),
+        ("request.headers.X-Ref", "req.headers[\"x-ref\"]"),
+    ] {
+        assert_eq!(extraction_expression(source), expression);
+    }
+    assert_eq!(
+        extraction_source("req.body.items[0].id"),
+        "request.body.items[0].id"
+    );
+    // Expressions écrites par l'import Bruno (lot C), telles quelles.
+    for (expression, source) in [
+        ("res.body.token", "body.token"),
+        ("res.body.items[0].id", "body.items[0].id"),
+        ("res.headers['x-request-id']", "headers.x-request-id"),
+        ("res.status", "status"),
+        ("res(\"data.id\")", "body.data.id"),
+        ("res('items[0].id')", "body.items[0].id"),
+        ("res.cookies.x", "res.cookies.x"),
+    ] {
+        assert_eq!(extraction_source(expression), source, "{expression}");
+    }
+    assert_eq!(
+        extraction_source("res.headers[\"location\"]"),
+        "headers.location"
+    );
+}
+
+#[test]
+fn lot_e_extractions_de_bruno_lues_et_appliquees() {
+    use crate::request::assertions::ResponseData;
+    use crate::request::extract;
+    let dir = project();
+    let path = dir.path().join("jeton.yml");
+    fs::write(
+        &path,
+        r#"info:
+  name: Jeton
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: "{{baseUrl}}/login"
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.token
+        method: jsonq
+      variable:
+        name: token
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res("data.id")
+        method: jsonq
+      variable:
+        name: id
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.headers['x-request-id']
+        method: jsonq
+      variable:
+        name: trace
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.cookies.session
+        method: jsonq
+      variable:
+        name: session
+        scope: runtime
+"#,
+    )
+    .unwrap();
+    let request = file::read(&path).unwrap();
+    assert_eq!(request.seq, Some(2.0));
+    let response = ResponseData {
+        status: 200,
+        duration_ms: 1,
+        headers: vec![("X-Request-Id".into(), "r-9".into())],
+        body: r#"{"token":"t0k","data":{"id":7}}"#.into(),
+    };
+    let sent = ResponseData {
+        status: 0,
+        duration_ms: 0,
+        headers: Vec::new(),
+        body: String::new(),
+    };
+    let values = extract::apply(&request.extractions, &response, &sent);
+    let got: Vec<Option<&str>> = values.iter().map(|v| v.value.as_deref()).collect();
+    assert_eq!(got, [Some("t0k"), Some("7"), Some("r-9"), None]);
+    assert!(
+        values[3]
+            .message
+            .as_deref()
+            .unwrap()
+            .contains("non reconnue")
+    );
+    // Réécrite telle quelle si elle n'est pas modifiée, et conforme au schéma.
+    file::write(&path, &request).unwrap();
+    assert_valid(Part::HttpRequest, &path);
+    let value = read(&path);
+    assert_eq!(
+        value.pointer("/runtime/actions/3/selector/expression"),
+        Some(&json!("res.cookies.session"))
+    );
 }

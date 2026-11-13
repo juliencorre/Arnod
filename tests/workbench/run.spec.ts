@@ -24,23 +24,29 @@ describe("run d'un dossier", () => {
       .findAll('li[role="presentation"]')
       .find((li) => li.get('[role="treeitem"]').text().includes("Clients"));
     await row?.get(".row__more").trigger("click");
-    await click(app, '[role="menuitem"]', "Exécuter le dossier");
+    // « Clients » ne contient que des requêtes : c'est un test (lot E, R3).
+    await click(app, '[role="menuitem"]', "Exécuter le test");
 
     expect(core.calls.find((c) => c.cmd === "run_start")?.args).toMatchObject({
       folder: "Clients",
       environment: "Local",
     });
     const run = app.get(".run");
-    expect(run.get(".run__progress").text().replace(/\s+/g, " ")).toBe("1 réussi, 1 en échec");
+    expect(run.get(".run__title").text()).toBe("Test « Clients »");
+    expect(run.get(".run__progress").text().replace(/\s+/g, " ")).toBe(
+      "Test en échec à l'étape 1 · 0/2 étapes",
+    );
     expect(run.get(".run__meta").text()).toBe("run #1 · Local · 8 en même temps · 4,1 s");
     // « Échecs » est montré d'abord ; « Tous » liste chaque requête.
     expect(run.findAll(".run__item")).toHaveLength(1);
     await click(app, ".run__tab", "Tous");
     const items = run.findAll(".run__item").map((i) => i.text().replace(/\s+/g, " "));
-    expect(items[0]).toContain("Lister");
-    expect(items[0]).toContain("Réussie");
-    expect(items[1]).toContain("Créer");
-    expect(items[1]).toContain("Échec");
+    // Étapes dans l'ordre ; celle qui suit l'échec n'est pas jouée.
+    expect(items[0]).toContain("1POSTCréer");
+    expect(items[0]).toContain("Échec");
+    expect(items[1]).toContain("2GETLister");
+    expect(items[1]).toContain("Non jouée");
+    expect(run.get(".run__test").text()).toContain("Clientsétape 1");
   });
 
   it("relance seulement les échecs", async () => {
@@ -52,7 +58,8 @@ describe("run d'un dossier", () => {
     await click(app, ".run button", "Relancer les échecs");
     expect(core.commands()).toContain("run_retry_failures");
     await click(app, ".run__tab", "Tous");
-    expect(app.findAll(".run__item")).toHaveLength(1);
+    // Le test en échec est rejoué en entier (lot E, TE5).
+    expect(app.findAll(".run__item")).toHaveLength(2);
     expect(app.get(".run__item").text()).toContain("Créer");
     expect(app.get(".run__meta").text()).toContain("run #2");
   });
@@ -95,7 +102,8 @@ describe("écran du run (maquette 1f)", () => {
       path: "Clients/creer.yml",
       check: "montant",
     });
-    expect(app.get(".run__progress").text()).toContain("3 réussis · tout est réussi");
+    // L'étape non jouée le reste (lot E, R3).
+    expect(app.get(".run__progress").text()).toContain("2 réussis · 1 non jouée");
     await click(app, ".run__tab", "Tous");
     expect(app.get(".run__ignored").text()).toBe("body.amount : ignorée pour ce run");
     // Le statut de la requête suit dans la barre latérale (R7).
@@ -112,7 +120,7 @@ describe("écran du run (maquette 1f)", () => {
     const groups = app
       .findAll(".run__group")
       .map((g) => `${g.get(".run__group-name").text()} ${g.get(".run__group-count").text()}`);
-    expect(groups).toEqual(["Clients 1/2", "Projet 1/1"]);
+    expect(groups).toEqual(["Clients 0/2", "Projet 1/1"]);
     expect(app.findAll(".run__tab").map((t) => t.text().replace(/\s+/g, " "))).toEqual([
       "Échecs 1",
       "Tous 3",

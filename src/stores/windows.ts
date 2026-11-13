@@ -79,6 +79,8 @@ export function contentKey(content: ContentRef): string {
       return "resultat";
     case "importReport":
       return `${content.projectId}::import`;
+    case "test":
+      return `${content.projectId}::test::${content.path}`;
   }
 }
 

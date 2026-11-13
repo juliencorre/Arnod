@@ -14,6 +14,7 @@ import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import StatusCount from "@/components/workbench/StatusCount.vue";
 import StatusMark from "@/components/workbench/StatusMark.vue";
+import { SECTION_ICONS } from "@/components/ui/sectionIcons";
 import { countStatuses, requestPaths } from "@/lib/status";
 import { highlight, matchedByUrl, type TreeFilter } from "@/lib/treeFilter";
 import { useWindowsStore } from "@/stores/windows";
@@ -25,9 +26,15 @@ const props = defineProps<{
   depth: number;
   folders: { path: string; name: string }[];
   projectId: string;
+  /** Numéro de l'étape, pour une requête d'un test (lot E, R1). */
+  step?: number;
   /** Filtre actif du référentiel (lot D), ou `null`. */
   filter?: TreeFilter | null;
 }>();
+
+/** Fiole d'un test (lot E) : l'icône de la section « Référentiel de tests ». */
+const FLASK = SECTION_ICONS.tests;
+const isTest = computed(() => props.node.kind === "folder" && props.node.test);
 const emit = defineEmits<{ action: [id: string, node: TreeNode, target?: string] }>();
 
 const workbench = useWorkbenchStore();
@@ -47,11 +54,11 @@ const byUrl = computed(
     (props.filter ?? null) !== null &&
     matchedByUrl(props.node, props.filter as TreeFilter),
 );
-/** Requête affichée dans l'onglet actif de cette fenêtre. */
+/** Requête (ou test) affiché dans l'onglet actif de cette fenêtre. */
 const isSelected = computed(() => {
   const content = windows.activeTab?.content;
   return (
-    content?.kind === "request" &&
+    (content?.kind === "request" || content?.kind === "test") &&
     content.projectId === props.projectId &&
     content.path === props.node.path
   );
@@ -88,8 +95,20 @@ const items = computed<MenuItem[]>(() => {
     tone: "danger",
     separatorBefore: true,
   };
+  if (isTest.value) {
+    return [
+      { id: "add-step", label: "Ajouter une étape" },
+      // Une requête nommée s'ajoute aussi, comme dans un dossier (R4 : libellés gardés).
+      { id: "new-request", label: "Nouvelle requête" },
+      { id: "run", label: "Exécuter le test", separatorBefore: true },
+      { id: "rename", label: "Renommer", separatorBefore: true },
+      move,
+      remove,
+    ];
+  }
   if (props.node.kind === "folder") {
     return [
+      { id: "new-test", label: "Nouveau test" },
       { id: "new-request", label: "Nouvelle requête" },
       { id: "new-folder", label: "Nouveau dossier" },
       { id: "run", label: "Exécuter le dossier", separatorBefore: true },
@@ -112,7 +131,9 @@ function onSelect(id: string): void {
 }
 
 function activate(): void {
-  if (props.node.kind === "folder") {
+  // Un test s'ouvre dans son onglet ; son chevron le replie (lot E, TE1).
+  if (isTest.value) void workbench.openTest(props.projectId, props.node.path);
+  else if (props.node.kind === "folder") {
     // Pendant un filtre, les dossiers restent dépliés (F3).
     if ((props.filter ?? null) === null)
       void workbench.toggleFolder(props.projectId, props.node.path);
@@ -131,11 +152,20 @@ function activate(): void {
         :aria-selected="isSelected"
         :aria-level="depth + 1"
         @click="activate"
+        @keydown.right="isTest && !isOpen && workbench.toggleFolder(projectId, node.path)"
+        @keydown.left="isTest && isOpen && workbench.toggleFolder(projectId, node.path)"
       >
         <template v-if="node.kind === 'folder'">
           <span class="row__lead" aria-hidden="true">
-            <span class="row__chevron">{{ isOpen ? "▾" : "▸" }}</span>
-            <svg class="row__folder" width="14" height="14" viewBox="0 0 14 14">
+            <span
+              class="row__chevron"
+              @click.stop="isTest && workbench.toggleFolder(projectId, node.path)"
+              >{{ isOpen ? "▾" : "▸" }}</span
+            >
+            <svg v-if="isTest" class="row__flask" width="14" height="14" viewBox="0 0 16 16">
+              <path v-for="(d, index) in FLASK" :key="index" :d="d" />
+            </svg>
+            <svg v-else class="row__folder" width="14" height="14" viewBox="0 0 14 14">
               <path d="M1.5 3.5h4l1.2 1.4h5.8v6.6h-11z" />
             </svg>
           </span>
@@ -146,6 +176,7 @@ function activate(): void {
           <span class="row__lead row__method" :class="`row__method--${node.method.toLowerCase()}`">
             {{ node.method }}
           </span>
+          <span v-if="step" class="row__step" :aria-label="`Étape ${step}`">{{ step }}</span>
           <span class="row__name"
             ><template v-for="(part, index) in nameParts" :key="index"
               ><mark v-if="part.hit" class="row__hit">{{ part.text }}</mark
@@ -175,9 +206,10 @@ function activate(): void {
     </div>
     <ul v-if="node.kind === 'folder' && isOpen" role="group" class="children">
       <TreeRow
-        v-for="child in node.children"
+        v-for="(child, index) in node.children"
         :key="child.path"
         :node="child"
+        :step="node.test && child.kind === 'request' && !filter ? index + 1 : undefined"
         :depth="depth + 1"
         :folders="folders"
         :project-id="projectId"
@@ -249,6 +281,23 @@ function activate(): void {
   fill: var(--color-chip);
   stroke: var(--color-subtle);
   stroke-width: 1;
+}
+
+.row__flask {
+  flex: none;
+  fill: none;
+  stroke: var(--color-subtle);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.row__step {
+  flex: none;
+  min-width: 0.75rem;
+  font: var(--text-caption) var(--font-mono);
+  text-align: right;
+  color: var(--color-muted);
 }
 
 .row__name {

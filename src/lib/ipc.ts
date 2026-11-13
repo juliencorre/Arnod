@@ -66,6 +66,9 @@ import type {
   HtmlNode,
   RenderedBody,
   ResponseFormat,
+  CreatedTest,
+  TestView,
+  VariableUser,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -531,6 +534,24 @@ export const ipc = {
   /** Les paires d'un texte et ses lignes illisibles (R12, R13). */
   pairsFromText: (text: string, format: PairsFormat, previous: Pair[]): Promise<PairsText> =>
     call<PairsText>("pairs_from_text", { text, format, previous }),
+
+  // --- Lot E : tests et étapes (docs/plan-mvp-e-tests-etapes.md)
+
+  /** Test ouvert dans un onglet : ses étapes dans l'ordre (TE2). */
+  testRead: (project: string, path: string): Promise<TestView> =>
+    call<TestView>("test_read", { project, path }),
+
+  /** « Nouveau test » : dossier du test et son étape 1 (NT1). */
+  treeCreateTest: (project: string, parent: string): Promise<CreatedTest> =>
+    call<CreatedTest>("tree_create_test", { project, parent }),
+
+  /** « + Étape » : étape suivante du test ; renvoie son chemin (NT2). */
+  treeAddStep: (project: string, test: string): Promise<string> =>
+    call<string>("tree_add_step", { project, test }),
+
+  /** Requêtes du projet, hors `path`, qui lisent l'une des variables `names` (EX5). */
+  requestVariableUsers: (project: string, path: string, names: string[]): Promise<VariableUser[]> =>
+    call<VariableUser[]>("request_variable_users", { project, path, names }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

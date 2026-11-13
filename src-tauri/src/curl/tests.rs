@@ -336,6 +336,8 @@ fn prepared(method: Method, body: Option<&str>) -> Prepared {
         body: body.map(str::to_owned),
         timeout_ms: None,
         max_redirects: 5,
+        drawn: Vec::new(),
+        used: Vec::new(),
     }
 }
 

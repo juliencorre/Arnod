@@ -8,6 +8,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue";
 
 import RequestEditor from "@/components/workbench/RequestEditor.vue";
+import StepBar from "@/components/workbench/StepBar.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import ResultSide from "@/components/zones/ResultSide.vue";
 import { useTabActions } from "@/composables/useTabActions";
@@ -77,6 +78,7 @@ function place(target: "right" | "below"): void {
     <p v-else-if="!editor?.draft" class="request-tab__loading">Chargement…</p>
     <template v-else>
       <div class="request-tab__editor">
+        <StepBar :project-id="projectId" :path="path" />
         <RequestEditor :editor-key="key" />
       </div>
       <div v-if="!windows.resultDetached" class="request-tab__response">
@@ -133,7 +135,10 @@ function place(target: "right" | "below"): void {
 }
 
 .request-tab__editor {
+  display: flex;
   flex: 1 1 55%;
+  flex-direction: column;
+  gap: 0.5rem;
   min-width: 0;
 }
 

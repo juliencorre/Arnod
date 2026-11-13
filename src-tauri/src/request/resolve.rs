@@ -6,7 +6,11 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
 use crate::error::{CommandError, CommandErrorKind};
+use crate::request::dynamic::{self, Dice};
 use crate::request::model::{
     ApiKeyLocation, Auth, AuthKind, BodyKind, Method, Pair, ParamKind, Request,
 };
@@ -76,31 +80,192 @@ pub struct Prepared {
     pub timeout_ms: Option<u64>,
     /// Redirections suivies au plus ; 0 : aucune (R3).
     pub max_redirects: u32,
+    /// Valeurs dynamiques tirées, dans l'ordre (`docs/plan-mvp-e-tests-etapes.md`, R9).
+    pub drawn: Vec<DrawnValue>,
+    /// Variables lues, sans doublon, dans l'ordre de première lecture.
+    pub used: Vec<String>,
 }
 
-/// Remplace `{{nom}}` ; les noms inconnus sont ajoutés à `unknown`.
-fn substitute(text: &str, variables: &Variables, unknown: &mut BTreeSet<String>) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(start) = rest.find("{{") {
-        out.push_str(&rest[..start]);
-        let after = &rest[start + 2..];
-        let Some(end) = after.find("}}") else {
-            out.push_str(&rest[start..]);
-            return out;
-        };
-        let name = after[..end].trim();
-        match variables.values.get(name) {
-            Some(value) => out.push_str(value),
-            None => {
-                unknown.insert(name.to_owned());
-                out.push_str(&rest[start..start + 2 + end + 2]);
+/// Valeur dynamique tirée à un envoi (R9, R10).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DrawnValue {
+    /// Nom, avec son `$` (`$randomUUID`).
+    pub name: String,
+    pub value: String,
+    /// Où la valeur est partie, si elle y forme seule une valeur
+    /// (`request.body.ref`, `request.headers.X-Ref`) : de quoi la garder (R10).
+    pub source: Option<String>,
+}
+
+/// Résolution en cours : variables connues, valeurs tirées, noms lus ou inconnus.
+struct Resolver<'a> {
+    variables: &'a Variables,
+    dice: &'a mut Dice,
+    unknown: BTreeSet<String>,
+    drawn: Vec<DrawnValue>,
+    used: Vec<String>,
+}
+
+impl Resolver<'_> {
+    /// Remplace `{{nom}}` ; une valeur dynamique est tirée à chaque occurrence
+    /// (R9), un nom inconnu est ajouté à `unknown`.
+    fn sub(&mut self, text: &str) -> String {
+        let mut out = String::with_capacity(text.len());
+        let mut rest = text;
+        while let Some(start) = rest.find("{{") {
+            out.push_str(&rest[..start]);
+            let after = &rest[start + 2..];
+            let Some(end) = after.find("}}") else {
+                out.push_str(&rest[start..]);
+                return out;
+            };
+            let name = after[..end].trim();
+            let raw = &rest[start..start + 2 + end + 2];
+            // Une valeur dynamique donnée par l'appelant (copie cURL : laissée telle quelle) prime.
+            if dynamic::is_dynamic(name) && !self.variables.values.contains_key(name) {
+                // Inconnue, elle part telle quelle : jamais signalée (R1 du plan d'ensemble).
+                match dynamic::draw(name, self.dice) {
+                    Some(value) => {
+                        out.push_str(&value);
+                        self.drawn.push(DrawnValue {
+                            name: name.to_owned(),
+                            value,
+                            source: None,
+                        });
+                    }
+                    None => out.push_str(raw),
+                }
+            } else {
+                match self.variables.values.get(name) {
+                    Some(value) => {
+                        out.push_str(value);
+                        if !self.used.iter().any(|n| n == name) {
+                            self.used.push(name.to_owned());
+                        }
+                    }
+                    None => {
+                        self.unknown.insert(name.to_owned());
+                        out.push_str(raw);
+                    }
+                }
             }
+            rest = &after[end + 2..];
         }
-        rest = &after[end + 2..];
+        out.push_str(rest);
+        out
+    }
+}
+
+/// `{{$nom}}` seul dans un texte, espaces compris.
+fn lone_placeholder(text: &str) -> Option<&str> {
+    let inner = text.trim().strip_prefix("{{")?.strip_suffix("}}")?.trim();
+    (dynamic::is_dynamic(inner) && !inner.contains("{{")).then_some(inner)
+}
+
+/// Met entre guillemets un `{{…}}` écrit hors d'une chaîne JSON (`"n": {{$randomInt}}`),
+/// pour lire le modèle du corps comme du JSON.
+fn quote_bare(template: &str) -> String {
+    let mut out = String::with_capacity(template.len() + 8);
+    let mut rest = template;
+    while let Some(start) = rest.find("{{") {
+        let before = &rest[..start];
+        let Some(end) = rest[start..].find("}}").map(|e| start + e + 2) else {
+            break;
+        };
+        out.push_str(before);
+        let previous = out.trim_end().chars().last();
+        let placeholder = &rest[start..end];
+        if matches!(previous, Some(':' | ',' | '[')) {
+            out.push('"');
+            out.push_str(placeholder);
+            out.push('"');
+        } else {
+            out.push_str(placeholder);
+        }
+        rest = &rest[end..];
     }
     out.push_str(rest);
     out
+}
+
+/// Feuilles d'un document JSON : chemin (`body.a[0].b`) et valeur.
+fn leaves(value: &Value, path: &str, out: &mut Vec<(String, Value)>) {
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map {
+                leaves(child, &format!("{path}.{key}"), out);
+            }
+        }
+        Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                leaves(child, &format!("{path}[{index}]"), out);
+            }
+        }
+        other => out.push((path.to_owned(), other.clone())),
+    }
+}
+
+fn leaf_text(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        other => other.to_string(),
+    }
+}
+
+/// Sources des valeurs tirées (R10) : une feuille du corps JSON envoyé, ou un
+/// en-tête, écrite `{{$nom}}` seule dans la requête.
+fn locate_drawn(
+    drawn: &mut [DrawnValue],
+    template: &str,
+    body: Option<&str>,
+    templates: &[(String, String)],
+    headers: &[(String, String)],
+) {
+    let mut taken: Vec<String> = Vec::new();
+    let sent = body.and_then(|b| serde_json::from_str::<Value>(b).ok());
+    let mut sent_leaves = Vec::new();
+    if let Some(sent) = &sent {
+        leaves(sent, "body", &mut sent_leaves);
+    }
+    // Feuilles du corps écrites `{{$nom}}` seules, si le modèle est du JSON.
+    let lone: Vec<(String, String)> = serde_json::from_str::<Value>(&quote_bare(template))
+        .ok()
+        .map(|value| {
+            let mut list = Vec::new();
+            leaves(&value, "body", &mut list);
+            list.into_iter()
+                .filter_map(|(path, v)| {
+                    let name = lone_placeholder(v.as_str()?)?.to_owned();
+                    Some((path, name))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    for draw in drawn.iter_mut() {
+        let in_body = sent_leaves.iter().find(|(path, value)| {
+            !taken.contains(path)
+                && leaf_text(value) == draw.value
+                && lone.iter().any(|(p, name)| p == path && *name == draw.name)
+        });
+        if let Some((path, _)) = in_body {
+            taken.push(path.clone());
+            draw.source = Some(format!("request.{path}"));
+            continue;
+        }
+        let header = headers
+            .iter()
+            .zip(templates)
+            .find(|((name, value), (_, raw))| {
+                *value == draw.value
+                    && lone_placeholder(raw) == Some(draw.name.as_str())
+                    && !taken.contains(name)
+            });
+        if let Some(((name, _), _)) = header {
+            taken.push(name.clone());
+            draw.source = Some(format!("request.headers.{name}"));
+        }
+    }
 }
 
 /// Noms des variables `{{…}}` d'un texte (B6).
@@ -164,8 +329,23 @@ fn has_header(headers: &[(String, String)], name: &str) -> bool {
 ///
 /// Une variable inconnue bloque l'envoi et est nommée dans le message.
 pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, CommandError> {
-    let mut unknown = BTreeSet::new();
-    let mut sub = |text: &str| substitute(text, variables, &mut unknown);
+    prepare_with(request, variables, &mut Dice::new())
+}
+
+/// [`prepare`] avec un hasard donné (tests des valeurs dynamiques).
+pub fn prepare_with(
+    request: &Request,
+    variables: &Variables,
+    dice: &mut Dice,
+) -> Result<Prepared, CommandError> {
+    let mut resolver = Resolver {
+        variables,
+        dice,
+        unknown: BTreeSet::new(),
+        drawn: Vec::new(),
+        used: Vec::new(),
+    };
+    let mut sub = |text: &str| resolver.sub(text);
 
     let settings = request.settings.resolve(&request.inherited.settings);
     // Adresse non encodée : les valeurs partent telles quelles (R5).
@@ -190,6 +370,10 @@ pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, Com
     let own: Vec<(String, String)> = active(&request.headers)
         .map(|pair| (sub(&pair.name), sub(&pair.value)))
         .collect();
+    // Valeurs écrites des en-têtes propres, pour situer une valeur tirée (R10).
+    let own_templates: Vec<(String, String)> = active(&request.headers)
+        .map(|pair| (pair.name.clone(), pair.value.clone()))
+        .collect();
     // En-têtes hérités d'abord, sauf ceux que la requête redéfinit (R4).
     let mut headers: Vec<(String, String)> = request
         .inherited
@@ -198,6 +382,7 @@ pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, Com
         .filter(|h| !h.name.trim().is_empty() && !has_header(&own, &h.name))
         .map(|h| (sub(&h.name), sub(&h.value)))
         .collect();
+    let own_sent = own.clone();
     headers.extend(own);
 
     // Authentification héritée : celle du dossier ou de la collection (R4).
@@ -261,6 +446,21 @@ pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, Com
         headers.push(("Content-Type".to_owned(), content_type.to_owned()));
     }
 
+    let Resolver {
+        unknown,
+        mut drawn,
+        used,
+        ..
+    } = resolver;
+    if !drawn.is_empty() {
+        let template = matches!(request.body.kind, BodyKind::Json)
+            .then(|| request.body.content())
+            .unwrap_or_default();
+        let sent_json = matches!(request.body.kind, BodyKind::Json)
+            .then_some(body.as_deref())
+            .flatten();
+        locate_drawn(&mut drawn, template, sent_json, &own_templates, &own_sent);
+    }
     if !unknown.is_empty() {
         let names: Vec<String> = unknown.iter().map(|name| format!("« {name} »")).collect();
         return Err(CommandError::new(
@@ -303,6 +503,8 @@ pub fn prepare(request: &Request, variables: &Variables) -> Result<Prepared, Com
         } else {
             0
         },
+        drawn,
+        used,
     })
 }
 
@@ -456,6 +658,51 @@ mod tests {
     #[test]
     fn liste_les_noms_de_variables() {
         assert_eq!(variable_names("{{a}}/x/{{ b }}"), ["a", "b"]);
+    }
+
+    #[test]
+    fn r9_valeurs_dynamiques_tirees_a_chaque_occurrence() {
+        let v = vars(&[("baseUrl", "https://api.test")], &[]);
+        let mut r = request("{{baseUrl}}/o/{{$randomInt}}?t={{$timestamp}}");
+        r.method = Method::Post;
+        r.headers.push(Pair::new("X-Ref", "{{ $guid }}"));
+        r.body = Body::raw(
+            BodyKind::Json,
+            r#"{"ref": "{{$randomUUID}}", "copie": "{{$randomUUID}}", "n": {{$randomInt}}, "x": "{{$hasard}}"}"#,
+        );
+        let mut dice = Dice::seeded(7, 1_794_495_731_000);
+        let p = prepare_with(&r, &v, &mut dice).unwrap();
+        let names: Vec<&str> = p.drawn.iter().map(|d| d.name.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "$randomInt",
+                "$timestamp",
+                "$guid",
+                "$randomUUID",
+                "$randomUUID",
+                "$randomInt"
+            ]
+        );
+        assert!(p.url.ends_with("?t=1794495731"), "{}", p.url);
+        // Une valeur par occurrence ; un nom inconnu part tel quel, sans erreur.
+        assert_ne!(p.drawn[3].value, p.drawn[4].value);
+        let body = p.body.unwrap();
+        assert!(body.contains(&p.drawn[3].value) && body.contains("{{$hasard}}"));
+        // Sources (R10) : feuilles du corps et en-tête écrits seuls.
+        let sources: Vec<Option<&str>> = p.drawn.iter().map(|d| d.source.as_deref()).collect();
+        assert_eq!(
+            sources,
+            [
+                None,
+                None,
+                Some("request.headers.X-Ref"),
+                Some("request.body.ref"),
+                Some("request.body.copie"),
+                Some("request.body.n"),
+            ]
+        );
+        assert_eq!(p.used, ["baseUrl"]);
     }
 
     #[test]

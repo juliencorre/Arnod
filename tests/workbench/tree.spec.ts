@@ -18,13 +18,15 @@ describe("arborescence du projet", () => {
   it("affiche les dossiers puis les requêtes avec leur méthode", async () => {
     ({ app } = await openProject());
     const items = app.findAll('[role="treeitem"]').map((i) => i.text());
-    expect(items).toEqual(["▾Clients2", "POSTCréer", "GETLister", "GETSanté"]);
+    // « Clients » est un test : ses étapes sont numérotées (lot E).
+    expect(items).toEqual(["▾Clients2", "POST1Créer", "GET2Lister", "GETSanté"]);
   });
 
   it("replie un dossier et mémorise l'état", async () => {
     let core;
     ({ app, core } = await openProject());
-    await click(app, '[role="treeitem"]', "Clients");
+    // Un test se replie par son chevron (lot E) ; un clic sur son nom ouvre son onglet.
+    await click(app, '[role="treeitem"] .row__chevron');
     expect(app.findAll('[role="treeitem"]')).toHaveLength(2);
     expect(core.calls.filter((c) => c.cmd === "tree_set_collapsed").at(-1)?.args).toMatchObject({
       collapsed: ["Clients"],

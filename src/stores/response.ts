@@ -230,6 +230,18 @@ export const useResponseStore = defineStore("response", () => {
     return true;
   }
 
+  /**
+   * « Extraire dans une variable » (lot E, 4.2-b bis) : la valeur trouvée devient une extraction
+   * de la requête, que les étapes suivantes du test lisent.
+   */
+  function addExtraction(key: string, found: FilterMatch): string | null {
+    const target = found.assertion?.target;
+    if (target === undefined) return null;
+    const name = workbench.addExtraction(key, target);
+    if (name !== null) toasts.show(`Variable « ${name} » extraite de ${target}.`);
+    return name;
+  }
+
   return {
     views,
     view,
@@ -244,5 +256,6 @@ export const useResponseStore = defineStore("response", () => {
     save,
     clear,
     addAssertion,
+    addExtraction,
   };
 });

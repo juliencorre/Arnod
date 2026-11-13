@@ -63,6 +63,12 @@ function add(): void {
   if (found) store.addAssertion(props.editorKey, found);
 }
 
+/** Lot E : la valeur trouvée devient une variable (extraction). */
+function extract(): void {
+  const found = current.value;
+  if (found) store.addExtraction(props.editorKey, found);
+}
+
 defineExpose({
   /** Place le focus dans le champ du filtre (Ctrl+F). */
   focus: () => {
@@ -123,6 +129,9 @@ defineExpose({
       <div class="filter__actions">
         <BaseButton :disabled="current.assertion === null" @click="add">
           + Vérification
+        </BaseButton>
+        <BaseButton :disabled="current.assertion === null" @click="extract">
+          Extraire dans une variable
         </BaseButton>
         <span class="filter__target"> sur {{ current.assertion?.target ?? current.path }} </span>
       </div>

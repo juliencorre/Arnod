@@ -32,6 +32,7 @@ pub struct CurlCopy {
 #[tauri::command]
 pub fn request_input(
     state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
     project: Uuid,
     environment: String,
     path: Option<String>,
@@ -59,7 +60,21 @@ pub fn request_input(
     request.inherited = inherited;
     let data = local::load(&ctx.data_dir, ctx.id);
     let locals = data.locals.get(&active.name).cloned().unwrap_or_default();
-    let known = input::known_names(&active, &locals, &inherited_vars);
+    let mut known = input::known_names(&active, &locals, &inherited_vars);
+    // Lot E : valeurs extraites par les étapes précédentes du test, et variables
+    // d'exécution de la session (docs/plan-mvp-e-tests-etapes.md, R5, R6).
+    let extracted = path
+        .as_deref()
+        .map(|path| crate::tree::extracted_before(&ctx.root, path))
+        .unwrap_or_default();
+    for name in extracted
+        .into_iter()
+        .chain(bench.runtime_variables(ctx.id).into_keys())
+    {
+        if !known.contains(&name) {
+            known.push(name);
+        }
+    }
     let unknown = input::unknown(&input::used_names(&request), &known, &all, &active.name);
     // Valeurs non secrètes, pour nommer l'hôte.
     let mut values: BTreeMap<String, String> = active

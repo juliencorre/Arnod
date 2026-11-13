@@ -1478,13 +1478,14 @@ describe("Premier usage : vérifications, run et statuts", () => {
   });
 
   it("exécute le dossier : résumé, échecs détaillés, résultat par dossier (RU1 à RU4)", async () => {
-    await rowAction("Commandes", "Exécuter le dossier");
+    // « Commandes » ne contient que des requêtes : c'est un test, arrêté au premier échec (lot E).
+    await rowAction("Commandes", "Exécuter le test");
     const progress = browser.$(".run__progress");
-    await browser.waitUntil(async () => (await progress.getText()).includes("1 en échec"), {
+    await browser.waitUntil(async () => (await progress.getText()).includes("en échec"), {
       timeout: 15_000,
       timeoutMsg: "run du dossier attendu",
     });
-    expect(await progress.getText()).toBe("1 réussi, 1 en échec");
+    expect(await progress.getText()).toBe("Test en échec à l'étape 1 · 0/2 étapes");
     expect(await browser.$(".run__meta").getText()).toMatch(
       /^run #\d+ · Local · 8 en même temps · \d/,
     );
@@ -1500,14 +1501,14 @@ describe("Premier usage : vérifications, run et statuts", () => {
       () => document.querySelector(".run__group-name")?.textContent.trim() ?? "",
     );
     expect(group).toBe("Commandes");
-    expect(await browser.$(".run__group-count").getText()).toBe("1/2");
-    // La barre latérale suit le run (R4, R6).
+    expect(await browser.$(".run__group-count").getText()).toBe("0/2");
+    // La barre latérale suit le run (R4, R6) ; l'étape non jouée garde son statut (lot E, R3).
     expect((await treeRow("Commandes"))?.count).toBe("1 réussie sur 2 exécutées (2 requêtes)");
     expect((await treeRow("Créer une commande"))?.status).toBe("✕, en échec");
     await screenshot(browser, "20-run-dossier");
 
     await browser.$(".run__link=Ignorer pour ce run").click();
-    await browser.waitUntil(async () => (await progress.getText()).includes("tout est réussi"), {
+    await browser.waitUntil(async () => (await progress.getText()).includes("non jouée"), {
       timeoutMsg: "échec ignoré attendu",
     });
     expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
@@ -2035,5 +2036,175 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
     expect(readFileSync(path.join(project(), "environments", "recette.yml"), "utf8")).not.toContain(
       "ne-pas-lire",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lot E : tests et étapes (docs/plan-mvp-e-tests-etapes.md)
+// ---------------------------------------------------------------------------
+
+describe("Lot E - tests et étapes", () => {
+  let server: Server;
+  let url = "";
+  let deleted = 0;
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      const json = (status: number, body: unknown): void => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      if (request.method === "POST" && request.url === "/clients") {
+        json(201, { id: "cus_7", name: "Léa" });
+      } else if (request.method === "GET" && request.url === "/clients/cus_7") {
+        json(200, { id: "cus_7", name: "Léa" });
+      } else if (request.method === "DELETE" && request.url === "/clients/cus_7") {
+        deleted += 1;
+        response.writeHead(204);
+        response.end();
+      } else json(404, { message: "absent" });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  /** Fichier OpenCollection d'une étape du test « Créer puis lire ». */
+  function writeStep(file: string, name: string, seq: number, body: string): void {
+    writeFileSync(
+      path.join(project(), "Créer puis lire", file),
+      `info:\n  name: ${name}\n  type: http\n  seq: ${String(seq)}\n${body}`,
+    );
+  }
+
+  /** Étapes de l'onglet du test : numéro, nom et dernier résultat. */
+  function steps() {
+    return browser.execute(() =>
+      Array.from(document.querySelectorAll(".test .step")).map((step) => ({
+        number: step.querySelector(".step__number")?.textContent.trim() ?? "",
+        name: step.querySelector(".step__name")?.textContent.trim() ?? "",
+        mark: step.querySelector(".step__mark")?.textContent.trim() ?? "",
+      })),
+    );
+  }
+
+  it("un test de trois étapes passe la valeur extraite de l'étape 1 à l'étape 3 (4.2-a, R2, R3)", async () => {
+    // Les trois étapes sont écrites sur disque, comme par Git ou un import de Bruno.
+    mkdirSync(path.join(project(), "Créer puis lire"), { recursive: true });
+    writeStep(
+      "creer.yml",
+      "Créer le client",
+      1,
+      `http:\n  method: POST\n  url: ${url}/clients\nruntime:\n  assertions:\n    - expression: res.status\n      operator: eq\n      value: "201"\n  actions:\n    - type: set-variable\n      phase: after-response\n      selector:\n        expression: res.body.id\n        method: jsonq\n      variable:\n        name: client.id\n        scope: runtime\n`,
+    );
+    writeStep(
+      "lire.yml",
+      "Lire le client",
+      2,
+      `http:\n  method: GET\n  url: ${url}/clients/{{client.id}}\nruntime:\n  assertions:\n    - expression: res.body.name\n      operator: eq\n      value: Léa\n`,
+    );
+    writeStep(
+      "supprimer.yml",
+      "Supprimer le client",
+      3,
+      `http:\n  method: DELETE\n  url: ${url}/clients/{{client.id}}\nruntime:\n  assertions:\n    - expression: res.status\n      operator: eq\n      value: "204"\n`,
+    );
+    await restart();
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await clickText('aside [role="treeitem"]', "Créer puis lire");
+    await browser.$(".test").waitForDisplayed({ timeout: 10_000 });
+    expect((await steps()).map((s) => `${s.number} ${s.name}`)).toEqual([
+      "1 Créer le client",
+      "2 Lire le client",
+      "3 Supprimer le client",
+    ]);
+
+    await clickText(".test button", "Exécuter le test");
+    const progress = browser.$(".run__progress");
+    await browser.waitUntil(async () => (await progress.getText()).startsWith("Test réussi"), {
+      timeout: 15_000,
+      timeoutMsg: "test réussi attendu",
+    });
+    expect(await progress.getText()).toBe("Test réussi · 3/3 étapes");
+    // L'étape 3 a reçu l'identifiant extrait de la réponse de l'étape 1.
+    expect(deleted).toBe(1);
+    await clickText(".zone__tab-button", "Créer puis lire");
+    await browser.waitUntil(async () => (await steps()).every((s) => s.mark.startsWith("✓")), {
+      timeoutMsg: "résultats des étapes attendus",
+    });
+    await screenshot(browser, "21-test-reussi");
+  });
+
+  it("une étape en échec arrête le test : les suivantes ne sont pas jouées (R3, R4)", async () => {
+    writeStep(
+      "lire.yml",
+      "Lire le client",
+      2,
+      `http:\n  method: GET\n  url: ${url}/clients/{{client.id}}\nruntime:\n  assertions:\n    - expression: res.body.name\n      operator: eq\n      value: Hugo\n`,
+    );
+    await clickText(".test button", "Exécuter le test");
+    const progress = browser.$(".run__progress");
+    await browser.waitUntil(async () => (await progress.getText()).includes("en échec"), {
+      timeout: 15_000,
+      timeoutMsg: "test en échec attendu",
+    });
+    expect(await progress.getText()).toBe("Test en échec à l'étape 2 · 1/3 étapes");
+    expect(deleted).toBe(1);
+    await clickText(".run__tab", "Tous");
+    const statuses = await browser.execute(() =>
+      Array.from(document.querySelectorAll(".run__item .run__status")).map((s) =>
+        s.textContent.trim(),
+      ),
+    );
+    expect(statuses).toEqual(["Réussie", "Échec", "Non jouée"]);
+    await screenshot(browser, "22-test-arrete");
+  });
+
+  it("l'onglet « Variables » montre l'extraction et sa dernière valeur (4.2-b bis)", async () => {
+    await clickText('aside [role="treeitem"]', "Créer le client");
+    const tab = browser.$(".request-tab");
+    await tab.waitForDisplayed();
+    await clickText(".request-tab .editor__line button", "Envoyer");
+    await browser.waitUntil(
+      async () => (await browser.$(".response__status").getText()).startsWith("201"),
+      { timeout: 15_000, timeoutMsg: "réponse 201 attendue" },
+    );
+    await clickText(".request-tab .editor__tab", "Variables");
+    const row = await browser.execute(() => ({
+      name: document.querySelector<HTMLInputElement>(".vars__name")?.value ?? "",
+      value: document.querySelector(".vars__value")?.textContent.trim() ?? "",
+    }));
+    expect(row).toEqual({ name: "client.id", value: "cus_7" });
+    await screenshot(browser, "23-variables");
+  });
+
+  it("« Nouveau test » crée le dossier et son étape 1, curseur dans l'adresse (4.1-b)", async () => {
+    await clickHidden(
+      'aside button[aria-label="Ajouter au référentiel de tests de boutique-tests"]',
+    );
+    await clickText('aside [role="menuitem"]', "Nouveau test");
+    await browser.waitUntil(() => existsSync(path.join(project(), "Nouveau test", "etape-1.yml")), {
+      timeoutMsg: "étape 1 du nouveau test attendue",
+    });
+    // L'étape s'ouvre après la création : le curseur arrive dans l'adresse une fois l'éditeur monté.
+    await browser.waitUntil(
+      () =>
+        browser.execute(() => document.activeElement?.classList.contains("editor__url") ?? false),
+      { timeout: 10_000, timeoutMsg: "curseur dans l'adresse attendu" },
+    );
+    expect(
+      await browser.execute(() => document.activeElement?.classList.contains("editor__url")),
+    ).toBe(true);
+    await screenshot(browser, "24-nouveau-test");
   });
 });

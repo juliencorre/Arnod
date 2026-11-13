@@ -167,6 +167,11 @@ pub fn run() {
             commands::import::import_detect,
             commands::import::import_run,
             commands::import::import_report,
+            // Lot E : tests et étapes.
+            commands::test_steps::test_read,
+            commands::test_steps::tree_create_test,
+            commands::test_steps::tree_add_step,
+            commands::test_steps::request_variable_users,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

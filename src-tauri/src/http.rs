@@ -281,6 +281,8 @@ mod tests {
             body: None,
             timeout_ms: Some(2000),
             max_redirects: 5,
+            drawn: Vec::new(),
+            used: Vec::new(),
         }
     }
 

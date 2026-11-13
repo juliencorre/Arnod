@@ -17,9 +17,10 @@ use crate::environment::{self, Environment};
 use crate::error::{CommandError, CommandErrorKind};
 use crate::http::{self, Cancel, HttpResponse};
 use crate::local::{self, LocalData, LocalVar};
-use crate::request::assertions::{self, AssertionResult, DEFAULT_LIMIT};
+use crate::request::assertions::{self, AssertionResult, DEFAULT_LIMIT, ResponseData};
+use crate::request::extract::{self, ExtractedValue};
 use crate::request::model::{Method, Request};
-use crate::request::resolve::{self, Variables};
+use crate::request::resolve::{self, DrawnValue, MASK, Prepared, Variables};
 use crate::request::{file, inherit};
 use crate::secrets::{self, SecretStore};
 use crate::statuses::{self, StatusBook, Statuses};
@@ -79,6 +80,85 @@ pub struct SendOutcome {
     pub assertions: Vec<AssertionResult>,
     pub passed: bool,
     pub slow: bool,
+    /// Ce qui est parti, pour l'onglet « Envoyé » (`docs/plan-mvp-e-tests-etapes.md`, VD2).
+    pub sent: Option<Sent>,
+}
+
+/// Variable lue par un envoi (VD2) : un secret est masqué.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsedVariable {
+    pub name: String,
+    pub value: String,
+    /// Variable d'exécution (valeur extraite), et non de l'environnement.
+    pub runtime: bool,
+}
+
+/// Requête envoyée, secrets masqués, avec ses valeurs tirées, ses variables
+/// et ses valeurs extraites (VD2, EX3).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Sent {
+    pub method: String,
+    pub url: String,
+    pub headers: Vec<(String, String)>,
+    pub body: Option<String>,
+    pub drawn: Vec<DrawnValue>,
+    pub used: Vec<UsedVariable>,
+    pub extracted: Vec<ExtractedValue>,
+}
+
+impl Sent {
+    /// Ce qui est parti, masqué (R9 du premier usage).
+    fn of(
+        prepared: &Prepared,
+        variables: &Variables,
+        runtime: &BTreeMap<String, String>,
+        extracted: Vec<ExtractedValue>,
+    ) -> Self {
+        let mask = |text: &str| variables.mask(text);
+        Self {
+            method: prepared.method.as_str().to_owned(),
+            url: mask(&prepared.url),
+            headers: prepared
+                .headers
+                .iter()
+                .map(|(k, v)| (k.clone(), mask(v)))
+                .collect(),
+            body: prepared.body.as_deref().map(mask),
+            drawn: prepared.drawn.clone(),
+            used: prepared
+                .used
+                .iter()
+                .map(|name| UsedVariable {
+                    name: name.clone(),
+                    value: if variables.secrets.contains(name) {
+                        MASK.to_owned()
+                    } else {
+                        mask(variables.values.get(name).map_or("", String::as_str))
+                    },
+                    runtime: runtime.contains_key(name),
+                })
+                .collect(),
+            extracted: extracted
+                .into_iter()
+                .map(|mut e| {
+                    e.value = e.value.map(|v| mask(&v));
+                    e
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Données de la requête envoyée, pour une extraction `request.…` (R7).
+fn sent_data(prepared: &Prepared) -> ResponseData {
+    ResponseData {
+        status: 0,
+        duration_ms: 0,
+        headers: prepared.headers.clone(),
+        body: prepared.body.clone().unwrap_or_default(),
+    }
 }
 
 /// État d'une requête dans un run.
@@ -91,6 +171,9 @@ pub enum ItemStatus {
     Failed,
     Error,
     Cancelled,
+    /// Non jouée : une étape précédente du test a échoué
+    /// (`docs/plan-mvp-e-tests-etapes.md`, R3).
+    Skipped,
 }
 
 /// Ligne d'un run.
@@ -106,6 +189,85 @@ pub struct RunItem {
     pub slow: bool,
     pub assertions: Vec<AssertionResult>,
     pub error: Option<String>,
+    /// Test dont la requête est une étape (R1), sinon `None`.
+    #[serde(default)]
+    pub test: Option<String>,
+    /// Numéro de l'étape dans son test, à partir de 1.
+    #[serde(default)]
+    pub step: Option<usize>,
+    /// Valeurs extraites par la ligne (R5), masquées.
+    #[serde(default)]
+    pub extracted: Vec<ExtractedValue>,
+}
+
+/// Verdict d'un test dans un run (R4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunTest {
+    pub path: String,
+    pub name: String,
+    /// `passed`, `failed`, `running`, `pending` ou `cancelled`.
+    pub status: ItemStatus,
+    pub steps: usize,
+    pub passed: usize,
+    /// Étape qui a arrêté le test (R3).
+    pub failed_step: Option<usize>,
+}
+
+/// Verdict de chaque test d'un run, dans l'ordre (R4).
+pub fn run_tests(items: &[RunItem]) -> Vec<RunTest> {
+    let mut tests: Vec<RunTest> = Vec::new();
+    let mut states: Vec<Vec<ItemStatus>> = Vec::new();
+    for item in items {
+        let Some(path) = &item.test else { continue };
+        let index = match tests.iter().position(|t| &t.path == path) {
+            Some(index) => index,
+            None => {
+                tests.push(RunTest {
+                    path: path.clone(),
+                    name: path.rsplit('/').next().unwrap_or(path).to_owned(),
+                    status: ItemStatus::Pending,
+                    steps: 0,
+                    passed: 0,
+                    failed_step: None,
+                });
+                states.push(Vec::new());
+                tests.len() - 1
+            }
+        };
+        if let (Some(test), Some(state)) = (tests.get_mut(index), states.get_mut(index)) {
+            test.steps += 1;
+            if item.status == ItemStatus::Passed {
+                test.passed += 1;
+            }
+            if matches!(item.status, ItemStatus::Failed | ItemStatus::Error)
+                && test.failed_step.is_none()
+            {
+                test.failed_step = item.step.or(Some(test.steps));
+            }
+            state.push(item.status);
+        }
+    }
+    for (test, state) in tests.iter_mut().zip(states) {
+        let any = |status: ItemStatus| state.contains(&status);
+        test.status = if test.failed_step.is_some() {
+            ItemStatus::Failed
+        } else if any(ItemStatus::Running) {
+            ItemStatus::Running
+        } else if any(ItemStatus::Cancelled) {
+            ItemStatus::Cancelled
+        } else if test.passed == test.steps {
+            ItemStatus::Passed
+        } else if any(ItemStatus::Pending) && state.iter().any(|s| *s != ItemStatus::Pending) {
+            ItemStatus::Running
+        } else if any(ItemStatus::Skipped) {
+            // Échec ignoré après coup : les étapes non jouées le restent (R3).
+            ItemStatus::Skipped
+        } else {
+            ItemStatus::Pending
+        };
+    }
+    tests
 }
 
 /// Résultat d'un groupe de requêtes d'un run (`docs/plan-fin-premier-usage.md`, R2).
@@ -151,6 +313,9 @@ pub struct RunView {
     /// Résultat par dossier (R2), recalculé à chaque changement.
     #[serde(default)]
     pub groups: Vec<RunGroup>,
+    /// Verdict de chaque test (`docs/plan-mvp-e-tests-etapes.md`, R4).
+    #[serde(default)]
+    pub tests: Vec<RunTest>,
 }
 
 fn default_concurrency() -> usize {
@@ -219,6 +384,7 @@ impl RunView {
     pub fn touch(&mut self) {
         self.revision += 1;
         self.groups = run_groups(&self.folder, &self.items);
+        self.tests = run_tests(&self.items);
     }
 }
 
@@ -269,6 +435,8 @@ pub struct Workbench {
     /// Statuts des projets déjà lus (R5), un seul verrou pour toutes les écritures.
     statuses: Mutex<HashMap<Uuid, StatusBook>>,
     notifier: Mutex<Option<Arc<dyn Notifier>>>,
+    /// Variables d'exécution de chaque projet pour la session (R6) : jamais écrites.
+    runtime: Mutex<HashMap<Uuid, BTreeMap<String, String>>>,
 }
 
 fn now_ms() -> u64 {
@@ -300,6 +468,7 @@ impl Workbench {
             runs: Mutex::new(HashMap::new()),
             statuses: Mutex::new(HashMap::new()),
             notifier: Mutex::new(None),
+            runtime: Mutex::new(HashMap::new()),
         }
     }
 
@@ -552,6 +721,38 @@ impl Workbench {
         ))
     }
 
+    // ---------------------------------------------------------------- variables d'exécution
+
+    /// Variables d'exécution du projet pour la session (R6).
+    pub fn runtime_variables(&self, project: Uuid) -> BTreeMap<String, String> {
+        self.runtime
+            .lock()
+            .ok()
+            .and_then(|all| all.get(&project).cloned())
+            .unwrap_or_default()
+    }
+
+    /// Garde des valeurs extraites pour la session (R6).
+    fn keep_runtime(&self, project: Uuid, values: &BTreeMap<String, String>) {
+        if values.is_empty() {
+            return;
+        }
+        if let Ok(mut all) = self.runtime.lock() {
+            all.entry(project)
+                .or_default()
+                .extend(values.iter().map(|(k, v)| (k.clone(), v.clone())));
+        }
+    }
+
+    /// Variables de l'environnement, puis variables d'exécution, qui priment (R5).
+    fn with_runtime(variables: &Variables, runtime: &BTreeMap<String, String>) -> Variables {
+        let mut merged = variables.clone();
+        for (name, value) in runtime {
+            merged.values.insert(name.clone(), value.clone());
+        }
+        merged
+    }
+
     // ---------------------------------------------------------------- envoi
 
     fn check_protected(
@@ -603,6 +804,8 @@ impl Workbench {
     ) -> Result<SendOutcome, CommandError> {
         let (variables, environment) = self.variables(ctx, env)?;
         Self::check_protected(&environment, &[request.method], confirmed)?;
+        let runtime = self.runtime_variables(ctx.id);
+        let variables = Self::with_runtime(&variables, &runtime);
         let prepared = resolve::prepare(&request, &variables)?;
         let cancel = Arc::new(Cancel::new());
         self.executions
@@ -611,14 +814,19 @@ impl Workbench {
             .insert(exec_id, cancel.clone());
         let result = http::send(&prepared, &cancel).await;
         self.executions.lock().map_err(|_| busy())?.remove(&exec_id);
-        let response = Self::mask_response(
-            &variables,
-            result.map_err(|mut e| {
-                e.message = variables.mask(&e.message);
-                e
-            })?,
-        );
-        Ok(Self::outcome(&ctx.root, &request, response))
+        let raw = result.map_err(|mut e| {
+            e.message = variables.mask(&e.message);
+            e
+        })?;
+        // Extractions lues dans la réponse reçue, avant le masquage des secrets (R6).
+        let extracted = extract::apply(&request.extractions, &raw.data(), &sent_data(&prepared));
+        let mut kept = BTreeMap::new();
+        extract::store(&extracted, &mut kept);
+        self.keep_runtime(ctx.id, &kept);
+        let response = Self::mask_response(&variables, raw);
+        let mut outcome = Self::outcome(&ctx.root, &request, response);
+        outcome.sent = Some(Sent::of(&prepared, &variables, &runtime, extracted));
+        Ok(outcome)
     }
 
     /// Envoie un essai hors de tout projet, sans variables
@@ -665,6 +873,7 @@ impl Workbench {
             assertions: results,
             passed,
             slow,
+            sent: None,
         }
     }
 
@@ -693,6 +902,7 @@ impl Workbench {
             .and_then(|text| serde_json::from_str::<RunView>(&text).ok())
             .map(|mut run| {
                 run.groups = run_groups(&run.folder, &run.items);
+                run.tests = run_tests(&run.items);
                 run
             })
     }
@@ -747,6 +957,12 @@ impl Workbench {
         if let Some(only) = &only {
             paths.retain(|p| only.contains(p));
         }
+        // Les requêtes d'un contrat sont des endpoints, jamais des étapes (0.2).
+        let steps = if contract.is_some() {
+            HashMap::new()
+        } else {
+            test_steps(&tree::read(&ctx.root).unwrap_or_default())
+        };
         let mut items = Vec::new();
         let mut methods = Vec::new();
         for path in &paths {
@@ -756,6 +972,9 @@ impl Workbench {
             let request = tree::resolve(&ctx.root, path).and_then(|p| file::read(&p));
             let (name, method) = request.map_or((name, Method::Get), |r| (r.name, r.method));
             methods.push(method);
+            let (test, step) = steps.get(path).map_or((None, None), |(test, step)| {
+                (Some(test.clone()), Some(*step))
+            });
             items.push(RunItem {
                 path: path.clone(),
                 name,
@@ -766,6 +985,9 @@ impl Workbench {
                 slow: false,
                 assertions: Vec::new(),
                 error: None,
+                test,
+                step,
+                extracted: Vec::new(),
             });
         }
         Self::check_protected(&environment, &methods, confirmed)?;
@@ -784,8 +1006,10 @@ impl Workbench {
             contract,
             revision: 0,
             groups: Vec::new(),
+            tests: Vec::new(),
         };
         view.groups = run_groups(&view.folder, &view.items);
+        view.tests = run_tests(&view.items);
         let handle = {
             let mut runs = self.runs.lock().map_err(|_| busy())?;
             // Numéro suivant celui du dernier run gardé ou en mémoire (R1).
@@ -841,9 +1065,13 @@ impl Workbench {
         variables: Variables,
     ) {
         let semaphore = Arc::new(Semaphore::new(RUN_CONCURRENCY));
-        let count = handle.view.lock().map_or(0, |v| v.items.len());
+        let units = handle
+            .view
+            .lock()
+            .map(|v| run_units(&v.items))
+            .unwrap_or_default();
         let mut tasks = Vec::new();
-        for index in 0..count {
+        for unit in units {
             let (bench, ctx, handle, variables, semaphore) = (
                 self.clone(),
                 ctx.clone(),
@@ -855,7 +1083,7 @@ impl Workbench {
                 let Ok(_permit) = semaphore.acquire_owned().await else {
                     return;
                 };
-                bench.run_item(&ctx, &handle, &variables, index).await;
+                bench.run_unit(&ctx, &handle, &variables, &unit).await;
             }));
         }
         for task in tasks {
@@ -904,13 +1132,41 @@ impl Workbench {
         }
     }
 
+    /// Exécute une unité du run : une requête seule, ou les étapes d'un test
+    /// une à une, arrêtées à la première en échec (R2, R3). Les valeurs
+    /// extraites passent aux étapes suivantes (R5), puis restent pour la session (R6).
+    async fn run_unit(
+        &self,
+        ctx: &ProjectCtx,
+        handle: &RunHandle,
+        variables: &Variables,
+        unit: &[usize],
+    ) {
+        let mut runtime = BTreeMap::new();
+        for (position, index) in unit.iter().enumerate() {
+            let passed = self
+                .run_item(ctx, handle, variables, &mut runtime, *index)
+                .await;
+            if !passed && !handle.cancel.is_cancelled() {
+                for rest in unit.iter().skip(position + 1) {
+                    self.update(ctx, handle, *rest, |i| i.status = ItemStatus::Skipped);
+                }
+                break;
+            }
+        }
+        self.keep_runtime(ctx.id, &runtime);
+    }
+
+    /// Exécute une ligne ; renvoie `true` si elle réussit.
     async fn run_item(
         &self,
         ctx: &ProjectCtx,
         handle: &RunHandle,
         variables: &Variables,
+        runtime: &mut BTreeMap<String, String>,
         index: usize,
-    ) {
+    ) -> bool {
+        let variables = &Self::with_runtime(variables, runtime);
         let path = handle
             .view
             .lock()
@@ -919,7 +1175,7 @@ impl Workbench {
             .unwrap_or_default();
         if handle.cancel.is_cancelled() {
             self.update(ctx, handle, index, |i| i.status = ItemStatus::Cancelled);
-            return;
+            return false;
         }
         self.update(ctx, handle, index, |i| i.status = ItemStatus::Running);
         let prepared = tree::resolve(&ctx.root, &path)
@@ -938,17 +1194,24 @@ impl Workbench {
                     i.status = ItemStatus::Error;
                     i.error = Some(message);
                 });
-                return;
+                return false;
             }
         };
         let result = http::send(&prepared, &handle.cancel).await;
         match result {
             Ok(response) => {
+                let extracted = extract::apply(
+                    &request.extractions,
+                    &response.data(),
+                    &sent_data(&prepared),
+                );
+                extract::store(&extracted, runtime);
                 let outcome = Self::outcome(
                     &ctx.root,
                     &request,
                     Self::mask_response(variables, response),
                 );
+                let passed = outcome.passed;
                 self.update(ctx, handle, index, |i| {
                     i.status = if outcome.passed {
                         ItemStatus::Passed
@@ -959,7 +1222,15 @@ impl Workbench {
                     i.duration_ms = Some(outcome.response.total_ms);
                     i.slow = outcome.slow;
                     i.assertions = outcome.assertions;
+                    i.extracted = extracted
+                        .into_iter()
+                        .map(|mut e| {
+                            e.value = e.value.map(|v| variables.mask(&v));
+                            e
+                        })
+                        .collect();
                 });
+                passed
             }
             Err(error) => {
                 let cancelled = error.kind == CommandErrorKind::Cancelled;
@@ -972,6 +1243,7 @@ impl Workbench {
                     };
                     i.error = (!cancelled).then_some(message);
                 });
+                false
             }
         }
     }
@@ -1072,10 +1344,19 @@ impl Workbench {
                 .filter(|run| run.id == run_id)
                 .ok_or(error)?,
         };
+        // Un test en échec est rejoué en entier : ses valeurs extraites sont
+        // recalculées (`docs/plan-mvp-e-tests-etapes.md`, TE5).
+        let bad = |i: &RunItem| matches!(i.status, ItemStatus::Failed | ItemStatus::Error);
+        let failed_tests: Vec<&String> = previous
+            .items
+            .iter()
+            .filter(|i| bad(i))
+            .filter_map(|i| i.test.as_ref())
+            .collect();
         let failed: Vec<String> = previous
             .items
             .iter()
-            .filter(|i| matches!(i.status, ItemStatus::Failed | ItemStatus::Error))
+            .filter(|i| bad(i) || i.test.as_ref().is_some_and(|t| failed_tests.contains(&t)))
             .map(|i| i.path.clone())
             .collect();
         self.launch(
@@ -1087,6 +1368,51 @@ impl Workbench {
             confirmed,
         )
     }
+}
+
+/// Unités d'un run (R2) : les étapes consécutives d'un même test ensemble,
+/// chaque requête hors test seule.
+pub fn run_units(items: &[RunItem]) -> Vec<Vec<usize>> {
+    let mut units: Vec<Vec<usize>> = Vec::new();
+    for (index, item) in items.iter().enumerate() {
+        let joins = index > 0
+            && item.test.is_some()
+            && items.get(index - 1).and_then(|p| p.test.as_ref()) == item.test.as_ref();
+        match units.last_mut() {
+            Some(unit) if joins => unit.push(index),
+            _ => units.push(vec![index]),
+        }
+    }
+    units
+}
+
+/// Test et numéro d'étape de chaque requête d'un test de l'arborescence (R1).
+pub fn test_steps(nodes: &[tree::TreeNode]) -> HashMap<String, (String, usize)> {
+    let mut found = HashMap::new();
+    for node in nodes {
+        if let tree::TreeNode::Folder {
+            path,
+            children,
+            test,
+            ..
+        } = node
+        {
+            if *test {
+                // Une requête liée à un contrat reste un endpoint, rangé sous son contrat.
+                let requests = children
+                    .iter()
+                    .filter(|c| matches!(c, tree::TreeNode::Request { contract: None, .. }));
+                for (index, child) in requests.enumerate() {
+                    if let tree::TreeNode::Request { path: step, .. } = child {
+                        found.insert(step.clone(), (path.clone(), index + 1));
+                    }
+                }
+            } else {
+                found.extend(test_steps(children));
+            }
+        }
+    }
+    found
 }
 
 #[cfg(test)]

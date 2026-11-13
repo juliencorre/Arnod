@@ -159,6 +159,19 @@ describe("corps de la réponse (5.1-b bis)", () => {
     expect(core.workbench.requests.get("Clients/creer.yml")?.assertions.length).toBe(count);
   });
 
+  it("un résultat devient une variable de la requête (lot E, 4.2-b bis)", async () => {
+    let core;
+    ({ app, core } = await sent());
+    await filter("$.items[*].sku");
+    await click(app, ".filter__actions button", "Extraire dans une variable");
+    expect(app.get(".toast").text()).toContain("Variable « sku » extraite de body.items[0].sku");
+    await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_MS + 50));
+    await flushPromises();
+    expect(core.workbench.requests.get("Clients/creer.yml")?.extractions).toEqual([
+      { name: "sku", source: "body.items[0].sku", enabled: true },
+    ]);
+  });
+
   it("Ctrl+F ouvre le filtre depuis le corps", async () => {
     ({ app } = await sent());
     await app.get(".code").trigger("keydown", { key: "f", ctrlKey: true });

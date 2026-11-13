@@ -31,6 +31,7 @@ function folder(path: string, children: TreeNode[]): TreeNode {
     path,
     children,
     requestCount: children.length,
+    test: false,
   };
 }
 

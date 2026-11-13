@@ -18,6 +18,7 @@ import RunPanel from "@/components/workbench/RunPanel.vue";
 import ProjectWelcome from "@/components/zones/ProjectWelcome.vue";
 import RequestTab from "@/components/zones/RequestTab.vue";
 import ResultTab from "@/components/zones/ResultTab.vue";
+import TestTab from "@/components/zones/TestTab.vue";
 import { useTabActions } from "@/composables/useTabActions";
 import {
   type DropRegion,
@@ -84,6 +85,13 @@ function info(tab: ContentTab): { name: string; badge: string; dirty: boolean } 
         content.path,
       badge: "API",
       dirty: contracts.isDirty(key),
+    };
+  }
+  if (content.kind === "test") {
+    return {
+      name: content.path.split("/").at(-1) ?? content.path,
+      badge: "TEST",
+      dirty: false,
     };
   }
   const key = requestKey(content.projectId, content.path);
@@ -430,6 +438,12 @@ const welcome = computed(
           :path="activeTab.content.path"
         />
         <ResultTab v-else-if="activeTab.content.kind === 'result'" :key="activeTab.id" />
+        <TestTab
+          v-else-if="activeTab.content.kind === 'test'"
+          :key="activeTab.id"
+          :project-id="activeTab.content.projectId"
+          :path="activeTab.content.path"
+        />
         <ImportReportTab
           v-else-if="activeTab.content.kind === 'importReport'"
           :key="activeTab.id"
@@ -562,6 +576,10 @@ const welcome = computed(
 
 .zone__badge--delete {
   color: var(--color-danger);
+}
+
+.zone__badge--test {
+  color: var(--color-family-data-text);
 }
 
 .zone__name {

@@ -74,6 +74,9 @@ pub async fn request_send(
     confirmed: bool,
 ) -> Result<SendOutcome, CommandError> {
     let ctx = state.project_ctx(project)?;
+    // Version envoyée, telle que l'éditeur l'a, gardée avec le résultat
+    // (`docs/plan-mvp-e-tests-etapes.md`, R12).
+    let version = request.clone();
     let mut request = request;
     request.inherited = path
         .as_deref()
@@ -90,9 +93,14 @@ pub async fn request_send(
         .send(&ctx, exec_id, &environment, request, confirmed)
         .await;
     if let Some(path) = path.as_deref() {
-        let finished = results
-            .lock()
-            .map(|mut book| book.finish(project, path, &sent, now_ms()));
+        let finished = results.lock().map(|mut book| {
+            let result = book.finish(project, path, &sent, now_ms());
+            if sent.is_ok() {
+                book.keep_request(project, path, version).unwrap_or(result)
+            } else {
+                result
+            }
+        });
         if let Ok(result) = finished {
             share(&window, result);
         }

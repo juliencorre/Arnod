@@ -25,6 +25,8 @@ pub mod response;
 pub mod input;
 // Lot C - Import Bruno.
 pub mod import;
+// Lot E : tests et étapes.
+pub mod test_steps;
 
 #[cfg(test)]
 mod tests {

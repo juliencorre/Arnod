@@ -9,6 +9,7 @@ import { computed, ref } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import ResponseBody from "@/components/workbench/ResponseBody.vue";
+import SentPanel from "@/components/workbench/SentPanel.vue";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { AssertionResult } from "@/types/ipc";
@@ -18,7 +19,7 @@ const props = defineProps<{ editorKey: string }>();
 const workbench = useWorkbenchStore();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
 const outcome = computed(() => editor.value?.outcome ?? null);
-const view = ref<"body" | "headers" | "checks">("body");
+const view = ref<"body" | "headers" | "checks" | "sent">("body");
 
 /** Identifiant du résultat de conformité au contrat lié (`CONTRACT_CHECK`, R8). */
 const CONTRACT_CHECK = "contrat";
@@ -83,6 +84,7 @@ function removable(check: AssertionResult): boolean {
             ['body', 'Corps'],
             ['headers', `En-têtes (${outcome.response.headers.length})`],
             ['checks', `Vérifications (${outcome.assertions.length})`],
+            ['sent', 'Envoyé'],
           ] as const"
           :key="id"
           type="button"
@@ -104,6 +106,8 @@ function removable(check: AssertionResult): boolean {
           <dd>{{ value }}</dd>
         </template>
       </dl>
+      <!-- Lot E (5.1-h) : ce qui est parti, valeurs tirées et extraites. -->
+      <SentPanel v-else-if="view === 'sent'" :editor-key="editorKey" />
       <div v-else>
         <ul class="response__checks">
           <li

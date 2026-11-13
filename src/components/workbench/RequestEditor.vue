@@ -26,6 +26,7 @@ import BodyEditor from "@/components/workbench/BodyEditor.vue";
 import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
+import VariablesEditor from "@/components/workbench/VariablesEditor.vue";
 import { pathParamNames } from "@/lib/url";
 import { KNOWN_VARIABLES, vVariables } from "@/lib/variables";
 import { useContractsStore } from "@/stores/contracts";
@@ -286,7 +287,8 @@ function onKeydown(event: KeyboardEvent): void {
 
 // --- Onglets ---------------------------------------------------------------------
 
-type Tab = "params" | "body" | "headers" | "auth" | "docs" | "settings" | "assertions";
+type Tab =
+  "params" | "body" | "headers" | "auth" | "docs" | "settings" | "variables" | "assertions";
 const tab = ref<Tab>("params");
 /** Un nombre pour une liste, un point pour un onglet rempli d'une seule valeur. */
 const tabs = computed<{ id: Tab; label: string; count?: number; filled?: boolean }[]>(() => {
@@ -304,9 +306,26 @@ const tabs = computed<{ id: Tab; label: string; count?: number; filled?: boolean
     },
     { id: "docs", label: "Docs", filled: r !== null && r.docs.trim() !== "" },
     { id: "settings", label: "Réglages", filled: settings },
+    { id: "variables", label: "Variables", count: r?.extractions.length },
     { id: "assertions", label: "Vérifications", count: r?.assertions.length },
   ];
 });
+// --- Lot E : modifié depuis l'envoi (écart 4.2-b), curseur dans l'adresse (4.1-b) ---------
+
+const changedSinceSent = computed(() => workbench.isChangedSinceSent(props.editorKey));
+const urlInput = useTemplateRef<HTMLInputElement>("urlInput");
+
+watch(
+  () => [workbench.focusUrl, urlInput.value] as const,
+  async ([wanted, input]) => {
+    if (wanted !== props.editorKey || !input) return;
+    workbench.focusUrl = null;
+    await nextTick();
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -347,6 +366,14 @@ const tabs = computed<{ id: Tab; label: string; count?: number; filled?: boolean
         </button>
       </p>
     </div>
+    <!-- Lot E (écart 4.2-b) : à part de l'état d'enregistrement, qu'il ne change pas. -->
+    <p v-if="changedSinceSent" class="editor__unsent" role="status">
+      <span><b aria-hidden="true">M</b> modifié, pas encore envoyé</span>
+      <span aria-hidden="true">·</span>
+      <button type="button" class="link" @click="workbench.revertToSent(editorKey)">
+        Revenir à la version envoyée
+      </button>
+    </p>
     <p v-if="editor?.changedElsewhere" class="editor__elsewhere" role="status">
       Modifiée dans une autre fenêtre.
       <button type="button" class="link" @click="workbench.reload(editorKey)">Recharger</button>
@@ -361,6 +388,7 @@ const tabs = computed<{ id: Tab; label: string; count?: number; filled?: boolean
       <span class="editor__url-box">
         <input
           :id="ids.url"
+          ref="urlInput"
           v-model="request.url"
           v-variables="known"
           class="editor__url"
@@ -600,6 +628,14 @@ const tabs = computed<{ id: Tab; label: string; count?: number; filled?: boolean
         :inherited="request.inherited.settings"
       />
 
+      <VariablesEditor
+        v-else-if="tab === 'variables' && editor"
+        v-model="request.extractions"
+        :project-id="editor.projectId"
+        :path="editor.path"
+        :extracted="editor.outcome?.sent?.extracted ?? null"
+      />
+
       <AssertionsEditor
         v-else
         v-model="request.assertions"
@@ -681,6 +717,21 @@ const tabs = computed<{ id: Tab; label: string; count?: number; filled?: boolean
 
 .editor__saved--error {
   color: var(--color-danger);
+}
+
+.editor__unsent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  justify-content: flex-end;
+  margin: -0.5rem 0 0;
+  font-size: var(--text-body);
+  color: var(--color-muted);
+}
+
+.editor__unsent b {
+  font: 700 var(--text-caption) var(--font-mono);
+  color: var(--color-link);
 }
 
 .editor__elsewhere {

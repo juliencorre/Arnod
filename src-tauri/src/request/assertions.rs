@@ -66,6 +66,17 @@ fn lookup(target: &str, response: &ResponseData, json: Option<&Value>) -> Option
     None
 }
 
+/// Valeur lue dans une réponse pour une cible (`body.id`, `headers.Nom`,
+/// `status`, `responseTime`) ; le corps est lu en JSON s'il en est.
+pub fn value_at(target: &str, response: &ResponseData) -> Option<Value> {
+    let json = if target.starts_with("body") {
+        serde_json::from_str::<Value>(&response.body).ok()
+    } else {
+        None
+    };
+    lookup(target, response, json.as_ref())
+}
+
 enum Segment {
     Key(String),
     Index(usize),
