@@ -17,9 +17,28 @@ import type {
 
 import type { FakeWorkbench } from "./fakeWorkbench";
 
+/** Remplace chaque `{{nom}}` d'un texte (lecture linéaire, sans expression régulière). */
+function eachVariable(text: string, replace: (name: string, all: string) => string): string {
+  let out = "";
+  let from = 0;
+  for (;;) {
+    const start = text.indexOf("{{", from);
+    const end = start < 0 ? -1 : text.indexOf("}}", start + 2);
+    if (end < 0) return out + text.slice(from);
+    const all = text.slice(start, end + 2);
+    out += text.slice(from, start) + replace(text.slice(start + 2, end).trim(), all);
+    from = end + 2;
+  }
+}
+
 /** Noms des `{{…}}` d'un texte. */
 function names(text: string): string[] {
-  return [...text.matchAll(/\{\{([^}]*)\}\}/g)].map((m) => (m[1] ?? "").trim());
+  const found: string[] = [];
+  eachVariable(text, (name, all) => {
+    found.push(name);
+    return all;
+  });
+  return found;
 }
 
 function used(request: RequestDoc): string[] {
@@ -91,8 +110,7 @@ function fromText(text: string, format: PairsFormat, previous: Pair[]): PairsTex
 function curl(wb: FakeWorkbench, request: RequestDoc): CurlCopy {
   const env = wb.envs.find((e) => e.name === wb.active);
   const resolve = (text: string): string =>
-    text.replace(/\{\{([^}]*)\}\}/g, (all, raw: string) => {
-      const name = raw.trim();
+    eachVariable(text, (name, all) => {
       if (env?.locals.includes(name)) return `$${name.toUpperCase()}`;
       return env?.variables.find((v) => v.name === name)?.value ?? all;
     });
