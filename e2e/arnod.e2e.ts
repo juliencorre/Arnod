@@ -1583,8 +1583,9 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
       timeoutMsg: "rapport d'import attendu",
     });
     expect(await browser.$(".report h1").getText()).toContain("Boutique API importée");
+    // WebKitGTK rend le nombre et son libellé sans séparateur : on compare sans les blancs.
     const stats = await browser.$$(".report__stat").map((s) => s.getText());
-    expect(stats.join(" | ")).toContain("6\nrequêtes");
+    expect(stats.map((s) => s.replace(/\s/g, ""))).toContain("6requêtes");
     await screenshot(browser, "c1-rapport-import");
 
     expect(readFileSync(path.join(source(), "Commandes", "Créer une commande.bru"), "utf8")).toBe(
