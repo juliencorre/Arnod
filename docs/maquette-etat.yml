@@ -234,7 +234,7 @@ pages:
     journal:
       - "2026-11-10 : Accueil « Essayer une étape », REST seule (PR #35)."
       - "2026-11-12 : Ancienne page « Premier usage » : démarrage et erreurs → 0.3, projet créé → 1.2, Non classés → 2.2."
-      - "2026-11-13 : Commande cURL collée reconnue REST, jeton au coffre (lot B, plan-mvp-b-saisie-curl)."
+      - "2026-11-13 : Commande cURL collée reconnue REST, jeton au coffre (lot B, PR #49)."
     ecrans:
       a: { etat: livré, pr: [8, 35], captures: [01-premier-lancement] }
       "a bis": { etat: livré, pr: [27] }
@@ -245,6 +245,7 @@ pages:
         {
           etat: livré,
           version: MVP,
+          pr: [49],
           captures: [21-curl-collee],
           ecart:
             {
@@ -570,7 +571,7 @@ pages:
     journal:
       - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
       - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
-      - "2026-11-13 : Variables inconnues, compteurs d'onglets, en-têtes ajoutés, édition en texte et copie en cURL (lot B, plan-mvp-b-saisie-curl)."
+      - "2026-11-13 : Variables inconnues, compteurs d'onglets, en-têtes ajoutés, édition en texte et copie en cURL (lot B, PR #49)."
     ecrans:
       a: { etat: livré, pr: [27] }
       b: { etat: livré, pr: [27, 42], captures: [19-verification-en-echec] }
@@ -579,6 +580,7 @@ pages:
         {
           etat: livré,
           version: MVP,
+          pr: [49],
           captures: [22-variable-inconnue],
           ecart:
             {
@@ -590,6 +592,7 @@ pages:
         {
           etat: livré,
           version: MVP,
+          pr: [49],
           captures: [23-en-tetes-en-texte],
           ecart:
             {
