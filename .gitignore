@@ -22,3 +22,6 @@ coverage
 e2e/artifacts
 # Pages de la maquette lues et régénérées par scripts/maquette-sync.py
 .maquette/
+
+# Captures de scripts/apercu.mjs
+.apercu/
