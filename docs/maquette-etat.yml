@@ -228,18 +228,30 @@ pages:
     plans:
       - "plan-accueil-non-classes (A1–A4)"
       - "plan-workspaces-onglets (O8)"
+      - "plan-mvp-b-saisie-curl (CU1–CU4)"
     liees: ["2.2", "4.4", "0.3"]
-    reste: "natures autres que REST (a ter à a quinquies), commande cURL collée (a sexies)."
+    reste: "natures autres que REST (a ter à a quinquies)."
     journal:
       - "2026-11-10 : Accueil « Essayer une étape », REST seule (PR #35)."
       - "2026-11-12 : Ancienne page « Premier usage » : démarrage et erreurs → 0.3, projet créé → 1.2, Non classés → 2.2."
+      - "2026-11-13 : Commande cURL collée reconnue REST, jeton au coffre (lot B, plan-mvp-b-saisie-curl)."
     ecrans:
       a: { etat: livré, pr: [8, 35], captures: [01-premier-lancement] }
       "a bis": { etat: livré, pr: [27] }
       "a ter": { etat: en partie, pr: [35], captures: [01b-accueil-rest] }
       "a quater": { etat: en partie, pr: [35] }
       "a quinquies": { etat: en partie, pr: [35] }
-      "a sexies": { etat: à faire, version: MVP }
+      "a sexies":
+        {
+          etat: livré,
+          version: MVP,
+          captures: [21-curl-collee],
+          ecart:
+            {
+              texte: "L'entrée garde l'adresse, pas la commande collée ; les en-têtes sont une zone de texte « Nom: valeur » où le jeton paraît en {{token}}, sans ligne masquée ni pastille « gardé dans le coffre » (une note sous le formulaire le dit) ; l'adresse reste dans l'entrée, sans champ Adresse dans le formulaire.",
+              aligner: maquette,
+            },
+        }
   "2.2":
     nom: "Non classés"
     version: MVP
@@ -552,17 +564,39 @@ pages:
     version: [MVP, V1]
     plans:
       - "plan-premier-usage (X1–X5)"
+      - "plan-mvp-b-saisie-curl (SA1–SA6, TX1–TX4)"
     liees: ["5.2", "1.4"]
-    reste: "format, aperçu et filtre (b bis), variables inconnues (b ter), édition en texte et cURL (b quater), chronologie détaillée DNS, connexion, TLS (c), valeurs dynamiques (h), échec réseau expliqué (i) ; historique en V1 (c bis)."
+    reste: "format, aperçu et filtre (b bis), chronologie détaillée DNS, connexion, TLS (c), valeurs dynamiques (h), échec réseau expliqué (i) ; historique en V1 (c bis)."
     journal:
       - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
       - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
+      - "2026-11-13 : Variables inconnues, compteurs d'onglets, en-têtes ajoutés, édition en texte et copie en cURL (lot B, plan-mvp-b-saisie-curl)."
     ecrans:
       a: { etat: livré, pr: [27] }
       b: { etat: livré, pr: [27, 42], captures: [19-verification-en-echec] }
       "b bis": { etat: à faire, version: MVP }
-      "b ter": { etat: à faire, version: MVP }
-      "b quater": { etat: à faire, version: MVP }
+      "b ter":
+        {
+          etat: livré,
+          version: MVP,
+          captures: [22-variable-inconnue],
+          ecart:
+            {
+              texte: "Le nom inconnu est souligné sans être écrit en rouge (un champ ne colore pas une partie de son texte) ; l'Authorization de l'onglet Auth est listée dans « Ajoutés à l'envoi » avec sa source, pas dans « Hérités » ; Accept-Encoding n'est pas listé : le client HTTP ne demande pas de compression.",
+              aligner: maquette,
+            },
+        }
+      "b quater":
+        {
+          etat: livré,
+          version: MVP,
+          captures: [23-en-tetes-en-texte],
+          ecart:
+            {
+              texte: "« Copier » de la fenêtre cURL est un bouton secondaire (un seul bouton plein par vue : « Envoyer ») ; la ligne illisible est marquée dans la gouttière, pas surlignée ; pas encore de liste de variables à éditer en texte (onglet Variables du lot E).",
+              aligner: maquette,
+            },
+        }
       c: { etat: en partie, pr: [27] }
       "c bis": { etat: à faire, version: V1 }
       h: { etat: à faire, version: MVP }

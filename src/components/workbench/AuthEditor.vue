@@ -5,6 +5,7 @@
  */
 import { computed, useId } from "vue";
 
+import { useKnownVariables, vVariables } from "@/lib/variables";
 import type { Auth, AuthKind, Inherited } from "@/types/ipc";
 
 const props = defineProps<{ inherited: Inherited }>();
@@ -20,6 +21,7 @@ const MODES: { id: AuthKind; label: string }[] = [
 
 const TOKEN_EXAMPLE = "{{token}}";
 const ids = { mode: useId(), a: useId(), b: useId(), c: useId() };
+const known = useKnownVariables();
 
 /** Résumé d'une authentification héritée. */
 function summary(auth: Auth): string {
@@ -73,25 +75,43 @@ const note = computed(() => {
     <template v-if="auth.type === 'basic'">
       <div class="field">
         <label :for="ids.a">Identifiant</label>
-        <input :id="ids.a" v-model="auth.username" type="text" autocomplete="off" />
+        <input
+          :id="ids.a"
+          v-model="auth.username"
+          v-variables="known"
+          type="text"
+          autocomplete="off"
+        />
       </div>
       <div class="field">
         <label :for="ids.b">Mot de passe</label>
-        <input :id="ids.b" v-model="auth.password" type="text" autocomplete="off" />
+        <input
+          :id="ids.b"
+          v-model="auth.password"
+          v-variables="known"
+          type="text"
+          autocomplete="off"
+        />
       </div>
     </template>
     <div v-else-if="auth.type === 'bearer'" class="field">
       <label :for="ids.a">Jeton</label>
-      <input :id="ids.a" v-model="auth.token" type="text" autocomplete="off" />
+      <input :id="ids.a" v-model="auth.token" v-variables="known" type="text" autocomplete="off" />
     </div>
     <template v-else-if="auth.type === 'apiKey'">
       <div class="field">
         <label :for="ids.a">Clé</label>
-        <input :id="ids.a" v-model="auth.name" type="text" autocomplete="off" />
+        <input :id="ids.a" v-model="auth.name" v-variables="known" type="text" autocomplete="off" />
       </div>
       <div class="field">
         <label :for="ids.b">Valeur</label>
-        <input :id="ids.b" v-model="auth.value" type="text" autocomplete="off" />
+        <input
+          :id="ids.b"
+          v-model="auth.value"
+          v-variables="known"
+          type="text"
+          autocomplete="off"
+        />
       </div>
       <div class="field">
         <label :for="ids.c">Envoyée dans</label>

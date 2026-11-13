@@ -55,6 +55,8 @@ export function ruleLabel(rule: StepRule): string {
       return `Un texte qui commence par « ${rule.text} ».`;
     case "suffix":
       return `Un texte qui finit par « ${rule.text} ».`;
+    case "curl":
+      return "Une commande cURL (curl …) : méthode, adresse, en-têtes et corps repris.";
   }
 }
 

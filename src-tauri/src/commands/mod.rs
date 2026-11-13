@@ -19,6 +19,8 @@ pub mod tree;
 pub mod trial;
 pub mod window;
 pub mod workspaces;
+// Lot B : saisie, texte et cURL.
+pub mod input;
 
 #[cfg(test)]
 mod tests {

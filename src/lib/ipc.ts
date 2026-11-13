@@ -45,6 +45,11 @@ import type {
   StepCatalog,
   Detection,
   TrialResult,
+  CurlCopy,
+  Pair,
+  PairsFormat,
+  PairsText,
+  RequestInput,
   TreeView,
   ProjectCreated,
   ProjectCreateInput,
@@ -334,12 +339,15 @@ export const ipc = {
   stepsDetect: (input: string): Promise<Detection | null> =>
     call<Detection | null>("steps_detect", { input }),
 
+  /** `secrets` : secrets d'une commande cURL collée, gardés au coffre à l'envoi. */
   trialSend: (
     execId: string,
     nature: string,
     subject: string,
     values: Record<string, string>,
-  ): Promise<TrialResult> => call<TrialResult>("trial_send", { execId, nature, subject, values }),
+    secrets: Record<string, string> = {},
+  ): Promise<TrialResult> =>
+    call<TrialResult>("trial_send", { execId, nature, subject, values, secrets }),
   runStart: (
     project: string,
     folder: string,
@@ -440,6 +448,33 @@ export const ipc = {
   windowReattach: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach"),
 
   windowReattachAll: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach_all"),
+
+  // --- Lot B : saisie, texte et cURL (docs/plan-mvp-b-saisie-curl.md) -------------
+
+  /** Variables connues et inconnues, en-têtes ajoutés à l'envoi (R1 à R3). */
+  requestInput: (
+    project: string,
+    environment: string,
+    path: string | null,
+    request: RequestDoc,
+  ): Promise<RequestInput> =>
+    call<RequestInput>("request_input", { project, environment, path, request }),
+
+  /** La requête en commande cURL, secrets remplacés par une variable du shell (R8 à R10). */
+  requestCurl: (
+    project: string,
+    environment: string,
+    path: string | null,
+    request: RequestDoc,
+  ): Promise<CurlCopy> => call<CurlCopy>("request_curl", { project, environment, path, request }),
+
+  /** Une liste de paires en texte, une ligne par paire (R11). */
+  pairsToText: (pairs: Pair[], format: PairsFormat): Promise<string> =>
+    call<string>("pairs_to_text", { pairs, format }),
+
+  /** Les paires d'un texte et ses lignes illisibles (R12, R13). */
+  pairsFromText: (text: string, format: PairsFormat, previous: Pair[]): Promise<PairsText> =>
+    call<PairsText>("pairs_from_text", { text, format, previous }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
