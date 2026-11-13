@@ -164,7 +164,7 @@ pages:
           captures: [02-projet-cree],
           ecart:
             {
-              texte: "« Écrire une requête » et « + Requête » au lieu de « Écrire un test » et « + Test » (R4) ; « Reprendre l'existant » importe un fichier OpenAPI, les collections Bruno viennent du lot C (2.3-b).",
+              texte: "« Écrire une requête » et « + Requête » au lieu de « Écrire un test » et « + Test » (R4).",
               aligner: code,
             },
         }
