@@ -88,6 +88,8 @@ export type CommandName =
   | "steps_catalog"
   | "steps_detect"
   | "trial_send"
+  // Lot D - Barre latérale
+  | "contract_count"
   | "response_render"
   | "response_preview"
   | "response_filter"
@@ -260,6 +262,10 @@ export type TreeNode =
       invalid: boolean;
       /** Contrat lié (`contracts/petstore.yaml`), d'après l'étiquette `contract:`. */
       contract: string | null;
+      /** Adresse, pour le filtre (docs/plan-mvp-d-barre-laterale.md, R1) ; vide si illisible. */
+      url: string;
+      /** Étiquettes, sans celle du lien au contrat (R1). */
+      tags: string[];
     };
 
 /** Arborescence et dossiers repliés (`TreeView`). */
@@ -787,6 +793,16 @@ export interface LinkedView {
   path: string;
   name: string;
   method: HttpMethod;
+  /** Réponses attendues, dans l'ordre du fichier (docs/plan-mvp-d-barre-laterale.md, R2). */
+  examples: ExampleRef[];
+}
+
+/** Réponse attendue d'une requête liée, pour la barre latérale (`ExampleRef`, 3.2-a3). */
+export interface ExampleRef {
+  /** Position dans `examples` de la requête. */
+  index: number;
+  status: number | null;
+  name: string;
 }
 
 /** Opération affichée dans l'onglet du contrat (`OperationView`). */

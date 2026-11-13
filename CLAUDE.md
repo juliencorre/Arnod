@@ -458,6 +458,29 @@ l'étude `docs/etude-catalogue-etapes.md` (catalogue synchronisé, non implémen
 - Couleurs des familles : jetons `--color-family-*` (texte, fond, bord) des deux thèmes, contrastes
   vérifiés dans `tests/theme.spec.ts`.
 
+## Lot D - Barre latérale
+
+Référence : `docs/plan-mvp-d-barre-laterale.md` (cas F1 à F5, D1, D2, M1, M2, E1 à E3, W1, règles
+R1 à R6), écrans 1.2-e, 1.2-d, 1.2-a ter, 3.2-a3 et 1.1-a.
+
+- Filtre du référentiel (`TreeFilter.vue`, `lib/treeFilter.ts`, pur et testé) : filtre d'affichage
+  fait dans l'interface (Q4 du plan d'ensemble), sur `TreeNode` (`url`, `tags` fournis par le cœur).
+  Termes cumulés : `#mot` (début d'étiquette), méthode en capitales, sinon nom ou adresse sans casse
+  ni accents. Pendant un filtre, les dossiers sont dépliés sans toucher à l'état replié enregistré.
+  Ctrl+F ne vaut que quand la barre latérale a le focus.
+- État d'affichage propre à la fenêtre dans le store `sidebar` : texte du filtre par projet,
+  sections dépliées, réponse attendue à ouvrir (`openExample`, servie par `ResultSide` et
+  `ExpectedResponses`), nombre de contrats des cartes (`contract_count`, sans lire les contrats).
+- `SectionHeading` avec `expanded` : section repliable ; une section vide est repliée par défaut,
+  dépliée elle montre sa ligne d'ajout ; le nombre n'est montré que replié.
+- Sous un contrat, la ligne d'une opération **est** son endpoint (première requête liée) : clic,
+  statut, nombre de réponses attendues (`LinkedView.examples`) et menu ⋯ ; dépliée, ses réponses
+  attendues par code, puis les autres requêtes de l'opération.
+- Projet vide (ni requête ni contrat) : `ProjectWelcome` montre quatre points de départ ; l'ajout
+  d'un contrat passe par `useContractAdd`, partagé avec `ContractsSection`.
+- Menu « + » du projet : Nouvelle requête (Ctrl+N), Nouveau dossier (Ctrl+Maj+N), Ajouter un
+  contrat ▸, Nouvel environnement… ; une création déplie la section concernée.
+
 ## Corps de la réponse
 
 Référence : `docs/plan-mvp-a-reponse.md` (lot A, cas F1 à F8, règles R1 à R10), écran `5.1-b bis`.

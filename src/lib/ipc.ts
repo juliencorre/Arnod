@@ -445,6 +445,11 @@ export const ipc = {
 
   windowReattachAll: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach_all"),
 
+  // --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) -------------
+
+  /** Nombre de contrats du projet, sans les lire (W1, R5). */
+  contractCount: (project: string): Promise<number> => call<number>("contract_count", { project }),
+
   // --- Lot A - Réponse (docs/plan-mvp-a-reponse.md) ---------------------------------------
 
   /** Corps mis en forme dans `format`, ou dans le format détecté (`null`). */

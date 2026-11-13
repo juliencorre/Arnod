@@ -146,6 +146,8 @@ pub fn run() {
             commands::steps::steps_catalog,
             commands::steps::steps_detect,
             commands::trial::trial_send,
+            // Lot D - Barre latérale
+            commands::contracts::contract_count,
             commands::response::response_render,
             commands::response::response_preview,
             commands::response::response_filter,
