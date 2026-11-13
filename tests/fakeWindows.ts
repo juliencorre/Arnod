@@ -317,6 +317,7 @@ export function closePath(fw: FakeWindows, projectId: string, path: string): voi
         if (
           c.kind !== "run" &&
           c.kind !== "result" &&
+          c.kind !== "importReport" &&
           c.projectId === projectId &&
           (c.path === path || c.path.startsWith(`${path}/`))
         ) {

@@ -10,6 +10,7 @@ import { newRequest, okOutcome } from "../fakeWorkbench";
 import { PETSTORE_SOURCE } from "../fakeContracts";
 import { AUTH_SSO, BOUTIQUE_TESTS, boutiqueSnapshot, firstRunSnapshot } from "../fixtures";
 import type { Example } from "@/types/ipc";
+import { brunoSource } from "../fakeImports";
 
 /** Gestes dans la page, par sélecteur CSS et texte visible. */
 export interface Gestes {
@@ -369,6 +370,62 @@ export const SCENARIOS: Record<string, Scenario> = {
       await g.attendre(200);
     },
   },
+
+  // Lot C - Import Bruno (docs/plan-mvp-c-import-bruno.md).
+  "2.3-a": {
+    description: "Premier lancement : « Importer… » reconnaît le format (2.3-a)",
+    setup: () => installFakeCore(firstRunSnapshot()),
+  },
+  "2.3-b": {
+    description: "Projet vide : « Reprendre l'existant », puis la fenêtre « Importer » (2.3-b)",
+    setup: () => {
+      const core = installFakeCore(boutiqueSnapshot());
+      core.imports.sources[BRUNO_DIR] = brunoSource(BRUNO_DIR);
+      core.imports.picked = BRUNO_DIR;
+      return core;
+    },
+    play: async (g) => {
+      await ouvrirProjet(g);
+      await g.cliquer(".start button", "Importer…");
+      await g.cliquer("dialog[open] button", "Choisir un dossier…");
+      await g.attendre(100);
+    },
+  },
+  "2.3-b-points": {
+    description: "Projet vide : le point de départ « Reprendre l'existant » (2.3-b)",
+    setup: () => installFakeCore(boutiqueSnapshot()),
+    play: ouvrirProjet,
+  },
+  "2.3-f": {
+    description: "Rapport d'import d'une collection Bruno (2.3-f)",
+    setup: () => {
+      const core = installFakeCore(firstRunSnapshot());
+      core.imports.sources[BRUNO_DIR] = brunoSource(BRUNO_DIR);
+      core.imports.picked = BRUNO_DIR;
+      const wb = core.workbench;
+      wb.folders.add("Authentification");
+      wb.folders.add("Commandes");
+      wb.requests.set(
+        "Commandes/creer-une-commande.yml",
+        newRequest("Créer une commande", { method: "POST", url: "{{baseUrl}}/orders" }),
+      );
+      wb.requests.set(
+        "Commandes/lire-une-commande.yml",
+        newRequest("Lire une commande", { url: "{{baseUrl}}/orders/:id" }),
+      );
+      wb.requests.set(
+        "Authentification/obtenir-un-jeton.yml",
+        newRequest("Obtenir un jeton", { method: "POST", url: "{{baseUrl}}/auth/token" }),
+      );
+      wb.requests.set("sante.yml", newRequest("Santé", { url: "{{baseUrl}}/health" }));
+      return core;
+    },
+    play: async (g) => {
+      await g.cliquer(".first-run__import button", "Choisir un dossier…");
+      await g.cliquer("dialog[open] button", "Importer");
+      await g.attendre(200);
+    },
+  },
 };
 
 // --- Lot A - Réponse (5.1-b bis, docs/plan-mvp-a-reponse.md) ---------------------------------
@@ -454,3 +511,6 @@ Object.assign(SCENARIOS, {
     },
   },
 } satisfies Record<string, Scenario>);
+
+/** Collection Bruno des scénarios d'import. */
+const BRUNO_DIR = "/home/julien/bruno/boutique-api";

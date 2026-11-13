@@ -22,13 +22,15 @@ import { startProjectDrag } from "@/lib/dnd";
 import { formatDayTime, pathSegments } from "@/lib/format";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
+import { useImportStore } from "@/stores/imports";
 import type { ProjectLastRun, ProjectView } from "@/types/ipc";
 
 const props = defineProps<{ highlightProjectId: string | null }>();
 
 const catalog = useCatalogStore();
 const dialogs = useDialogStore();
-const { addToWorkspaces, addExistingProject, forgetProject } = useProjectActions();
+const { addToWorkspaces, forgetProject } = useProjectActions();
+const imports = useImportStore();
 const titleId = useId();
 const table = useTemplateRef<HTMLElement>("table");
 
@@ -93,7 +95,7 @@ onMounted(async () => {
           label="Rechercher un projet ou un dossier"
           placeholder="Rechercher…"
         />
-        <BaseButton @click="addExistingProject(null)">Importer…</BaseButton>
+        <BaseButton @click="imports.open(null, null)">Importer…</BaseButton>
         <BaseButton variant="primary" @click="dialogs.openNewProject(null)"
           >Nouveau projet</BaseButton
         >

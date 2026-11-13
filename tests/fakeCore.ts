@@ -18,6 +18,8 @@ import {
 } from "./fakeWindows";
 import { handleInput } from "./fakeInput";
 import { STEP_CATALOG, detect } from "./fakeSteps";
+// Lot C - Import Bruno.
+import { createFakeImports, handleImports, type FakeImports } from "./fakeImports";
 import {
   createFakeWorkbench,
   handleWorkbench,
@@ -54,6 +56,8 @@ export interface FakeCore {
   emitWindows: () => Promise<void>;
   /** Corps de la réponse (lot A) : fichier du prochain enregistrement. */
   response: FakeResponse;
+  /** Lot C - Import Bruno : sources reconnues, rapports. */
+  imports: FakeImports;
 }
 
 const COLORS: WorkspaceColor[] = [
@@ -91,6 +95,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     emit: (event, payload) => emit(event, payload),
     emitWindows: () => emit("arnod://fenetres", snapshotOf(core.windows)),
     response: createFakeResponse(),
+    imports: createFakeImports(),
   };
 
   const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -327,11 +332,33 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
         default: {
           const windows = handleWindows(core.windows, cmd, args);
           if (windows !== undefined) return windows;
+          const response = handleResponse(core.response, core.workbench, cmd, args);
+          if (response !== undefined) return response;
           // Lot B : saisie et cURL.
           const input = handleInput(core.workbench, cmd, args);
           if (input !== undefined) return input;
-          const response = handleResponse(core.response, core.workbench, cmd, args);
-          if (response !== undefined) return response;
+          // Lot C - Import Bruno.
+          const imported = handleImports(
+            core.imports,
+            cmd,
+            args,
+            (name, path, workspaceId) => {
+              const taken = state.projects.find((p) => same(p.name, name));
+              if (taken) {
+                fail(
+                  "nameTaken",
+                  `Un projet « ${taken.name} » existe déjà dans « Tous les projets ».`,
+                );
+              }
+              const id = `p-${name}`;
+              state.projects.push({ id, name, path, status: "ok", workspaceIds: [] });
+              if (workspaceId !== null) workspace(workspaceId).projectIds.push(id);
+              return { snapshot: normalize(), projectId: id };
+            },
+            (id) => project(id).name,
+            DEFAULT_LOCATION,
+          );
+          if (imported !== undefined) return imported;
           const contracts = handleContracts(core.contracts, core.workbench, cmd, args);
           const handled =
             contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);

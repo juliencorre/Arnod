@@ -26,6 +26,7 @@ const crumbs = computed<string[]>(() => {
   if (content.kind === "result") return ["Résultat"];
   const project = catalog.projectById(content.projectId)?.name ?? "projet";
   if (content.kind === "run") return [project, "Run"];
+  if (content.kind === "importReport") return [project, "Rapport d'import"];
   if (content.kind === "contract") {
     const name =
       contracts.open[contractKey(content.projectId, content.path)]?.view?.name ??

@@ -88,17 +88,23 @@ export type CommandName =
   | "steps_catalog"
   | "steps_detect"
   | "trial_send"
-  // Lot B : saisie et cURL
-  | "request_input"
-  | "request_curl"
-  | "pairs_to_text"
-  | "pairs_from_text"
   | "response_render"
   | "response_preview"
   | "response_filter"
   | "response_save"
   | "response_clear"
-  | "contract_count";
+  // Lot D - Barre latérale
+  | "contract_count"
+  // Lot B : saisie et cURL
+  | "request_input"
+  | "request_curl"
+  | "pairs_to_text"
+  | "pairs_from_text"
+  // Lot C - Import Bruno.
+  | "import_pick"
+  | "import_detect"
+  | "import_run"
+  | "import_report";
 
 /**
  * Nature d'une erreur de commande.
@@ -619,7 +625,9 @@ export type ContentRef =
   | { kind: "run"; projectId: string }
   | { kind: "contract"; projectId: string; path: string }
   /** Résultat de la requête active, dans sa fenêtre (docs/plan-resultat-detachable.md). */
-  | { kind: "result" };
+  | { kind: "result" }
+  /** Dernier rapport d'import d'un projet (docs/plan-mvp-c-import-bruno.md, 2.3-f). */
+  | { kind: "importReport"; projectId: string };
 
 /** Onglet de contenu d'une zone (`Tab`). */
 export interface ContentTab {
@@ -983,6 +991,68 @@ export interface TrialResult {
   outcome: SendOutcome;
 }
 
+// --- Lot A - Réponse (docs/plan-mvp-a-reponse.md, écran 5.1-b bis) -------------------------
+
+/**
+ * Format d'affichage d'un corps de réponse, détecté d'après `content-type` (R1).
+ *
+ * Équivalent Rust : `ResponseFormat` (`src-tauri/src/response/format.rs`).
+ */
+export type ResponseFormat = "json" | "xml" | "html" | "text";
+
+/** Nature d'un jeton de la mise en forme, pour sa couleur (`TokenKind`). */
+export type TokenKind =
+  | "key"
+  | "string"
+  | "number"
+  | "literal"
+  | "punct"
+  | "tag"
+  | "attr"
+  | "attrValue"
+  | "comment"
+  | "text";
+
+/** Morceau d'une ligne mise en forme (`Token`). */
+export interface BodyToken {
+  text: string;
+  kind: TokenKind;
+  /** Chemin canonique de la valeur JSON (`$.items[0].sku`), comme ceux du filtre. */
+  path?: string;
+}
+
+/** Réponse de `response_render` (`RenderedBody`). */
+export interface RenderedBody {
+  /** Format appliqué : celui choisi, sinon celui détecté. */
+  format: ResponseFormat;
+  detected: ResponseFormat;
+  lines: BodyToken[][];
+  /** Pourquoi le corps est montré sans mise en forme. */
+  notice: string | null;
+}
+
+/** Nœud de l'aperçu HTML (`HtmlNode`) : balises sûres, sans attribut. */
+export type HtmlNode =
+  { kind: "text"; text: string } | { kind: "element"; tag: string; children: HtmlNode[] };
+
+/** Correspondance du filtre JSONPath (`FilterMatch`). */
+export interface FilterMatch {
+  path: string;
+  /** Valeur en JSON compact, raccourcie au-delà de 200 caractères. */
+  value: string;
+  /** Vérification tirée de la valeur ; absente pour un nom qui ne s'écrit pas en notation pointée. */
+  assertion: Assertion | null;
+}
+
+/** Réponse de `response_filter` (`FilterResult`). */
+export interface FilterResult {
+  matches: FilterMatch[];
+  /** Nombre total de correspondances (500 renvoyées au plus). */
+  total: number;
+  /** Expression invalide ou corps non JSON, en français. */
+  error: string | null;
+}
+
 // --- Lot B : saisie, texte et cURL (docs/plan-mvp-b-saisie-curl.md) ------------
 
 /** Environnement qui définit une variable inconnue de l'environnement actif (`VariableSource`). */
@@ -1065,64 +1135,106 @@ export interface CurlImport {
   ignored: CurlIgnored[];
 }
 
-// --- Lot A - Réponse (docs/plan-mvp-a-reponse.md, écran 5.1-b bis) -------------------------
+// ---------------------------------------------------------------------------
+// Lot C - Import Bruno (docs/plan-mvp-c-import-bruno.md)
+// ---------------------------------------------------------------------------
 
-/**
- * Format d'affichage d'un corps de réponse, détecté d'après `content-type` (R1).
- *
- * Équivalent Rust : `ResponseFormat` (`src-tauri/src/response/format.rs`).
- */
-export type ResponseFormat = "json" | "xml" | "html" | "text";
+/** Format reconnu par l'import (`SourceFormat`). */
+export type ImportFormat = "bruno" | "openCollection" | "openApi";
 
-/** Nature d'un jeton de la mise en forme, pour sa couleur (`TokenKind`). */
-export type TokenKind =
-  | "key"
-  | "string"
-  | "number"
-  | "literal"
-  | "punct"
-  | "tag"
-  | "attr"
-  | "attrValue"
-  | "comment"
-  | "text";
-
-/** Morceau d'une ligne mise en forme (`Token`). */
-export interface BodyToken {
-  text: string;
-  kind: TokenKind;
-  /** Chemin canonique de la valeur JSON (`$.items[0].sku`), comme ceux du filtre. */
-  path?: string;
-}
-
-/** Réponse de `response_render` (`RenderedBody`). */
-export interface RenderedBody {
-  /** Format appliqué : celui choisi, sinon celui détecté. */
-  format: ResponseFormat;
-  detected: ResponseFormat;
-  lines: BodyToken[][];
-  /** Pourquoi le corps est montré sans mise en forme. */
-  notice: string | null;
-}
-
-/** Nœud de l'aperçu HTML (`HtmlNode`) : balises sûres, sans attribut. */
-export type HtmlNode =
-  { kind: "text"; text: string } | { kind: "element"; tag: string; children: HtmlNode[] };
-
-/** Correspondance du filtre JSONPath (`FilterMatch`). */
-export interface FilterMatch {
+/** Réponse de `import_detect` : ce que l'import a reconnu, avant toute écriture. */
+export interface ImportSource {
+  /** Dossier (ou fichier, pour un contrat) à importer. */
   path: string;
-  /** Valeur en JSON compact, raccourcie au-delà de 200 caractères. */
-  value: string;
-  /** Vérification tirée de la valeur ; absente pour un nom qui ne s'écrit pas en notation pointée. */
-  assertion: Assertion | null;
+  format: ImportFormat;
+  /** Nom de la collection, du projet, ou titre du contrat. */
+  name: string;
+  /** Ce que la conversion reprendra ; `requests` compte les opérations d'un contrat. */
+  counts: ImportCounts;
+  /** Fichiers `.bru` lus. */
+  files: number;
 }
 
-/** Réponse de `response_filter` (`FilterResult`). */
-export interface FilterResult {
-  matches: FilterMatch[];
-  /** Nombre total de correspondances (500 renvoyées au plus). */
-  total: number;
-  /** Expression invalide ou corps non JSON, en français. */
-  error: string | null;
+/** Destination d'un import (`ImportTarget`). */
+export type ImportTarget =
+  | { kind: "newProject"; location: string | null; workspaceId: string | null }
+  | { kind: "project"; projectId: string };
+
+/** Nature d'un élément du rapport (`ItemKind`). */
+export type ImportItemKind =
+  | "tests"
+  | "preRequest"
+  | "postResponse"
+  | "env"
+  | "auth"
+  | "body"
+  | "request"
+  | "assertion"
+  | "extraction"
+  | "option";
+
+/** Suite à donner à un élément du rapport (`ItemStatus`). */
+export type ImportItemStatus = "notRun" | "toFill" | "toCheck" | "skipped" | "stored";
+
+/** Élément signalé par l'import, avec son fichier d'origine. */
+export interface ImportReportItem {
+  kind: ImportItemKind;
+  status: ImportItemStatus;
+  name: string;
+  /** Dossier ou environnement ; vide à la racine. */
+  place: string;
+  /** Fichier d'origine, relatif à la collection. */
+  file: string;
+  /** Bloc d'origine (`tests`, `auth:oauth2`…). */
+  block: string | null;
+  /** Requête créée dans le projet, relative à sa racine. */
+  request: string | null;
+  detail: string;
+  /** Contenu d'origine (script, valeur). */
+  code: string | null;
+}
+
+/** Exemple de conversion sans code. */
+export interface ConversionExample {
+  before: string;
+  after: string;
+}
+
+/** Comptes du rapport (`ImportCounts`). */
+export interface ImportCounts {
+  folders: number;
+  requests: number;
+  environments: number;
+  assertions: number;
+  extractions: number;
+  secrets: number;
+  dynamicValues: number;
+  scripts: number;
+}
+
+/** Rapport d'import (2.3-f), gardé sur le poste. */
+export interface ImportReport {
+  collection: string;
+  format: ImportFormat;
+  source: string;
+  sourceFiles: number;
+  projectId: string;
+  projectName: string;
+  /** Dossier créé dans un projet existant ; `null` pour un nouveau projet. */
+  folder: string | null;
+  /** Millisecondes depuis 1970. */
+  importedAt: number;
+  counts: ImportCounts;
+  items: ImportReportItem[];
+  examples: ConversionExample[];
+}
+
+/** Réponse de `import_run`. */
+export interface ImportDone {
+  projectId: string;
+  /** Nouvel instantané si le catalogue a changé. */
+  snapshot: CatalogSnapshot | null;
+  report: ImportReport | null;
+  /** Contrat ajouté (OpenAPI), relatif au projet. */
+  contract: string | null;
 }

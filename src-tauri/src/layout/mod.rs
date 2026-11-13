@@ -38,6 +38,9 @@ pub enum Content {
     /// Le résultat de la requête active, dans sa propre fenêtre
     /// (`docs/plan-resultat-detachable.md`).
     Result,
+    /// Dernier rapport d'import d'un projet (docs/plan-mvp-c-import-bruno.md, 2.3-f).
+    #[serde(rename_all = "camelCase")]
+    ImportReport { project_id: Uuid },
 }
 
 impl Content {
@@ -46,7 +49,8 @@ impl Content {
         match self {
             Self::Request { project_id, .. }
             | Self::Run { project_id }
-            | Self::Contract { project_id, .. } => Some(*project_id),
+            | Self::Contract { project_id, .. }
+            | Self::ImportReport { project_id } => Some(*project_id),
             Self::Result => None,
         }
     }
@@ -597,7 +601,7 @@ impl Layout {
                     project_id: id,
                     path: tab_path,
                 } => *id == project_id && within(tab_path, path).is_some(),
-                Content::Run { .. } | Content::Result => false,
+                Content::Run { .. } | Content::Result | Content::ImportReport { .. } => false,
             })
             .map(|tab| tab.id)
             .collect();

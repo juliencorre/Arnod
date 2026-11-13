@@ -6,6 +6,7 @@
 //! vivent dans [`catalog`], leur persistance dans [`storage`] et [`manifest`],
 //! l'état partagé dans [`state`].
 
+pub mod bruno;
 pub mod catalog;
 pub mod commands;
 pub mod contract;
@@ -13,6 +14,7 @@ pub mod curl;
 pub mod environment;
 pub mod error;
 pub mod http;
+pub mod import;
 pub mod input;
 pub mod layout;
 pub mod local;
@@ -148,18 +150,23 @@ pub fn run() {
             commands::steps::steps_catalog,
             commands::steps::steps_detect,
             commands::trial::trial_send,
-            // Lot B : saisie et cURL (docs/plan-mvp-b-saisie-curl.md)
-            commands::input::request_input,
-            commands::input::request_curl,
-            commands::input::pairs_to_text,
-            commands::input::pairs_from_text,
-            // Lot D - Barre latérale
-            commands::contracts::contract_count,
             commands::response::response_render,
             commands::response::response_preview,
             commands::response::response_filter,
             commands::response::response_save,
             commands::response::response_clear,
+            // Lot D - Barre latérale
+            commands::contracts::contract_count,
+            // Lot B : saisie et cURL (docs/plan-mvp-b-saisie-curl.md)
+            commands::input::request_input,
+            commands::input::request_curl,
+            commands::input::pairs_to_text,
+            commands::input::pairs_from_text,
+            // Lot C - Import Bruno.
+            commands::import::import_pick,
+            commands::import::import_detect,
+            commands::import::import_run,
+            commands::import::import_report,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

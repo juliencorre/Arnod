@@ -37,6 +37,7 @@ fn names(layout: &Layout) -> Vec<Vec<String>> {
                     Content::Run { .. } => "run".to_owned(),
                     Content::Contract { path, .. } => format!("contrat:{path}"),
                     Content::Result => "résultat".to_owned(),
+                    Content::ImportReport { .. } => "rapport".to_owned(),
                 })
                 .collect()
         })
@@ -826,4 +827,16 @@ fn unions_typescript_concordantes() {
             ProjectScope::Contracts
         ])
     );
+}
+
+// Lot C - Import Bruno.
+#[test]
+fn rapport_d_import_forme_json_et_projet() {
+    let project_id = Uuid::from_u128(7);
+    let content = Content::ImportReport { project_id };
+    assert_eq!(
+        serde_json::to_value(&content).unwrap(),
+        serde_json::json!({ "kind": "importReport", "projectId": project_id })
+    );
+    assert_eq!(content.project_id(), Some(project_id));
 }

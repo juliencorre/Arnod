@@ -167,6 +167,19 @@ impl AppState {
         location: Option<&str>,
         workspace_id: Option<Uuid>,
     ) -> Result<ProjectCreated, CommandError> {
+        self.create_project_with(raw_name, location, workspace_id, environment::init)
+    }
+
+    /// Crée un projet comme `create_project`, `fill` remplissant son dossier
+    /// après la racine (au lieu du seul environnement « Local ») : un import par
+    /// exemple. Si `fill` échoue, le dossier créé est retiré et rien n'est inscrit.
+    pub fn create_project_with(
+        &self,
+        raw_name: &str,
+        location: Option<&str>,
+        workspace_id: Option<Uuid>,
+        fill: impl FnOnce(&Path) -> Result<(), CommandError>,
+    ) -> Result<ProjectCreated, CommandError> {
         let location = location.map_or_else(|| self.default_location.clone(), PathBuf::from);
         if !location.is_absolute() {
             return Err(CommandError::new(
@@ -188,8 +201,8 @@ impl AppState {
 
         let project_id = Uuid::new_v4();
         let created = manifest::create_project_folder(&folder, &Manifest::new(project_id, &name))?;
-        // Chaque projet démarre avec un environnement « Local » (N1).
-        if let Err(error) = environment::init(created.path()) {
+        // Chaque projet démarre avec un environnement « Local » (N1), ou ce que `fill` écrit.
+        if let Err(error) = fill(created.path()) {
             created.rollback();
             return Err(error);
         }

@@ -50,6 +50,10 @@ import type {
   PairsFormat,
   PairsText,
   RequestInput,
+  ImportDone,
+  ImportReport,
+  ImportSource,
+  ImportTarget,
   TreeView,
   ProjectCreated,
   ProjectCreateInput,
@@ -352,6 +356,20 @@ export const ipc = {
     secrets: Record<string, string> = {},
   ): Promise<TrialResult> =>
     call<TrialResult>("trial_send", { execId, nature, subject, values, secrets }),
+
+  // Lot C - Import Bruno (docs/plan-mvp-c-import-bruno.md).
+  /** Sélecteur natif : un dossier, ou un fichier avec `file` ; `null` si annulé. */
+  importPick: (file: boolean): Promise<string | null> =>
+    call<string | null>("import_pick", { file }),
+  /** Reconnaît le format d'un dossier ou d'un fichier, sans rien écrire. */
+  importDetect: (path: string): Promise<ImportSource> =>
+    call<ImportSource>("import_detect", { path }),
+  /** Importe dans un nouveau projet ou dans un projet existant. */
+  importRun: (path: string, target: ImportTarget): Promise<ImportDone> =>
+    call<ImportDone>("import_run", { path, target }),
+  /** Dernier rapport d'import d'un projet. */
+  importReport: (projectId: string): Promise<ImportReport | null> =>
+    call<ImportReport | null>("import_report", { projectId }),
   runStart: (
     project: string,
     folder: string,
@@ -453,38 +471,6 @@ export const ipc = {
 
   windowReattachAll: (): Promise<WindowsSnapshot> => call<WindowsSnapshot>("window_reattach_all"),
 
-  // --- Lot B : saisie, texte et cURL (docs/plan-mvp-b-saisie-curl.md) -------------
-
-  /** Variables connues et inconnues, en-têtes ajoutés à l'envoi (R1 à R3). */
-  requestInput: (
-    project: string,
-    environment: string,
-    path: string | null,
-    request: RequestDoc,
-  ): Promise<RequestInput> =>
-    call<RequestInput>("request_input", { project, environment, path, request }),
-
-  /** La requête en commande cURL, secrets remplacés par une variable du shell (R8 à R10). */
-  requestCurl: (
-    project: string,
-    environment: string,
-    path: string | null,
-    request: RequestDoc,
-  ): Promise<CurlCopy> => call<CurlCopy>("request_curl", { project, environment, path, request }),
-
-  /** Une liste de paires en texte, une ligne par paire (R11). */
-  pairsToText: (pairs: Pair[], format: PairsFormat): Promise<string> =>
-    call<string>("pairs_to_text", { pairs, format }),
-
-  /** Les paires d'un texte et ses lignes illisibles (R12, R13). */
-  pairsFromText: (text: string, format: PairsFormat, previous: Pair[]): Promise<PairsText> =>
-    call<PairsText>("pairs_from_text", { text, format, previous }),
-
-  // --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) -------------
-
-  /** Nombre de contrats du projet, sans les lire (W1, R5). */
-  contractCount: (project: string): Promise<number> => call<number>("contract_count", { project }),
-
   // --- Lot A - Réponse (docs/plan-mvp-a-reponse.md) ---------------------------------------
 
   /** Corps mis en forme dans `format`, ou dans le format détecté (`null`). */
@@ -514,6 +500,37 @@ export const ipc = {
   /** Efface la réponse affichée d'une requête, dans toutes les fenêtres. */
   responseClear: (project: string, path: string): Promise<RequestResult> =>
     call<RequestResult>("response_clear", { project, path }),
+  // --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) -------------
+
+  /** Nombre de contrats du projet, sans les lire (W1, R5). */
+  contractCount: (project: string): Promise<number> => call<number>("contract_count", { project }),
+
+  // --- Lot B : saisie, texte et cURL (docs/plan-mvp-b-saisie-curl.md) -------------
+
+  /** Variables connues et inconnues, en-têtes ajoutés à l'envoi (R1 à R3). */
+  requestInput: (
+    project: string,
+    environment: string,
+    path: string | null,
+    request: RequestDoc,
+  ): Promise<RequestInput> =>
+    call<RequestInput>("request_input", { project, environment, path, request }),
+
+  /** La requête en commande cURL, secrets remplacés par une variable du shell (R8 à R10). */
+  requestCurl: (
+    project: string,
+    environment: string,
+    path: string | null,
+    request: RequestDoc,
+  ): Promise<CurlCopy> => call<CurlCopy>("request_curl", { project, environment, path, request }),
+
+  /** Une liste de paires en texte, une ligne par paire (R11). */
+  pairsToText: (pairs: Pair[], format: PairsFormat): Promise<string> =>
+    call<string>("pairs_to_text", { pairs, format }),
+
+  /** Les paires d'un texte et ses lignes illisibles (R12, R13). */
+  pairsFromText: (text: string, format: PairsFormat, previous: Pair[]): Promise<PairsText> =>
+    call<PairsText>("pairs_from_text", { text, format, previous }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
