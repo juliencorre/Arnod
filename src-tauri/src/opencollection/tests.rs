@@ -1112,8 +1112,106 @@ fn lot_e_expressions_des_extractions() {
         extraction_source("req.body.items[0].id"),
         "request.body.items[0].id"
     );
+    // Expressions écrites par l'import Bruno (lot C), telles quelles.
+    for (expression, source) in [
+        ("res.body.token", "body.token"),
+        ("res.body.items[0].id", "body.items[0].id"),
+        ("res.headers['x-request-id']", "headers.x-request-id"),
+        ("res.status", "status"),
+        ("res(\"data.id\")", "body.data.id"),
+        ("res('items[0].id')", "body.items[0].id"),
+        ("res.cookies.x", "res.cookies.x"),
+    ] {
+        assert_eq!(extraction_source(expression), source, "{expression}");
+    }
     assert_eq!(
         extraction_source("res.headers[\"location\"]"),
         "headers.location"
+    );
+}
+
+#[test]
+fn lot_e_extractions_de_bruno_lues_et_appliquees() {
+    use crate::request::assertions::ResponseData;
+    use crate::request::extract;
+    let dir = project();
+    let path = dir.path().join("jeton.yml");
+    fs::write(
+        &path,
+        r#"info:
+  name: Jeton
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: "{{baseUrl}}/login"
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.token
+        method: jsonq
+      variable:
+        name: token
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res("data.id")
+        method: jsonq
+      variable:
+        name: id
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.headers['x-request-id']
+        method: jsonq
+      variable:
+        name: trace
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.cookies.session
+        method: jsonq
+      variable:
+        name: session
+        scope: runtime
+"#,
+    )
+    .unwrap();
+    let request = file::read(&path).unwrap();
+    assert_eq!(request.seq, Some(2.0));
+    let response = ResponseData {
+        status: 200,
+        duration_ms: 1,
+        headers: vec![("X-Request-Id".into(), "r-9".into())],
+        body: r#"{"token":"t0k","data":{"id":7}}"#.into(),
+    };
+    let sent = ResponseData {
+        status: 0,
+        duration_ms: 0,
+        headers: Vec::new(),
+        body: String::new(),
+    };
+    let values = extract::apply(&request.extractions, &response, &sent);
+    let got: Vec<Option<&str>> = values.iter().map(|v| v.value.as_deref()).collect();
+    assert_eq!(got, [Some("t0k"), Some("7"), Some("r-9"), None]);
+    assert!(
+        values[3]
+            .message
+            .as_deref()
+            .unwrap()
+            .contains("non reconnue")
+    );
+    // Réécrite telle quelle si elle n'est pas modifiée, et conforme au schéma.
+    file::write(&path, &request).unwrap();
+    assert_valid(Part::HttpRequest, &path);
+    let value = read(&path);
+    assert_eq!(
+        value.pointer("/runtime/actions/3/selector/expression"),
+        Some(&json!("res.cookies.session"))
     );
 }

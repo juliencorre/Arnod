@@ -34,6 +34,15 @@ fn text_of(value: &Value) -> String {
     }
 }
 
+/// Source qu'Arnod sait lire : corps, en-tête, statut ou durée.
+fn known(source: &str) -> bool {
+    matches!(source, "status" | "responseTime")
+        || source.starts_with("headers.")
+        || source == "body"
+        || source.starts_with("body.")
+        || source.starts_with("body[")
+}
+
 /// Valeur d'une source dans `data` ; `body` d'un corps qui n'est pas du JSON
 /// donne le texte du corps.
 fn read(source: &str, data: &ResponseData) -> Option<String> {
@@ -59,9 +68,15 @@ pub fn apply(
                 Some(rest) => read(rest, sent),
                 None => read(source, response),
             };
-            let message = value
-                .is_none()
-                .then(|| format!("« {source} » est absent : la variable n'est pas remplie."));
+            let message = value.is_none().then(|| {
+                if known(source.strip_prefix(REQUEST_PREFIX).unwrap_or(source)) {
+                    format!("« {source} » est absent : la variable n'est pas remplie.")
+                } else {
+                    format!(
+                        "Expression « {source} » non reconnue (body.chemin, headers.Nom ou status attendu) : la variable n'est pas remplie."
+                    )
+                }
+            });
             ExtractedValue {
                 name: extraction.name.trim().to_owned(),
                 source: source.to_owned(),
@@ -161,6 +176,35 @@ mod tests {
         store(&values, &mut vars);
         assert_eq!(vars["id"], "ancien");
         assert_eq!(vars["texte"], "pas du json");
+    }
+
+    #[test]
+    fn r7_expression_non_reconnue_signalee_sans_planter() {
+        let values = apply(
+            &[
+                extraction("x", "res.cookies.session"),
+                extraction("y", "request.res.z"),
+            ],
+            &data(200, &[], "{}"),
+            &data(0, &[], ""),
+        );
+        assert!(values.iter().all(|v| v.value.is_none()));
+        assert!(
+            values[0]
+                .message
+                .as_deref()
+                .unwrap()
+                .contains("non reconnue"),
+            "{:?}",
+            values[0]
+        );
+        assert!(
+            values[1]
+                .message
+                .as_deref()
+                .unwrap()
+                .contains("non reconnue")
+        );
     }
 
     #[test]

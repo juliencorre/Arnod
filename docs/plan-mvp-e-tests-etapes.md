@@ -202,9 +202,10 @@ seule). Tout se fait au clavier (onglets, boutons, champs).
 
 ## 11. Décisions
 
-| ID  | Question                                   | Décision                                                                                                                    |
-| --- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Ordre des étapes                           | 2026-11-13 : `info.seq` du schéma (Bruno), puis le nom.                                                                     |
-| Q2  | Où « Garder » range une valeur tirée       | 2026-11-13 : extraction de la valeur envoyée (`req.body.…`, comme les variables post-réponse de Bruno), sans champ inventé. |
-| Q3  | Portée des valeurs extraites hors d'un run | 2026-11-13 : le projet, pendant la session ; un run en garde aussi les dernières.                                           |
-| Q4  | Aléatoire                                  | 2026-11-13 : graine d'un UUID v4 (crate `uuid` déjà présente), générateur xorshift ; pas de crate ajoutée.                  |
+| ID  | Question                                   | Décision                                                                                                                                                                                   |
+| --- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Q1  | Ordre des étapes                           | 2026-11-13 : `info.seq` du schéma (Bruno), puis le nom.                                                                                                                                    |
+| Q2  | Où « Garder » range une valeur tirée       | 2026-11-13 : extraction de la valeur envoyée (`req.body.…`, comme les variables post-réponse de Bruno), sans champ inventé.                                                                |
+| Q3  | Portée des valeurs extraites hors d'un run | 2026-11-13 : le projet, pendant la session ; un run en garde aussi les dernières.                                                                                                          |
+| Q4  | Aléatoire                                  | 2026-11-13 : graine d'un UUID v4 (crate `uuid` déjà présente), générateur xorshift ; pas de crate ajoutée.                                                                                 |
+| Q5  | Extractions importées de Bruno (lot C)     | 2026-11-13 : lues telles quelles (`res.body.…`, `res.headers['…']`, `res.status`, `res("…")`) ; une expression non reconnue donne un échec d'extraction lisible, jamais une erreur du run. |

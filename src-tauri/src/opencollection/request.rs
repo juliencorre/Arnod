@@ -497,6 +497,18 @@ pub fn extraction_expression(source: &str) -> String {
 /// Source Arnod d'une expression d'extraction.
 pub fn extraction_source(expression: &str) -> String {
     let expression = expression.trim();
+    // Raccourci de Bruno : `res("data.id")` lit le corps (import du lot C).
+    if let Some(path) = expression
+        .strip_prefix("res(")
+        .and_then(|rest| rest.strip_suffix(')'))
+        .map(|inner| inner.trim().trim_matches(|c| c == '"' || c == '\''))
+    {
+        return if path.is_empty() || path.starts_with('[') {
+            format!("body{path}")
+        } else {
+            format!("body.{path}")
+        };
+    }
     match expression.strip_prefix(REQUEST_EXPRESSION) {
         Some(rest) => format!(
             "{}{}",
