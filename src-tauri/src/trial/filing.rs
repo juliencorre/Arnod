@@ -4,7 +4,7 @@
 //! fichier touché est gardé pour « Annuler ».
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::Serialize;
 
@@ -29,35 +29,7 @@ pub struct Filed {
     pub contract_name: String,
 }
 
-/// De quoi remettre les fichiers comme avant (« Annuler »).
-#[derive(Debug, Clone, Default)]
-pub struct Undo {
-    /// Fichiers créés, à retirer.
-    created: Vec<PathBuf>,
-    /// Fichiers retirés ou modifiés, avec leur texte d'avant.
-    restored: Vec<(PathBuf, String)>,
-}
-
-impl Undo {
-    /// Remet les fichiers : les créés sont retirés, les autres retrouvent leur texte.
-    pub fn apply(&self) -> Result<(), CommandError> {
-        for path in &self.created {
-            if path.exists() {
-                fs::remove_file(path)
-                    .map_err(|e| CommandError::io("Annulation impossible", path, &e))?;
-                crate::watch::settle(path);
-            }
-        }
-        for (path, text) in &self.restored {
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| CommandError::io("Annulation impossible", parent, &e))?;
-            }
-            contract_file::write_text(path, text)?;
-        }
-        Ok(())
-    }
-}
+pub use crate::tree::undo::Undo;
 
 fn invalid(message: impl Into<String>) -> CommandError {
     CommandError::new(CommandErrorKind::InvalidRequest, message)
@@ -133,7 +105,7 @@ pub fn file_into(
             let name = contract_file::free_name(&folder, &stem, &ext);
             let path = folder.join(&name);
             contract_file::write_text(&path, &source_text)?;
-            undo.created.push(path.clone());
+            undo.created(path.clone());
             let relative = contract_file::relative(&path);
             let read = contract_file::read(target, &relative)?;
             (relative, read)
@@ -179,12 +151,12 @@ pub fn file_into(
             .unwrap_or_else(|| tree::slug(&request.name));
         let to = target_dir.join(tree::free_file_name(&target_dir, &stem));
         request_file::write(&to, &request)?;
-        undo.created.push(to.clone());
+        undo.created(to.clone());
         fs::remove_file(&from)
             .map_err(|e| CommandError::io("Déplacement impossible", &from, &e))?;
         // Suppression faite par Arnod : pas une modification hors d'Arnod (lot I).
         crate::watch::settle(&from);
-        undo.restored.push((from, original));
+        undo.restored(from, original);
         let relative = format!(
             "{folder}/{}",
             to.file_name()
@@ -205,7 +177,7 @@ pub fn file_into(
         fs::remove_file(&source)
             .map_err(|e| CommandError::io("Retrait du contrat impossible", &source, &e))?;
         crate::watch::settle(&source);
-        undo.restored.push((source, source_text));
+        undo.restored(source, source_text);
     }
     Ok((
         Filed {

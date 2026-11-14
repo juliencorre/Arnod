@@ -220,7 +220,12 @@ describe("agir sur une requête liée (RC5, R6)", () => {
     await trigger.trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
     const labels = texts('[role="menuitem"]');
-    expect(labels).toEqual(["Renommer", "Dupliquer", "Mettre à la corbeille"]);
+    expect(labels).toEqual([
+      "Renommer",
+      "Dupliquer",
+      "Copier ou déplacer…",
+      "Mettre à la corbeille",
+    ]);
     // Flèche vers le bas jusqu'à l'entrée, puis Entrée.
     const index = labels.indexOf(item);
     for (let i = 0; i < index; i++) {
