@@ -828,6 +828,8 @@ describe("Contrats de services", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -1127,6 +1129,8 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -1359,6 +1363,8 @@ describe("Premier usage : vérifications, run et statuts", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -1641,6 +1647,8 @@ describe("Lot A - Réponse : format, aperçu, filtre JSONPath (5.1-b bis)", () =
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -1853,6 +1861,8 @@ describe("Lot B : saisie, texte et cURL", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -2151,6 +2161,8 @@ describe("Lot E - tests et étapes", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -2376,6 +2388,8 @@ describe("Lot H - Réseau et authentification", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
