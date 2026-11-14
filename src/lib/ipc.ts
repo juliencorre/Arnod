@@ -91,6 +91,8 @@ import type {
   TransferMode,
   TransferTarget,
   TransferTargets,
+  UpdateChannel,
+  UpdatesView,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -739,6 +741,19 @@ export const ipc = {
   /** « Annuler » une copie ou un déplacement. */
   transferUndo: (undoToken: string): Promise<void> =>
     call<null>("transfer_undo", { undoToken }).then(() => undefined),
+
+  // Lot L allégé - Mises à jour (1.6-g).
+  /** Préférences et dernière version trouvée. */
+  updatesLoad: (): Promise<UpdatesView> => call<UpdatesView>("updates_load"),
+  /** Enregistre la vérification automatique et le canal. */
+  updatesSave: (automatic: boolean, channel: UpdateChannel): Promise<UpdatesView> =>
+    call<UpdatesView>("updates_save", { automatic, channel }),
+  /** Cherche une version plus récente ; `automatic` : seulement si c'est dû. */
+  updatesCheck: (automatic: boolean): Promise<UpdatesView> =>
+    call<UpdatesView>("updates_check", { automatic }),
+  /** Ouvre la page d'une release dans le navigateur du système. */
+  updatesOpen: (url: string): Promise<void> =>
+    call<null>("updates_open", { url }).then(() => undefined),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

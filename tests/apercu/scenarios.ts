@@ -1331,3 +1331,33 @@ Object.assign(SCENARIOS, {
     },
   },
 } satisfies Record<string, Scenario>);
+
+// --- Lot L allégé : mises à jour (1.6-g) -------------------------------------------
+
+Object.assign(SCENARIOS, {
+  "1.6-g": {
+    description: "Préférences → Mises à jour : une version plus récente trouvée",
+    setup: () => {
+      const core = boutique();
+      core.updates.view.prefs.lastCheck = Date.now();
+      core.updates.view.checked = true;
+      core.updates.view.latest = {
+        version: "0.10.0",
+        prerelease: false,
+        highlights: [
+          "Valeurs dynamiques dans l'adresse, les en-têtes et le corps",
+          "Filtre de l'arborescence",
+          "4 corrections, dont les cookies d'un environnement protégé",
+        ],
+        url: "https://github.com/juliencorre/Arnod/releases/tag/v0.10.0",
+        published: "2026-11-14",
+      };
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await g.touche(",", { ctrlKey: true });
+      await g.cliquer(".preferences__section", "Mises à jour");
+      await g.attendre(150);
+    },
+  },
+} satisfies Record<string, Scenario>);

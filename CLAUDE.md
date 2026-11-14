@@ -739,3 +739,19 @@ Référence : écrans 4.1-f, 4.1-g et 3.2-c (lot J).
   (`lib/requestDrag.ts`). Avant un transfert, les brouillons sont enregistrés et les requêtes
   ouvertes du dossier relues (`workbench.reloadIn`).
 - « Requête au point ? » (`TrialTransfer.vue`) s'affiche sous toute requête liée à un contrat.
+
+## Mises à jour
+
+Référence : écran 1.6-g (lot L allégé). Q1 reste ouverte : ni téléchargement ni installation
+automatique, ni plugin `updater` ni signature.
+
+- `src-tauri/src/updates.rs` : version la plus récente du canal (`pick`, stable ou préversions,
+  brouillons ignorés), échéance d'une vérification automatique (`due` : au démarrage, puis au plus
+  une fois par jour), points des notes (`highlights`) ; préférences du poste dans `updates.json`
+  (dossier de données, écriture atomique). La liste vient de l'API des releases GitHub, lue par
+  `network::Network` (proxy et autorités du poste).
+- Commandes `updates_load`, `updates_save`, `updates_check` (`automatic` : seulement si c'est dû),
+  `updates_open` (page d'une release du dépôt seulement, par `startup::open_external`).
+- Interface : section « Mises à jour » des préférences (`UpdatesSection.vue`, store `updates`) ;
+  au démarrage, la fenêtre principale appelle `checkAtStartup` : une version plus récente
+  s'annonce par une notification « Voir ». Le bac à sable e2e coupe la vérification automatique.

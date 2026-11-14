@@ -7,7 +7,7 @@
  * projets et son `arnod.json` sur un vrai disque, isolé de l'utilisateur.
  */
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
@@ -52,7 +52,11 @@ export function createSandbox(): Sandbox {
   const root = mkdtempSync(path.join(tmpdir(), "arnod-e2e-"));
   const home = path.join(root, "home");
   mkdirSync(home, { recursive: true });
-  return { root, home, dataDir: path.join(root, "data", IDENTIFIER) };
+  const dataDir = path.join(root, "data", IDENTIFIER);
+  // Lot L : pas de vérification des mises à jour au démarrage (ni réseau, ni notification).
+  mkdirSync(dataDir, { recursive: true });
+  writeFileSync(path.join(dataDir, "updates.json"), JSON.stringify({ automatic: false }));
+  return { root, home, dataDir };
 }
 
 export function removeSandbox(sandbox: Sandbox): void {
