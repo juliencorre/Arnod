@@ -36,7 +36,7 @@ function folders(wb: FakeWorkbench): string[] {
       p = parentOf(p);
     }
   }
-  return [...all].sort();
+  return [...all].sort((a, b) => a.localeCompare(b));
 }
 
 /** Étapes d'un test, dans l'ordre (`seq`, puis le chemin). */
