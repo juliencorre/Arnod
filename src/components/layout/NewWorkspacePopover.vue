@@ -154,7 +154,6 @@ async function submit(): Promise<void> {
 .popover__input {
   box-sizing: border-box;
   width: 100%;
-  box-sizing: border-box;
   min-height: var(--control-md);
   padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border-strong);
