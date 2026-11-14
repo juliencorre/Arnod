@@ -2878,6 +2878,12 @@ describe("Lot J - Copier et déplacer (4.1-f, 4.1-g, 3.2-c)", () => {
         ),
       { timeoutMsg: "« Requête au point ? » attendu sous la requête liée" },
     );
+    expect(
+      await browser.execute(
+        () =>
+          document.querySelector(".trial-transfer")?.textContent.includes("Glissez-la") ?? false,
+      ),
+    ).toBe(true);
     await screenshot(browser, "30-transferer-un-endpoint");
   });
 });
