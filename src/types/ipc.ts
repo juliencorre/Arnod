@@ -150,7 +150,11 @@ export type CommandName =
   | "transfer_targets"
   | "transfer_preview"
   | "transfer_apply"
-  | "transfer_undo";
+  | "transfer_undo"
+  | "updates_load"
+  | "updates_save"
+  | "updates_check"
+  | "updates_open";
 
 /**
  * Nature d'une erreur de commande.
@@ -1816,4 +1820,38 @@ export interface TransferDone {
   name: string;
   /** Jeton de « Annuler » (`transfer_undo`). */
   undoToken: string;
+}
+
+// --- Lot L allégé - Mises à jour (1.6-g) -----------------------------------------
+
+/** Canal suivi (`updates::Channel`). */
+export type UpdateChannel = "stable" | "prerelease";
+
+/** Préférences du poste (`updates::UpdatePrefs`). */
+export interface UpdatePrefs {
+  /** Chercher au démarrage, puis chaque jour. */
+  automatic: boolean;
+  channel: UpdateChannel;
+  /** Dernière vérification réussie (ms). */
+  lastCheck: number | null;
+}
+
+/** Version plus récente que celle installée (`updates::Release`). */
+export interface Release {
+  version: string;
+  prerelease: boolean;
+  highlights: string[];
+  /** Page de la release. */
+  url: string;
+  /** `2026-11-14`. */
+  published: string | null;
+}
+
+/** Section « Mises à jour » (`updates::UpdatesView`). */
+export interface UpdatesView {
+  current: string;
+  prefs: UpdatePrefs;
+  latest: Release | null;
+  /** Une vérification a eu lieu pendant la session. */
+  checked: boolean;
 }

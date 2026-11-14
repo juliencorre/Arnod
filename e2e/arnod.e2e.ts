@@ -2882,6 +2882,30 @@ describe("Lot J - Copier et déplacer (4.1-f, 4.1-g, 3.2-c)", () => {
   });
 });
 
+describe("Lot L allégé - Mises à jour (1.6-g)", () => {
+  it("la section dit la version installée, la vérification et le canal", async () => {
+    await browser.execute(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ctrlKey: true }));
+    });
+    await browser.$(".preferences").waitForDisplayed({ timeoutMsg: "préférences attendues" });
+    await clickText(".preferences__section", "Mises à jour");
+    await browser.$(".updates").waitForDisplayed({ timeoutMsg: "section Mises à jour attendue" });
+    const text = await browser.execute(
+      () => document.querySelector(".updates")?.textContent.replace(/\s+/g, " ") ?? "",
+    );
+    expect(text).toContain("installée sur ce poste");
+    expect(text).toContain("Vérifier maintenant");
+    // Le bac à sable coupe la vérification automatique (e2e/app.ts).
+    expect(
+      await browser.execute(
+        () => document.querySelector<HTMLInputElement>('.updates input[type="checkbox"]')?.checked,
+      ),
+    ).toBe(false);
+    await screenshot(browser, "32-mises-a-jour");
+    await browser.keys("Escape");
+  });
+});
+
 describe("Lot G - Démarrage et erreurs (0.3)", () => {
   const statePath = () => path.join(sandbox.dataDir, "arnod.json");
 

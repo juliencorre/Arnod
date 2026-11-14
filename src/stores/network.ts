@@ -12,7 +12,7 @@ import type {
 } from "@/types/ipc";
 
 /** Sections des préférences ; les suivantes viendront (Apparence, Raccourcis, Mises à jour). */
-export type PreferencesSection = "network";
+export type PreferencesSection = "network" | "updates";
 
 /**
  * Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md) : préférences réseau du

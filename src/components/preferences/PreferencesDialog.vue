@@ -1,13 +1,14 @@
 <script setup lang="ts">
 /**
  * Préférences du poste (1.6-e), ouvertes par Ctrl+, ou par Fichier → Préférences… : une colonne
- * de sections, puis la section choisie. Seule « Réseau et certificats » existe ; Apparence,
- * Raccourcis et Mises à jour viendront s'ajouter à `SECTIONS` (lot H,
- * docs/plan-mvp-h-reseau-auth.md, PR1).
+ * de sections, puis la section choisie : « Réseau et certificats » (lot H,
+ * docs/plan-mvp-h-reseau-auth.md, PR1) et « Mises à jour » (lot L allégé, 1.6-g). Apparence et
+ * Raccourcis viendront s'ajouter à `SECTIONS`.
  */
 import { onBeforeUnmount, onMounted } from "vue";
 
 import NetworkSection from "@/components/preferences/NetworkSection.vue";
+import UpdatesSection from "@/components/preferences/UpdatesSection.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
 import { events } from "@/lib/ipc";
 import { type PreferencesSection, useNetworkStore } from "@/stores/network";
@@ -20,6 +21,7 @@ const toasts = useToastStore();
 
 const SECTIONS: { id: PreferencesSection; label: string }[] = [
   { id: "network", label: "Réseau et certificats" },
+  { id: "updates", label: "Mises à jour" },
 ];
 
 function open(): void {
@@ -75,6 +77,7 @@ onBeforeUnmount(() => {
       </nav>
       <div class="preferences__content">
         <NetworkSection v-if="network.section === 'network'" />
+        <UpdatesSection v-else-if="network.section === 'updates'" />
       </div>
     </div>
   </BaseDialog>

@@ -36,6 +36,7 @@ pub mod tree;
 pub mod trial;
 #[cfg(test)]
 mod ts_contract;
+pub mod updates;
 pub mod watch;
 pub mod windows;
 pub mod workbench;
@@ -241,6 +242,11 @@ pub fn run() {
             commands::transfer::transfer_preview,
             commands::transfer::transfer_apply,
             commands::transfer::transfer_undo,
+            // Lot L allégé - Mises à jour.
+            commands::updates::updates_load,
+            commands::updates::updates_save,
+            commands::updates::updates_check,
+            commands::updates::updates_open,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

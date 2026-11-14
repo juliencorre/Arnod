@@ -300,6 +300,7 @@ pages:
     journal:
       - "2026-11-12 : Écrans repris de « Authentification et Préférences » (e, f, f bis)."
       - "2026-11-13 : Préférences (Ctrl+, et Fichier → Préférences…) → Réseau et certificats : proxy du système, aucun ou manuel, délai de connexion, autorités internes ajoutées après avoir montré leur empreinte (e, lot H, PR #58)."
+      - "2026-11-14 : Préférences → Mises à jour : versions publiées lues par le réseau du poste, au démarrage puis chaque jour ou à la demande, canal stable ou préversions ; « Voir la version » ouvre la page de la release (g, lot L allégé, PR #63)."
     ecrans:
       e:
         {
@@ -315,7 +316,18 @@ pages:
         }
       f: { etat: à faire, version: V1 }
       "f bis": { etat: à faire, version: V1 }
-      g: { etat: à faire, version: MVP }
+      g:
+        {
+          etat: en partie,
+          version: MVP,
+          pr: [63],
+          captures: [32-mises-a-jour],
+          ecart:
+            {
+              texte: "Ni téléchargement ni installation automatique (Q1 ouverte : signature, updater) : la version trouvée ouvre la page de sa release (« Voir la version ») au lieu de « Redémarrer maintenant » ou « Au prochain lancement » ; pas de stratégie de groupe pour couper les vérifications.",
+              aligner: à décider,
+            },
+        }
   "2.1":
     nom: "Accueil et premier essai"
     version: MVP
