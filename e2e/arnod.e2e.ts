@@ -2809,6 +2809,9 @@ describe("Lot J - Copier et déplacer (4.1-f, 4.1-g, 3.2-c)", () => {
     expect(existsSync(path.join(project(), "sans-coupon.yml"))).toBe(false);
 
     // « Annuler » de la notification remet tout.
+    await browser.waitUntil(async () => (await toastText(browser)).includes("déplacée"), {
+      timeoutMsg: "notification du déplacement attendue",
+    });
     await clickText(".toast button", "Annuler");
     await browser.waitUntil(() => existsSync(path.join(project(), "sans-coupon.yml")), {
       timeoutMsg: "requête remise à sa place attendue",
@@ -2846,7 +2849,11 @@ describe("Lot J - Copier et déplacer (4.1-f, 4.1-g, 3.2-c)", () => {
     await browser.waitUntil(
       () =>
         browser.execute(() => {
-          const open = document.querySelector<HTMLElement>('[aria-label="Ouvrir POST /orders"]');
+          // « Ouvrir POST /orders », ou « Créer la requête de POST /orders » si la requête écrite
+          // n'est pas encore rangée sous l'opération : les deux ouvrent une requête liée.
+          const open = document.querySelector<HTMLElement>(
+            '.crow__main[aria-label$=" POST /orders"]',
+          );
           if (open) {
             open.click();
             return true;
@@ -2855,7 +2862,8 @@ describe("Lot J - Copier et déplacer (4.1-f, 4.1-g, 3.2-c)", () => {
           for (const b of document.querySelectorAll<HTMLElement>(
             '.crow__main[aria-expanded="false"]',
           )) {
-            if (b.textContent.trim().startsWith("/orders")) b.click();
+            if (b.classList.contains("crow__resource") && b.textContent.includes("/orders"))
+              b.click();
           }
           return false;
         }),
