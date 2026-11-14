@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::catalog::names::{same_name, sort_key};
 use crate::contract::generate::{request_for, safe_name, supported};
-use crate::contract::parse::{Contract, SpecKind, load};
+use crate::contract::parse::{Contract, Operation, SpecKind, load};
 use crate::contract::{conformance, deduce};
 use crate::environment;
 use crate::error::{CommandError, CommandErrorKind};
@@ -643,6 +643,15 @@ pub(crate) fn folder_name(title: &str) -> String {
         format!("{name} (contrat)")
     } else {
         name
+    }
+}
+
+/// Dossier où se rangent les requêtes d'une opération : `<contrat>/<tag>` (C6).
+pub(crate) fn operation_dir(contract: &Contract, operation: &Operation) -> String {
+    let folder = folder_name(&contract.title);
+    match &operation.tag {
+        Some(tag) => format!("{folder}/{}", safe_name(tag, "Autres")),
+        None => folder,
     }
 }
 

@@ -218,7 +218,11 @@ describe("Ctrl+Tab (1.3-c)", () => {
     window.dispatchEvent(new KeyboardEvent("keyup", { key: "Control", code: "ControlLeft" }));
     await flushPromises();
     expect(app.find(".zone__switcher").exists()).toBe(false);
-    expect(core.calls.at(-1)?.cmd).toBe("layout_activate");
+    // Des lectures (contrats, saisie) peuvent finir après : seule la dernière action de
+    // disposition compte.
+    expect(core.calls.filter((c) => c.cmd.startsWith("layout_")).at(-1)?.cmd).toBe(
+      "layout_activate",
+    );
     expect(app.get('.zone__tab-button[aria-selected="true"]').text()).toContain("Créer");
 
     // Créer est maintenant le plus récent : Ctrl+Tab revient à Santé.

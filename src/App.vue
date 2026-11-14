@@ -22,6 +22,7 @@ import { useContractsStore } from "@/stores/contracts";
 import { useNavigationStore } from "@/stores/navigation";
 import { useStartupStore } from "@/stores/startup";
 import { useToastStore } from "@/stores/toasts";
+import { useUpdatesStore } from "@/stores/updates";
 import { useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 
@@ -87,6 +88,8 @@ watch(
 onMounted(async () => {
   if (await startup.check()) await boot();
   await reveal();
+  // Lot L allégé (1.6-g) : une version plus récente s'annonce, si la vérification est due.
+  if (ready.value && windows.kind === "main") void useUpdatesStore().checkAtStartup();
 });
 </script>
 

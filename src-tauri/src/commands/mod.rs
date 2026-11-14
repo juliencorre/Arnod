@@ -15,8 +15,10 @@ pub mod projects;
 pub mod requests;
 pub mod runs;
 pub mod steps;
+pub mod transfer;
 pub mod tree;
 pub mod trial;
+pub mod updates;
 pub mod window;
 pub mod workspaces;
 // Lot A - Réponse (docs/plan-mvp-a-reponse.md).

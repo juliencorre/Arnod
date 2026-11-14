@@ -116,7 +116,8 @@ src-tauri/              Cœur Rust
   src/storage.rs        Lecture / écriture atomique d'arnod.json
   src/request/          Requête : modèle, fichier, résolution des variables, vérifications,
                         héritage des dossiers (inherit.rs), réponse attendue (example.rs)
-  src/tree/             Arborescence d'un projet sur disque (dossiers, requêtes, corbeille)
+  src/tree/             Arborescence d'un projet sur disque (dossiers, requêtes, corbeille), copier
+                        et déplacer (transfer.rs), annulation (undo.rs)
   src/environment.rs    Environnements d'un projet (fichiers, chaîne, protection)
   src/local.rs          Données locales d'un projet (hors dépôt : local.json)
   src/secrets.rs        Coffre des secrets (trait SecretStore, keyring du système)
@@ -716,3 +717,41 @@ règles R1 à R8), écrans 0.3-a, 0.3-b, 0.3-b bis, 0.3-b ter.
 - Fenêtres créées cachées (`visible: false`, `.visible(false)` des détachées) : `App.vue` appelle
   `window_ready` après le premier rendu ; `windows::show_later` les montre après 300 ms sinon, avec
   le squelette (`StartupSkeleton`), jamais un écran « Chargement… ».
+
+## Copier et déplacer
+
+Référence : écrans 4.1-f, 4.1-g et 3.2-c (lot J).
+
+- Le cœur décide (`tree/transfer.rs`) : destinations (`targets` : opérations de même méthode,
+  dossiers, tests et leurs étapes), « Ce qui change » (`preview` : place, lien au contrat,
+  authentification héritée, variables inconnues, ce qui suit) et écriture (`transfer`). Tout le
+  fichier suit (`file::copy_as`), seuls le lien au contrat et `seq` changent : hors d'une opération
+  le lien est retiré (une étape n'est jamais liée), dans un test les étapes sont renumérotées de 1 à
+  n. Copier à côté de l'original nomme « (copie) » ; un autre projet est une destination comme une
+  autre.
+- `tree::undo::Undo` (partagé avec le rangement des essais) garde chaque fichier touché ;
+  `transfer_undo` l'applique (20 transferts gardés). Commandes `transfer_*` dans
+  `commands/transfer.rs` ; un déplacement fait suivre ou ferme les onglets.
+- Interface : `CopyMoveDialog.vue` (dans `SharedDialogs`, ouvert par « Copier ou déplacer… » du
+  menu ⋯ d'une requête), store `transfer` (dialogue, presse-papiers, dernier transfert). Dans la
+  barre latérale : Ctrl+C / Ctrl+X sur une requête, Ctrl+V sur un dossier, un test, une étape
+  (juste après) ou une opération, Ctrl+Z ; glisser déplace, Ctrl+glisser copie
+  (`lib/requestDrag.ts`). Avant un transfert, les brouillons sont enregistrés et les requêtes
+  ouvertes du dossier relues (`workbench.reloadIn`).
+- « Requête au point ? » (`TrialTransfer.vue`) s'affiche sous toute requête liée à un contrat.
+
+## Mises à jour
+
+Référence : écran 1.6-g (lot L allégé). Q1 reste ouverte : ni téléchargement ni installation
+automatique, ni plugin `updater` ni signature.
+
+- `src-tauri/src/updates.rs` : version la plus récente du canal (`pick`, stable ou préversions,
+  brouillons ignorés), échéance d'une vérification automatique (`due` : au démarrage, puis au plus
+  une fois par jour), points des notes (`highlights`) ; préférences du poste dans `updates.json`
+  (dossier de données, écriture atomique). La liste vient de l'API des releases GitHub, lue par
+  `network::Network` (proxy et autorités du poste).
+- Commandes `updates_load`, `updates_save`, `updates_check` (`automatic` : seulement si c'est dû),
+  `updates_open` (page d'une release du dépôt seulement, par `startup::open_external`).
+- Interface : section « Mises à jour » des préférences (`UpdatesSection.vue`, store `updates`) ;
+  au démarrage, la fenêtre principale appelle `checkAtStartup` : une version plus récente
+  s'annonce par une notification « Voir ». Le bac à sable e2e coupe la vérification automatique.

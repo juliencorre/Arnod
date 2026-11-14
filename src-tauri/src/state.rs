@@ -409,6 +409,11 @@ impl AppState {
         &self.data_dir
     }
 
+    /// Nom d'un projet du catalogue.
+    pub fn project_name(&self, project_id: Uuid) -> Result<String, CommandError> {
+        Ok(self.lock()?.catalog.project(project_id)?.name.clone())
+    }
+
     /// Dossier et données locales d'un projet dont le dossier existe encore.
     pub fn project_ctx(&self, project_id: Uuid) -> Result<ProjectCtx, CommandError> {
         let inner = self.lock()?;

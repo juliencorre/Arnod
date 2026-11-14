@@ -18,6 +18,8 @@ import {
 } from "./fakeWindows";
 import { handleInput } from "./fakeInput";
 import { handleTrials } from "./fakeTrials";
+import { handleTransfer } from "./fakeTransfer";
+import { createFakeUpdates, type FakeUpdates, handleUpdates } from "./fakeUpdates";
 import { STEP_CATALOG, detect } from "./fakeSteps";
 // Lot C - Import Bruno.
 import { createFakeImports, handleImports, type FakeImports } from "./fakeImports";
@@ -68,6 +70,8 @@ export interface FakeCore {
   network: FakeNetwork;
   /** Lot G - Démarrage et erreurs : erreur bloquante, démarrage lent. */
   startup: FakeStartup;
+  /** Lot L allégé - Mises à jour : préférences, version trouvée. */
+  updates: FakeUpdates;
 }
 
 const COLORS: WorkspaceColor[] = [
@@ -108,6 +112,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     imports: createFakeImports(),
     network: createFakeNetwork(),
     startup: createFakeStartup(),
+    updates: createFakeUpdates(),
   };
 
   const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -385,6 +390,12 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           if (files !== undefined) return files;
           const started = handleStartupLotG(core.startup, cmd, args);
           if (started !== undefined) return started;
+          // Lot J - Copier et déplacer.
+          const transferred = handleTransfer(core.workbench, core.contracts, cmd, args);
+          if (transferred !== undefined) return transferred;
+          // Lot L allégé - Mises à jour.
+          const updated = handleUpdates(core.updates, cmd, args);
+          if (updated !== undefined) return updated;
           const contracts = handleContracts(core.contracts, core.workbench, cmd, args);
           const handled =
             contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);
