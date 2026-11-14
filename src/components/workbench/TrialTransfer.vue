@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
- * « Requête au point ? » sous un essai de « Non classés » (écran 2.2-b) : « Transférer au
- * référentiel de tests » ouvre une fenêtre qui nomme le test et choisit où le ranger ; le cœur
- * crée le dossier du test et y déplace l'essai, qui devient son étape 1.
+ * « Requête au point ? » sous une requête liée à un contrat : essai de « Non classés » (écran
+ * 2.2-b) ou requête d'un endpoint (3.2-c, lot J). « Transférer au référentiel de tests » ouvre une
+ * fenêtre qui nomme le test et choisit où le ranger ; le cœur crée le dossier du test et y déplace
+ * la requête, qui devient son étape 1 (sans lien au contrat).
  */
 import { computed, ref, useId } from "vue";
 
@@ -76,7 +77,7 @@ async function submit(): Promise<void> {
   <section v-if="request?.contract" class="trial-transfer" aria-label="Requête au point ?">
     <p class="trial-transfer__title">Requête au point ?</p>
     <p class="trial-transfer__hint">
-      Transférez-la au référentiel de tests : elle devient un test.
+      Glissez-la dans un test, ou transférez-la au référentiel : elle devient un test.
     </p>
     <BaseButton class="trial-transfer__button" @click="start">
       Transférer au référentiel de tests

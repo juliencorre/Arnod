@@ -236,6 +236,11 @@ pub fn run() {
             commands::startup::startup_open,
             commands::startup::startup_quit,
             commands::startup::window_ready,
+            // Lot J - Copier et déplacer.
+            commands::transfer::transfer_targets,
+            commands::transfer::transfer_preview,
+            commands::transfer::transfer_apply,
+            commands::transfer::transfer_undo,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

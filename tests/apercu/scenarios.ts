@@ -1258,3 +1258,76 @@ Object.assign(SCENARIOS, {
     },
   },
 } satisfies Record<string, Scenario>);
+
+// --- Lot J : copier et déplacer (4.1-g, 4.1-f, 3.2-c) ------------------------------
+
+/** « API Commandes » avec deux requêtes sous POST /orders, et le test « Créer une commande ». */
+function copierDeplacer(): FakeCore {
+  const core = largeur(boutique(), 320);
+  const file = "contracts/api-commandes.yaml";
+  core.contracts.files.set(file, {
+    name: "API Commandes",
+    version: "2.4.0",
+    source: "openapi: 3.0.3\n",
+    operations: [
+      { key: "GET /orders", method: "GET", path: "/orders", summary: null, tag: null },
+      { key: "POST /orders", method: "POST", path: "/orders", summary: null, tag: null },
+    ],
+  });
+  const wb = core.workbench;
+  const lie = (name: string) =>
+    newRequest(name, {
+      method: "POST",
+      url: "{{baseUrl}}/orders",
+      contract: { file, operation: "POST /orders" },
+    });
+  wb.requests.set("API Commandes/commande-simple.yml", lie("Commande simple"));
+  wb.requests.set("API Commandes/sans-coupon.yml", lie("Sans coupon"));
+  wb.folders.add("commandes");
+  wb.folders.add("commandes/v2");
+  wb.folders.add("commandes/v2/Créer une commande");
+  wb.requests.set(
+    "commandes/v2/Créer une commande/creer.yml",
+    newRequest("Créer la commande", { method: "POST", seq: 1 }),
+  );
+  wb.requests.set(
+    "commandes/v2/Créer une commande/relire.yml",
+    newRequest("Relire la commande", { seq: 2 }),
+  );
+  return core;
+}
+
+async function ouvrirCommandes(g: Gestes): Promise<void> {
+  await ouvrirProjet(g);
+  await g.attendre(200);
+  await g.cliquer('[aria-label="Déplier le contrat API Commandes"]');
+  await g.attendre(200);
+  await g.cliquer(".crow__main", "/orders");
+  await g.cliquer('[aria-label="Déplier POST /orders"]');
+  await g.attendre(150);
+}
+
+Object.assign(SCENARIOS, {
+  "4.1-g": {
+    description: "Dialogue « Copier ou déplacer » d'une requête liée, vers une étape d'un test",
+    setup: copierDeplacer,
+    play: async (g: Gestes) => {
+      await ouvrirCommandes(g);
+      await g.cliquer('button[aria-label="Actions pour Sans coupon"]');
+      await g.cliquer('[role="menuitem"]', "Copier ou déplacer…");
+      await g.saisir(".copy-move__search", "créer");
+      await g.attendre(150);
+    },
+  },
+  "3.2-c": {
+    description: "« Requête au point ? » sous une requête d'un endpoint, et sa fenêtre",
+    setup: copierDeplacer,
+    play: async (g: Gestes) => {
+      await ouvrirCommandes(g);
+      await g.cliquer('[aria-label="Ouvrir POST /orders"]');
+      await g.attendre(150);
+      await g.cliquer(".trial-transfer button", "Transférer au référentiel de tests");
+      await g.attendre(100);
+    },
+  },
+} satisfies Record<string, Scenario>);

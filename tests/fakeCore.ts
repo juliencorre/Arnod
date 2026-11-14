@@ -18,6 +18,7 @@ import {
 } from "./fakeWindows";
 import { handleInput } from "./fakeInput";
 import { handleTrials } from "./fakeTrials";
+import { handleTransfer } from "./fakeTransfer";
 import { STEP_CATALOG, detect } from "./fakeSteps";
 // Lot C - Import Bruno.
 import { createFakeImports, handleImports, type FakeImports } from "./fakeImports";
@@ -385,6 +386,9 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           if (files !== undefined) return files;
           const started = handleStartupLotG(core.startup, cmd, args);
           if (started !== undefined) return started;
+          // Lot J - Copier et déplacer.
+          const transferred = handleTransfer(core.workbench, core.contracts, cmd, args);
+          if (transferred !== undefined) return transferred;
           const contracts = handleContracts(core.contracts, core.workbench, cmd, args);
           const handled =
             contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);

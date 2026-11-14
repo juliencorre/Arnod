@@ -146,7 +146,11 @@ export type CommandName =
   | "startup_start_empty"
   | "startup_open"
   | "startup_quit"
-  | "window_ready";
+  | "window_ready"
+  | "transfer_targets"
+  | "transfer_preview"
+  | "transfer_apply"
+  | "transfer_undo";
 
 /**
  * Nature d'une erreur de commande.
@@ -1748,4 +1752,68 @@ export interface StartupProblem {
   /** Issue GitHub préremplie : rien n'est envoyé sans l'utilisateur. */
   issueUrl: string;
   footer: string;
+}
+
+// --- Lot J - Copier et déplacer (4.1-f, 4.1-g) --------------------------------
+
+/** Copier (l'original reste) ou déplacer (`tree::transfer::Mode`). */
+export type TransferMode = "copy" | "move";
+
+/** Destination d'une requête copiée ou déplacée (`tree::transfer::Target`). */
+export type TransferTarget =
+  /** Dossier du référentiel (`""` : racine du projet). */
+  | { kind: "folder"; folder: string }
+  /** Test, à la place `position` (0 : avant la première étape). */
+  | { kind: "step"; test: string; position: number }
+  /** Opération d'un contrat du projet (`contracts/…`, `POST /orders`). */
+  | { kind: "operation"; contract: string; operation: string };
+
+/** Opération de même méthode qui peut recevoir la requête. */
+export interface OperationTarget {
+  contract: string;
+  /** Titre et version du contrat (« API Commandes v2.4.0 »). */
+  contractName: string;
+  operation: string;
+  current: boolean;
+}
+
+/** Dossier du référentiel (`""` : racine). */
+export interface FolderTarget {
+  path: string;
+  current: boolean;
+}
+
+/** Test et ses étapes, pour choisir la place. */
+export interface TestTarget {
+  path: string;
+  name: string;
+  steps: string[];
+  /** Place actuelle de la requête dans ce test. */
+  current: number | null;
+}
+
+/** Destinations d'une requête dans un projet (`transfer_targets`). */
+export interface TransferTargets {
+  /** Méthode de la requête, pour le titre du dialogue. */
+  method: string;
+  operations: OperationTarget[];
+  folders: FolderTarget[];
+  tests: TestTarget[];
+}
+
+/** Ligne de « Ce qui change » (`transfer_preview`). */
+export interface TransferChange {
+  title: string;
+  detail: string;
+  /** Quelque chose se perd ou manque (lien retiré, variable inconnue). */
+  warning: boolean;
+}
+
+/** Requête copiée ou déplacée (`transfer_apply`). */
+export interface TransferDone {
+  projectId: string;
+  path: string;
+  name: string;
+  /** Jeton de « Annuler » (`transfer_undo`). */
+  undoToken: string;
 }

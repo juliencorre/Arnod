@@ -8,7 +8,7 @@
  * changer leur état enregistré, la partie trouvée du nom est surlignée et une requête trouvée
  * par son adresse le dit.
  */
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
@@ -17,6 +17,9 @@ import StatusMark from "@/components/workbench/StatusMark.vue";
 import { SECTION_ICONS } from "@/components/ui/sectionIcons";
 import { countStatuses, requestPaths } from "@/lib/status";
 import { highlight, matchedByUrl, type TreeFilter } from "@/lib/treeFilter";
+import { REQUEST_DRAG, dragged, startRequestDrag } from "@/lib/requestDrag";
+import { useToastStore } from "@/stores/toasts";
+import { useTransferStore } from "@/stores/transfer";
 import { useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
@@ -120,6 +123,8 @@ const items = computed<MenuItem[]>(() => {
   return [
     { id: "rename", label: "Renommer" },
     { id: "duplicate", label: "Dupliquer" },
+    // Lot J (4.1-g) : vers un dossier, un test, une opération ou un autre projet.
+    { id: "copy-move", label: "Copier ou déplacer…" },
     move,
     remove,
   ];
@@ -128,6 +133,78 @@ const items = computed<MenuItem[]>(() => {
 function onSelect(id: string): void {
   if (id.startsWith("move:")) emit("action", "move", props.node, id.slice(5));
   else emit("action", id, props.node);
+}
+
+// --- Lot J : copier, couper, coller, annuler et glisser ----------------------------
+
+const transfer = useTransferStore();
+const toasts = useToastStore();
+
+function parentOf(path: string): string {
+  const index = path.lastIndexOf("/");
+  return index < 0 ? "" : path.slice(0, index);
+}
+
+/** Colle ici : dans le dossier ou le test, ou après cette requête dans son dossier. */
+async function pasteHere(mode?: "copy" | "move"): Promise<void> {
+  const node = props.node;
+  try {
+    if (node.kind === "folder") {
+      await transfer.paste(props.projectId, node.path, node.test, mode);
+    } else if (props.step !== undefined) {
+      await transfer.paste(props.projectId, parentOf(node.path), true, mode, props.step);
+    } else {
+      await transfer.paste(props.projectId, parentOf(node.path), false, mode);
+    }
+  } catch (caught) {
+    toasts.showError(caught);
+  }
+}
+
+/** Ctrl+C, Ctrl+X, Ctrl+V et Ctrl+Z sur la ligne (code de la touche, pour l'AZERTY). */
+function onKeydown(event: KeyboardEvent): void {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+  const node = props.node;
+  const source = { projectId: props.projectId, path: node.path, name: node.name };
+  if ((event.code === "KeyC" || event.code === "KeyX") && node.kind === "request") {
+    transfer.copy(source, event.code === "KeyC" ? "copy" : "move");
+  } else if (event.code === "KeyV" && transfer.clipboard) {
+    void pasteHere();
+  } else if (event.code === "KeyZ" && transfer.last) {
+    void transfer.undo().catch(toasts.showError);
+  } else return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function onDragStart(event: DragEvent): void {
+  if (props.node.kind !== "request") return;
+  startRequestDrag(event, {
+    projectId: props.projectId,
+    path: props.node.path,
+    name: props.node.name,
+  });
+}
+
+/** Une requête glissée se dépose sur un dossier, un test, ou une étape (après elle). */
+const dropTarget = computed(() => props.node.kind === "folder" || props.step !== undefined);
+const dropping = ref(false);
+
+function onDragOver(event: DragEvent): void {
+  if (!dropTarget.value || !event.dataTransfer?.types.includes(REQUEST_DRAG)) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = event.ctrlKey ? "copy" : "move";
+  dropping.value = true;
+}
+
+async function onDrop(event: DragEvent): Promise<void> {
+  dropping.value = false;
+  const source = dragged(event);
+  if (!dropTarget.value || !source || source.path === props.node.path) return;
+  event.preventDefault();
+  const mode = event.ctrlKey ? "copy" : "move";
+  transfer.clipboard = { ...source, mode };
+  await pasteHere(mode);
 }
 
 /**
@@ -147,7 +224,14 @@ function activate(preview = true): void {
 
 <template>
   <li role="presentation">
-    <div class="row" :class="{ 'row--selected': isSelected }" :style="{ '--depth': depth + 1 }">
+    <div
+      class="row"
+      :class="{ 'row--selected': isSelected, 'row--drop': dropping }"
+      :style="{ '--depth': depth + 1 }"
+      @dragover="onDragOver"
+      @dragleave="dropping = false"
+      @drop="onDrop"
+    >
       <button
         type="button"
         class="row__main"
@@ -155,6 +239,9 @@ function activate(preview = true): void {
         :aria-expanded="node.kind === 'folder' ? isOpen : undefined"
         :aria-selected="isSelected"
         :aria-level="depth + 1"
+        :draggable="node.kind === 'request'"
+        @dragstart="onDragStart"
+        @keydown="onKeydown"
         @click="activate()"
         @dblclick="activate(false)"
         @keydown.right="isTest && !isOpen && workbench.toggleFolder(projectId, node.path)"
@@ -236,6 +323,11 @@ function activate(preview = true): void {
 .row:hover,
 .row--selected {
   background: var(--color-accent-soft);
+}
+
+/* Lot J : une requête glissée sera déposée ici. */
+.row--drop {
+  box-shadow: inset 0 0 0 1px var(--color-accent);
 }
 
 .row__main {

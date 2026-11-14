@@ -9,6 +9,8 @@ import ImportDialog from "@/components/import/ImportDialog.vue";
 // Lot H - Réseau et authentification.
 import PreferencesDialog from "@/components/preferences/PreferencesDialog.vue";
 import ProjectSettingsDialog from "@/components/projects/ProjectSettingsDialog.vue";
+// Lot J - Copier et déplacer.
+import CopyMoveDialog from "@/components/workbench/CopyMoveDialog.vue";
 </script>
 
 <template>
@@ -19,4 +21,5 @@ import ProjectSettingsDialog from "@/components/projects/ProjectSettingsDialog.v
   <ImportDialog />
   <PreferencesDialog />
   <ProjectSettingsDialog />
+  <CopyMoveDialog />
 </template>

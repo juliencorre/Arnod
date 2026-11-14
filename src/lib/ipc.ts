@@ -86,6 +86,11 @@ import type {
   MenuShortcut,
   StartupProblem,
   StartupTarget,
+  TransferChange,
+  TransferDone,
+  TransferMode,
+  TransferTarget,
+  TransferTargets,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -708,6 +713,32 @@ export const ipc = {
 
   /** L'interface est prête : la fenêtre, créée cachée, apparaît (0.3-a). */
   windowReady: (): Promise<null> => call<null>("window_ready"),
+
+  // Lot J - Copier et déplacer (4.1-f, 4.1-g).
+  /** Destinations de la requête `path` de `project` dans le projet `target`. */
+  transferTargets: (project: string, path: string, target: string): Promise<TransferTargets> =>
+    call<TransferTargets>("transfer_targets", { project, path, target }),
+  /** « Ce qui change » si la requête va à `destination` du projet `target`. */
+  transferPreview: (
+    project: string,
+    path: string,
+    target: string,
+    destination: TransferTarget,
+    mode: TransferMode,
+  ): Promise<TransferChange[]> =>
+    call<TransferChange[]>("transfer_preview", { project, path, target, destination, mode }),
+  /** Copie ou déplace la requête ; le jeton sert à « Annuler ». */
+  transferApply: (
+    project: string,
+    path: string,
+    target: string,
+    destination: TransferTarget,
+    mode: TransferMode,
+  ): Promise<TransferDone> =>
+    call<TransferDone>("transfer_apply", { project, path, target, destination, mode }),
+  /** « Annuler » une copie ou un déplacement. */
+  transferUndo: (undoToken: string): Promise<void> =>
+    call<null>("transfer_undo", { undoToken }).then(() => undefined),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

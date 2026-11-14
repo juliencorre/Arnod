@@ -261,7 +261,7 @@ describe("réponses attendues dans l'arborescence (3.2-a3, E1 à E3)", () => {
       wrapper()
         .findAll('[role="menuitem"]')
         .map((i) => i.text()),
-    ).toEqual(["Renommer", "Dupliquer", "Mettre à la corbeille"]);
+    ).toEqual(["Renommer", "Dupliquer", "Copier ou déplacer…", "Mettre à la corbeille"]);
   });
 });
 

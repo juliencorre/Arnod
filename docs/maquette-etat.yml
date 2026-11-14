@@ -501,11 +501,12 @@ pages:
       - "plan-configuration-endpoint (EP1–EP10)"
       - "plan-mvp-d-barre-laterale (E1–E3)"
     liees: ["3.1", "4.2", "4.8"]
-    reste: "test transféré au référentiel ou aux templates (b, c, d)."
+    reste: "test sur un endpoint (b), transfert aux templates (d, V4)."
     journal:
       - "2026-11-09 : Configuration d'un endpoint (PR #32)."
       - "2026-11-12 : Page « Contrats de service » (fichier « Endpoints ») recentrée sur l'endpoint ; e, f, g → 3.1."
       - "2026-11-13 : Réponses attendues listées sous l'endpoint dans la barre latérale (lot D, PR #48)."
+      - "2026-11-14 : « Requête au point ? » sous toute requête liée : transférée au référentiel de tests, elle devient l'étape 1 d'un test (c, lot J, PR #62)."
     ecrans:
       a:
         {
@@ -542,7 +543,17 @@ pages:
               aligner: à décider,
             },
         }
-      c: { etat: à faire }
+      c:
+        {
+          etat: livré,
+          pr: [62],
+          captures: [30-transferer-un-endpoint],
+          ecart:
+            {
+              texte: "Une étape n'est jamais liée à un contrat (lot E, R1) : le test quitte l'endpoint au lieu d'y rester lié ; pas de « Version métier du test » ni de « Transférer vers les templates » (V4) ; le dossier se choisit dans « Ranger dans », sans proposition d'après les autres tests de l'opération.",
+              aligner: à décider,
+            },
+        }
       d: { etat: à faire, version: V4 }
   "3.3":
     nom: "Environnements"
@@ -628,13 +639,14 @@ pages:
       - "plan-mvp-e-tests-etapes (NT1, NT2)"
       - "plan-mvp-i-fichiers-externes (FE1–FE7)"
     liees: ["4.2", "3.1"]
-    reste: "glisser-déposer, copier et déplacer une requête (f, g), sélection multiple (a quater)."
+    reste: "sélection multiple (a quater)."
     journal:
       - "2026-11-09 : Arborescence livrée avec le premier usage."
       - "2026-11-11 : Devient le référentiel : les requêtes liées à un contrat sont rangées sous lui (PR #40)."
       - "2026-11-12 : Écrans du test (c, c bis, d) → 4.2."
       - "2026-11-13 : « Nouveau test » crée le dossier et son étape 1, ouverte, curseur dans l'adresse ; « + Étape » ajoute la suivante (b, plan-mvp-e-tests-etapes, PR #51)."
       - "2026-11-13 : Fichiers modifiés hors d'Arnod : dossier surveillé, arborescence et onglets rechargés, brouillon en conflit réglé élément par élément (e, plan-mvp-i-fichiers-externes, PR #54)."
+      - "2026-11-14 : Copier ou déplacer une requête vers un dossier, une place dans un test, une opération ou un autre projet, avec « Ce qui change » et « Annuler » ; Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Z et Ctrl+glisser dans la barre latérale (f, g, lot J, PR #62)."
     ecrans:
       a: { etat: livré, pr: [27, 40, 42], captures: [19-verification-en-echec] }
       "a bis": { etat: livré, pr: [27] }
@@ -662,8 +674,30 @@ pages:
               aligner: maquette,
             },
         }
-      f: { etat: à faire, version: MVP }
-      g: { etat: à faire, version: MVP }
+      f:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [62],
+          captures: [31-copier-deplacer],
+          ecart:
+            {
+              texte: "Le dépôt se fait sur une ligne de la barre latérale (dossier, test, étape : juste après elle, opération) ; pas de poignée ⋮⋮ ni de ligne d'insertion entre les étapes de l'onglet du test, ni de panneau « En lâchant ici » pendant le glisser : « Ce qui change » est dans le dialogue (g).",
+              aligner: à décider,
+            },
+        }
+      g:
+        {
+          etat: livré,
+          version: MVP,
+          pr: [62],
+          captures: [31-copier-deplacer],
+          ecart:
+            {
+              texte: "Une étape n'est jamais liée à un contrat (lot E, R1) : vers un test, « N'est plus liée à POST /orders » au lieu de « Reste liée » ; seules les opérations de même méthode sont proposées, sans « nouvel endpoint… » ni « Nouveau test dans… » ; « Non classés » n'est pas une destination ; la place dans le test se choisit sous la liste.",
+              aligner: à décider,
+            },
+        }
   "4.2":
     nom: "Tests et étapes"
     version: MVP

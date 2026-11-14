@@ -11,6 +11,9 @@ import { computed } from "vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import StatusMark from "@/components/workbench/StatusMark.vue";
+import { startRequestDrag } from "@/lib/requestDrag";
+import { useToastStore } from "@/stores/toasts";
+import { useTransferStore } from "@/stores/transfer";
 import { useWindowsStore } from "@/stores/windows";
 import { requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type { LinkedView } from "@/types/ipc";
@@ -30,6 +33,8 @@ const windows = useWindowsStore();
 const ITEMS: MenuItem[] = [
   { id: "rename", label: "Renommer" },
   { id: "duplicate", label: "Dupliquer" },
+  // Lot J (4.1-g).
+  { id: "copy-move", label: "Copier ou déplacer…" },
   { id: "delete", label: "Mettre à la corbeille", tone: "danger", separatorBefore: true },
 ];
 
@@ -43,6 +48,26 @@ const selected = computed(() => {
   );
 });
 const dirty = computed(() => workbench.isDirty(requestKey(props.projectId, props.request.path)));
+// Lot J : Ctrl+C, Ctrl+X et Ctrl+Z sur la ligne, glisser (Ctrl : copier).
+const transfer = useTransferStore();
+const toasts = useToastStore();
+const source = computed(() => ({
+  projectId: props.projectId,
+  path: props.request.path,
+  name: props.request.name,
+}));
+
+function onKeydown(event: KeyboardEvent): void {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+  if (event.code === "KeyC" || event.code === "KeyX") {
+    transfer.copy(source.value, event.code === "KeyC" ? "copy" : "move");
+  } else if (event.code === "KeyZ" && transfer.last) {
+    void transfer.undo().catch(toasts.showError);
+  } else return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
 /** Dernière exécution (`docs/plan-fin-premier-usage.md`, ST1). */
 const status = computed(() => workbench.statuses[props.projectId]?.[props.request.path] ?? null);
 </script>
@@ -58,6 +83,9 @@ const status = computed(() => workbench.statuses[props.projectId]?.[props.reques
         type="button"
         class="linked__main"
         :aria-current="selected ? 'page' : undefined"
+        draggable="true"
+        @dragstart="startRequestDrag($event, source)"
+        @keydown="onKeydown"
         @click="workbench.openRequest(projectId, request.path, true)"
         @dblclick="workbench.openRequest(projectId, request.path)"
       >

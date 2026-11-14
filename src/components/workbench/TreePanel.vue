@@ -23,6 +23,7 @@ import { filterTree, parseFilter } from "@/lib/treeFilter";
 import { useCatalogStore } from "@/stores/catalog";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
+import { useTransferStore } from "@/stores/transfer";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
 
@@ -34,6 +35,7 @@ const nodes = computed(() => workbench.trees[props.projectId]?.tests ?? []);
 const projectName = computed(() => useCatalogStore().projectById(props.projectId)?.name ?? "");
 const toasts = useToastStore();
 const sidebar = useSidebarStore();
+const transfer = useTransferStore();
 
 // --- Section repliable et filtre (lot D) ---------------------------------------
 
@@ -165,6 +167,9 @@ async function onAction(id: string, node: TreeNode, target?: string): Promise<vo
       break;
     case "duplicate":
       await guard(() => workbench.duplicate(props.projectId, node.path));
+      break;
+    case "copy-move":
+      transfer.openDialog({ projectId: props.projectId, path: node.path, name: node.name });
       break;
     case "move":
       await guard(() => workbench.move(props.projectId, node.path, target ?? ""));

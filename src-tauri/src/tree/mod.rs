@@ -589,6 +589,9 @@ pub fn requests_in(root: &Path, folder: &str) -> Result<Vec<String>, CommandErro
     Ok(out)
 }
 
+pub mod transfer;
+pub mod undo;
+
 mod test;
 pub use test::{
     CreatedTest, StepView, TestView, VariableUser, add_step, create_test, extracted_before,
