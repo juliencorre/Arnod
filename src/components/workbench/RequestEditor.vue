@@ -608,7 +608,7 @@ watch(
     </div>
 
     <TrialTransfer
-      v-if="editor && catalog.isInbox(editor.projectId)"
+      v-if="editor"
       :editor-key="editorKey"
       :project-name="catalog.projects.find((p) => p.id === editor?.projectId)?.name ?? ''"
     />

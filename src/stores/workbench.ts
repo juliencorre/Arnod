@@ -1121,6 +1121,29 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return moved;
   }
 
+  // --- Lot J : copier et déplacer -------------------------------------------------
+
+  /** Une requête déplacée : ses éditeurs suivent (`to`) ou sont oubliés (autre projet). */
+  function followTransfer(projectId: string, from: string, to: string | null): void {
+    if (to !== null) {
+      moveEditors(projectId, from, to);
+      return;
+    }
+    for (const [key, editor] of Object.entries(editors)) {
+      if (editor.projectId === projectId && editor.path === from) forget(key);
+    }
+  }
+
+  /** Relit les requêtes ouvertes du dossier `folder` (rangs d'étapes renumérotés). */
+  async function reloadIn(projectId: string, folder: string): Promise<void> {
+    for (const [key, editor] of Object.entries(editors)) {
+      const parent = editor.path.includes("/")
+        ? editor.path.slice(0, editor.path.lastIndexOf("/"))
+        : "";
+      if (editor.projectId === projectId && parent === folder) await reload(key);
+    }
+  }
+
   return {
     trees,
     environments,
@@ -1200,5 +1223,8 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     restoreRemoved,
     discardRemoved,
     onFiles,
+    // Lot J : copier et déplacer.
+    followTransfer,
+    reloadIn,
   };
 });

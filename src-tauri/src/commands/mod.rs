@@ -15,6 +15,7 @@ pub mod projects;
 pub mod requests;
 pub mod runs;
 pub mod steps;
+pub mod transfer;
 pub mod tree;
 pub mod trial;
 pub mod window;

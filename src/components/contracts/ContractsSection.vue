@@ -32,6 +32,8 @@ import { useCatalogStore } from "@/stores/catalog";
 import { type ContractNode, useContractsStore } from "@/stores/contracts";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
+import { useTransferStore } from "@/stores/transfer";
+import { REQUEST_DRAG, dragged, startRequestDrag } from "@/lib/requestDrag";
 import { useWindowsStore } from "@/stores/windows";
 import { requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type {
@@ -48,6 +50,7 @@ const props = defineProps<{ projectId: string }>();
 const contracts = useContractsStore();
 const windows = useWindowsStore();
 const workbench = useWorkbenchStore();
+const transfer = useTransferStore();
 
 /** Dernière exécution de l'endpoint d'une opération, sa première requête (ST1, Q4 du lot D). */
 function endpointStatus(operation: OperationNode): RequestStatus | null {
@@ -277,6 +280,8 @@ function operationLabel(contract: ContractSummary, operation: OperationNode): st
 const ENDPOINT_ITEMS: MenuItem[] = [
   { id: "rename", label: "Renommer" },
   { id: "duplicate", label: "Dupliquer" },
+  // Lot J (4.1-g).
+  { id: "copy-move", label: "Copier ou déplacer…" },
   { id: "delete", label: "Mettre à la corbeille", tone: "danger", separatorBefore: true },
 ];
 
@@ -292,6 +297,8 @@ async function onRequest(id: string, request: LinkedView): Promise<void> {
       renameError.value = null;
       renaming.value = request;
     } else if (id === "duplicate") await workbench.duplicate(props.projectId, request.path);
+    else if (id === "copy-move")
+      transfer.openDialog({ projectId: props.projectId, path: request.path, name: request.name });
     else if (id === "delete") {
       await workbench.remove(props.projectId, request.path, false);
       toasts.show(`« ${request.name} » mis à la corbeille.`);
@@ -299,6 +306,86 @@ async function onRequest(id: string, request: LinkedView): Promise<void> {
   } catch (caught) {
     toasts.showError(caught);
   }
+}
+
+// --- Lot J : copier, couper, coller et glisser sur une opération -----------------
+
+/** Ctrl+C, Ctrl+X (l'endpoint), Ctrl+V (vers l'opération), Ctrl+Z sur la ligne. */
+function onOperationKeydown(
+  event: KeyboardEvent,
+  contract: ContractSummary,
+  operation: OperationNode,
+): void {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+  const endpoint = operation.requests[0];
+  if ((event.code === "KeyC" || event.code === "KeyX") && endpoint) {
+    transfer.copy(
+      { projectId: props.projectId, path: endpoint.path, name: endpoint.name },
+      event.code === "KeyC" ? "copy" : "move",
+    );
+  } else if (event.code === "KeyV" && transfer.clipboard) {
+    void pasteOnOperation(contract, operation, transfer.clipboard.mode);
+  } else if (event.code === "KeyZ" && transfer.last) {
+    void transfer.undo().catch(toasts.showError);
+  } else return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+async function pasteOnOperation(
+  contract: ContractSummary,
+  operation: OperationNode,
+  mode: "copy" | "move",
+): Promise<void> {
+  const source = transfer.clipboard;
+  if (!source) return;
+  try {
+    await transfer.apply(
+      source,
+      props.projectId,
+      { kind: "operation", contract: contract.path, operation: operation.key },
+      mode,
+    );
+  } catch (caught) {
+    toasts.showError(caught);
+  }
+}
+
+function onOperationDragStart(event: DragEvent, operation: OperationNode): void {
+  const endpoint = operation.requests[0];
+  if (endpoint)
+    startRequestDrag(event, {
+      projectId: props.projectId,
+      path: endpoint.path,
+      name: endpoint.name,
+    });
+}
+
+const dropOn = ref<string | null>(null);
+
+function onOperationDragOver(
+  event: DragEvent,
+  contract: ContractSummary,
+  operation: OperationNode,
+) {
+  if (!event.dataTransfer?.types.includes(REQUEST_DRAG)) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = event.ctrlKey ? "copy" : "move";
+  dropOn.value = `${contract.path}#${operation.key}`;
+}
+
+async function onOperationDrop(
+  event: DragEvent,
+  contract: ContractSummary,
+  operation: OperationNode,
+): Promise<void> {
+  dropOn.value = null;
+  const source = dragged(event);
+  if (!source) return;
+  event.preventDefault();
+  const mode = event.ctrlKey ? "copy" : "move";
+  transfer.clipboard = { ...source, mode };
+  await pasteOnOperation(contract, operation, mode);
 }
 
 async function rename(name: string): Promise<void> {
@@ -432,8 +519,12 @@ async function rename(name: string): Promise<void> {
                   class="crow crow--operation"
                   :class="{
                     'crow--selected': operationSelected(contract, operation),
+                    'crow--drop': dropOn === `${contract.path}#${operation.key}`,
                   }"
                   style="--depth: 2"
+                  @dragover="onOperationDragOver($event, contract, operation)"
+                  @dragleave="dropOn = null"
+                  @drop="onOperationDrop($event, contract, operation)"
                 >
                   <button
                     v-if="expandable(operation)"
@@ -455,6 +546,9 @@ async function rename(name: string): Promise<void> {
                     :aria-label="operationLabel(contract, operation)"
                     :title="operation.summary ?? `${operation.method} ${operation.path}`"
                     :disabled="operation.requests.length === 0 && !creatable(contract, operation)"
+                    :draggable="operation.requests.length > 0"
+                    @dragstart="onOperationDragStart($event, operation)"
+                    @keydown="onOperationKeydown($event, contract, operation)"
                     @click="onOperation(contract, operation)"
                     @dblclick="
                       operation.requests.length > 0 && onOperation(contract, operation, false)
@@ -806,6 +900,11 @@ async function rename(name: string): Promise<void> {
 .crow:hover,
 .crow--selected {
   background: var(--color-accent-soft);
+}
+
+/* Lot J : une requête glissée sera rangée sous cette opération. */
+.crow--drop {
+  box-shadow: inset 0 0 0 1px var(--color-accent);
 }
 
 .crow__toggle {

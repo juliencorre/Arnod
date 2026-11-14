@@ -828,6 +828,8 @@ describe("Contrats de services", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -1127,6 +1129,8 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -1359,6 +1363,8 @@ describe("Premier usage : vérifications, run et statuts", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -1641,6 +1647,8 @@ describe("Lot A - Réponse : format, aperçu, filtre JSONPath (5.1-b bis)", () =
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -1853,6 +1861,8 @@ describe("Lot B : saisie, texte et cURL", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -2151,6 +2161,8 @@ describe("Lot E - tests et étapes", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -2376,6 +2388,8 @@ describe("Lot H - Réseau et authentification", () => {
   });
 
   afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => {
         resolve();
@@ -2742,6 +2756,149 @@ describe("Lot I - Fichiers modifiés hors d'Arnod (4.1-e)", () => {
         ),
       ),
     ).toBe(false);
+  });
+});
+
+describe("Lot J - Copier et déplacer (4.1-f, 4.1-g, 3.2-c)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  function step(name: string, method: string, seq: number): string {
+    return `info:\n  name: ${name}\n  type: http\n  seq: ${String(seq)}\nhttp:\n  method: ${method}\n  url: http://localhost/orders\n`;
+  }
+
+  async function inTree(name: string): Promise<boolean> {
+    return browser.execute(
+      (n) =>
+        Array.from(document.querySelectorAll('aside [role="treeitem"]')).some((i) =>
+          i.textContent.includes(n),
+        ),
+      name,
+    );
+  }
+
+  it("une requête se déplace à une place d'un test, les étapes suivantes reculent (4.1-g)", async () => {
+    const test = path.join(project(), "Parcours J");
+    mkdirSync(test, { recursive: true });
+    writeFileSync(path.join(test, "creer.yml"), step("Créer la commande J", "POST", 1));
+    writeFileSync(path.join(test, "relire.yml"), step("Relire la commande J", "GET", 2));
+    writeFileSync(path.join(project(), "sans-coupon.yml"), step("Sans coupon", "POST", 1));
+    await browser.waitUntil(() => inTree("Sans coupon"), {
+      timeout: 10_000,
+      timeoutMsg: "requêtes écrites sur disque attendues dans l'arborescence",
+    });
+    await clickHidden('aside button[aria-label="Actions pour Sans coupon"]');
+    await clickText('[role="menuitem"]', "Copier ou déplacer…");
+    await browser.$(".copy-move").waitForDisplayed({ timeoutMsg: "dialogue attendu" });
+    await browser.execute(() => {
+      const field = document.querySelector<HTMLInputElement>(".copy-move__search");
+      if (!field) throw new Error("recherche introuvable");
+      field.value = "Parcours";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await browser.waitUntil(
+      () => browser.execute(() => document.querySelector(".copy-move__place select") !== null),
+      { timeoutMsg: "choix de la place dans le test attendu" },
+    );
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".copy-move__place select");
+      if (!select) throw new Error("place introuvable");
+      select.value = "1";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          (document.querySelector(".copy-move__changes")?.textContent ?? "").includes(
+            "Devient l'étape 2",
+          ),
+        ),
+      { timeoutMsg: "« Ce qui change » attendu" },
+    );
+    await screenshot(browser, "31-copier-deplacer");
+    await clickText("dialog[open] button", "Déplacer");
+    const moved = path.join(test, "sans-coupon.yml");
+    await browser.waitUntil(() => existsSync(moved), { timeoutMsg: "étape déplacée attendue" });
+    expect(readFileSync(moved, "utf8")).toContain("seq: 2");
+    expect(readFileSync(path.join(test, "relire.yml"), "utf8")).toContain("seq: 3");
+    expect(existsSync(path.join(project(), "sans-coupon.yml"))).toBe(false);
+
+    // « Annuler » de la notification remet tout.
+    await browser.waitUntil(async () => (await toastText(browser)).includes("déplacée"), {
+      timeoutMsg: "notification du déplacement attendue",
+    });
+    await clickText(".toast button", "Annuler");
+    await browser.waitUntil(() => existsSync(path.join(project(), "sans-coupon.yml")), {
+      timeoutMsg: "requête remise à sa place attendue",
+    });
+    expect(existsSync(moved)).toBe(false);
+    expect(readFileSync(path.join(test, "relire.yml"), "utf8")).toContain("seq: 2");
+  });
+
+  it("une requête d'un endpoint se transfère au référentiel de tests (3.2-c)", async () => {
+    const contracts = path.join(project(), "contracts");
+    mkdirSync(contracts, { recursive: true });
+    writeFileSync(
+      path.join(contracts, "commandes-j.yaml"),
+      'openapi: 3.0.3\ninfo:\n  title: API Commandes J\n  version: 2.4.0\npaths:\n  /orders:\n    post:\n      responses:\n        "201": { description: créée }\n',
+    );
+    const folder = path.join(project(), "API Commandes J");
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(
+      path.join(folder, "commande-simple.yml"),
+      'info:\n  name: Commande simple J\n  type: http\n  tags:\n    - "contract:contracts/commandes-j.yaml#POST /orders"\nhttp:\n  method: POST\n  url: http://localhost/orders\n',
+    );
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document.querySelector('[aria-label="Déplier le contrat API Commandes J"]') !== null,
+        ),
+      { timeout: 10_000, timeoutMsg: "contrat écrit sur disque attendu" },
+    );
+    await browser.execute(() => {
+      document
+        .querySelector<HTMLElement>('[aria-label="Déplier le contrat API Commandes J"]')
+        ?.click();
+    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() => {
+          // « Ouvrir POST /orders », ou « Créer la requête de POST /orders » si la requête écrite
+          // n'est pas encore rangée sous l'opération : les deux ouvrent une requête liée.
+          const open = document.querySelector<HTMLElement>(
+            '.crow__main[aria-label$=" POST /orders"]',
+          );
+          if (open) {
+            open.click();
+            return true;
+          }
+          // La ressource /orders, repliée, se déplie d'abord.
+          for (const b of document.querySelectorAll<HTMLElement>(
+            '.crow__main[aria-expanded="false"]',
+          )) {
+            if (b.classList.contains("crow__resource") && b.textContent.includes("/orders"))
+              b.click();
+          }
+          return false;
+        }),
+      { timeoutMsg: "opération POST /orders attendue" },
+    );
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll<HTMLElement>(".trial-transfer")).some(
+            (t) => t.offsetParent !== null,
+          ),
+        ),
+      { timeoutMsg: "« Requête au point ? » attendu sous la requête liée" },
+    );
+    expect(
+      await browser.execute(
+        () =>
+          document.querySelector(".trial-transfer")?.textContent.includes("Glissez-la") ?? false,
+      ),
+    ).toBe(true);
+    await screenshot(browser, "30-transferer-un-endpoint");
   });
 });
 
