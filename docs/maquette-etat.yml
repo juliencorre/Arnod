@@ -305,6 +305,7 @@ pages:
       - "2026-11-13 : Préférences (Ctrl+, et Fichier → Préférences…) → Réseau et certificats : proxy du système, aucun ou manuel, délai de connexion, autorités internes ajoutées après avoir montré leur empreinte (e, lot H, PR #58)."
       - "2026-11-14 : Préférences → Mises à jour : versions publiées lues par le réseau du poste, au démarrage puis chaque jour ou à la demande, canal stable ou préversions ; « Voir la version » ouvre la page de la release (g, lot L allégé, PR #63)."
       - "2026-11-16 : Mises à jour installées par Arnod : « Installer » (notification et section), téléchargement par le réseau du poste avec progression et « Annuler », signature vérifiée, « Redémarrer maintenant » ou « Au prochain lancement » ; « Voir la version » si la release n'est pas installable (g, lot L)."
+      - "2026-11-16 : Écran g aligné sur le code : plus de pastille en bas de la barre latérale, la version prête s'annonce par une notification « Redémarrer maintenant » ; textes de la section repris de l'application (carte « prête » sans liste des points, « Notes de version »), sans stratégie de groupe (V2)."
     ecrans:
       e:
         {
@@ -320,18 +321,7 @@ pages:
         }
       f: { etat: à faire, version: V1 }
       "f bis": { etat: à faire, version: V1 }
-      g:
-        {
-          etat: livré,
-          version: MVP,
-          pr: [63],
-          captures: [32-mises-a-jour],
-          ecart:
-            {
-              texte: "L'installation demande une release qui porte latest.json et une clé publique embarquée ; sinon « Voir la version » ouvre la page de la release. Pas de stratégie de groupe pour couper les vérifications (V2) ; pas de pastille en bas de la barre latérale (notification et section seulement).",
-              aligner: maquette,
-            },
-        }
+      g: { etat: livré, version: MVP, pr: [63, 67], captures: [32-mises-a-jour] }
   "2.1":
     nom: "Accueil et premier essai"
     version: MVP
