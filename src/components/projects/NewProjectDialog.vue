@@ -1,5 +1,7 @@
 <script setup lang="ts">
-/** Fenêtre « Nouveau projet » (2a bis) : workspace prérempli, ajout au défaut (R4). */
+/** Fenêtre « Nouveau projet » (2a bis) : workspace ouvert prérempli, facultatif (R4, O8). */
+import { computed } from "vue";
+
 import ProjectForm from "@/components/projects/ProjectForm.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
 import { useProjectActions } from "@/composables/useProjectActions";
@@ -12,7 +14,13 @@ function close(): void {
   dialogs.newProject = null;
 }
 
-function onCreated(projectId: string, workspaceId: string): void {
+const description = computed(() =>
+  dialogs.newProject?.workspaceId
+    ? "Il sera rangé dans le workspace ouvert, et visible dans « Tous les projets »."
+    : "Il sera visible dans « Tous les projets ». Un workspace est facultatif.",
+);
+
+function onCreated(projectId: string, workspaceId: string | null): void {
   close();
   announceCreated(projectId, workspaceId);
 }
@@ -22,12 +30,12 @@ function onCreated(projectId: string, workspaceId: string): void {
   <BaseDialog
     :open="dialogs.newProject !== null"
     title="Nouveau projet"
-    description="Il sera rangé dans le workspace choisi et dans le workspace par défaut."
+    :description="description"
     @close="close"
   >
     <ProjectForm
       v-if="dialogs.newProject"
-      :key="dialogs.newProject.workspaceId"
+      :key="dialogs.newProject.workspaceId ?? 'all'"
       mode="dialog"
       :initial-workspace-id="dialogs.newProject.workspaceId"
       @created="onCreated"

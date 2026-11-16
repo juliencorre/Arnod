@@ -1,9 +1,9 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { h } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
-import type { MenuItem, MenuTriggerAttrs } from "@/components/ui/menu";
+import type { Box, MenuItem, MenuTriggerAttrs } from "@/components/ui/menu";
 
 /** Menu ⋯ d'un projet (maquette 2a). */
 const items: MenuItem[] = [
@@ -194,5 +194,78 @@ describe("BaseMenu", () => {
     expect(remove.text()).toContain("Le projet reste dans le référentiel.");
     await remove.trigger("click");
     expect(wrapper.emitted("select")).toEqual([["remove"]]);
+  });
+});
+
+/**
+ * Mise en page simulée : fenêtre de 800 × 600, menus de 240 × 160 ; `anchors` donne le rectangle
+ * du déclencheur (`.menu`) et des entrées du menu principal (`data-index`).
+ */
+function stubLayout(anchors: { trigger: Box; items?: Box }): void {
+  vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(800);
+  vi.spyOn(document.documentElement, "clientHeight", "get").mockReturnValue(600);
+  vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(240);
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(160);
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    const zero = { top: 0, right: 0, bottom: 0, left: 0 };
+    const rect = this.classList.contains("menu")
+      ? anchors.trigger
+      : this.dataset.level === "0"
+        ? (anchors.items ?? zero)
+        : zero;
+    return DOMRect.fromRect({
+      x: rect.left,
+      y: rect.top,
+      width: rect.right - rect.left,
+      height: rect.bottom - rect.top,
+    });
+  });
+}
+
+function placement(selector: string): { top: string; left: string } {
+  const style = wrapper?.get<HTMLElement>(selector).element.style;
+  return { top: style?.top ?? "", left: style?.left ?? "" };
+}
+
+describe("BaseMenu, position", () => {
+  it("se place en position fixe sous le déclencheur, sans sortir de la fenêtre", async () => {
+    // Déclencheur près du bord droit : le menu se décale pour tenir (800 - 240 - 8).
+    stubLayout({ trigger: { top: 100, right: 780, bottom: 120, left: 700 } });
+    wrapper = mountMenu();
+    await openWithClick(wrapper);
+
+    expect(placement(".menu__popover")).toEqual({ top: "124px", left: "552px" });
+    expect(document.activeElement?.textContent).toContain("Ouvrir");
+  });
+
+  it("suit le déclencheur quand une colonne défile", async () => {
+    const trigger = { top: 100, right: 180, bottom: 120, left: 100 };
+    stubLayout({ trigger });
+    wrapper = mountMenu();
+    await openWithClick(wrapper);
+    expect(placement(".menu__popover")).toEqual({ top: "124px", left: "100px" });
+
+    trigger.top = 40;
+    trigger.bottom = 60;
+    document.body.dispatchEvent(new Event("scroll"));
+    await flushPromises();
+
+    expect(placement(".menu__popover")).toEqual({ top: "64px", left: "100px" });
+  });
+
+  it("ouvre le sous-menu à gauche quand il n'y a pas la place à droite", async () => {
+    stubLayout({
+      trigger: { top: 100, right: 780, bottom: 120, left: 700 },
+      items: { top: 200, right: 792, bottom: 240, left: 552 },
+    });
+    wrapper = mountMenu();
+    await openWithClick(wrapper);
+    await press("ArrowDown");
+    await press("ArrowRight");
+
+    // 552 - 6 - 240 : à gauche de l'entrée, première entrée alignée sur la sienne.
+    expect(placement(".menu__list--sub")).toEqual({ top: "194px", left: "306px" });
   });
 });

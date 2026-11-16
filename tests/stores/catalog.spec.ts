@@ -60,7 +60,7 @@ describe("useCatalogStore", () => {
     await expect(catalog.load()).resolves.toEqual(warning);
 
     expect(catalog.isFirstRun).toBe(true);
-    expect(catalog.defaultWorkspace?.name).toBe("Mes projets");
+    expect(catalog.workspaces).toEqual([]);
   });
 
   it("donne les projets d'un workspace dans son ordre", async () => {

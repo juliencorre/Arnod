@@ -25,14 +25,12 @@ pub enum CommandErrorKind {
     NameTaken,
     /// Le dossier cible existe déjà et n'est pas vide.
     FolderNotEmpty,
-    /// Le projet est déjà inscrit au référentiel.
+    /// Le projet est déjà dans « Tous les projets ».
     AlreadyRegistered,
     /// Le dossier ne contient pas de manifeste `arnod.yml`.
     NotAProject,
     /// Projet ou workspace introuvable.
     NotFound,
-    /// Action interdite sur le workspace par défaut.
-    DefaultWorkspace,
     /// Le jeton d'annulation n'est plus valable.
     UndoExpired,
     /// Erreur d'entrée-sortie : disque, droits, chemin.
@@ -41,6 +39,22 @@ pub enum CommandErrorKind {
     CorruptState,
     /// Le fichier d'état a été écrit par une version plus récente d'Arnod.
     NewerVersion,
+    /// Une variable `{{nom}}` n'existe pas dans l'environnement actif.
+    UnknownVariable,
+    /// Fichier de requête ou de dossier invalide, ou opération impossible dessus.
+    InvalidRequest,
+    /// Échec réseau : hôte introuvable, connexion refusée, certificat.
+    Network,
+    /// Délai dépassé.
+    Timeout,
+    /// Exécution annulée par l'utilisateur.
+    Cancelled,
+    /// Le coffre du système est indisponible.
+    SecretStore,
+    /// Envoi sur un environnement protégé sans confirmation.
+    ProtectedEnvironment,
+    /// Fichier modifié hors d'Arnod depuis sa dernière lecture : rien n'est écrasé (lot I).
+    ChangedOnDisk,
 }
 
 /// Erreur renvoyée par une commande : une nature et un message prêt à afficher.
@@ -51,6 +65,10 @@ pub struct CommandError {
     pub kind: CommandErrorKind,
     /// Message en français, destiné à l'utilisateur.
     pub message: String,
+    /// Lot H : échec réseau classé (cause, certificat, proxy), absent du JSON s'il est vide
+    /// (`docs/plan-mvp-h-reseau-auth.md`, 5.1-i).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failure: Option<Box<crate::network::failure::NetworkFailure>>,
 }
 
 impl CommandError {
@@ -59,7 +77,15 @@ impl CommandError {
         Self {
             kind,
             message: message.into(),
+            failure: None,
         }
+    }
+
+    /// Lot H : joint l'échec réseau classé.
+    #[must_use]
+    pub fn with_failure(mut self, failure: crate::network::failure::NetworkFailure) -> Self {
+        self.failure = Some(Box::new(failure));
+        self
     }
 
     /// Erreur d'entrée-sortie : `action` décrit ce qui a échoué
@@ -88,18 +114,25 @@ mod tests {
     use crate::ts_contract::{serialized_name, union_members};
 
     /// Toutes les natures, à compléter à chaque ajout de variante.
-    const ALL_KINDS: [CommandErrorKind; 11] = [
+    const ALL_KINDS: [CommandErrorKind; 18] = [
         CommandErrorKind::InvalidName,
         CommandErrorKind::NameTaken,
         CommandErrorKind::FolderNotEmpty,
         CommandErrorKind::AlreadyRegistered,
         CommandErrorKind::NotAProject,
         CommandErrorKind::NotFound,
-        CommandErrorKind::DefaultWorkspace,
         CommandErrorKind::UndoExpired,
         CommandErrorKind::Io,
         CommandErrorKind::CorruptState,
         CommandErrorKind::NewerVersion,
+        CommandErrorKind::UnknownVariable,
+        CommandErrorKind::InvalidRequest,
+        CommandErrorKind::Network,
+        CommandErrorKind::Timeout,
+        CommandErrorKind::Cancelled,
+        CommandErrorKind::SecretStore,
+        CommandErrorKind::ProtectedEnvironment,
+        CommandErrorKind::ChangedOnDisk,
     ];
 
     fn serialized_kind(kind: CommandErrorKind) -> String {

@@ -3,12 +3,22 @@
  * vrai disque) : création et gestion des projets et des workspaces.
  *
  * Les étapes s'enchaînent et partagent un même bac à sable : elles suivent le
- * premier usage puis l'usage quotidien d'un utilisateur. Le sélecteur de
- * dossier natif (« Changer », P3) ne se pilote pas par WebDriver : il est
- * couvert par les tests Rust et Vitest.
+ * premier usage puis l'usage quotidien d'un utilisateur, avec les workspaces en
+ * onglets et l'onglet épinglé « Tous les projets ». Le sélecteur de dossier
+ * natif (« Changer », P3) ne se pilote pas par WebDriver : il est couvert par les
+ * tests Rust et Vitest. Les dernières étapes divisent la fenêtre en zones et
+ * ouvrent des fenêtres interconnectées (docs/plan-fenetres-zones.md), puis
+ * ajoutent un contrat de service et exécutent ses requêtes contre un serveur
+ * HTTP local (docs/plan-contrats-services.md). Les dernières essaient une étape
+ * REST depuis « Tous les projets » : l'essai est gardé dans « Non classés », sous
+ * le contrat déduit de son serveur (docs/plan-accueil-non-classes.md). Les toutes dernières suivent
+ * le premier usage jusqu'au run d'un dossier : vérifications en échec, résultat par dossier et
+ * statuts de la barre latérale gardés au redémarrage (docs/plan-fin-premier-usage.md).
  */
 import type { ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -22,6 +32,8 @@ import {
   launchApp,
   removeSandbox,
   readState,
+  readWindows,
+  type SavedNode,
   screenshot,
   startDriver,
   stopDriver,
@@ -56,14 +68,104 @@ async function restart(): Promise<void> {
   browser = await launchApp();
 }
 
+/** Workspace affiché par le sélecteur (docs/plan-selecteur-workspace.md, S1). */
+async function currentWorkspace(): Promise<string> {
+  // Texte du DOM : `getText` de WebKitWebDriver rend vide un libellé tronqué par ellipse.
+  return browser.execute(
+    () => document.querySelector(".switcher__label")?.textContent.trim() ?? "",
+  );
+}
+
 async function openSwitcher(): Promise<void> {
-  await browser.$('aside button[aria-haspopup="dialog"]').click();
-  await browser.$('[aria-label="Changer de workspace"]').waitForDisplayed();
+  const menu = browser.$('.switcher__popover [role="menu"]');
+  if (await menu.isExisting()) return;
+  await browser.$(".switcher__trigger").click();
+  await menu.waitForDisplayed();
+}
+
+async function closeSwitcher(): Promise<void> {
+  if (!(await browser.$('.switcher__popover [role="menu"]').isExisting())) return;
+  await browser.keys("Escape");
+  await browser.$('.switcher__popover [role="menu"]').waitForExist({ reverse: true });
+}
+
+/** « Tous les projets » puis les workspaces, lus dans le menu du sélecteur. */
+async function workspaceNames(): Promise<string[]> {
+  await openSwitcher();
+  const names = await browser.execute(() =>
+    Array.from(
+      document.querySelectorAll('.switcher__popover [role="menuitemradio"] .switcher__name'),
+    ).map((name) => name.textContent.trim()),
+  );
+  await closeSwitcher();
+  return names;
+}
+
+/** Ligne d'un workspace (ou de « Tous les projets ») dans le menu ouvert. */
+async function clickSwitcherEntry(label: string, role = "menuitemradio"): Promise<void> {
+  await browser.execute(
+    (text, kind) => {
+      const entry = Array.from(
+        document.querySelectorAll<HTMLElement>(`.switcher__popover [role="${kind}"]`),
+      ).find((item) => item.querySelector(".switcher__name")?.textContent.trim() === text);
+      if (!entry) throw new Error(`« ${text} » absent du sélecteur`);
+      entry.click();
+    },
+    label,
+    role,
+  );
+}
+
+/** Ouvre un workspace, ou « Tous les projets », par le sélecteur. */
+async function chooseWorkspace(name: string): Promise<void> {
+  await openSwitcher();
+  await clickSwitcherEntry(name);
+  await browser.$('.switcher__popover [role="menu"]').waitForExist({ reverse: true });
+}
+
+/** Actions d'un workspace : menu du sélecteur, puis clic droit sur sa ligne (S4). */
+async function openWorkspaceActions(name: string): Promise<void> {
+  await openSwitcher();
+  // Clic droit émis dans la WebView : un clic droit par actions WebDriver dérègle
+  // ensuite la frappe des majuscules sous WebKitWebDriver. Le vrai clic droit est
+  // couvert par Vitest ; ici, le menu s'ouvre sur le même événement `contextmenu`.
+  await browser.execute((label) => {
+    const target = Array.from(
+      document.querySelectorAll('.switcher__popover [role="menuitemradio"]'),
+    ).find((t) => t.querySelector(".switcher__name")?.textContent.trim() === label);
+    if (!target) throw new Error(`workspace « ${label} » introuvable`);
+    const box = target.getBoundingClientRect();
+    target.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        button: 2,
+        clientX: box.right - 24,
+        clientY: box.top + box.height / 2,
+      }),
+    );
+  }, name);
+  await browser.$('.switcher__context [role="menu"]').waitForDisplayed();
+}
+
+async function chooseWorkspaceAction(label: string): Promise<void> {
+  await browser.$(".switcher__context").$(`[role="menuitem"]*=${label}`).click();
+}
+
+/** Crée un workspace par « + Nouveau workspace » du sélecteur (S3). */
+async function createWorkspace(name: string): Promise<void> {
+  await openSwitcher();
+  await clickSwitcherEntry("Nouveau workspace", "menuitem");
+  const popover = browser.$('[role="dialog"][aria-labelledby]');
+  await popover.waitForDisplayed();
+  await popover.$("input").setValue(name);
+  await browser.keys("Enter");
+  await waitForHeading(browser, name);
 }
 
 async function openProjectMenu(name: string): Promise<void> {
   await browser.$(`button[aria-label="Actions du projet ${name}"]`).click();
-  await browser.$('[role="menu"]').waitForDisplayed();
+  await browser.$('main [role="menu"]').waitForDisplayed();
 }
 
 async function dismissToast(): Promise<void> {
@@ -72,75 +174,135 @@ async function dismissToast(): Promise<void> {
   });
 }
 
+/** Noms des onglets de chaque zone de la fenêtre courante. */
+async function zoneTabs(): Promise<string[][]> {
+  return browser.execute(() =>
+    Array.from(document.querySelectorAll("section.zone")).map((zone) =>
+      Array.from(zone.querySelectorAll(".zone__tab-button .zone__name")).map((name) =>
+        name.textContent.trim(),
+      ),
+    ),
+  );
+}
+
+async function waitForZoneTabs(expected: string[][]): Promise<void> {
+  await browser.waitUntil(
+    async () => JSON.stringify(await zoneTabs()) === JSON.stringify(expected),
+    { timeout: 10_000, timeoutMsg: `onglets ${JSON.stringify(expected)} attendus` },
+  );
+}
+
+/** Clic émis dans la WebView, pour un bouton qui n'apparaît qu'au survol. */
+async function clickHidden(selector: string): Promise<void> {
+  await browser.execute((css) => {
+    const target = document.querySelector<HTMLElement>(css);
+    if (!target) throw new Error(`élément « ${css} » introuvable`);
+    target.click();
+  }, selector);
+}
+
+/** Clique, depuis la page, le premier élément `selector` dont le texte contient `text`. */
+async function clickText(selector: string, text: string): Promise<void> {
+  await browser.execute(
+    (css, label) => {
+      const target = Array.from(document.querySelectorAll<HTMLElement>(css)).find((element) =>
+        element.textContent.includes(label),
+      );
+      if (!target) throw new Error(`« ${label} » introuvable dans ${css}`);
+      target.click();
+    },
+    selector,
+    text,
+  );
+}
+
+/** Attend `count` fenêtres et renvoie leurs identifiants WebDriver. */
+async function waitForWindows(count: number): Promise<string[]> {
+  await browser.waitUntil(async () => (await browser.getWindowHandles()).length === count, {
+    timeout: 15_000,
+    timeoutMsg: `${count} fenêtre(s) attendue(s)`,
+  });
+  return browser.getWindowHandles();
+}
+
+function zonesOf(node: SavedNode): Extract<SavedNode, { kind: "zone" }>[] {
+  return node.kind === "zone" ? [node] : [...zonesOf(node.first), ...zonesOf(node.second)];
+}
+
+function workspaceNamed(name: string) {
+  return readState(sandbox).workspaces.find((w) => w.name === name);
+}
+
 describe("Arnod, de bout en bout", () => {
-  it("premier lancement : « Mes projets » par défaut et invitation à créer (1a, W1)", async () => {
-    expect(await heading(browser)).toBe("Créez votre premier projet");
-    const sidebar = await browser.$("aside").getText();
-    expect(sidebar).toContain("Mes projets");
-    expect(sidebar).toContain("par défaut");
-    expect(sidebar).toContain("Créé automatiquement. Votre premier projet y sera rangé.");
+  it("premier lancement : seul l'onglet « Tous les projets », aucun workspace (1a, R3, A1)", async () => {
+    expect(await heading(browser)).toBe("Bienvenue dans Arnod");
+    expect(await currentWorkspace()).toBe("Tous les projets");
+    expect(await workspaceNames()).toEqual(["Tous les projets"]);
+    expect(await browser.$("aside").getText()).toBe("Aucun projet pour l'instant.");
+    const main = await browser.$("main").getText();
+    expect(main).toContain("Essayer une étape");
+    expect(main).toContain("Créer un projet");
+    expect(main).toContain(
+      "Un projet = un dossier sur votre poste, prêt à être partagé avec l'équipe.",
+    );
 
     const state = readState(sandbox);
-    expect(state.workspaces.map((w) => w.name)).toEqual(["Mes projets"]);
+    expect(state.workspaces).toEqual([]);
     expect(state.projects).toEqual([]);
+    expect(state.lastWorkspaceId).toBeNull();
+    expect(state.inboxProjectId).toBeUndefined();
     await screenshot(browser, "01-premier-lancement");
   });
 
-  it("crée le premier projet sur disque et l'ouvre (P1, P4, P5)", async () => {
-    await browser.$("form input").setValue("boutique-tests");
-    const folder = browser.$('[data-testid="project-folder"]');
+  it("choisir REST ouvre son formulaire, créer et importer se réduisent à une ligne (A3, A4)", async () => {
+    await browser.$('main button[title^="REST"]').click();
+    const form = browser.$('main [role="group"][aria-label="Formulaire de la nature REST"]');
+    await form.waitForDisplayed();
+    expect(await browser.$("main .first-run__compact").isDisplayed()).toBe(true);
+    expect(await browser.$("main .first-run__cards").isExisting()).toBe(false);
+    expect(await browser.$("main .try__form").$("button=Envoyer").isDisplayed()).toBe(true);
+    // POST montre le type et le corps (champs conditionnels de la définition).
+    await form.$("button=POST").click();
+    await form.$("textarea[id$='-body']").waitForDisplayed();
+    await screenshot(browser, "01b-accueil-rest");
+
+    // Échap ferme le formulaire : les cartes reviennent.
+    await browser.$("main .try__input").click();
+    await browser.keys("Escape");
+    await browser.$("main .first-run__cards").waitForDisplayed();
+    expect(await form.isExisting()).toBe(false);
+  });
+
+  it("crée le premier projet sur disque, sans workspace, et l'ouvre (P1, P4, P5)", async () => {
+    // Les fenêtres fermées restent dans le DOM, hors de `main` : leurs champs ne comptent pas.
+    await browser.$("main .first-run__card form input").setValue("boutique-tests");
+    const folder = browser.$('main [data-testid="project-folder"]');
     const expected = path.join(sandbox.home, "arnod", "boutique-tests");
     await browser.waitUntil(async () => (await folder.getText()) === expected, {
       timeoutMsg: `aperçu du dossier « ${expected} » attendu`,
     });
 
-    await browser.$("button=Créer le projet").click();
+    await browser.$("main").$("button=Créer le projet").click();
     await waitForHeading(browser, "boutique-tests");
 
     expect(await toastText(browser)).toContain(
-      "« boutique-tests » créé dans le workspace Mes projets (par défaut).",
+      "« boutique-tests » créé · visible dans « Tous les projets ».",
     );
-    const manifest = readFileSync(path.join(expected, "arnod.yml"), "utf8");
+    // Le projet est une collection OpenCollection 1.0.0.
+    const manifest = readFileSync(path.join(expected, "opencollection.yml"), "utf8");
+    expect(manifest).toMatch(/^opencollection: "?1\.0\.0"?\n/);
     expect(manifest).toContain("name: boutique-tests");
     const state = readState(sandbox);
     expect(state.projects.map((p) => p.name)).toEqual(["boutique-tests"]);
-    expect(state.workspaces[0]?.projectIds).toEqual([state.projects[0]?.id]);
+    expect(state.workspaces).toEqual([]);
     await screenshot(browser, "02-projet-cree");
   });
 
-  it("le menu du sélecteur s'affiche en entier, par-dessus la zone principale (2b, W4)", async () => {
-    await openSwitcher();
-    const layout = await browser.execute(() => {
-      const sidebar = document.querySelector("aside");
-      const popover = document.querySelector('[aria-label="Changer de workspace"]');
-      if (!sidebar || !popover) return null;
-      const box = popover.getBoundingClientRect();
-      // Près de chaque coin, c'est bien le menu qui est affiché : il n'est pas rogné.
-      const corners = [
-        [box.left + 4, box.top + 4],
-        [box.right - 4, box.top + 4],
-        [box.left + 4, box.bottom - 4],
-        [box.right - 4, box.bottom - 4],
-      ] as const;
-      return {
-        sidebarScrollLeft: sidebar.scrollLeft,
-        overflowsSidebar: box.right > sidebar.getBoundingClientRect().right,
-        cornersVisible: corners.every(([x, y]) =>
-          popover.contains(document.elementFromPoint(x, y)),
-        ),
-      };
-    });
-    expect(layout).toEqual({ sidebarScrollLeft: 0, overflowsSidebar: true, cornersVisible: true });
-    await screenshot(browser, "02b-selecteur-workspaces");
-
-    await browser.keys("Escape");
-    await browser.$('[aria-label="Changer de workspace"]').waitForDisplayed({ reverse: true });
-  });
-
   it("refuse un nom déjà pris, message du cœur sous le champ (R9)", async () => {
-    await browser.$("button=← Mes projets").click();
-    await waitForHeading(browser, "Mes projets");
-    await browser.$("button=+ Nouveau projet").click();
+    // Depuis un projet, l'onglet de départ ramène à sa liste.
+    await chooseWorkspace("Tous les projets");
+    await waitForHeading(browser, "Tous les projets · 1");
+    await browser.$("main").$("button=Nouveau projet").click();
     const dialog = browser.$("dialog[open]");
     await dialog.waitForDisplayed();
 
@@ -150,26 +312,55 @@ describe("Arnod, de bout en bout", () => {
     const error = dialog.$('[role="alert"]');
     await error.waitForDisplayed();
     expect(await error.getText()).toBe(
-      "Un projet « boutique-tests » existe déjà dans le référentiel.",
+      "Un projet « boutique-tests » existe déjà dans « Tous les projets ».",
     );
     await dialog.$("button=Annuler").click();
     await dialog.waitForDisplayed({ reverse: true });
   });
 
-  it("crée un workspace depuis le sélecteur et l'ouvre (2b, W5)", async () => {
-    await openSwitcher();
-    await browser.$("button=+ Nouveau workspace").click();
-    const dialog = browser.$("dialog[open]");
-    await dialog.waitForDisplayed();
-    await dialog.$("input").setValue("Boutique");
-    await browser.keys("Enter");
+  it("« + Nouveau workspace » du sélecteur crée un workspace et l'ouvre (S3)", async () => {
+    await createWorkspace("Boutique");
 
-    await waitForHeading(browser, "Boutique");
+    expect(await workspaceNames()).toEqual(["Tous les projets", "Boutique"]);
+    expect(await currentWorkspace()).toBe("Boutique");
     expect(await browser.$("main").getText()).toContain("Aucun projet pour l'instant");
-    expect(readState(sandbox).workspaces.map((w) => w.name)).toEqual(["Mes projets", "Boutique"]);
+    const state = readState(sandbox);
+    expect(state.workspaces.map((w) => w.name)).toEqual(["Boutique"]);
+    expect(state.lastWorkspaceId).toBe(workspaceNamed("Boutique")?.id);
   });
 
-  it("ajoute un projet du référentiel au workspace (2c, W6)", async () => {
+  it("le sélecteur et les actions d'un workspace s'affichent en entier, par-dessus la zone principale (S2, S4)", async () => {
+    await openWorkspaceActions("Boutique");
+    const layout = await browser.execute(() => {
+      const menu = document.querySelector('.switcher__context [role="menu"]');
+      if (!menu) return null;
+      const box = menu.getBoundingClientRect();
+      // Près de chaque coin, c'est bien le menu qui est affiché : il n'est pas rogné.
+      const corners = [
+        [box.left + 4, box.top + 4],
+        [box.right - 4, box.top + 4],
+        [box.left + 4, box.bottom - 4],
+        [box.right - 4, box.bottom - 4],
+      ] as const;
+      return corners.every(([x, y]) => menu.contains(document.elementFromPoint(x, y)));
+    });
+    expect(layout).toBe(true);
+    const popover = await browser.execute(() => {
+      const menu = document.querySelector(".switcher__popover");
+      if (!menu) return null;
+      const box = menu.getBoundingClientRect();
+      // Le bas du menu du sélecteur passe par-dessus la zone principale.
+      return menu.contains(document.elementFromPoint(box.left + 4, box.bottom - 4));
+    });
+    expect(popover).toBe(true);
+    await screenshot(browser, "02b-selecteur-workspace");
+
+    await browser.keys("Escape");
+    await browser.$('.switcher__context [role="menu"]').waitForExist({ reverse: true });
+    await closeSwitcher();
+  });
+
+  it("ajoute un projet existant au workspace (2c, W6)", async () => {
     await browser.$("main .add-card").click();
     const dialog = browser.$("dialog[open]");
     await dialog.waitForDisplayed();
@@ -183,22 +374,26 @@ describe("Arnod, de bout en bout", () => {
     expect(await toastText(browser)).toBe("« boutique-tests » ajouté à « Boutique ».");
   });
 
-  it("crée un projet depuis le workspace : rangé ici et dans le défaut (2a bis, R4)", async () => {
-    await browser.$("button=+ Nouveau projet").click();
+  it("crée un projet depuis le workspace : rangé ici seulement (2a bis, R4)", async () => {
+    await browser.$("main").$("button=+ Nouveau projet").click();
     const dialog = browser.$("dialog[open]");
     await dialog.waitForDisplayed();
-    expect(await dialog.getText()).toContain("Aussi ajouté à");
+    expect(await dialog.getText()).toContain("workspace ouvert");
 
     await dialog.$("input").setValue("paiements-v3");
     await dialog.$("button=Créer le projet").click();
     await waitForHeading(browser, "paiements-v3");
 
-    expect(existsSync(path.join(sandbox.home, "arnod", "paiements-v3", "arnod.yml"))).toBe(true);
+    expect(existsSync(path.join(sandbox.home, "arnod", "paiements-v3", "opencollection.yml"))).toBe(
+      true,
+    );
     const state = readState(sandbox);
     const id = state.projects.find((p) => p.name === "paiements-v3")?.id;
-    expect(state.workspaces.every((w) => id !== undefined && w.projectIds.includes(id))).toBe(true);
+    expect(
+      state.workspaces.map((w) => [w.name, id !== undefined && w.projectIds.includes(id)]),
+    ).toEqual([["Boutique", true]]);
 
-    await browser.$("button=← Boutique").click();
+    await chooseWorkspace("Boutique");
     await waitForHeading(browser, "Boutique");
     expect(await cardNames(browser)).toEqual(["boutique-tests", "paiements-v3"]);
     await screenshot(browser, "03-workspace-boutique");
@@ -206,65 +401,144 @@ describe("Arnod, de bout en bout", () => {
 
   it("retire un projet du workspace puis annule (P7, R5, R6)", async () => {
     await openProjectMenu("paiements-v3");
-    await browser.$('[role="menuitem"]*=Retirer de « Boutique »').click();
+    await browser.$("main").$('[role="menuitem"]*=Retirer de « Boutique »').click();
 
     await browser.waitUntil(async () => (await cardNames(browser)).length === 1);
-    expect(await toastText(browser)).toContain("Le projet reste dans le référentiel.");
+    expect(await toastText(browser)).toContain("Le projet reste dans « Tous les projets ».");
     expect(readState(sandbox).projects).toHaveLength(2);
 
     await browser.$(".toast").$("button=Annuler").click();
     await browser.waitUntil(async () => (await cardNames(browser)).length === 2);
     expect(await cardNames(browser)).toEqual(["boutique-tests", "paiements-v3"]);
-  });
-
-  it("gère les workspaces : défaut transféré, suppression annulée (2d, W9, W11)", async () => {
-    await openSwitcher();
-    await browser.$("button=Gérer les workspaces…").click();
-    await browser.$('[role="tab"][aria-selected="true"]').waitForDisplayed();
-    expect(await browser.$("aside").isExisting()).toBe(false);
-
-    await browser.$('[role="switch"]').click();
-    await browser.waitUntil(async () =>
-      (await browser.$("main").getText()).includes("(actuellement : Boutique)"),
-    );
-    expect(readState(sandbox).defaultWorkspaceId).toBe(
-      readState(sandbox).workspaces.find((w) => w.name === "Boutique")?.id,
-    );
-    await screenshot(browser, "04-gerer-workspaces");
-
-    await browser.$("nav").$("button*=Mes projets").click();
-    await browser.$("button=Supprimer ce workspace").click();
-    expect(await toastText(browser)).toContain(
-      "Workspace « Mes projets » supprimé · 2 projets conservés dans le référentiel.",
-    );
-    expect(readState(sandbox).workspaces.map((w) => w.name)).toEqual(["Boutique"]);
-
-    await browser.$(".toast").$("button=Annuler").click();
-    await browser.waitUntil(() => readState(sandbox).workspaces.length === 2);
     await dismissToast();
   });
 
-  it("le référentiel liste chaque projet une fois avec ses workspaces (2e, P9)", async () => {
-    await browser.$('[role="tab"]=Référentiel des projets').click();
-    await waitForHeading(browser, "2 projets");
+  it("renomme un workspace depuis le sélecteur (S4)", async () => {
+    await openWorkspaceActions("Boutique");
+    await chooseWorkspaceAction("Renommer");
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForDisplayed();
+    expect(await dialog.$("h2").getText()).toBe("Renommer le workspace");
+    const input = dialog.$("input");
+    expect(await input.getValue()).toBe("Boutique");
+    await input.setValue("E-commerce");
+    await browser.keys("Enter");
 
-    expect(await browser.$$("tbody th").map((row) => row.getText())).toEqual([
+    await waitForHeading(browser, "E-commerce");
+    expect(await currentWorkspace()).toBe("E-commerce");
+    expect(await workspaceNames()).toEqual(["Tous les projets", "E-commerce"]);
+    expect(workspaceNamed("E-commerce")?.projectIds).toHaveLength(2);
+  });
+
+  it("glisser une ligne de « Tous les projets » sur le sélecteur ajoute le projet (S6)", async () => {
+    await createWorkspace("Recette");
+    await chooseWorkspace("Tous les projets");
+    await waitForHeading(browser, "Tous les projets · 2");
+
+    // Le glisser natif ne se pilote pas par WebDriver sous WebKit : on émet les
+    // événements HTML du glisser-déposer dans la vraie WebView. Le sélecteur
+    // s'ouvre au survol, puis le projet se dépose sur un workspace.
+    await browser.execute(() => {
+      const row = Array.from(document.querySelectorAll("main tbody tr")).find(
+        (tr) => tr.querySelector(".all__project")?.textContent.trim() === "boutique-tests",
+      );
+      const trigger = document.querySelector(".switcher__trigger");
+      if (!row || !trigger) throw new Error("ligne ou sélecteur introuvable");
+      const dataTransfer = new DataTransfer();
+      (window as unknown as { __drag: { row: Element; dataTransfer: DataTransfer } }).__drag = {
+        row,
+        dataTransfer,
+      };
+      for (const [element, type] of [
+        [row, "dragstart"],
+        [trigger, "dragenter"],
+      ] as const) {
+        element.dispatchEvent(
+          new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer }),
+        );
+      }
+    });
+    await browser.$('.switcher__popover [role="menu"]').waitForDisplayed();
+    await browser.execute(() => {
+      const { row, dataTransfer } = (
+        window as unknown as { __drag: { row: Element; dataTransfer: DataTransfer } }
+      ).__drag;
+      const target = Array.from(
+        document.querySelectorAll('.switcher__popover [role="menuitemradio"]'),
+      ).find((t) => t.querySelector(".switcher__name")?.textContent.trim() === "Recette");
+      if (!target) throw new Error("workspace « Recette » absent du sélecteur");
+      const fire = (element: Element, type: string) =>
+        element.dispatchEvent(
+          new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer }),
+        );
+      fire(target, "dragover");
+      fire(target, "drop");
+      fire(row, "dragend");
+    });
+
+    expect(await toastText(browser)).toBe("« boutique-tests » ajouté à « Recette ».");
+    const boutique = readState(sandbox).projects.find((p) => p.name === "boutique-tests");
+    expect(workspaceNamed("Recette")?.projectIds).toEqual([boutique?.id]);
+    await dismissToast();
+  });
+
+  it("gère les workspaces : suppression sans confirmation, puis annulée (2d, O6, O11)", async () => {
+    await openWorkspaceActions("Recette");
+    await chooseWorkspaceAction("Gérer les workspaces…");
+    await waitForHeading(browser, "Workspaces");
+    expect(await browser.$("aside").isExisting()).toBe(false);
+    expect(await browser.$("main").getText()).not.toContain("par défaut");
+    await screenshot(browser, "04-gerer-workspaces");
+
+    await browser.$("main").$("button=Supprimer ce workspace").click();
+    expect(await toastText(browser)).toContain(
+      "Workspace « Recette » supprimé · 1 projet conservé dans « Tous les projets ».",
+    );
+    expect(readState(sandbox).workspaces.map((w) => w.name)).toEqual(["E-commerce"]);
+    expect(await workspaceNames()).toEqual(["Tous les projets", "E-commerce"]);
+
+    await browser.$(".toast").$("button=Annuler").click();
+    await browser.waitUntil(() => readState(sandbox).workspaces.length === 2);
+    expect(await workspaceNames()).toEqual(["Tous les projets", "E-commerce", "Recette"]);
+    await dismissToast();
+    await browser.$("main").$("button*=Retour").click();
+    await waitForHeading(browser, "Tous les projets · 2");
+  });
+
+  it("« Tous les projets » liste chaque projet une fois avec ses workspaces (2e, O1)", async () => {
+    expect(await browser.$$("main tbody .all__project").map((name) => name.getText())).toEqual([
       "boutique-tests",
       "paiements-v3",
     ]);
-    expect(await browser.$$("tbody tr:first-child .chip").map((chip) => chip.getText())).toEqual([
-      "Boutique",
-      "Mes projets",
-    ]);
-    await screenshot(browser, "05-referentiel");
-    await browser.$("button=Retour au workspace").click();
-    await waitForHeading(browser, "Boutique");
+    expect(
+      await browser.$$("main tbody tr:first-child .chip").map((chip) => chip.getText()),
+    ).toEqual(["E-commerce", "Recette"]);
+    // La barre latérale reste : on en sort en ouvrant un projet ou par le sélecteur (2e, 2f).
+    // Noms lus par textContent, comme ceux du sélecteur : sous WebKitWebDriver, getText
+    // (innerText) renvoie une chaîne vide pour un nom en text-overflow: ellipsis.
+    expect(
+      await browser.execute(() =>
+        Array.from(document.querySelectorAll("aside .project__name")).map((name) =>
+          name.textContent.trim(),
+        ),
+      ),
+    ).toEqual(["boutique-tests", "paiements-v3"]);
+    expect(await browser.$("aside .sidebar__hint").getText()).toBe(
+      "Ouvrez un projet ici, ou choisissez un workspace dans le sélecteur.",
+    );
+    await screenshot(browser, "05-tous-les-projets");
   });
 
-  it("au redémarrage, rouvre le dernier workspace avec ses projets (W2, R7)", async () => {
+  it("au redémarrage, rouvre le dernier onglet utilisé (R7)", async () => {
+    await restart();
+    await waitForHeading(browser, "Tous les projets · 2");
+    expect(readState(sandbox).lastWorkspaceId).toBeNull();
+
+    await chooseWorkspace("E-commerce");
+    await waitForHeading(browser, "E-commerce");
     await restart();
 
-    await waitForHeading(browser, "Boutique");
+    await waitForHeading(browser, "E-commerce");
     expect(await cardNames(browser)).toEqual(["boutique-tests", "paiements-v3"]);
   });
 
@@ -278,10 +552,10 @@ describe("Arnod, de bout en bout", () => {
     expect(await toastText(browser)).toContain(
       "Le dossier du projet « paiements-v3 » est introuvable",
     );
-    expect(await heading(browser)).toBe("Boutique");
+    expect(await heading(browser)).toBe("E-commerce");
   });
 
-  it("inscrit un dossier projet existant par son manifeste (P12)", async () => {
+  it("inscrit un projet du format précédent et le convertit (P12, R6)", async () => {
     const folder = path.join(sandbox.home, "dev", "catalogue-legacy");
     mkdirSync(folder, { recursive: true });
     writeFileSync(
@@ -306,19 +580,23 @@ describe("Arnod, de bout en bout", () => {
     );
     await restart();
 
-    await waitForHeading(browser, "Boutique");
+    await waitForHeading(browser, "E-commerce");
     expect(await cardNames(browser)).toContain("catalogue-legacy");
     const added = readState(sandbox).projects.find((p) => p.name === "catalogue-legacy");
     expect(added?.id).toBe("7f3c2a10-5b1e-4c8d-9a2f-0e6b4d3c2a10");
+    // Converti une fois en collection OpenCollection, identifiant gardé.
+    expect(existsSync(path.join(folder, "arnod.yml"))).toBe(false);
+    const root = readFileSync(path.join(folder, "opencollection.yml"), "utf8");
+    expect(root).toContain("name: catalogue-legacy");
+    expect(root).toContain("id: 7f3c2a10-5b1e-4c8d-9a2f-0e6b4d3c2a10");
   });
 
   it("oublie un projet sans toucher à ses fichiers, puis annule (P11, R6)", async () => {
-    await openSwitcher();
-    await browser.$("button*=Référentiel des projets").click();
-    await waitForHeading(browser, "3 projets");
+    await chooseWorkspace("Tous les projets");
+    await waitForHeading(browser, "Tous les projets · 3");
 
     await browser.$('button[aria-label="Oublier catalogue-legacy"]').click();
-    await waitForHeading(browser, "2 projets");
+    await waitForHeading(browser, "Tous les projets · 2");
 
     expect(await toastText(browser)).toContain("Ses fichiers restent sur le disque.");
     const state = readState(sandbox);
@@ -326,10 +604,2582 @@ describe("Arnod, de bout en bout", () => {
     expect(state.workspaces.flatMap((w) => w.projectIds)).not.toContain(
       "7f3c2a10-5b1e-4c8d-9a2f-0e6b4d3c2a10",
     );
-    expect(existsSync(path.join(sandbox.home, "dev", "catalogue-legacy", "arnod.yml"))).toBe(true);
+    expect(
+      existsSync(path.join(sandbox.home, "dev", "catalogue-legacy", "opencollection.yml")),
+    ).toBe(true);
 
     await browser.$(".toast").$("button=Annuler").click();
-    await waitForHeading(browser, "3 projets");
+    await waitForHeading(browser, "Tous les projets · 3");
     expect(readState(sandbox).projects.map((p) => p.name)).toContain("catalogue-legacy");
+  });
+});
+
+describe("Fenêtres et zones", () => {
+  let mainWindow: string;
+
+  it("ouvre les requêtes en onglets et divise la zone (F1, F2, F4)", async () => {
+    await chooseWorkspace("E-commerce");
+    await waitForHeading(browser, "E-commerce");
+    await browser.$("aside nav").$("button*=boutique-tests").click();
+    await waitForHeading(browser, "boutique-tests");
+
+    // « + » de la ligne du projet, puis « Requête libre » (barre latérale du projet, B3, 1.2-a ter).
+    const freeRequest = async (name: string): Promise<void> => {
+      await browser.$('aside button[aria-label="Ajouter au projet boutique-tests"]').click();
+      await browser.$('[role="menuitem"]*=Requête libre').click();
+      const dialog = browser.$("dialog[open]");
+      await dialog.waitForDisplayed();
+      await dialog.$("input").setValue(name);
+      await browser.keys("Enter");
+    };
+    await freeRequest("Nouvelle requête");
+    await waitForZoneTabs([["Nouvelle requête"]]);
+    await freeRequest("lister");
+    await waitForZoneTabs([["Nouvelle requête", "lister"]]);
+
+    await browser.$('button[aria-label="Diviser à droite"]').click();
+    await waitForZoneTabs([["Nouvelle requête"], ["lister"]]);
+
+    // Au clavier : la séparation prend le focus, la flèche droite élargit la première zone.
+    await browser.execute(() => {
+      document
+        .querySelector<HTMLElement>('[role="separator"][aria-label="Largeur des zones"]')
+        ?.focus();
+    });
+    await browser.keys("ArrowRight");
+    const handle = browser.$('[role="separator"][aria-label="Largeur des zones"]');
+    await browser.waitUntil(async () => (await handle.getAttribute("aria-valuenow")) === "55");
+    await browser.waitUntil(() => {
+      const root = readWindows(sandbox).windows[0]?.layout?.root;
+      return root?.kind === "split" && Math.abs(root.ratio - 0.55) < 0.001;
+    });
+    expect(readWindows(sandbox).windows[0]?.layout?.root).toMatchObject({
+      kind: "split",
+      axis: "row",
+    });
+    await screenshot(browser, "06-zones");
+  });
+
+  it("ouvre une zone dans sa fenêtre, puis la rattache (F8, F12)", async () => {
+    mainWindow = await browser.getWindowHandle();
+    const tools = await browser.$$('button[aria-label="Ouvrir la zone dans une fenêtre"]');
+    await tools[1]?.click();
+    const handles = await waitForWindows(2);
+    await waitForZoneTabs([["Nouvelle requête"]]);
+    expect(readWindows(sandbox).windows.map((w) => w.kind)).toEqual(["main", "content"]);
+
+    const detached = handles.find((h) => h !== mainWindow) ?? "";
+    await browser.switchToWindow(detached);
+    const crumbs = browser.$('nav[aria-label="Emplacement"]');
+    await crumbs.waitForDisplayed({ timeout: 15_000 });
+    await browser.waitUntil(async () => (await crumbs.getText()).includes("lister"));
+    expect(await crumbs.getText()).toContain("boutique-tests");
+    expect(await browser.$(".content-window__follow").getAttribute("aria-pressed")).toBe("true");
+    await screenshot(browser, "07-fenetre-contenu");
+
+    await browser.$(".content-window__bar").$("button=Rattacher").click();
+    await waitForWindows(1);
+    await browser.switchToWindow(mainWindow);
+    await waitForZoneTabs([["Nouvelle requête", "lister"]]);
+    expect(readWindows(sandbox).windows.map((w) => w.kind)).toEqual(["main"]);
+  });
+
+  it("détache la barre latérale, qui pilote la fenêtre principale (F9, Z5)", async () => {
+    await clickHidden('button[aria-label="Détacher la barre latérale dans une fenêtre"]');
+    const handles = await waitForWindows(2);
+    await browser.waitUntil(async () => !(await browser.$("aside").isExisting()));
+
+    await browser.switchToWindow(handles.find((h) => h !== mainWindow) ?? "");
+    const pilot = browser.$(".sidebar-window__pilot");
+    await pilot.waitForDisplayed({ timeout: 15_000 });
+    expect(await pilot.getText()).toBe("Pilote 1 fenêtre de contenu");
+    const expand = browser.$('button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await browser.$('[role="tree"]').$("button*=Nouvelle requête").click();
+    await browser.waitUntil(() => {
+      const layout = readWindows(sandbox).windows[0]?.layout;
+      const zone = layout ? zonesOf(layout.root).find((z) => z.id === layout.activeZone) : null;
+      const active = zone?.tabs.find((t) => t.id === zone.activeTab);
+      return active?.content.path?.includes("nouvelle") ?? false;
+    });
+    await screenshot(browser, "08-barre-detachee");
+
+    await browser.$(".sidebar-window__footer").$("button=Rattacher").click();
+    await waitForWindows(1);
+    await browser.switchToWindow(mainWindow);
+    await browser.$("aside").waitForDisplayed();
+    expect(readWindows(sandbox).windows[0]?.sidebarDetached).toBe(false);
+  });
+
+  it("au redémarrage, rouvre les onglets dans leurs zones (Z8)", async () => {
+    await restart();
+    await waitForZoneTabs([["Nouvelle requête", "lister"]]);
+    expect(await browser.$("aside").isExisting()).toBe(true);
+  });
+
+  it("le menu de l'environnement n'est pas rogné par la barre latérale, sa gestion tient dans la fenêtre", async () => {
+    await browser.$('aside button[aria-label^="Environnement de boutique-tests"]').click();
+    await browser.$('aside [role="menu"]').waitForDisplayed();
+    const whole = await browser.execute(() => {
+      const menu = document.querySelector("aside .menu__popover");
+      if (!menu) return null;
+      const box = menu.getBoundingClientRect();
+      // Près de chaque coin, c'est bien le menu qui est affiché, même hors de la barre latérale.
+      const corners = [
+        [box.left + 4, box.top + 4],
+        [box.right - 4, box.top + 4],
+        [box.left + 4, box.bottom - 4],
+        [box.right - 4, box.bottom - 4],
+      ] as const;
+      return corners.every(([x, y]) => menu.contains(document.elementFromPoint(x, y)));
+    });
+    expect(whole).toBe(true);
+    await screenshot(browser, "08b-menu-environnement");
+
+    await browser.$('[role="menuitem"]*=Gérer les environnements').click();
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForDisplayed();
+    // Aucun champ ne dépasse : le contenu suit la largeur de la fenêtre, sans défilement horizontal.
+    const fits = await browser.execute(() => {
+      const body = document.querySelector("dialog[open] .dialog__body");
+      return body ? body.scrollWidth <= body.clientWidth : null;
+    });
+    expect(fits).toBe(true);
+    await screenshot(browser, "08c-environnements");
+    await browser.keys("Escape");
+    await browser.$("dialog[open]").waitForExist({ reverse: true });
+  });
+});
+
+/** Contrat OpenAPI du serveur de test, servi à `url`. */
+function animalerie(url: string): string {
+  return `openapi: 3.0.3
+info:
+  title: Animalerie
+  version: 2.1.0
+servers:
+  - url: ${url}
+paths:
+  /pets:
+    get:
+      tags: [animaux]
+      summary: Lister les animaux
+      responses:
+        "200":
+          description: Liste
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Pet" }
+    post:
+      tags: [animaux]
+      summary: Créer un animal
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Pet" }
+      responses:
+        "201":
+          description: Créé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+  /pets/{petId}:
+    get:
+      tags: [animaux]
+      summary: Trouver un animal
+      parameters:
+        - { name: petId, in: path, required: true, schema: { type: integer }, example: 1 }
+      responses:
+        "200":
+          description: Un animal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+components:
+  schemas:
+    Pet:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+`;
+}
+
+describe("Contrats de services", () => {
+  let server: Server;
+  let url = "";
+  /** Le serveur répond un identifiant texte : écart au contrat. */
+  let broken = false;
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      const json = (status: number, body: unknown): void => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      const pet = { id: broken ? "un" : 1, name: "Rex" };
+      if (request.method === "GET" && request.url === "/pets") json(200, [pet]);
+      else if (request.method === "GET" && request.url === "/pets/1") json(200, pet);
+      else if (request.method === "POST" && request.url === "/pets") json(201, pet);
+      else json(404, { message: "absent" });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  it("ajoute un contrat collé, présenté dans son onglet (C2, C5)", async () => {
+    await browser.$('button[aria-label="Ajouter un contrat à boutique-tests"]').click();
+    await clickText('[role="menuitem"]', "Coller un contrat");
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForDisplayed();
+    // Texte collé d'un bloc, comme un Ctrl+V.
+    await browser.execute((text) => {
+      const area = document.querySelector<HTMLTextAreaElement>("dialog[open] textarea");
+      if (!area) throw new Error("zone de texte introuvable");
+      area.value = text;
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    }, animalerie(url));
+    await dialog.$("button=Ajouter").click();
+
+    const name = browser.$(".contract__name");
+    await name.waitForDisplayed({ timeout: 10_000 });
+    expect(await name.getText()).toBe("Animalerie");
+    expect(await browser.$(".contract__coverage").getText()).toBe("3 opérations · 0 avec requête");
+    expect(await browser.$(".contract-row__version").getText()).toBe("2.1.0");
+    expect(readFileSync(path.join(project(), "contracts", "animalerie.yaml"), "utf8")).toBe(
+      animalerie(url),
+    );
+  });
+
+  it("crée les requêtes du contrat et renseigne baseUrl (C6, R8)", async () => {
+    await browser.$(".contract__actions").$("button*=Créer les requêtes (3)").click();
+    await browser.waitUntil(
+      async () =>
+        (await browser.$(".contract__coverage").getText()) === "3 opérations · 3 avec requête",
+      { timeout: 10_000 },
+    );
+    const request = readFileSync(
+      path.join(project(), "Animalerie", "animaux", "trouver-un-animal.yml"),
+      "utf8",
+    );
+    // Requête OpenCollection, liée par une étiquette ; la conformité n'est pas écrite (R8).
+    expect(request).toContain("type: http");
+    // Endpoint : paramètre de chemin dans l'adresse, réponses attendues du contrat (R8).
+    expect(request).toContain("{{baseUrl}}/pets/:petId");
+    expect(request).toContain("type: path");
+    expect(request).toContain("name: Un animal");
+    expect(request).toContain("contract:contracts/animalerie.yaml#GET /pets/{petId}");
+    expect(request).toContain("operator: eq");
+    expect(request).not.toContain("matchesContract");
+    expect(readFileSync(path.join(project(), "environments", "local.yml"), "utf8")).toContain(url);
+
+    // Rangées sous le contrat, qui se déplie (RC7) ; aucune dans le référentiel de tests (RC6).
+    const operation = browser.$('aside [aria-label="Ouvrir GET /pets/{petId}"]');
+    await operation.waitForExist({
+      timeout: 10_000,
+      timeoutMsg: "opération absente du contrat déplié",
+    });
+    // Texte du DOM : une ligne hors de la partie visible de la barre latérale compte aussi.
+    const sidebar = () =>
+      browser.execute(() => ({
+        resources: Array.from(document.querySelectorAll("aside .crow__resource .crow__name")).map(
+          (n) => n.textContent.trim(),
+        ),
+        tests: Array.from(document.querySelectorAll('aside [role="treeitem"]')).map((i) =>
+          i.textContent.trim(),
+        ),
+      }));
+    expect((await sidebar()).resources).toEqual(["/pets"]);
+    expect((await sidebar()).tests.some((text) => text.includes("Animalerie"))).toBe(false);
+    // Un clic sur l'opération ouvre son endpoint (RC2).
+    await operation.click();
+    await browser.waitUntil(async () => (await zoneTabs()).flat().includes("Trouver un animal"), {
+      timeout: 10_000,
+      timeoutMsg: "endpoint de l'opération non ouvert",
+    });
+    await clickText(".zone__tab-button", "Animalerie");
+    await screenshot(browser, "09-contrat");
+  });
+
+  it("exécute le contrat : réponses conformes (C10)", async () => {
+    await browser.$(".contract__actions").$("button*=Exécuter (3)").click();
+    const progress = browser.$(".run__progress");
+    await progress.waitForDisplayed({ timeout: 10_000 });
+    await browser.waitUntil(async () => (await progress.getText()).includes("tout est réussi"), {
+      timeout: 15_000,
+      timeoutMsg: "run du contrat non réussi",
+    });
+    expect(await browser.$(".run__title").getText()).toContain("Run du contrat « Animalerie »");
+    expect(await browser.$$(".run__item--passed").length).toBe(3);
+  });
+
+  it("un écart au contrat fait échouer la conformité, avec le chemin (C8)", async () => {
+    broken = true;
+    await clickText(".zone__tab-button", "Animalerie");
+    await browser.$(".contract__actions").$("button*=Exécuter (3)").click();
+    const progress = browser.$(".run__progress");
+    await browser.waitUntil(async () => (await progress.getText()).includes("3 en échec"), {
+      timeout: 15_000,
+      timeoutMsg: "écart au contrat non détecté",
+    });
+    const errors = await browser.$$(".run__error").map((e) => e.getText());
+    expect(errors.some((text) => text.includes("body[0].id : attendu entier"))).toBe(true);
+    expect(errors.some((text) => text.includes("body.id : attendu entier"))).toBe(true);
+    await screenshot(browser, "10-run-contrat");
+    broken = false;
+  });
+
+  it("une requête liée est vérifiée contre le contrat à l'envoi (R8, S3)", async () => {
+    await clickText(".zone__tab-button", "Animalerie");
+    await browser.$('[aria-label="Ouvrir la requête de GET /pets/{petId}"]').click();
+    // Éditeur de la requête liée (d'autres zones peuvent en afficher d'autres).
+    const inEditor = (action: "verifications" | "send" | "state") =>
+      browser.execute((step) => {
+        const editor = Array.from(document.querySelectorAll<HTMLElement>(".editor")).find((e) =>
+          e.querySelector(".editor__contract")?.textContent.includes("GET /pets/{petId}"),
+        );
+        if (!editor) throw new Error("éditeur de la requête liée introuvable");
+        const buttons = Array.from(editor.querySelectorAll<HTMLButtonElement>("button"));
+        if (step === "verifications")
+          buttons.find((b) => b.textContent.includes("Assertions"))?.click();
+        if (step === "send") buttons.find((b) => b.textContent.trim() === "Envoyer")?.click();
+        const contract = editor.querySelector(".assertion--contract");
+        return {
+          contract: contract?.className ?? null,
+          operators: editor.querySelectorAll(`[aria-label="Opérateur de l'assertion 1"] option`)
+            .length,
+        };
+      }, action);
+    await browser.waitUntil(async () => (await inEditor("verifications")).contract !== null, {
+      timeout: 10_000,
+      timeoutMsg: "conformité au contrat absente des assertions",
+    });
+    expect((await inEditor("state")).operators).toBe(28);
+    await inEditor("send");
+    await browser.waitUntil(
+      async () => (await inEditor("state")).contract?.includes("assertion--ok") === true,
+      { timeout: 15_000, timeoutMsg: "conformité non vérifiée à l'envoi" },
+    );
+    await screenshot(browser, "11-requete-liee");
+  });
+
+  it("configure l'endpoint : réglages et réponses attendues (EP7 à EP9)", async () => {
+    // Onglet de la requête liée, dans sa zone (d'autres zones peuvent en afficher d'autres).
+    const inTab = (step: "expected" | "fromLast" | "back" | "settings" | "ten" | "state") =>
+      browser.execute((action) => {
+        const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find((t) =>
+          t.querySelector(".editor__contract")?.textContent.includes("GET /pets/{petId}"),
+        );
+        if (!tab) throw new Error("onglet de la requête liée introuvable");
+        const buttons = Array.from(tab.querySelectorAll<HTMLButtonElement>("button"));
+        const find = (text: string) => buttons.find((b) => b.textContent.trim().startsWith(text));
+        if (action === "expected") find("Réponses attendues")?.click();
+        if (action === "fromLast") find("Depuis la dernière réponse reçue")?.click();
+        if (action === "back") find("← Réponses attendues")?.click();
+        if (action === "settings") find("Réglages")?.click();
+        if (action === "ten") {
+          tab
+            .querySelector<HTMLButtonElement>(
+              '[aria-labelledby="setting-timeoutMs"] button:nth-child(3)',
+            )
+            ?.click();
+        }
+        return {
+          rows: Array.from(tab.querySelectorAll(".expected__name")).map((n) => n.textContent),
+          saved: tab.querySelector(".editor__saved")?.textContent.trim() ?? "",
+          fromLast: find("Depuis la dernière réponse reçue")?.disabled ?? true,
+        };
+      }, step);
+    await browser.waitUntil(async () => (await inTab("expected")).rows.length === 1, {
+      timeout: 10_000,
+      timeoutMsg: "réponse attendue du contrat absente",
+    });
+    expect((await inTab("state")).rows).toEqual(["Un animal"]);
+    expect((await inTab("state")).fromLast).toBe(false);
+    await inTab("fromLast");
+    await browser.waitUntil(async () => (await inTab("back")).rows.length === 2, {
+      timeout: 10_000,
+      timeoutMsg: "réponse reçue non reprise",
+    });
+    await inTab("settings");
+    await inTab("ten");
+    await browser.waitUntil(async () => (await inTab("state")).saved === "✓ Enregistré", {
+      timeout: 10_000,
+      timeoutMsg: "endpoint non enregistré",
+    });
+    const file = readFileSync(
+      path.join(project(), "Animalerie", "animaux", "trouver-un-animal.yml"),
+      "utf8",
+    );
+    expect(file).toContain("timeout: 10000");
+    expect(file).toContain("examples:");
+    expect(file).toMatch(/name: "?Reçue le \d\d\/\d\d à \d\d:\d\d/);
+    expect(file).toContain("status: 200");
+    await screenshot(browser, "12-endpoint");
+  });
+
+  it("trois fenêtres : barre latérale, requête et résultat qui suit la requête active (D1 à D6)", async () => {
+    const mainWindow = await browser.getWindowHandle();
+    // Dans la requête liée : éditeur, envoi, ⧉ du résultat.
+    const linked = (action: "detach" | "send" | "state") =>
+      browser.execute((step) => {
+        const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find((t) =>
+          t.querySelector(".editor__contract")?.textContent.includes("GET /pets/{petId}"),
+        );
+        if (!tab) throw new Error("onglet de la requête liée introuvable");
+        if (step === "detach") {
+          tab
+            .querySelector<HTMLButtonElement>(
+              'button[aria-label="Ouvrir le résultat dans une fenêtre"]',
+            )
+            ?.click();
+        }
+        if (step === "send") {
+          Array.from(tab.querySelectorAll<HTMLButtonElement>("button"))
+            .find((b) => b.textContent.trim() === "Envoyer")
+            ?.click();
+        }
+        return { response: tab.querySelector(".request-tab__response") !== null };
+      }, action);
+
+    await linked("detach");
+    let handles = await waitForWindows(2);
+    const result = handles.find((h) => h !== mainWindow) ?? "";
+    expect(readWindows(sandbox).windows.map((w) => [w.kind, w.follow])).toEqual([
+      ["main", true],
+      ["content", false],
+    ]);
+    await browser.waitUntil(async () => !(await linked("state")).response, {
+      timeoutMsg: "le résultat reste dans l'onglet de la requête",
+    });
+
+    await clickHidden('button[aria-label="Détacher la barre latérale dans une fenêtre"]');
+    handles = await waitForWindows(3);
+    const sidebar = handles.find((h) => h !== mainWindow && h !== result) ?? "";
+
+    // Envoi depuis la fenêtre principale : la réponse arrive dans la fenêtre de résultat.
+    await browser.switchToWindow(mainWindow);
+    await linked("send");
+    await browser.switchToWindow(result);
+    const name = browser.$(".result-tab__name");
+    await name.waitForDisplayed({ timeout: 15_000 });
+    expect((await name.getText()).toLowerCase()).toContain("animal");
+    expect(await browser.$(".content-window__follow").getText()).toBe("⇆ Suit la requête active");
+    await browser.waitUntil(async () => (await browser.$(".response").getText()).includes("200"), {
+      timeout: 15_000,
+      timeoutMsg: "réponse absente de la fenêtre de résultat",
+    });
+    await screenshot(browser, "14-fenetre-resultat");
+    await browser.switchToWindow(sidebar);
+    await browser.$(".sidebar-window__pilot").waitForDisplayed({ timeout: 15_000 });
+    await screenshot(browser, "15-fenetre-barre");
+    await browser.switchToWindow(mainWindow);
+    await screenshot(browser, "13-fenetre-requete");
+
+    // Rattacher : le résultat revient dans l'onglet de la requête (R4).
+    await browser.switchToWindow(result);
+    await browser.$(".content-window__bar").$("button=Rattacher").click();
+    await waitForWindows(2);
+    await browser.switchToWindow(sidebar);
+    await browser.$(".sidebar-window__footer").$("button=Rattacher").click();
+    await waitForWindows(1);
+    await browser.switchToWindow(mainWindow);
+    await browser.waitUntil(async () => (await linked("state")).response, {
+      timeoutMsg: "le résultat n'est pas revenu dans l'onglet",
+    });
+    expect(readWindows(sandbox).windows.map((w) => w.kind)).toEqual(["main"]);
+  });
+});
+
+describe("Accueil, catalogue des étapes et Non classés", () => {
+  let server: Server;
+  let url = "";
+  let host = "";
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      const json = (status: number, body: unknown): void => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      if (request.method === "GET" && request.url === "/sante") {
+        json(200, { etat: "ok", version: "1.4.2" });
+      } else if (request.method === "POST" && request.url === "/commandes") {
+        json(201, { id: 42, statut: "créée" });
+      } else if (request.method === "GET" && request.url === "/commandes/42/suivi") {
+        json(200, { commande: 42, transporteur: "Colissimo" });
+      } else json(404, { message: "absent" });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = String((server.address() as AddressInfo).port);
+    url = `http://127.0.0.1:${port}`;
+    host = `127.0.0.1:${port}`;
+  });
+
+  afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  const inbox = () => path.join(sandbox.home, "arnod", "Non classés");
+  const contractFile = () => path.join(inbox(), "contracts", `${host.replace(/[.:]/g, "-")}.yaml`);
+
+  async function showAllProjects(): Promise<void> {
+    // Les zones ont aussi leurs listes d'onglets : on vise celle des workspaces.
+    await chooseWorkspace("Tous les projets");
+    await browser.waitUntil(async () => (await heading(browser)).startsWith("Tous les projets"), {
+      timeoutMsg: "« Tous les projets » attendu",
+    });
+  }
+
+  /** Colle `text` d'un bloc dans l'entrée « Essayer une étape », comme un Ctrl+V. */
+  async function paste(text: string): Promise<void> {
+    await browser.execute((value) => {
+      const input = document.querySelector<HTMLInputElement>("main .try__input");
+      if (!input) throw new Error("entrée « Essayer une étape » introuvable");
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, text);
+  }
+
+  /** Envoie l'essai reconnu et attend son onglet. */
+  async function sendTrial(name: string): Promise<void> {
+    const submit = browser.$("main .try__form").$("button=Envoyer");
+    await submit.waitForDisplayed({ timeoutMsg: "nature REST non reconnue" });
+    await submit.click();
+    await browser.waitUntil(async () => (await zoneTabs()).flat().includes(name), {
+      timeout: 15_000,
+      timeoutMsg: `onglet « ${name} » attendu`,
+    });
+    await browser.waitUntil(async () => (await toastText(browser)).includes("Essai gardé"), {
+      timeoutMsg: "notification de l'essai attendue",
+    });
+  }
+
+  it("le catalogue des étapes liste REST, intégrée à Arnod (K1, K2)", async () => {
+    await showAllProjects();
+    await browser.$("main .try").$("button*=Parcourir le catalogue").click();
+    await waitForHeading(browser, "Catalogue des étapes");
+    const table = await browser.$("main .catalog__table").getText();
+    expect(table).toContain("REST");
+    expect(table).toContain("Intégrée");
+    expect(await browser.$("main").getText()).toContain("arnod-steps");
+    await screenshot(browser, "16-catalogue-etapes");
+
+    await browser.$("main").$("button=← Retour").click();
+    await browser.waitUntil(async () => (await heading(browser)).startsWith("Tous les projets"), {
+      timeoutMsg: "retour à « Tous les projets » attendu",
+    });
+  });
+
+  it("une adresse collée crée « Non classés », son contrat déduit et « Essai 1 » (A2, A5, N1)", async () => {
+    await paste(`${url}/sante`);
+    await sendTrial("Essai 1");
+
+    // « Non classés » : un vrai projet, premier de la liste, hors des workspaces.
+    const state = readState(sandbox);
+    const project = state.projects.find((p) => p.name === "Non classés");
+    expect(project).toBeDefined();
+    expect(state.inboxProjectId).toBe(project?.id);
+    expect(state.workspaces.some((w) => w.projectIds.includes(project?.id ?? ""))).toBe(false);
+    expect(existsSync(path.join(inbox(), "opencollection.yml"))).toBe(true);
+
+    // Contrat déduit du serveur et requête liée à son opération.
+    const contract = readFileSync(contractFile(), "utf8");
+    expect(contract).toContain("x-arnod-deduced: true");
+    expect(contract).toContain("/sante:");
+    const request = readFileSync(path.join(inbox(), host.replace(":", " "), "essai-1.yml"), "utf8");
+    expect(request).toContain("name: Essai 1");
+    expect(request).toContain("contract:contracts/");
+    expect(request).toContain("GET /sante");
+
+    // Dans la barre latérale, l'essai est sous le contrat déduit, à son opération (RC8).
+    const operation = browser.$('aside [aria-label="Ouvrir GET /sante"]');
+    await operation.waitForExist({
+      timeout: 10_000,
+      timeoutMsg: "essai absent du contrat déduit",
+    });
+    const tests = await browser.execute(() =>
+      Array.from(document.querySelectorAll('aside [role="treeitem"]')).map((i) => i.textContent),
+    );
+    expect(tests.some((text) => text.includes("Essai 1"))).toBe(false);
+
+    // La réponse est déjà dans l'onglet, vérifications proposées comprises.
+    const status = await browser.execute(() => {
+      const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find((t) =>
+        t.querySelector(".editor__contract")?.textContent.includes("GET /sante"),
+      );
+      return tab?.querySelector(".response__status")?.textContent.trim() ?? "";
+    });
+    expect(status).toContain("200");
+    await screenshot(browser, "17-essai-non-classes");
+  });
+
+  it("une méthode en tête est reprise ; l'essai suivant enrichit le même contrat (A2, N2, N3)", async () => {
+    await showAllProjects();
+    await paste(`POST ${url}/commandes`);
+    const form = browser.$('main [role="group"][aria-label="Formulaire de la nature REST"]');
+    await form.waitForDisplayed();
+    // Options cochées : méthode, puis type du corps (visible pour un POST).
+    const checked = () => form.$$('[role="radio"][aria-checked="true"]').map((r) => r.getText());
+    await browser.waitUntil(async () => (await checked())[0] === "POST", {
+      timeoutMsg: "méthode POST non reprise de la saisie",
+    });
+    expect(await checked()).toEqual(["POST", "JSON"]);
+    expect(await browser.$("main .try__input").getValue()).toBe(`${url}/commandes`);
+    await form.$("textarea[id$='-body']").setValue('{"article":"T-shirt"}');
+    await sendTrial("Essai 2");
+
+    const contract = readFileSync(contractFile(), "utf8");
+    expect(contract).toContain("/sante:");
+    expect(contract).toContain("/commandes:");
+    expect(contract).toMatch(/"?201"?:/);
+    expect(existsSync(path.join(inbox(), host.replace(":", " "), "essai-2.yml"))).toBe(true);
+    // « Non classés » reste premier dans « Tous les projets ».
+    await showAllProjects();
+    const rows = await browser.$$("main tr.all__row").map((row) => row.getText());
+    expect(rows[0]).toContain("Non classés");
+    expect(rows[0]).toContain("Hors workspaces");
+    await screenshot(browser, "18-tous-les-projets-non-classes");
+  });
+
+  /** Marque l'onglet de l'essai `name` (`data-essai`), les autres essais restant ouverts. */
+  async function markTrial(name: string): Promise<boolean> {
+    return browser.execute((n) => {
+      const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find(
+        (t) => t.querySelector<HTMLInputElement>(".meta__input")?.value === n,
+      );
+      tab?.setAttribute("data-essai", "");
+      return tab !== undefined;
+    }, name);
+  }
+
+  it("un chemin qui ressemble à /commandes/{id}/suivi se généralise, puis l'essai devient un test (2.2-c, 2.2-b)", async () => {
+    await showAllProjects();
+    await paste(`${url}/commandes/42/suivi`);
+    await sendTrial("Essai 3");
+    await browser.waitUntil(() => markTrial("Essai 3"), {
+      timeoutMsg: "onglet de l'essai attendu",
+    });
+    const banner = browser.$("[data-essai] .generalize");
+    await banner.waitForDisplayed({ timeoutMsg: "proposition de chemin généralisé attendue" });
+    await screenshot(browser, "27-essai-chemin-generalise");
+    await clickText("[data-essai] .generalize button", "Généraliser");
+    const essai = () => path.join(inbox(), host.replace(":", " "), "essai-3.yml");
+    await browser.waitUntil(
+      () => readFileSync(contractFile(), "utf8").includes("/commandes/{id}/suivi"),
+      { timeoutMsg: "chemin généralisé dans le contrat déduit attendu" },
+    );
+    expect(readFileSync(essai(), "utf8")).toContain("/commandes/{id}/suivi");
+
+    await clickText("[data-essai] .trial-transfer > button", "Transférer au référentiel");
+    const input = browser.$("[data-essai] .transfer input");
+    await input.waitForDisplayed({ timeoutMsg: "fenêtre de transfert attendue" });
+    await browser.execute(() => {
+      const field = document.querySelector<HTMLInputElement>("[data-essai] .transfer input");
+      if (!field) throw new Error("nom du test introuvable");
+      field.value = "Suivre une commande";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await screenshot(browser, "28-transferer-au-referentiel");
+    await browser.execute(() => {
+      document.querySelector<HTMLFormElement>("[data-essai] .transfer")?.requestSubmit();
+    });
+    const step = path.join(inbox(), "Suivre une commande", "essai-3.yml");
+    await browser.waitUntil(() => existsSync(step), { timeoutMsg: "étape 1 du test attendue" });
+    expect(readFileSync(step, "utf8")).not.toContain("contract:");
+    expect(existsSync(essai())).toBe(false);
+  });
+
+  it("les essais d'un contrat déduit se rangent dans un projet, avec leur contrat (2.2-d)", async () => {
+    const target = path.join(sandbox.home, "arnod", "boutique-tests");
+    await clickHidden(`aside button[aria-label="Actions pour le contrat ${host}"]`);
+    await clickText('[role="menuitem"]', "Ranger dans un projet…");
+    await browser.$(".filing").waitForDisplayed({ timeoutMsg: "fenêtre de rangement attendue" });
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".filing select");
+      const option = Array.from(select?.options ?? []).find((o) => o.text === "boutique-tests");
+      if (!select || !option) throw new Error("projet boutique-tests introuvable");
+      select.value = option.value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await screenshot(browser, "29-ranger-dans-un-projet");
+    await browser.execute(() => {
+      document.querySelector<HTMLFormElement>(".filing")?.requestSubmit();
+    });
+    const moved = path.join(target, host.replace(":", " "), "essai-1.yml");
+    await browser.waitUntil(() => existsSync(moved), {
+      timeoutMsg: "essai rangé dans le projet attendu",
+    });
+    expect(existsSync(path.join(target, "contracts", `${host.replace(/[.:]/g, "-")}.yaml`))).toBe(
+      true,
+    );
+    expect(existsSync(contractFile())).toBe(false);
+    await browser.waitUntil(
+      async () => (await toastText(browser)).includes("rangés dans boutique-tests"),
+      {
+        timeoutMsg: "notification du rangement attendue",
+      },
+    );
+  });
+});
+
+describe("Premier usage : assertions, run et statuts", () => {
+  let server: Server;
+  let url = "";
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      const json = (status: number, body: unknown): void => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      // Pas d'en-tête Location sur la création : la vérification ajoutée échoue (1e).
+      if (request.method === "GET" && request.url === "/commandes") {
+        json(200, [{ id: 1, amount: "129.90" }]);
+      } else if (request.method === "POST" && request.url === "/commandes") {
+        json(201, { id: 2, status: "pending" });
+      } else json(404, { message: "absent" });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  /** Ligne de l'arborescence (référentiel de tests) dont le nom est `name`. */
+  async function treeRow(name: string): Promise<{ status: string; count: string } | null> {
+    return browser.execute((label) => {
+      const item = Array.from(document.querySelectorAll('aside [role="treeitem"]')).find(
+        (row) => row.querySelector(".row__name")?.textContent.trim() === label,
+      );
+      if (!item) return null;
+      return {
+        status: item.querySelector(".row__status")?.textContent.trim() ?? "",
+        count: item.querySelector(".row__count")?.getAttribute("title") ?? "",
+      };
+    }, name);
+  }
+
+  /** Ouvre le menu « ⋯ » d'une ligne de l'arborescence et choisit `action`. */
+  async function rowAction(name: string, action: string): Promise<void> {
+    await browser.execute((label) => {
+      const row = Array.from(document.querySelectorAll('aside li[role="presentation"]')).find(
+        (li) => li.querySelector(".row__name")?.textContent.trim() === label,
+      );
+      const more = row?.querySelector<HTMLElement>(".row__more");
+      if (!more) throw new Error(`ligne « ${label} » introuvable`);
+      more.click();
+    }, name);
+    await clickText('aside [role="menuitem"]', action);
+  }
+
+  /** Saisit `name` dans la fenêtre de nom ouverte et valide. */
+  async function nameIt(name: string): Promise<void> {
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForDisplayed();
+    await dialog.$("input").setValue(name);
+    await browser.keys("Enter");
+    await dialog.waitForExist({ reverse: true, timeout: 10_000 });
+  }
+
+  type Step =
+    | { kind: "url"; value: string }
+    | { kind: "method"; value: string }
+    | { kind: "click"; value: string }
+    | { kind: "addCheck"; target: string; operator: string }
+    | { kind: "editorChecks" }
+    | { kind: "state" };
+
+  /**
+   * Agit dans l'onglet de la requête `name` (d'autres zones en montrent d'autres) et renvoie son
+   * état : statut de la réponse, verdict, encadrés d'échec, vérifications de l'éditeur.
+   */
+  function inRequest(name: string, step: Step) {
+    return browser.execute(
+      (label, action) => {
+        const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find(
+          (t) => t.querySelector<HTMLInputElement>(".meta__input")?.value === label,
+        );
+        if (!tab) throw new Error(`onglet « ${label} » introuvable`);
+        const input = (el: HTMLInputElement | HTMLSelectElement | null, value: string): void => {
+          if (!el) throw new Error("champ introuvable");
+          el.value = value;
+          el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? "change" : "input"));
+        };
+        const button = (text: string): HTMLButtonElement | undefined =>
+          Array.from(tab.querySelectorAll<HTMLButtonElement>("button")).find((b) =>
+            b.textContent.trim().startsWith(text),
+          );
+        if (action.kind === "url") input(tab.querySelector(".editor__url"), action.value);
+        if (action.kind === "method") input(tab.querySelector(".editor__method"), action.value);
+        if (action.kind === "click") {
+          const found = button(action.value);
+          if (!found) throw new Error(`bouton « ${action.value} » introuvable`);
+          found.click();
+        }
+        // Onglet « Vérifications » de l'éditeur (celui de la réponse a son propre onglet).
+        const editorChecks = (): void => {
+          Array.from(tab.querySelectorAll<HTMLButtonElement>('.editor [role="tab"]'))
+            .find((b) => b.textContent.includes("Assertions"))
+            ?.click();
+        };
+        if (action.kind === "editorChecks") editorChecks();
+        if (action.kind === "addCheck") {
+          editorChecks();
+          const rows = tab.querySelectorAll(".assertions .assertion").length;
+          button("+ Assertion")?.click();
+          const n = String(rows + 1);
+          setTimeout(() => {
+            input(tab.querySelector(`[aria-label="Cible de l'assertion ${n}"]`), action.target);
+            input(
+              tab.querySelector(`[aria-label="Opérateur de l'assertion ${n}"]`),
+              action.operator,
+            );
+          }, 50);
+        }
+        return {
+          status: tab.querySelector(".response__status")?.textContent.trim() ?? "",
+          verdict: tab.querySelector(".response__verdict")?.textContent.trim() ?? "",
+          failures: Array.from(tab.querySelectorAll(".failure__title")).map((f) =>
+            f.textContent.trim(),
+          ),
+          checks: Array.from(
+            tab.querySelectorAll<HTMLInputElement>('.assertion input[aria-label^="Cible"]'),
+          ).map((i) => i.value),
+          saved: tab.querySelector(".editor__saved")?.textContent.trim() ?? "",
+        };
+      },
+      name,
+      step,
+    );
+  }
+
+  async function createRequest(name: string): Promise<void> {
+    await rowAction("Commandes", "Nouvelle requête");
+    await nameIt(name);
+    await browser.waitUntil(async () => (await zoneTabs()).flat().includes(name), {
+      timeout: 10_000,
+      timeoutMsg: `onglet « ${name} » attendu`,
+    });
+  }
+
+  async function sendAndWait(name: string, status: string): Promise<void> {
+    await inRequest(name, { kind: "click", value: "Envoyer" });
+    await browser.waitUntil(
+      async () => (await inRequest(name, { kind: "state" })).status.startsWith(status),
+      { timeout: 15_000, timeoutMsg: `réponse ${status} attendue pour « ${name} »` },
+    );
+  }
+
+  it("crée un dossier et une requête, l'envoie et accepte les assertions proposées (B1, X1, V1)", async () => {
+    // La notification de l'essai précédent ne doit pas masquer les captures.
+    await dismissToast();
+    await browser.$(".toast").waitForExist({ reverse: true, timeout: 15_000 });
+    await chooseWorkspace("E-commerce");
+    // Les onglets ouverts restent dans la zone principale : le projet se déplie dans la barre.
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    // « + » n'apparaît qu'au survol ou sur le projet ouvert.
+    await clickHidden('aside button[aria-label="Ajouter au projet boutique-tests"]');
+    await browser.$('[role="menuitem"]*=Nouveau dossier').click();
+    await nameIt("Commandes");
+    await browser.waitUntil(async () => (await treeRow("Commandes")) !== null, {
+      timeoutMsg: "dossier « Commandes » attendu",
+    });
+    expect(existsSync(path.join(project(), "Commandes"))).toBe(true);
+
+    await createRequest("Lister les commandes");
+    await inRequest("Lister les commandes", { kind: "url", value: `${url}/commandes` });
+    await sendAndWait("Lister les commandes", "200");
+    await inRequest("Lister les commandes", { kind: "click", value: "Assertions (" });
+    await inRequest("Lister les commandes", { kind: "click", value: "Proposer des assertions" });
+    await inRequest("Lister les commandes", { kind: "editorChecks" });
+    await browser.waitUntil(
+      async () =>
+        (await inRequest("Lister les commandes", { kind: "state" })).checks.includes("status"),
+      { timeoutMsg: "assertion de statut proposée attendue" },
+    );
+    expect((await treeRow("Lister les commandes"))?.status).toBe("✓, réussie");
+  });
+
+  it("une assertion en échec se détaille, s'ignore pour ce run et reste dans la requête (VT1, VT2)", async () => {
+    await createRequest("Créer une commande");
+    await inRequest("Créer une commande", { kind: "method", value: "POST" });
+    await inRequest("Créer une commande", { kind: "url", value: `${url}/commandes` });
+    await inRequest("Créer une commande", {
+      kind: "addCheck",
+      target: "headers.Location",
+      operator: "exists",
+    });
+    await browser.waitUntil(
+      async () =>
+        (await inRequest("Créer une commande", { kind: "state" })).checks.includes(
+          "headers.Location",
+        ),
+      { timeoutMsg: "assertion ajoutée attendue" },
+    );
+    await sendAndWait("Créer une commande", "201");
+    const failed = await inRequest("Créer une commande", { kind: "state" });
+    expect(failed.failures).toEqual(["✕ headers.Location"]);
+    expect(failed.verdict).toBe("Échec · 1 assertion(s)");
+    expect((await treeRow("Créer une commande"))?.status).toBe("✕, en échec");
+    await screenshot(browser, "19-verification-en-echec");
+
+    await inRequest("Créer une commande", { kind: "click", value: "Ignorer pour ce run" });
+    await browser.waitUntil(
+      async () => (await inRequest("Créer une commande", { kind: "state" })).verdict === "Réussie",
+      { timeoutMsg: "verdict recalculé attendu" },
+    );
+    expect((await treeRow("Créer une commande"))?.status).toBe("✓, réussie");
+    // La vérification reste dans le fichier : elle sera de nouveau évaluée (R7).
+    const file = readFileSync(path.join(project(), "Commandes", "creer-une-commande.yml"), "utf8");
+    // OpenCollection écrit le nom de l'en-tête en minuscules.
+    expect(file).toContain('res.headers["location"]');
+  });
+
+  it("exécute le dossier : résumé, échecs détaillés, résultat par dossier (RU1 à RU4)", async () => {
+    // « Commandes » ne contient que des requêtes : c'est un test, arrêté au premier échec (lot E).
+    await rowAction("Commandes", "Exécuter le test");
+    const progress = browser.$(".run__progress");
+    await browser.waitUntil(async () => (await progress.getText()).includes("en échec"), {
+      timeout: 15_000,
+      timeoutMsg: "run du dossier attendu",
+    });
+    expect(await progress.getText()).toBe("Test en échec à l'étape 1 · 0/2 étapes");
+    expect(await browser.$(".run__meta").getText()).toMatch(
+      /^run #\d+ · Local · 8 en même temps · \d/,
+    );
+    expect(await browser.$('.run__tab[aria-selected="true"]').getText()).toContain("Échecs");
+    const failures = await browser.$$(".run__item").map((item) => item.getText());
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain("Créer une commande");
+    expect(await browser.$(".run__failure .run__error").getText()).toBe(
+      "headers.location : en-tête absent de la réponse",
+    );
+    // Texte du DOM : `getText` de WebKitWebDriver rend vide un libellé tronqué par ellipse.
+    const group = await browser.execute(
+      () => document.querySelector(".run__group-name")?.textContent.trim() ?? "",
+    );
+    expect(group).toBe("Commandes");
+    expect(await browser.$(".run__group-count").getText()).toBe("0/2");
+    // La barre latérale suit le run (R4, R6) ; l'étape non jouée garde son statut (lot E, R3).
+    expect((await treeRow("Commandes"))?.count).toBe("1 réussie sur 2 exécutées (2 requêtes)");
+    expect((await treeRow("Créer une commande"))?.status).toBe("✕, en échec");
+    await screenshot(browser, "20-run-dossier");
+
+    await browser.$(".run__link=Ignorer pour ce run").click();
+    await browser.waitUntil(async () => (await progress.getText()).includes("non jouée"), {
+      timeoutMsg: "échec ignoré attendu",
+    });
+    expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
+  });
+
+  it("au redémarrage, les statuts et le dernier run sont relus (ST4)", async () => {
+    await restart();
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await browser.waitUntil(async () => (await treeRow("Créer une commande"))?.status !== "", {
+      timeout: 15_000,
+      timeoutMsg: "statut relu attendu",
+    });
+    expect((await treeRow("Créer une commande"))?.status).toBe("✓, réussie");
+    expect((await treeRow("Lister les commandes"))?.status).toBe("✓, réussie");
+    expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
+  });
+});
+
+describe("Lot A - Réponse : format, aperçu, filtre JSONPath (5.1-b bis)", () => {
+  let server: Server;
+  let url = "";
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      if (request.url === "/commande") {
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(
+          JSON.stringify({
+            id: "ord_8F2kQ",
+            items: [
+              { sku: "TSH-BLU-M", qty: 2 },
+              { sku: "MUG-NOIR", qty: 1 },
+            ],
+            total: 47.82,
+          }),
+        );
+      } else {
+        response.writeHead(502, { "Content-Type": "text/html; charset=utf-8" });
+        response.end(
+          '<html><head><script>document.title="piégé"</script></head><body><h1>Panne</h1><img src="https://example.com/x.png" alt="Logo"><p>Réessayez.</p></body></html>',
+        );
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /** Onglet de la requête « Lister les commandes » (premier usage), ouvert depuis la barre. */
+  async function openRequest(): Promise<void> {
+    await browser.execute(() => {
+      const row = Array.from(
+        document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'),
+      ).find(
+        (item) => item.querySelector(".row__name")?.textContent.trim() === "Lister les commandes",
+      );
+      if (!row) throw new Error("requête « Lister les commandes » introuvable");
+      row.click();
+    });
+    await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+  }
+
+  /** Envoie la requête ouverte à `target` et attend la réponse. */
+  async function sendTo(target: string, status: string): Promise<void> {
+    await browser.execute((address) => {
+      const input = document.querySelector<HTMLInputElement>(".request-tab .editor__url");
+      if (!input) throw new Error("adresse introuvable");
+      input.value = address;
+      input.dispatchEvent(new Event("input"));
+    }, target);
+    await clickText(".request-tab button", "Envoyer");
+    await browser.waitUntil(
+      async () => (await browser.$(".response__status").getText()).startsWith(status),
+      { timeout: 15_000, timeoutMsg: `réponse ${status} attendue` },
+    );
+  }
+
+  it("met en forme le JSON, filtre en JSONPath et ajoute une assertion (F1 à F4)", async () => {
+    await openRequest();
+    await sendTo(`${url}/commande`, "200");
+    expect(await browser.$('select[aria-label="Format du corps"]').getValue()).toBe("json");
+    await browser.waitUntil(async () => (await browser.$(".code").getText()).includes("MUG-NOIR"));
+
+    await browser.$(".filter__input").setValue("$.items[*].sku");
+    await browser.waitUntil(
+      async () => (await browser.$(".filter__count").getText()) === "2 résultats",
+      { timeoutMsg: "deux résultats attendus" },
+    );
+    const marks = await browser.$$(".tok--match").map((m) => m.getText());
+    expect(marks).toEqual(['"TSH-BLU-M"', '"MUG-NOIR"']);
+    await screenshot(browser, "a1-reponse-filtre");
+
+    await browser.$(".filter__input").setValue("$.items[0");
+    await browser.waitUntil(async () =>
+      (await browser.$(".filter [role='alert']").getText()).includes("Crochet « [ » non fermé"),
+    );
+
+    await browser.$(".filter__input").setValue("$.items[1].sku");
+    await browser.waitUntil(
+      async () => (await browser.$(".filter__count").getText()) === "1 résultat",
+    );
+    await clickText(".filter__actions button", "+ Assertion");
+    const file = path.join(project(), "Commandes", "lister-les-commandes.yml");
+    await browser.waitUntil(() => readFileSync(file, "utf8").includes("res.body.items[1].sku"), {
+      timeout: 10_000,
+      timeoutMsg: "assertion écrite dans le fichier attendue",
+    });
+  });
+
+  it("montre un HTML en aperçu sans script ni image distante, puis efface la réponse (R4, R9)", async () => {
+    await sendTo(`${url}/page`, "502");
+    expect(await browser.$('select[aria-label="Format du corps"]').getValue()).toBe("html");
+    await browser.$(".body__bar [role='switch']").click();
+    const preview = browser.$(".preview");
+    await preview.waitForExist({ timeout: 10_000 });
+    expect(await preview.$("h1").getText()).toBe("Panne");
+    expect(await preview.getText()).toContain("[image : Logo]");
+    expect(await preview.$("script").isExisting()).toBe(false);
+    expect(await preview.$("img").isExisting()).toBe(false);
+    expect(await browser.getTitle()).not.toBe("piégé");
+    await screenshot(browser, "a2-reponse-apercu-html");
+
+    await browser.$('button[aria-label="Effacer la réponse"]').click();
+    await browser.waitUntil(async () =>
+      (await browser.$(".response").getText()).includes("Envoyez la requête pour voir la réponse."),
+    );
+  });
+});
+
+// --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) -----------------------------
+
+describe("Lot D - Barre latérale", () => {
+  /** Valeur saisie dans le champ, événement `input` compris (le filtre réagit à la frappe). */
+  async function typeFilter(value: string): Promise<void> {
+    await browser.execute((text) => {
+      const input = document.querySelector<HTMLInputElement>("aside .tree .tree-filter input");
+      if (!input) throw new Error("filtre du référentiel introuvable");
+      input.focus();
+      input.value = text;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, value);
+  }
+
+  function filterState() {
+    return browser.execute(() => ({
+      count: document.querySelector("aside .tree .tree-filter__count")?.textContent.trim() ?? "",
+      names: Array.from(document.querySelectorAll('aside .tree [role="treeitem"] .row__name')).map(
+        (n) => n.textContent.trim(),
+      ),
+      none: document.querySelector("aside .tree__none")?.textContent.trim() ?? "",
+    }));
+  }
+
+  it("filtre le référentiel : dossiers dépliés, compte affiché, Échap efface (1.2-e)", async () => {
+    await chooseWorkspace("E-commerce");
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await browser.$("aside .tree .tree-filter input").waitForExist({ timeout: 10_000 });
+
+    await typeFilter("créer");
+    await browser.waitUntil(async () => (await filterState()).count.startsWith("1 sur"), {
+      timeoutMsg: "compte du filtre attendu",
+    });
+    expect((await filterState()).names).toEqual(["Commandes", "Créer une commande"]);
+    await screenshot(browser, "21-filtre-referentiel");
+
+    await typeFilter("introuvable");
+    await browser.waitUntil(async () => (await filterState()).none !== "", {
+      timeoutMsg: "« aucun résultat » attendu",
+    });
+    expect((await filterState()).none).toBe("Aucune requête ne correspond.");
+
+    await browser.keys("Escape");
+    await browser.waitUntil(async () => (await filterState()).count === "", {
+      timeoutMsg: "filtre effacé attendu",
+    });
+  });
+
+  it("le menu « + » du projet propose ses créations avec leurs raccourcis (1.2-a ter)", async () => {
+    await clickHidden('aside button[aria-label="Ajouter au projet boutique-tests"]');
+    const items = await browser.$$('aside [role="menuitem"]').map((i) => i.getText());
+    expect(items.some((t) => t.includes("Nouveau test") && t.includes("Ctrl+N"))).toBe(true);
+    expect(items.some((t) => t.includes("Requête libre"))).toBe(true);
+    expect(items.some((t) => t.includes("Nouveau dossier") && t.includes("Ctrl+Maj+N"))).toBe(true);
+    expect(items.some((t) => t.includes("Nouvel environnement"))).toBe(true);
+    await screenshot(browser, "22-menu-ajouter");
+    await browser.keys("Escape");
+  });
+
+  it("l'endpoint liste ses réponses attendues ; un clic ouvre la réponse (3.2-a3)", async () => {
+    const contract = browser.$('aside button[aria-label="Déplier le contrat Animalerie"]');
+    if (await contract.isExisting()) await contract.click();
+    await clickText("aside .crow__resource", "/pets");
+    const operation = browser.$('aside button[aria-label="Déplier GET /pets/{petId}"]');
+    await operation.waitForExist({ timeout: 10_000 });
+    await operation.click();
+    const rows = () =>
+      browser.execute(() =>
+        Array.from(document.querySelectorAll("aside .crow__example .crow__name")).map((n) =>
+          n.textContent.trim(),
+        ),
+      );
+    await browser.waitUntil(async () => (await rows()).includes("Un animal"), {
+      timeoutMsg: "réponses attendues sous l'endpoint attendues",
+    });
+    expect(await rows()).toContain("Un animal");
+    await clickText("aside .crow__example", "Un animal");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll<HTMLInputElement>(".expected input")).some(
+            (i) => i.value === "Un animal",
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "réponse attendue ouverte attendue" },
+    );
+    await screenshot(browser, "23-reponses-attendues-arborescence");
+  });
+
+  it("les cartes de projet disent leur nombre de contrats (1.1-a)", async () => {
+    await chooseWorkspace("E-commerce");
+    await waitForHeading(browser, "E-commerce");
+    // Une carte par projet du workspace : chacune dit son nombre de contrats.
+    await browser.waitUntil(
+      async () => (await browser.$$("main article .card__stats")).length > 0,
+      {
+        timeout: 10_000,
+        timeoutMsg: "cartes de projet attendues",
+      },
+    );
+    const stats = await browser.$$("main article .card__stats").map((s) => s.getText());
+    expect(stats.length).toBeGreaterThan(0);
+    for (const text of stats) expect(text).toMatch(/contrats? de service/);
+    await screenshot(browser, "24-cartes-contrats");
+  });
+});
+
+describe("Lot B : saisie, texte et cURL", () => {
+  // docs/plan-mvp-b-saisie-curl.md : 2.1-a sexies, 5.1-b ter, 5.1-b quater.
+  let server: Server;
+  let url = "";
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      response.writeHead(request.method === "POST" ? 201 : 200, {
+        "Content-Type": "application/json",
+      });
+      response.end(JSON.stringify({ id: 7, recu: request.headers["x-client"] ?? null }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /** Colle `text` d'un bloc dans l'entrée « Essayer une étape », comme un Ctrl+V. */
+  async function paste(text: string): Promise<void> {
+    await browser.execute((value) => {
+      const input = document.querySelector<HTMLInputElement>("main .try__input");
+      if (!input) throw new Error("entrée « Essayer une étape » introuvable");
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, text);
+  }
+
+  /** Agit dans l'onglet de la requête dont le nom est `name` et renvoie ce qu'il montre. */
+  function inEditor(
+    name: string,
+    action:
+      | { kind: "url"; value: string }
+      | { kind: "click"; value: string }
+      | { kind: "text"; value: string }
+      | { kind: "state" },
+  ) {
+    return browser.execute(
+      (label, step) => {
+        const tab = Array.from(document.querySelectorAll<HTMLElement>(".request-tab")).find(
+          (t) => t.querySelector<HTMLInputElement>(".meta__input")?.value === label,
+        );
+        if (!tab) throw new Error(`onglet « ${label} » introuvable`);
+        const set = (field: HTMLInputElement | HTMLTextAreaElement, value: string): void => {
+          field.value = value;
+          field.dispatchEvent(new Event("input", { bubbles: true }));
+        };
+        if (step.kind === "url") {
+          const field = tab.querySelector<HTMLInputElement>(".editor__url");
+          if (field) set(field, step.value);
+        } else if (step.kind === "text") {
+          const field = tab.querySelector<HTMLTextAreaElement>(".pairs__textarea");
+          if (field) set(field, step.value);
+        } else if (step.kind === "click") {
+          const button = Array.from(tab.querySelectorAll<HTMLElement>("button")).find(
+            (b) =>
+              b.textContent.trim().startsWith(step.value) ||
+              b.getAttribute("aria-label") === step.value,
+          );
+          if (!button) throw new Error(`bouton « ${step.value} » introuvable`);
+          button.click();
+        }
+        return {
+          unknown: tab.querySelector(".unknown")?.textContent.replace(/\s+/g, " ").trim() ?? "",
+          marked: tab.querySelector(".editor__url")?.getAttribute("data-unknown-variables") ?? "",
+          tabs: Array.from(tab.querySelectorAll('[role="tab"]')).map((t) =>
+            t.textContent.replace(/\s+/g, " ").trim(),
+          ),
+          added: Array.from(tab.querySelectorAll(".sent--added .sent__name")).map((n) =>
+            n.textContent.trim(),
+          ),
+          text: tab.querySelector<HTMLTextAreaElement>(".pairs__textarea")?.value ?? null,
+          rows: tab.querySelectorAll(".pairs__row").length,
+          curl: document.querySelector(".curl__command")?.textContent ?? "",
+        };
+      },
+      name,
+      action,
+    );
+  }
+
+  let essai = "";
+
+  it("une commande cURL collée devient une requête REST ; l'option sans équivalent est signalée (2.1-a sexies)", async () => {
+    await chooseWorkspace("Tous les projets");
+    // Un jeton collé ne reste pas dans le texte (le coffre n'est rempli qu'à l'envoi).
+    await paste(`curl ${url}/moi -H 'Authorization: Bearer eyJ.e2e'`);
+    await browser.waitUntil(
+      async () =>
+        (
+          await browser
+            .$("main .try__import")
+            .getText()
+            .catch(() => "")
+        ).includes("{{token}}"),
+      { timeoutMsg: "jeton retiré attendu" },
+    );
+    const headers = await browser.$("main .try__form textarea").getValue();
+    expect(headers).toBe("Authorization: Bearer {{token}}");
+    await browser.keys("Escape");
+
+    const before = (await zoneTabs()).flat();
+    await paste(
+      `curl -X POST ${url}/orders \\\n  -H 'Content-Type: application/json' \\\n  -H 'X-Client: arnod-tests' \\\n  --data '{"sku":"TSH-BLU-M"}' --compressed`,
+    );
+    const note = browser.$("main .try__import");
+    await note.waitForDisplayed({ timeoutMsg: "commande cURL non reconnue" });
+    expect(await browser.$("main .try__input").getValue()).toBe(`${url}/orders`);
+    expect(await browser.$("main .try__note").getText()).toBe("Reconnu : une commande cURL.");
+    expect(await note.getText()).toContain("--compressed est ignorée");
+    await screenshot(browser, "21-curl-collee");
+
+    await browser.$("main .try__form").$("button=Envoyer").click();
+    await browser.waitUntil(
+      async () =>
+        (await zoneTabs()).flat().some((t) => /^Essai \d+$/.test(t) && !before.includes(t)),
+      { timeout: 15_000, timeoutMsg: "onglet de l'essai attendu" },
+    );
+    // L'essai envoyé est l'onglet de requête affiché (son numéro dépend des essais précédents).
+    await browser.waitUntil(
+      async () =>
+        /^Essai \d+$/.test(
+          await browser.execute(
+            () =>
+              document.querySelector<HTMLInputElement>(".request-tab .meta__input")?.value ?? "",
+          ),
+        ),
+      { timeout: 15_000, timeoutMsg: "onglet de l'essai envoyé attendu" },
+    );
+    essai = await browser.execute(
+      () => document.querySelector<HTMLInputElement>(".request-tab .meta__input")?.value ?? "",
+    );
+    // Le serveur a reçu les en-têtes de la commande.
+    await browser.waitUntil(
+      async () =>
+        (
+          await browser.execute(() => document.querySelector(".response")?.textContent ?? "")
+        ).includes("arnod-tests"),
+      { timeout: 10_000, timeoutMsg: "réponse avec l'en-tête X-Client attendue" },
+    );
+  });
+
+  it("une variable inconnue est soulignée et signalée ; compteurs et en-têtes ajoutés (5.1-b ter)", async () => {
+    await inEditor(essai, { kind: "url", value: `${url}/{{apiVersion}}/orders` });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).unknown !== "", {
+      timeoutMsg: "variable inconnue signalée attendue",
+    });
+    const state = await inEditor(essai, { kind: "state" });
+    expect(state.unknown).toContain("apiVersion est inconnue dans Local");
+    expect(state.marked).toBe("{{apiVersion}}");
+    expect(state.tabs).toContain("En-têtes 2");
+    expect(state.tabs.some((t) => t.startsWith("Corps ●"))).toBe(true);
+
+    await inEditor(essai, { kind: "click", value: "En-têtes" });
+    await browser.waitUntil(
+      async () => (await inEditor(essai, { kind: "state" })).added.length > 0,
+      {
+        timeoutMsg: "en-têtes ajoutés attendus",
+      },
+    );
+    expect((await inEditor(essai, { kind: "state" })).added).toEqual([
+      "User-Agent",
+      "Accept",
+      "Content-Length",
+      "Host",
+    ]);
+    await screenshot(browser, "22-variable-inconnue");
+  });
+
+  it("les en-têtes s'éditent en texte ; </> copie la requête en cURL (5.1-b quater)", async () => {
+    await inEditor(essai, { kind: "click", value: "Éditer en texte" });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).text !== null, {
+      timeoutMsg: "zone de texte attendue",
+    });
+    expect((await inEditor(essai, { kind: "state" })).text).toBe(
+      "Content-Type: application/json\nX-Client: arnod-tests",
+    );
+    await inEditor(essai, {
+      kind: "text",
+      value:
+        "Content-Type: application/json\nX-Client: arnod-tests\n# X-Debug: true\nAccept-Language: fr-FR",
+    });
+    await screenshot(browser, "23-en-tetes-en-texte");
+    await inEditor(essai, { kind: "click", value: "Revenir au tableau" });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).rows === 4, {
+      timeoutMsg: "quatre lignes attendues",
+    });
+
+    await inEditor(essai, { kind: "url", value: `${url}/orders` });
+    await inEditor(essai, { kind: "click", value: "Copier la requête en cURL" });
+    await browser.waitUntil(async () => (await inEditor(essai, { kind: "state" })).curl !== "", {
+      timeoutMsg: "commande cURL attendue",
+    });
+    const command = (await inEditor(essai, { kind: "state" })).curl;
+    expect(command).toContain(`curl -X POST '${url}/orders'`);
+    expect(command).toContain("-H 'X-Client: arnod-tests'");
+    expect(command).not.toContain("X-Debug");
+    await browser.keys("Escape");
+  });
+});
+
+// Lot C - Import Bruno (docs/plan-mvp-c-import-bruno.md).
+describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
+  const source = () => path.join(sandbox.home, "bruno", "boutique-api");
+  const project = () => path.join(sandbox.home, "arnod", "Boutique API");
+
+  function invoke(cmd: string, args: unknown): Promise<unknown> {
+    return browser.execute(
+      (name, payload) =>
+        (
+          window as unknown as {
+            __TAURI_INTERNALS__: { invoke: (cmd: string, args: unknown) => Promise<unknown> };
+          }
+        ).__TAURI_INTERNALS__.invoke(name, payload),
+      cmd,
+      args,
+    );
+  }
+
+  beforeAll(() => {
+    cpSync(
+      path.join(import.meta.dirname, "..", "src-tauri", "src", "bruno", "fixtures", "boutique"),
+      source(),
+      {
+        recursive: true,
+      },
+    );
+  });
+
+  it("reconnaît la collection .bru sans rien écrire (2.3-a)", async () => {
+    const detected = (await invoke("import_detect", { path: source() })) as {
+      format: string;
+      name: string;
+      counts: { requests: number };
+    };
+    expect(detected.format).toBe("bruno");
+    expect(detected.name).toBe("Boutique API");
+    expect(detected.counts.requests).toBe(6);
+    expect(existsSync(project())).toBe(false);
+  });
+
+  it("crée le projet OpenCollection à côté, ouvre le rapport, les .bru restent intacts (2.3-f)", async () => {
+    const before = readFileSync(path.join(source(), "Commandes", "Créer une commande.bru"), "utf8");
+    // Le sélecteur natif ne se pilote pas : on appelle la commande Rust réelle.
+    const done = (await invoke("import_run", {
+      path: source(),
+      target: { kind: "newProject", location: path.join(sandbox.home, "arnod"), workspaceId: null },
+    })) as { projectId: string };
+    await invoke("layout_open_selection", {
+      content: { kind: "importReport", projectId: done.projectId },
+    });
+
+    await browser.waitUntil(async () => await browser.$(".report h1").isExisting(), {
+      timeout: 15_000,
+      timeoutMsg: "rapport d'import attendu",
+    });
+    expect(await browser.$(".report h1").getText()).toContain("Boutique API importée");
+    // WebKitGTK rend le nombre et son libellé sans séparateur : on compare sans les blancs.
+    const stats = await browser.$$(".report__stat").map((s) => s.getText());
+    expect(stats.map((s) => s.replace(/\s/g, ""))).toContain("6requêtes");
+    await screenshot(browser, "c1-rapport-import");
+
+    expect(readFileSync(path.join(source(), "Commandes", "Créer une commande.bru"), "utf8")).toBe(
+      before,
+    );
+    const root = readFileSync(path.join(project(), "opencollection.yml"), "utf8");
+    expect(root).toContain("name: Boutique API");
+    const request = readFileSync(
+      path.join(project(), "Commandes", "creer-une-commande.yml"),
+      "utf8",
+    );
+    expect(request).toContain("set-variable");
+    expect(request).toContain("{{$randomUUID}}");
+    expect(readFileSync(path.join(project(), "environments", "recette.yml"), "utf8")).not.toContain(
+      "ne-pas-lire",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lot E : tests et étapes (docs/plan-mvp-e-tests-etapes.md)
+// ---------------------------------------------------------------------------
+
+describe("Lot E - tests et étapes", () => {
+  let server: Server;
+  let url = "";
+  let deleted = 0;
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      const json = (status: number, body: unknown): void => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      if (request.method === "POST" && request.url === "/clients") {
+        json(201, { id: "cus_7", name: "Léa" });
+      } else if (request.method === "GET" && request.url === "/clients/cus_7") {
+        json(200, { id: "cus_7", name: "Léa" });
+      } else if (request.method === "DELETE" && request.url === "/clients/cus_7") {
+        deleted += 1;
+        response.writeHead(204);
+        response.end();
+      } else json(404, { message: "absent" });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  /** Fichier OpenCollection d'une étape du test « Créer puis lire ». */
+  function writeStep(file: string, name: string, seq: number, body: string): void {
+    writeFileSync(
+      path.join(project(), "Créer puis lire", file),
+      `info:\n  name: ${name}\n  type: http\n  seq: ${String(seq)}\n${body}`,
+    );
+  }
+
+  /** Étapes de l'onglet du test : numéro, nom et dernier résultat. */
+  function steps() {
+    return browser.execute(() =>
+      Array.from(document.querySelectorAll(".test .step")).map((step) => ({
+        number: step.querySelector(".step__number")?.textContent.trim() ?? "",
+        name: step.querySelector(".step__name")?.textContent.trim() ?? "",
+        mark: step.querySelector(".step__mark")?.textContent.trim() ?? "",
+      })),
+    );
+  }
+
+  it("un test de trois étapes passe la valeur extraite de l'étape 1 à l'étape 3 (4.2-a, R2, R3)", async () => {
+    // Les trois étapes sont écrites sur disque, comme par Git ou un import de Bruno.
+    mkdirSync(path.join(project(), "Créer puis lire"), { recursive: true });
+    writeStep(
+      "creer.yml",
+      "Créer le client",
+      1,
+      `http:\n  method: POST\n  url: ${url}/clients\nruntime:\n  assertions:\n    - expression: res.status\n      operator: eq\n      value: "201"\n  actions:\n    - type: set-variable\n      phase: after-response\n      selector:\n        expression: res.body.id\n        method: jsonq\n      variable:\n        name: client.id\n        scope: runtime\n`,
+    );
+    writeStep(
+      "lire.yml",
+      "Lire le client",
+      2,
+      `http:\n  method: GET\n  url: ${url}/clients/{{client.id}}\nruntime:\n  assertions:\n    - expression: res.body.name\n      operator: eq\n      value: Léa\n`,
+    );
+    writeStep(
+      "supprimer.yml",
+      "Supprimer le client",
+      3,
+      `http:\n  method: DELETE\n  url: ${url}/clients/{{client.id}}\nruntime:\n  assertions:\n    - expression: res.status\n      operator: eq\n      value: "204"\n`,
+    );
+    await restart();
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await clickText('aside [role="treeitem"]', "Créer puis lire");
+    await browser.$(".test").waitForDisplayed({ timeout: 10_000 });
+    expect((await steps()).map((s) => `${s.number} ${s.name}`)).toEqual([
+      "1 Créer le client",
+      "2 Lire le client",
+      "3 Supprimer le client",
+    ]);
+
+    await clickText(".test button", "Exécuter le test");
+    const progress = browser.$(".run__progress");
+    await browser.waitUntil(async () => (await progress.getText()).startsWith("Test réussi"), {
+      timeout: 15_000,
+      timeoutMsg: "test réussi attendu",
+    });
+    expect(await progress.getText()).toBe("Test réussi · 3/3 étapes");
+    // L'étape 3 a reçu l'identifiant extrait de la réponse de l'étape 1.
+    expect(deleted).toBe(1);
+    await clickText(".zone__tab-button", "Créer puis lire");
+    await browser.waitUntil(async () => (await steps()).every((s) => s.mark.startsWith("✓")), {
+      timeoutMsg: "résultats des étapes attendus",
+    });
+    await screenshot(browser, "21-test-reussi");
+  });
+
+  it("une étape en échec arrête le test : les suivantes ne sont pas jouées (R3, R4)", async () => {
+    writeStep(
+      "lire.yml",
+      "Lire le client",
+      2,
+      `http:\n  method: GET\n  url: ${url}/clients/{{client.id}}\nruntime:\n  assertions:\n    - expression: res.body.name\n      operator: eq\n      value: Hugo\n`,
+    );
+    await clickText(".test button", "Exécuter le test");
+    const progress = browser.$(".run__progress");
+    await browser.waitUntil(async () => (await progress.getText()).includes("en échec"), {
+      timeout: 15_000,
+      timeoutMsg: "test en échec attendu",
+    });
+    expect(await progress.getText()).toBe("Test en échec à l'étape 2 · 1/3 étapes");
+    expect(deleted).toBe(1);
+    await clickText(".run__tab", "Tous");
+    const statuses = await browser.execute(() =>
+      Array.from(document.querySelectorAll(".run__item .run__status")).map((s) =>
+        s.textContent.trim(),
+      ),
+    );
+    expect(statuses).toEqual(["Réussie", "Échec", "Non jouée"]);
+    await screenshot(browser, "22-test-arrete");
+  });
+
+  it("l'onglet « Variables » montre l'extraction et sa dernière valeur (4.2-b bis)", async () => {
+    await clickText('aside [role="treeitem"]', "Créer le client");
+    const tab = browser.$(".request-tab");
+    await tab.waitForDisplayed();
+    await clickText(".request-tab .editor__line button", "Envoyer");
+    await browser.waitUntil(
+      async () => (await browser.$(".response__status").getText()).startsWith("201"),
+      { timeout: 15_000, timeoutMsg: "réponse 201 attendue" },
+    );
+    await clickText(".request-tab .editor__tab", "Variables");
+    const row = await browser.execute(() => ({
+      name: document.querySelector<HTMLInputElement>(".vars__name")?.value ?? "",
+      value: document.querySelector(".vars__value")?.textContent.trim() ?? "",
+    }));
+    expect(row).toEqual({ name: "client.id", value: "cus_7" });
+    await screenshot(browser, "23-variables");
+  });
+
+  it("« Nouveau test » crée le dossier et son étape 1, curseur dans l'adresse (4.1-b)", async () => {
+    await clickHidden(
+      'aside button[aria-label="Ajouter au référentiel de tests de boutique-tests"]',
+    );
+    await clickText('aside [role="menuitem"]', "Nouveau test");
+    await browser.waitUntil(() => existsSync(path.join(project(), "Nouveau test", "etape-1.yml")), {
+      timeoutMsg: "étape 1 du nouveau test attendue",
+    });
+    // L'étape s'ouvre après la création : le curseur arrive dans l'adresse une fois l'éditeur monté.
+    await browser.waitUntil(
+      () =>
+        browser.execute(() => document.activeElement?.classList.contains("editor__url") ?? false),
+      { timeout: 10_000, timeoutMsg: "curseur dans l'adresse attendu" },
+    );
+    expect(
+      await browser.execute(() => document.activeElement?.classList.contains("editor__url")),
+    ).toBe(true);
+    await screenshot(browser, "24-nouveau-test");
+  });
+
+  it("la liste des valeurs dynamiques s'ouvre à la frappe de {{$ et insère la valeur choisie (5.1-h)", async () => {
+    // Le curseur est resté dans l'adresse de l'étape 1 (4.1-b) : on tape à la suite.
+    const value = () =>
+      browser.execute(() => (document.activeElement as HTMLInputElement | null)?.value ?? "");
+    // Deux « { » envoyés d'un coup se fondent en un sous WebKitGTK : une touche par appel.
+    for (const key of ["End", "{", "{", "$", "r", "a", "n", "d"]) await browser.keys([key]);
+    await browser.waitUntil(() => browser.$(".dynamic-values").isExisting(), {
+      timeoutMsg: "liste des valeurs dynamiques attendue",
+    });
+    await screenshot(browser, "25-valeurs-dynamiques");
+    await browser.keys(["ArrowDown", "Enter"]);
+    await browser.waitUntil(async () => (await value()).endsWith("{{$randomInt}}"), {
+      timeoutMsg: "valeur dynamique insérée attendue",
+    });
+    expect(await browser.$(".dynamic-values").isExisting()).toBe(false);
+  });
+
+  it("une étiquette du projet est proposée avec son nombre de requêtes (4.9-a)", async () => {
+    const file = (name: string) => path.join(project(), "Créer puis lire", name);
+    /** Ouvre une requête de la barre latérale et attend son éditeur. */
+    const open = async (name: string): Promise<void> => {
+      await clickText('aside [role="treeitem"]', name);
+      await browser.waitUntil(
+        () =>
+          browser.execute(
+            (n) =>
+              Array.from(
+                document.querySelectorAll<HTMLInputElement>(".request-tab .meta__input"),
+              ).some((input) => input.value === n) &&
+              document.querySelector(".request-tab .tag__add") !== null,
+            name,
+          ),
+        { timeoutMsg: `éditeur de « ${name} » attendu` },
+      );
+    };
+    await open("Lire le client");
+    await clickText(".request-tab .tag__add", "+ Étiquette");
+    await browser.keys([..."parcours".split(""), "Enter"]);
+    await browser.waitUntil(() => readFileSync(file("lire.yml"), "utf8").includes("parcours"), {
+      timeoutMsg: "étiquette enregistrée attendue",
+    });
+    await open("Supprimer le client");
+    await clickText(".request-tab .tag__add", "+ Étiquette");
+    await browser.keys("par".split(""));
+    await browser.waitUntil(
+      async () =>
+        (await browser.$(".tag-list").isExisting()) &&
+        (await browser.$(".tag-list").getText()).includes("parcours"),
+      { timeoutMsg: "étiquette du projet proposée attendue" },
+    );
+    await screenshot(browser, "26-etiquettes");
+    await browser.keys(["Enter"]);
+    await browser.waitUntil(
+      () => readFileSync(file("supprimer.yml"), "utf8").includes("parcours"),
+      { timeoutMsg: "étiquette proposée ajoutée attendue" },
+    );
+    expect(readFileSync(file("supprimer.yml"), "utf8")).toContain("parcours");
+  });
+});
+
+describe("Lot H - Réseau et authentification", () => {
+  let server: Server;
+  let url = "";
+  /** Dernier en-tête Cookie reçu par le serveur. */
+  let received: string | null = null;
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      if (request.url === "/login") {
+        response.writeHead(200, {
+          "Content-Type": "application/json",
+          "Set-Cookie": "session=lot-h-1234; Path=/; HttpOnly; Max-Age=1800",
+        });
+        response.end('{"ok":true}');
+      } else {
+        // Garde le cookie reçu : la requête suivante doit l'avoir.
+        received = request.headers.cookie ?? null;
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ cookie: received }));
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  });
+
+  afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /** Ouvre « Lister les commandes » et l'envoie à `target`. */
+  async function sendTo(target: string): Promise<void> {
+    await browser.execute(() => {
+      const row = Array.from(
+        document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'),
+      ).find(
+        (item) => item.querySelector(".row__name")?.textContent.trim() === "Lister les commandes",
+      );
+      if (!row) throw new Error("requête « Lister les commandes » introuvable");
+      row.click();
+    });
+    await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+    await browser.execute((address) => {
+      const input = document.querySelector<HTMLInputElement>(".request-tab .editor__url");
+      if (!input) throw new Error("adresse introuvable");
+      input.value = address;
+      input.dispatchEvent(new Event("input"));
+    }, target);
+    await clickText(".request-tab button", "Envoyer");
+  }
+
+  it("Ctrl+, ouvre les préférences : proxy et autorités du poste (1.6-e)", async () => {
+    await browser.execute(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ctrlKey: true }));
+    });
+    const dialog = browser.$("dialog[open]");
+    await dialog.waitForExist({ timeout: 10_000 });
+    await browser.waitUntil(async () => (await dialog.getText()).includes("Autorités racines"), {
+      timeoutMsg: "section Certificats attendue",
+    });
+    expect(await dialog.getText()).toContain("Celui du système");
+    await screenshot(browser, "h1-preferences-reseau");
+    await browser.keys("Escape");
+    await browser.$("dialog[open]").waitForExist({ reverse: true, timeout: 5_000 });
+  });
+
+  it("un serveur injoignable est expliqué : la requête n'est pas partie (5.1-i)", async () => {
+    await sendTo("http://127.0.0.1:1/commandes");
+    const panel = browser.$(".net-failure");
+    await panel.waitForExist({ timeout: 30_000 });
+    const text = await panel.getText();
+    expect(text).toContain("127.0.0.1:1");
+    expect(text).toContain("La requête n'est pas partie");
+    expect(text).not.toContain("Ignorer");
+    await screenshot(browser, "h2-echec-reseau");
+  });
+
+  it("un cookie reçu est gardé pour l'environnement et renvoyé (3.4-g)", async () => {
+    await sendTo(`${url}/login`);
+    await browser.waitUntil(
+      async () => (await browser.$(".response__status").getText()).startsWith("200"),
+      { timeout: 15_000, timeoutMsg: "réponse 200 attendue" },
+    );
+    await sendTo(`${url}/moi`);
+    await browser.waitUntil(() => received === "session=lot-h-1234", {
+      timeout: 15_000,
+      timeoutMsg: "le cookie gardé doit repartir",
+    });
+    // HttpOnly : sa valeur reste masquée dans la réponse affichée.
+    await browser.waitUntil(
+      async () => (await browser.$(".code").getText()).includes("session=••••"),
+      {
+        timeout: 10_000,
+        timeoutMsg: "valeur du cookie masquée attendue",
+      },
+    );
+    await clickText(".request-tab .editor__tab", "En-têtes");
+    const cookies = browser.$('[aria-label="Cookies gardés de 127.0.0.1"]');
+    await cookies.waitForExist({ timeout: 10_000 });
+    expect(await cookies.getText()).toContain("GET /login");
+    await screenshot(browser, "h4-cookies");
+    await clickText(".cookies button", "Vider");
+    await cookies.waitForExist({ reverse: true, timeout: 10_000 });
+  });
+
+  it("les réglages du projet règlent OAuth 2 et disent qui l'hérite (3.4-a)", async () => {
+    await clickHidden(`aside button[aria-label="Plus d'actions sur boutique-tests"]`);
+    await clickText('[role="menuitem"]', "Réglages du projet…");
+    // Le texte est lu dans le DOM : WebKitGTK ne rend pas toute la fenêtre visible d'un coup.
+    const settingsText = () =>
+      browser.execute(() => document.querySelector("dialog[open]")?.textContent ?? "");
+    await browser.waitUntil(async () => (await settingsText()).includes("Qui l'utilise"), {
+      timeout: 10_000,
+      timeoutMsg: "réglages du projet attendus",
+    });
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>("dialog[open] select");
+      if (!select) throw new Error("type introuvable");
+      select.value = "oauth2";
+      select.dispatchEvent(new Event("change"));
+    });
+    await browser.$("dialog[open] .oauth2").waitForExist({ timeout: 5_000 });
+    expect(await settingsText()).toContain("URL du jeton");
+    await screenshot(browser, "h3-reglages-projet");
+    await clickText("dialog[open] button", "Fermer");
+  });
+});
+
+describe("Lot F - onglets et clavier", () => {
+  /** Onglets de la zone active : nom et aperçu (titre en italique). */
+  async function activeZoneTabs(): Promise<{ name: string; preview: boolean }[]> {
+    return browser.execute(() =>
+      Array.from(document.querySelectorAll(".zone__tab:not(.zone__tab--hidden)")).map((tab) => ({
+        name: tab.querySelector(".zone__name")?.textContent.trim() ?? "",
+        preview: tab.classList.contains("zone__tab--preview"),
+      })),
+    );
+  }
+
+  async function waitForTabs(expected: { name: string; preview: boolean }[]): Promise<void> {
+    const norm = (tabs: { name: string; preview: boolean }[]) =>
+      JSON.stringify(
+        tabs.map((t) => ({
+          name: t.name.normalize("NFC").replace(/\s+/g, " "),
+          preview: t.preview,
+        })),
+      );
+    let last: unknown = null;
+    try {
+      await browser.waitUntil(
+        async () => {
+          const tabs = await activeZoneTabs();
+          last = tabs;
+          return norm(tabs) === norm(expected);
+        },
+        { timeout: 10_000 },
+      );
+    } catch (error) {
+      console.error("activeZoneTabs", JSON.stringify(last), String(error));
+      // Diagnostic : tous les onglets du DOM (cachés compris) et les zones enregistrées.
+      const dom = await browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab")).map(
+          (tab) => `${tab.className}:${tab.querySelector(".zone__name")?.textContent ?? ""}`,
+        ),
+      );
+      const saved = readWindows(sandbox).windows.map((w) =>
+        w.layout ? zonesOf(w.layout.root).map((z) => z.tabs) : w.kind,
+      );
+      throw new Error(
+        `onglets ${JSON.stringify(expected)} attendus, lus ${JSON.stringify(last)} ; DOM ${JSON.stringify(dom)} ; windows.json ${JSON.stringify(saved)}`,
+      );
+    }
+  }
+
+  /** Raccourci émis dans la WebView, par le code de la touche (AZERTY compris). */
+  async function shortcut(code: string, type = "keydown", shift = false): Promise<void> {
+    await browser.execute(
+      (keyCode, eventType, withShift) => {
+        const key = keyCode === "Tab" ? "Tab" : keyCode === "ControlLeft" ? "Control" : keyCode;
+        window.dispatchEvent(
+          new KeyboardEvent(eventType, {
+            code: keyCode,
+            key,
+            ctrlKey: eventType === "keydown",
+            shiftKey: withShift,
+            bubbles: true,
+          }),
+        );
+      },
+      code,
+      type,
+      shift,
+    );
+  }
+
+  /** Texte du DOM : WebKitGTK peut perdre les blancs entre éléments avec `getText`. */
+  async function textOf(selector: string): Promise<string> {
+    return browser.execute((css) => document.querySelector(css)?.textContent ?? "", selector);
+  }
+
+  async function dblclickRow(name: string): Promise<void> {
+    await browser.execute((label) => {
+      const row = Array.from(
+        document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'),
+      ).find((r) => r.textContent.includes(label));
+      if (!row) throw new Error(`« ${label} » introuvable`);
+      row.click();
+      row.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    }, name);
+  }
+
+  it("ferme tout, puis un simple clic ouvre en aperçu, remplacé au suivant (1.3-a, 1.3-b)", async () => {
+    if ((await activeZoneTabs()).length > 0) {
+      await browser.execute(() => {
+        document
+          .querySelector('.zone__tab-button[aria-selected="true"]')
+          ?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+      });
+      await browser.$('[role="menu"]').waitForDisplayed();
+      await clickText('[role="menuitem"]', "Fermer tout");
+    }
+    await waitForTabs([]);
+
+    await clickText('aside [role="treeitem"]', "Créer le client");
+    await waitForTabs([{ name: "Créer le client", preview: true }]);
+    await clickText('aside [role="treeitem"]', "Lire le client");
+    await waitForTabs([{ name: "Lire le client", preview: true }]);
+    await dblclickRow("Supprimer le client");
+    await waitForTabs([{ name: "Supprimer le client", preview: false }]);
+    await clickText('aside [role="treeitem"]', "Lire le client");
+    await waitForTabs([
+      { name: "Supprimer le client", preview: false },
+      { name: "Lire le client", preview: true },
+    ]);
+    expect(await activeZoneTabs()).toHaveLength(2);
+    await screenshot(browser, "25-onglet-apercu");
+  });
+
+  it("« +N » liste les onglets en trop et ferme les autres (1.3-b)", async () => {
+    const requests: string[] = await browser.execute(() =>
+      Array.from(document.querySelectorAll('aside [role="treeitem"]:not([aria-expanded])')).map(
+        (r) => r.querySelector(".row__name")?.textContent.trim() ?? "",
+      ),
+    );
+    for (const name of requests) {
+      if (await browser.$(".zone__more").isExisting()) break;
+      if (name !== "") await dblclickRow(name);
+    }
+    const more = browser.$(".zone__more");
+    await more.waitForExist({ timeout: 10_000, timeoutMsg: "bouton « +N » attendu" });
+    await more.click();
+    const menu = browser.$('[role="menu"][aria-label^="Autres onglets"]');
+    await menu.waitForDisplayed();
+    expect(await menu.getText()).toContain("Fermer les autres onglets");
+    await screenshot(browser, "26-onglets-en-trop");
+
+    await clickText('[role="menuitem"]', "Fermer les autres onglets");
+    await browser.waitUntil(async () => (await activeZoneTabs()).length === 1, {
+      timeoutMsg: "un seul onglet attendu",
+    });
+    expect(await browser.$(".zone__more").isExisting()).toBe(false);
+  });
+
+  it("Ctrl+Tab passe à l'onglet utilisé juste avant (1.3-c)", async () => {
+    const [first] = (await activeZoneTabs()).map((t) => t.name);
+    await dblclickRow(first === "Lire le client" ? "Créer le client" : "Lire le client");
+    await browser.waitUntil(async () => (await activeZoneTabs()).length === 2);
+
+    await shortcut("Tab");
+    const list = browser.$(".zone__switcher");
+    await list.waitForDisplayed();
+    expect(await textOf('.zone__switcher [aria-selected="true"]')).toContain(first ?? "");
+    await screenshot(browser, "27-ctrl-tab");
+    await shortcut("ControlLeft", "keyup");
+    await browser.waitUntil(async () => !(await list.isExisting()));
+    expect(await textOf('.zone__tab-button[aria-selected="true"]')).toContain(first ?? "");
+  });
+
+  it("Ctrl+J met le résultat dessous, Ctrl+\\ masque la barre latérale (1.4-j)", async () => {
+    await dblclickRow("Lire le client");
+    await browser.$(".request-tab").waitForDisplayed();
+    const below = () => browser.$(".request-tab--below").isExisting();
+    const before = await below();
+    await shortcut("KeyJ");
+    await browser.waitUntil(async () => (await below()) !== before, {
+      timeoutMsg: "place du résultat changée attendue",
+    });
+
+    await shortcut("Backslash");
+    await browser.waitUntil(async () => !(await browser.$("aside").isExisting()), {
+      timeoutMsg: "barre latérale masquée attendue",
+    });
+    await browser.waitUntil(() => readWindows(sandbox).windows[0]?.sidebarHidden === true);
+    expect(readWindows(sandbox).windows[0]?.sidebarHidden).toBe(true);
+    await screenshot(browser, "28-clavier");
+
+    // Gardé par la fenêtre : rouvert après un redémarrage, masqué.
+    await restart();
+    await browser.$('[aria-label="Afficher la barre latérale"]').waitForDisplayed();
+    await browser.$('[aria-label="Afficher la barre latérale"]').click();
+    await browser.$("aside").waitForDisplayed();
+    expect(readWindows(sandbox).windows[0]?.sidebarHidden).toBe(false);
+    await shortcut("KeyJ");
+    await browser.waitUntil(async () => (await below()) === before);
+  });
+});
+
+describe("Lot I - Fichiers modifiés hors d'Arnod (4.1-e)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const file = () => path.join(project(), "surveille.yml");
+
+  /** Écrit la requête comme un éditeur ou un `git pull`, application lancée. */
+  function writeOutside(url: string): void {
+    writeFileSync(
+      file(),
+      `info:\n  name: Fichier surveillé\n  type: http\nhttp:\n  method: GET\n  url: ${url}\n`,
+    );
+  }
+
+  /** Adresse de l'onglet de la requête surveillée, s'il est affiché. */
+  function shownUrl(): Promise<string> {
+    return browser.execute(() => {
+      const fields = Array.from(document.querySelectorAll<HTMLInputElement>(".editor__url"));
+      return fields.find((f) => f.offsetParent !== null)?.value ?? "";
+    });
+  }
+
+  it("une requête ajoutée sur disque apparaît, puis son onglet suit le fichier (R3)", async () => {
+    writeOutside("http://localhost/v1");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll('aside [role="treeitem"]')).some((i) =>
+            i.textContent.includes("Fichier surveillé"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "requête ajoutée hors d'Arnod attendue dans l'arborescence" },
+    );
+    await clickText('aside [role="treeitem"]', "Fichier surveillé");
+    await browser.waitUntil(async () => (await shownUrl()) === "http://localhost/v1", {
+      timeoutMsg: "onglet de la requête attendu",
+    });
+
+    writeOutside("http://localhost/v2");
+    await browser.waitUntil(async () => (await shownUrl()) === "http://localhost/v2", {
+      timeout: 10_000,
+      timeoutMsg: "onglet relu après la modification sur disque attendu",
+    });
+    expect(await shownUrl()).toBe("http://localhost/v2");
+    await screenshot(browser, "25-recharge-depuis-le-disque");
+  });
+
+  it("un brouillon en conflit n'est pas écrasé et se règle élément par élément (R9 à R11)", async () => {
+    await browser.execute(() => {
+      const field = Array.from(document.querySelectorAll<HTMLInputElement>(".editor__url")).find(
+        (f) => f.offsetParent !== null,
+      );
+      if (!field) throw new Error("adresse introuvable");
+      field.value = "http://localhost/brouillon";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    // Écrit avant l'enregistrement automatique (600 ms) : le brouillon est en conflit.
+    writeOutside("http://localhost/v3");
+    await browser.$(".conflict").waitForDisplayed({ timeout: 10_000 });
+    expect(readFileSync(file(), "utf8")).toContain("http://localhost/v3");
+    await screenshot(browser, "26-conflit");
+
+    await clickText(".conflict__actions button", "Tout garder de mon brouillon");
+    await clickText(".conflict__actions button", "Appliquer et enregistrer");
+    await browser.waitUntil(
+      () => readFileSync(file(), "utf8").includes("http://localhost/brouillon"),
+      { timeout: 10_000, timeoutMsg: "brouillon écrit une seule fois après le choix" },
+    );
+    expect(await browser.$(".conflict").isExisting()).toBe(false);
+  });
+
+  it("une requête supprimée sur disque ferme son onglet (R4)", async () => {
+    rmSync(file());
+    await browser.waitUntil(async () => (await shownUrl()) !== "http://localhost/brouillon", {
+      timeout: 10_000,
+      timeoutMsg: "onglet fermé attendu",
+    });
+    expect(
+      await browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab-button")).some((t) =>
+          t.textContent.includes("Fichier surveillé"),
+        ),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("Lot J - Copier et déplacer (4.1-f, 4.1-g, 3.2-c)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+
+  function step(name: string, method: string, seq: number): string {
+    return `info:\n  name: ${name}\n  type: http\n  seq: ${String(seq)}\nhttp:\n  method: ${method}\n  url: http://localhost/orders\n`;
+  }
+
+  async function inTree(name: string): Promise<boolean> {
+    return browser.execute(
+      (n) =>
+        Array.from(document.querySelectorAll('aside [role="treeitem"]')).some((i) =>
+          i.textContent.includes(n),
+        ),
+      name,
+    );
+  }
+
+  it("une requête se déplace à une place d'un test, les étapes suivantes reculent (4.1-g)", async () => {
+    const test = path.join(project(), "Parcours J");
+    mkdirSync(test, { recursive: true });
+    writeFileSync(path.join(test, "creer.yml"), step("Créer la commande J", "POST", 1));
+    writeFileSync(path.join(test, "relire.yml"), step("Relire la commande J", "GET", 2));
+    writeFileSync(path.join(project(), "sans-coupon.yml"), step("Sans coupon", "POST", 1));
+    await browser.waitUntil(() => inTree("Sans coupon"), {
+      timeout: 10_000,
+      timeoutMsg: "requêtes écrites sur disque attendues dans l'arborescence",
+    });
+    await clickHidden('aside button[aria-label="Actions pour Sans coupon"]');
+    await clickText('[role="menuitem"]', "Copier ou déplacer…");
+    await browser.$(".copy-move").waitForDisplayed({ timeoutMsg: "dialogue attendu" });
+    await browser.execute(() => {
+      const field = document.querySelector<HTMLInputElement>(".copy-move__search");
+      if (!field) throw new Error("recherche introuvable");
+      field.value = "Parcours";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await browser.waitUntil(
+      () => browser.execute(() => document.querySelector(".copy-move__place select") !== null),
+      { timeoutMsg: "choix de la place dans le test attendu" },
+    );
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".copy-move__place select");
+      if (!select) throw new Error("place introuvable");
+      select.value = "1";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          (document.querySelector(".copy-move__changes")?.textContent ?? "").includes(
+            "Devient l'étape 2",
+          ),
+        ),
+      { timeoutMsg: "« Ce qui change » attendu" },
+    );
+    await screenshot(browser, "31-copier-deplacer");
+    await clickText("dialog[open] button", "Déplacer");
+    const moved = path.join(test, "sans-coupon.yml");
+    await browser.waitUntil(() => existsSync(moved), { timeoutMsg: "étape déplacée attendue" });
+    expect(readFileSync(moved, "utf8")).toContain("seq: 2");
+    expect(readFileSync(path.join(test, "relire.yml"), "utf8")).toContain("seq: 3");
+    expect(existsSync(path.join(project(), "sans-coupon.yml"))).toBe(false);
+
+    // « Annuler » de la notification remet tout.
+    await browser.waitUntil(async () => (await toastText(browser)).includes("déplacée"), {
+      timeoutMsg: "notification du déplacement attendue",
+    });
+    await clickText(".toast button", "Annuler");
+    await browser.waitUntil(() => existsSync(path.join(project(), "sans-coupon.yml")), {
+      timeoutMsg: "requête remise à sa place attendue",
+    });
+    expect(existsSync(moved)).toBe(false);
+    expect(readFileSync(path.join(test, "relire.yml"), "utf8")).toContain("seq: 2");
+  });
+
+  it("une requête d'un endpoint se transfère au référentiel de tests (3.2-c)", async () => {
+    const contracts = path.join(project(), "contracts");
+    mkdirSync(contracts, { recursive: true });
+    writeFileSync(
+      path.join(contracts, "commandes-j.yaml"),
+      'openapi: 3.0.3\ninfo:\n  title: API Commandes J\n  version: 2.4.0\npaths:\n  /orders:\n    post:\n      responses:\n        "201": { description: créée }\n',
+    );
+    const folder = path.join(project(), "API Commandes J");
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(
+      path.join(folder, "commande-simple.yml"),
+      'info:\n  name: Commande simple J\n  type: http\n  tags:\n    - "contract:contracts/commandes-j.yaml#POST /orders"\nhttp:\n  method: POST\n  url: http://localhost/orders\n',
+    );
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document.querySelector('[aria-label="Déplier le contrat API Commandes J"]') !== null,
+        ),
+      { timeout: 10_000, timeoutMsg: "contrat écrit sur disque attendu" },
+    );
+    await browser.execute(() => {
+      document
+        .querySelector<HTMLElement>('[aria-label="Déplier le contrat API Commandes J"]')
+        ?.click();
+    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() => {
+          // « Ouvrir POST /orders », ou « Créer la requête de POST /orders » si la requête écrite
+          // n'est pas encore rangée sous l'opération : les deux ouvrent une requête liée.
+          const open = document.querySelector<HTMLElement>(
+            '.crow__main[aria-label$=" POST /orders"]',
+          );
+          if (open) {
+            open.click();
+            return true;
+          }
+          // La ressource /orders, repliée, se déplie d'abord.
+          for (const b of document.querySelectorAll<HTMLElement>(
+            '.crow__main[aria-expanded="false"]',
+          )) {
+            if (b.classList.contains("crow__resource") && b.textContent.includes("/orders"))
+              b.click();
+          }
+          return false;
+        }),
+      { timeoutMsg: "opération POST /orders attendue" },
+    );
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll<HTMLElement>(".trial-transfer")).some(
+            (t) => t.offsetParent !== null,
+          ),
+        ),
+      { timeoutMsg: "« Requête au point ? » attendu sous la requête liée" },
+    );
+    expect(
+      await browser.execute(
+        () =>
+          document.querySelector(".trial-transfer")?.textContent.includes("Glissez-la") ?? false,
+      ),
+    ).toBe(true);
+    await screenshot(browser, "30-transferer-un-endpoint");
+  });
+});
+
+describe("Lot L allégé - Mises à jour (1.6-g)", () => {
+  it("la section dit la version installée, la vérification et le canal", async () => {
+    await browser.execute(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ctrlKey: true }));
+    });
+    await browser.$(".preferences").waitForDisplayed({ timeoutMsg: "préférences attendues" });
+    await clickText(".preferences__section", "Mises à jour");
+    await browser.$(".updates").waitForDisplayed({ timeoutMsg: "section Mises à jour attendue" });
+    const text = await browser.execute(
+      () => document.querySelector(".updates")?.textContent.replace(/\s+/g, " ") ?? "",
+    );
+    expect(text).toContain("installée sur ce poste");
+    expect(text).toContain("Vérifier maintenant");
+    // Le bac à sable coupe la vérification automatique (e2e/app.ts).
+    expect(
+      await browser.execute(
+        () => document.querySelector<HTMLInputElement>('.updates input[type="checkbox"]')?.checked,
+      ),
+    ).toBe(false);
+    await screenshot(browser, "32-mises-a-jour");
+    await browser.keys("Escape");
+  });
+});
+
+describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const file = () => path.join(project(), "chrono-k.yml");
+  let server: Server;
+
+  beforeAll(async () => {
+    server = createServer((_request, response) => {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ etat: "ok" }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = String((server.address() as AddressInfo).port);
+    writeFileSync(
+      file(),
+      `info:\n  name: Chrono K\n  type: http\nhttp:\n  method: GET\n  url: http://127.0.0.1:${port}/sante\n`,
+    );
+  });
+
+  afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  it("l'onglet Chronologie dit où le temps est passé (5.1-c)", async () => {
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]')).some((i) =>
+            i.textContent.includes("Chrono K"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "requête écrite sur disque attendue dans l'arborescence" },
+    );
+    await browser.execute(() => {
+      Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'))
+        .find((i) => i.textContent.includes("Chrono K"))
+        ?.click();
+    });
+    await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+    await clickText(".request-tab button", "Envoyer");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll('[role="tab"]')).some((t) =>
+            t.textContent.includes("Chronologie"),
+          ),
+        ),
+      { timeout: 15_000, timeoutMsg: "réponse attendue" },
+    );
+    await clickText('[role="tab"]', "Chronologie");
+    await browser.$(".timeline").waitForDisplayed({ timeout: 15_000 });
+    const labels = await browser.execute(() =>
+      Array.from(document.querySelectorAll(".timeline__label")).map((l) => l.textContent.trim()),
+    );
+    expect(labels).toContain("Attente du serveur");
+    expect(labels).toContain("Réception");
+    await screenshot(browser, "34-chronologie");
+  });
+
+  it("un jeton saisi en clair est proposé en variable locale, rien n'est écrit avant (4.2-c)", async () => {
+    await clickText(".request-tab .editor__tab", "Auth");
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".request-tab .auth select");
+      if (!select) throw new Error("mode d'authentification introuvable");
+      select.value = "bearer";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await browser.$('.request-tab .auth input[type="text"]').waitForExist();
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        '.request-tab .auth input[type="text"]',
+      );
+      if (!input) throw new Error("jeton introuvable");
+      input.value = "eyJhbGciOiJIUzI1NiJ9.e2e";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await browser
+      .$(".secret")
+      .waitForDisplayed({ timeout: 10_000, timeoutMsg: "proposition attendue" });
+    // Le jeton n'est jamais écrit dans le projet tant que l'utilisateur n'a pas choisi.
+    expect(readFileSync(file(), "utf8")).not.toContain("eyJhbGciOiJIUzI1NiJ9");
+    await screenshot(browser, "33-secret-en-clair");
+    await clickText(".secret button", "Mettre dans une variable locale");
+    // Avec un coffre du système, la référence est écrite ; sans coffre (bac à sable e2e sans
+    // service de secrets), l'échec est dit. Dans les deux cas, le jeton n'est jamais écrit.
+    await browser.waitUntil(
+      async () =>
+        readFileSync(file(), "utf8").includes("{{token}}") ||
+        (await browser.$(".toast--error").isExisting()),
+      { timeout: 10_000, timeoutMsg: "référence écrite ou échec du coffre annoncé attendu" },
+    );
+    expect(readFileSync(file(), "utf8")).not.toContain("eyJhbGciOiJIUzI1NiJ9");
+  });
+});
+
+describe("Sélection multiple (4.1-a quater)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const names = ["Sel A", "Sel B"];
+  const files = ["sel-a.yml", "sel-b.yml"];
+
+  beforeAll(() => {
+    names.forEach((name, i) => {
+      writeFileSync(
+        path.join(project(), files[i] ?? ""),
+        `info:\n  name: ${name}\n  type: http\nhttp:\n  method: GET\n  url: http://127.0.0.1:9/${String(i)}\n`,
+      );
+    });
+  });
+
+  it("Ctrl+clic choisit deux requêtes ; « Dupliquer » puis « Annuler » remet le projet", async () => {
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          (wanted) =>
+            wanted.every((n) =>
+              Array.from(document.querySelectorAll('aside [role="treeitem"]')).some((i) =>
+                i.textContent.includes(n),
+              ),
+            ),
+          names,
+        ),
+      { timeout: 10_000, timeoutMsg: "requêtes écrites sur disque attendues dans l'arborescence" },
+    );
+    // Un simple clic ouvre la première ; le Ctrl+clic suivant la prend avec la seconde (la ligne
+    // ouverte entre dans la sélection, comme dans un explorateur de fichiers).
+    const clickRow = (name: string, ctrlKey: boolean) =>
+      browser.execute(
+        (n, ctrl) => {
+          Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'))
+            .find((item) => item.textContent.includes(n))
+            ?.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: ctrl }));
+        },
+        name,
+        ctrlKey,
+      );
+    await clickRow("Sel A", false);
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document
+              .querySelector('.zone__tab-button[aria-selected="true"]')
+              ?.textContent.includes("Sel A") ?? false,
+        ),
+      { timeout: 10_000, timeoutMsg: "onglet « Sel A » actif attendu" },
+    );
+    await clickRow("Sel B", true);
+    await browser.$(".selection").waitForDisplayed({ timeout: 10_000 });
+    expect(
+      await browser.execute(
+        () => document.querySelector(".selection__count")?.textContent.trim() ?? "",
+      ),
+    ).toBe("2 sélectionnés");
+    await screenshot(browser, "35-selection-multiple");
+    await clickText(".selection button", "Dupliquer");
+    const copies = files.map((f) => path.join(project(), f.replace(".yml", "-copie.yml")));
+    await browser.waitUntil(() => copies.every((c) => existsSync(c)), {
+      timeout: 10_000,
+      timeoutMsg: "copies attendues",
+    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document.querySelector(".toast__message")?.textContent.includes("dupliqués") ?? false,
+        ),
+      { timeout: 10_000, timeoutMsg: "notification « 2 éléments dupliqués » attendue" },
+    );
+    await clickText(".toast button", "Annuler");
+    await browser.waitUntil(() => copies.every((c) => !existsSync(c)), {
+      timeout: 10_000,
+      timeoutMsg: "copies retirées attendues",
+    });
+    expect(files.every((f) => existsSync(path.join(project(), f)))).toBe(true);
+  });
+});
+
+describe("Lot G - Démarrage et erreurs (0.3)", () => {
+  const statePath = () => path.join(sandbox.dataDir, "arnod.json");
+
+  /** Texte d'un élément du DOM (WebKitGTK peut perdre les blancs entre éléments). */
+  function textOf(selector: string): Promise<string> {
+    return browser.execute(
+      (s) => document.querySelector(s)?.textContent.replace(/\s+/g, " ").trim() ?? "",
+      selector,
+    );
+  }
+
+  it("un arnod.json illisible s'explique, intact, avec deux issues (0.3-b, 0.3-b ter)", async () => {
+    const original = readFileSync(statePath(), "utf8");
+    await browser.deleteSession();
+    writeFileSync(statePath(), "{ pas du JSON");
+    browser = await launchApp();
+
+    await browser.$(".startup-problem").waitForDisplayed({ timeout: 10_000 });
+    expect(await heading(browser)).toBe("L'état d'Arnod est illisible");
+    expect(await textOf(".startup-problem__intact")).toContain("Rien n'a été modifié.");
+    const buttons = await browser.execute(() =>
+      Array.from(document.querySelectorAll(".startup-problem__option-button")).map((b) =>
+        b.textContent.trim(),
+      ),
+    );
+    expect(buttons).toEqual(["Repartir d'un état vide", "Réessayer"]);
+    // Rien n'est écrit tant que l'utilisateur n'a pas choisi.
+    expect(readFileSync(statePath(), "utf8")).toBe("{ pas du JSON");
+    await screenshot(browser, "0.3-b-illisible");
+
+    await browser.$(".startup-problem__toggle").click();
+    await browser.$("#startup-problem-details").waitForDisplayed();
+    expect(await textOf("#startup-problem-details")).toContain("corruptState");
+    await screenshot(browser, "0.3-b-ter-details");
+
+    await browser.$(".startup-problem__option-button*=Repartir").click();
+    await browser.$(".startup-problem").waitForExist({ reverse: true, timeout: 10_000 });
+    expect(await toastText(browser)).toContain("arnod.json.illisible");
+    expect(readFileSync(path.join(sandbox.dataDir, "arnod.json.illisible"), "utf8")).toBe(
+      "{ pas du JSON",
+    );
+    expect(readState(sandbox).projects).toEqual([]);
+
+    // L'état d'origine remis en place, les projets reviennent.
+    await browser.deleteSession();
+    writeFileSync(statePath(), original);
+    browser = await launchApp();
+    expect(await browser.$(".startup-problem").isExisting()).toBe(false);
+    expect(readState(sandbox).projects.length).toBeGreaterThan(0);
+  });
+
+  it("un état d'une version plus récente n'est ni lu ni réécrit (0.3-b)", async () => {
+    const original = readFileSync(statePath(), "utf8");
+    const newer = JSON.stringify({ version: 99, writtenBy: "9.0.0" });
+    await browser.deleteSession();
+    writeFileSync(statePath(), newer);
+    browser = await launchApp();
+
+    await browser.$(".startup-problem").waitForDisplayed({ timeout: 10_000 });
+    expect(await heading(browser)).toBe("Cet état vient d'une version plus récente d'Arnod");
+    expect(await textOf(".startup-problem__option--recommended h3")).toContain(
+      "Installer Arnod 9.0.0 ou plus récent",
+    );
+
+    await browser.deleteSession();
+    expect(readFileSync(statePath(), "utf8")).toBe(newer);
+    writeFileSync(statePath(), original);
+    browser = await launchApp();
+    expect(await browser.$(".startup-problem").isExisting()).toBe(false);
   });
 });

@@ -51,7 +51,10 @@ async function submit(): Promise<void> {
     description="Un projet peut être dans plusieurs workspaces."
     @close="close"
   >
-    <ul v-if="project" class="choices">
+    <p v-if="catalog.workspaces.length === 0" class="empty">
+      Aucun workspace pour l'instant : créez-en un avec « + Nouveau workspace » du sélecteur.
+    </p>
+    <ul v-else-if="project" class="choices">
       <li v-for="workspace in catalog.workspaces" :key="workspace.id">
         <label
           class="choice"
@@ -82,6 +85,11 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
+.empty {
+  margin: 0;
+  color: var(--color-muted);
+}
+
 .choices {
   display: flex;
   flex-direction: column;
@@ -96,7 +104,7 @@ async function submit(): Promise<void> {
   align-items: center;
   gap: 0.625rem;
   padding: 0.5rem 0.625rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -114,7 +122,7 @@ async function submit(): Promise<void> {
 }
 
 .choice__note {
-  font-size: 0.8125rem;
+  font-size: var(--text-body);
   color: var(--color-muted);
 }
 </style>

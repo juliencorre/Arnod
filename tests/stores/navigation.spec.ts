@@ -16,7 +16,7 @@ import {
 } from "../fixtures";
 
 let titles: (string | null)[];
-let opened: string[];
+let opened: (string | null)[];
 
 /** Mock IPC : chargement de `snapshot`, ouverture de workspace et titres de fenêtre notés. */
 function mockCore(snapshot: CatalogSnapshot): void {
@@ -26,7 +26,7 @@ function mockCore(snapshot: CatalogSnapshot): void {
       case "catalog_load":
         return { snapshot, warning: null };
       case "workspace_open": {
-        const workspaceId = String(payload.workspaceId);
+        const workspaceId = (payload.workspaceId as string | null) ?? null;
         opened.push(workspaceId);
         return { ...snapshot, lastWorkspaceId: workspaceId };
       }
@@ -60,11 +60,11 @@ afterEach(() => {
 });
 
 describe("useNavigationStore", () => {
-  it("affiche le premier lancement sans projet, titre « Arnod » seul", async () => {
+  it("affiche le premier lancement sur « Tous les projets », titre « Arnod » seul", async () => {
     const { navigation } = await started(firstRunSnapshot());
 
-    expect(navigation.view).toEqual({ kind: "firstRun" });
-    expect(navigation.currentWorkspaceId).toBe(MES_PROJETS);
+    expect(navigation.view).toEqual({ kind: "all", highlightProjectId: null });
+    expect(navigation.currentWorkspaceId).toBeNull();
     expect(titles).toEqual([null]);
   });
 
@@ -88,7 +88,7 @@ describe("useNavigationStore", () => {
     expect(titles.at(-1)).toBe("Mes projets");
   });
 
-  it("titre du projet ouvert et des onglets de gestion", async () => {
+  it("titre du projet ouvert, de « Tous les projets » et de la gestion", async () => {
     const { navigation } = await started(boutiqueSnapshot());
 
     navigation.showProject(BOUTIQUE_TESTS, BOUTIQUE);
@@ -96,13 +96,17 @@ describe("useNavigationStore", () => {
     expect(titles.at(-1)).toBe("boutique-tests");
     expect(navigation.currentWorkspaceId).toBe(BOUTIQUE);
 
-    navigation.showManage("registry");
-    await nextTick();
-    expect(titles.at(-1)).toBe("Référentiel des projets");
-
-    navigation.showManage("workspaces");
+    navigation.showManage();
     await nextTick();
     expect(titles.at(-1)).toBe("Workspaces");
+    expect(navigation.view).toEqual({ kind: "manage", workspaceId: BOUTIQUE, returnTo: BOUTIQUE });
+    expect(navigation.currentWorkspaceId).toBe(BOUTIQUE);
+
+    await navigation.showAll();
+    await nextTick();
+    expect(titles.at(-1)).toBe("Tous les projets");
+    expect(opened.at(-1)).toBeNull();
+    expect(navigation.currentWorkspaceId).toBeNull();
   });
 
   it("suit un renommage dans le titre", async () => {
@@ -117,17 +121,32 @@ describe("useNavigationStore", () => {
     expect(titles.at(-1)).toBe("Boutique v2");
   });
 
-  it("revient au workspace choisi par le cœur si le workspace affiché disparaît (R8)", async () => {
+  it("revient sur « Tous les projets » si le workspace affiché disparaît (R8)", async () => {
     const { catalog, navigation } = await started(boutiqueSnapshot());
+    const next = boutiqueSnapshot();
+    next.workspaces = next.workspaces.filter((w) => w.id !== BOUTIQUE);
+    next.lastWorkspaceId = null;
 
-    catalog.snapshot = {
-      ...firstRunSnapshot(),
-      projects: boutiqueSnapshot().projects,
-      lastWorkspaceId: MES_PROJETS,
-    };
+    catalog.snapshot = next;
     await nextTick();
 
-    expect(navigation.view).toEqual({ kind: "workspace", workspaceId: MES_PROJETS });
+    expect(navigation.view).toEqual({ kind: "all", highlightProjectId: null });
+  });
+
+  it("un projet ouvert depuis un workspace supprimé reste ouvert, sous « Tous les projets »", async () => {
+    const { catalog, navigation } = await started(boutiqueSnapshot());
+    navigation.showProject(BOUTIQUE_TESTS, BOUTIQUE);
+    const next = boutiqueSnapshot();
+    next.workspaces = next.workspaces.filter((w) => w.id !== BOUTIQUE);
+
+    catalog.snapshot = next;
+    await nextTick();
+
+    expect(navigation.view).toEqual({
+      kind: "project",
+      projectId: BOUTIQUE_TESTS,
+      workspaceId: null,
+    });
   });
 
   it("un échec du titre de fenêtre n'interrompt rien", async () => {

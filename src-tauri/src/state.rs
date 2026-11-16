@@ -6,7 +6,7 @@
 //! l'écriture échoue, rien ne change.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use uuid::Uuid;
 
@@ -14,10 +14,13 @@ use crate::catalog::snapshot::{
     CatalogLoad, CatalogSnapshot, ProjectCreated, ProjectStatus, ProjectView, Undoable,
 };
 use crate::catalog::undo::{UndoAction, UndoStack};
-use crate::catalog::{Catalog, names};
+use crate::catalog::{Catalog, INBOX_NAME, names};
+use crate::environment;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::manifest::{self, Manifest};
+use crate::startup::{Cause, Failure, StateFile};
 use crate::storage::{self, Loaded};
+use crate::workbench::ProjectCtx;
 
 /// Dossier, dans le dossier personnel, où les projets sont créés par défaut.
 pub const DEFAULT_LOCATION_DIR: &str = "arnod";
@@ -29,57 +32,93 @@ pub struct AppState {
     /// Emplacement proposé pour les nouveaux projets (`~/arnod`).
     default_location: PathBuf,
     inner: Mutex<Inner>,
+    /// Prévenu après chaque modification enregistrée : la synchronisation des
+    /// fenêtres (F11) diffuse l'instantané. Absent dans les tests.
+    listener: OnceLock<ChangeListener>,
 }
+
+/// Fonction prévenue à chaque nouvel instantané du catalogue.
+pub type ChangeListener = Box<dyn Fn(&CatalogSnapshot) + Send + Sync>;
 
 struct Inner {
     catalog: Catalog,
     undo: UndoStack,
-    /// Erreur qui interdit toute lecture et écriture, par exemple un fichier
-    /// d'état écrit par une version plus récente d'Arnod.
-    blocked: Option<CommandError>,
+    /// Échec de lecture au démarrage qui interdit toute lecture et écriture : fichier
+    /// d'état écrit par une version plus récente, illisible, verrouillé (lot G).
+    failure: Option<Failure>,
     /// Avertissement de démarrage, renvoyé une seule fois par `catalog_load`.
     warning: Option<CommandError>,
 }
 
+/// Lit l'état de `data_dir` : catalogue, ou échec à expliquer au démarrage.
+fn read_state(data_dir: &Path) -> (Catalog, Option<Failure>) {
+    match storage::load(data_dir) {
+        Ok(Loaded::Existing(catalog)) => (catalog, None),
+        Ok(Loaded::FirstLaunch(catalog)) => {
+            // Enregistré tout de suite pour que les identifiants restent stables. Un dossier
+            // de données où rien ne s'écrit bloque le démarrage, expliqué (lot G).
+            match storage::save(data_dir, &catalog) {
+                Ok(()) => (catalog, None),
+                Err(error) => {
+                    let failure = Failure {
+                        file: StateFile::Catalog,
+                        path: data_dir.to_path_buf(),
+                        cause: Cause::Inaccessible {
+                            code: None,
+                            error: error.message,
+                        },
+                    };
+                    (catalog, Some(failure))
+                }
+            }
+        }
+        Err(failure) => (Catalog::first_launch(), Some(failure)),
+    }
+}
+
 impl AppState {
-    /// Charge l'état depuis `data_dir`. N'échoue jamais : une erreur bloquante
-    /// est mémorisée et renvoyée par chaque commande.
+    /// Charge l'état depuis `data_dir`. N'échoue jamais : un échec de lecture est
+    /// mémorisé, expliqué par `startup_status` et renvoyé par chaque commande.
     pub fn load(data_dir: PathBuf, default_location: PathBuf) -> Self {
-        let (catalog, blocked, warning) = match storage::load(&data_dir) {
-            Ok(Loaded::Existing(catalog)) => (catalog, None, None),
-            Ok(Loaded::FirstLaunch(catalog)) => {
-                // Enregistré tout de suite pour que les identifiants restent stables ;
-                // en cas d'échec, la prochaine modification signalera l'erreur.
-                let _ = storage::save(&data_dir, &catalog);
-                (catalog, None, None)
-            }
-            Ok(Loaded::Recovered {
-                catalog,
-                backup,
-                reason,
-            }) => {
-                let _ = storage::save(&data_dir, &catalog);
-                let warning = CommandError::new(
-                    CommandErrorKind::CorruptState,
-                    format!(
-                        "L'état d'Arnod était illisible ({reason}). Il a été mis de côté sous {} \
-                         et Arnod repart d'un état neuf.",
-                        backup.display()
-                    ),
-                );
-                (catalog, None, Some(warning))
-            }
-            Err(error) => (Catalog::first_launch(), Some(error), None),
-        };
+        let (catalog, failure) = read_state(&data_dir);
         Self {
             data_dir,
             default_location,
             inner: Mutex::new(Inner {
                 catalog,
                 undo: UndoStack::default(),
-                blocked,
-                warning,
+                failure,
+                warning: None,
             }),
+            listener: OnceLock::new(),
+        }
+    }
+
+    /// Échec de lecture au démarrage, s'il n'est pas réglé.
+    pub fn failure(&self) -> Option<Failure> {
+        self.inner
+            .lock()
+            .map_or(None, |inner| inner.failure.clone())
+    }
+
+    /// Relit l'état après un échec (réessai, fichier mis de côté) ; renvoie l'échec restant.
+    /// Sans échec en cours, ne relit rien.
+    pub fn reload(&self) -> Option<Failure> {
+        let Ok(mut inner) = self.inner.lock() else {
+            return None;
+        };
+        inner.failure.as_ref()?;
+        let (catalog, failure) = read_state(&self.data_dir);
+        inner.catalog = catalog;
+        inner.undo = UndoStack::default();
+        inner.failure.clone_from(&failure);
+        failure
+    }
+
+    /// Avertissement à notifier au prochain `catalog_load` (fichier mis de côté).
+    pub fn set_warning(&self, warning: CommandError) {
+        if let Ok(mut inner) = self.inner.lock() {
+            inner.warning = Some(warning);
         }
     }
 
@@ -90,6 +129,11 @@ impl AppState {
             snapshot: snapshot_of(&inner.catalog),
             warning: inner.warning.take(),
         })
+    }
+
+    /// Instantané courant, sans consommer l'avertissement de démarrage.
+    pub fn snapshot(&self) -> Result<CatalogSnapshot, CommandError> {
+        Ok(snapshot_of(&self.lock()?.catalog))
     }
 
     /// Applique une modification du catalogue et l'enregistre.
@@ -151,7 +195,20 @@ impl AppState {
         &self,
         raw_name: &str,
         location: Option<&str>,
-        workspace_id: Uuid,
+        workspace_id: Option<Uuid>,
+    ) -> Result<ProjectCreated, CommandError> {
+        self.create_project_with(raw_name, location, workspace_id, environment::init)
+    }
+
+    /// Crée un projet comme `create_project`, `fill` remplissant son dossier
+    /// après la racine (au lieu du seul environnement « Local ») : un import par
+    /// exemple. Si `fill` échoue, le dossier créé est retiré et rien n'est inscrit.
+    pub fn create_project_with(
+        &self,
+        raw_name: &str,
+        location: Option<&str>,
+        workspace_id: Option<Uuid>,
+        fill: impl FnOnce(&Path) -> Result<(), CommandError>,
     ) -> Result<ProjectCreated, CommandError> {
         let location = location.map_or_else(|| self.default_location.clone(), PathBuf::from);
         if !location.is_absolute() {
@@ -174,6 +231,11 @@ impl AppState {
 
         let project_id = Uuid::new_v4();
         let created = manifest::create_project_folder(&folder, &Manifest::new(project_id, &name))?;
+        // Chaque projet démarre avec un environnement « Local » (N1), ou ce que `fill` écrit.
+        if let Err(error) = fill(created.path()) {
+            created.rollback();
+            return Err(error);
+        }
         let mut next = inner.catalog.clone();
         let registered = next
             .register_project(project_id, &name, canonical(created.path()), workspace_id)
@@ -190,14 +252,15 @@ impl AppState {
         }
     }
 
-    /// Inscrit au référentiel un dossier projet existant, reconnu par son
-    /// manifeste `arnod.yml` (P12, après un clone Git par exemple), et l'ajoute
-    /// au workspace par défaut et à `workspace_id` (R4). Rien n'est écrit dans
-    /// le dossier du projet.
+    /// Inscrit dans « Tous les projets » un dossier projet existant, reconnu par
+    /// sa racine `opencollection.yml` (P12, après un clone Git par exemple ; une
+    /// collection Bruno 3 aussi, S5), et l'ajoute à `workspace_id` s'il est
+    /// donné (R4). Seules écritures possibles : la conversion d'un projet au
+    /// format précédent (R6), l'identifiant Arnod d'une collection qui n'en a pas (Q4).
     pub fn add_existing_project(
         &self,
         path: &str,
-        workspace_id: Uuid,
+        workspace_id: Option<Uuid>,
     ) -> Result<ProjectCreated, CommandError> {
         let folder = PathBuf::from(path);
         if !folder.is_absolute() {
@@ -245,7 +308,7 @@ impl AppState {
             .ok_or_else(|| {
                 CommandError::new(
                     CommandErrorKind::NotFound,
-                    "Ce projet n'existe plus dans le référentiel.",
+                    "Ce projet n'est plus dans « Tous les projets ».",
                 )
             })?;
         if project.status == ProjectStatus::Missing {
@@ -260,6 +323,120 @@ impl AppState {
         Ok(project)
     }
 
+    /// Projet « Non classés » qui reçoit les essais (R4, N5) : celui du
+    /// catalogue, recréé si son dossier a disparu ; sinon le dossier
+    /// `<emplacement par défaut>/Non classés`, réinscrit s'il contient déjà un
+    /// projet, créé sinon. Renvoie son contexte et l'instantané s'il a changé.
+    pub fn ensure_inbox(&self) -> Result<(ProjectCtx, Option<CatalogSnapshot>), CommandError> {
+        let mut inner = self.lock()?;
+        if let Some(id) = inner.catalog.inbox_project_id() {
+            let project = inner.catalog.project(id)?.clone();
+            let snapshot = if project.path.is_dir() {
+                None
+            } else {
+                let created = manifest::create_project_folder(
+                    &project.path,
+                    &Manifest::new(id, &project.name),
+                )?;
+                if let Err(error) = environment::init(created.path()) {
+                    created.rollback();
+                    return Err(error);
+                }
+                // Le dossier est revenu : l'instantané le dit aux fenêtres.
+                let next = inner.catalog.clone();
+                Some(self.commit(&mut inner, next)?)
+            };
+            drop(inner);
+            return Ok((self.project_ctx(id)?, snapshot));
+        }
+
+        let folder = self.default_location.join(INBOX_NAME);
+        let mut next = inner.catalog.clone();
+        let mut created = None;
+        let id = match manifest::read_manifest(&folder) {
+            Ok(existing) => {
+                if existing.version > manifest::MANIFEST_VERSION {
+                    return Err(CommandError::new(
+                        CommandErrorKind::NewerVersion,
+                        format!(
+                            "Le projet « {} » a été créé par une version plus récente d'Arnod (format {}).",
+                            existing.name, existing.version
+                        ),
+                    ));
+                }
+                if next.project(existing.id).is_err() {
+                    next.register_project(existing.id, &existing.name, canonical(&folder), None)?;
+                }
+                existing.id
+            }
+            Err(_) => {
+                let name = next.check_new_project(INBOX_NAME, &canonical(&folder), None)?;
+                let id = Uuid::new_v4();
+                let folder_created =
+                    manifest::create_project_folder(&folder, &Manifest::new(id, &name))?;
+                if let Err(error) = environment::init(folder_created.path()) {
+                    folder_created.rollback();
+                    return Err(error);
+                }
+                if let Err(error) =
+                    next.register_project(id, &name, canonical(folder_created.path()), None)
+                {
+                    folder_created.rollback();
+                    return Err(error);
+                }
+                created = Some(folder_created);
+                id
+            }
+        };
+        let committed = next
+            .set_inbox(id)
+            .and_then(|()| self.commit(&mut inner, next));
+        let snapshot = match committed {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                if let Some(created) = created {
+                    created.rollback();
+                }
+                return Err(error);
+            }
+        };
+        drop(inner);
+        Ok((self.project_ctx(id)?, Some(snapshot)))
+    }
+
+    /// Dossier de données de l'application (`arnod.json`, données locales des projets).
+    pub fn data_dir(&self) -> &Path {
+        &self.data_dir
+    }
+
+    /// Nom d'un projet du catalogue.
+    pub fn project_name(&self, project_id: Uuid) -> Result<String, CommandError> {
+        Ok(self.lock()?.catalog.project(project_id)?.name.clone())
+    }
+
+    /// Dossier et données locales d'un projet dont le dossier existe encore.
+    pub fn project_ctx(&self, project_id: Uuid) -> Result<ProjectCtx, CommandError> {
+        let inner = self.lock()?;
+        let project = inner.catalog.project(project_id)?;
+        if !project.path.is_dir() {
+            return Err(CommandError::new(
+                CommandErrorKind::NotFound,
+                format!(
+                    "Le dossier du projet « {} » est introuvable : {}.",
+                    project.name,
+                    project.path.display()
+                ),
+            ));
+        }
+        // Projet au format précédent : converti en OpenCollection, une fois (R6).
+        crate::opencollection::migrate::run(&project.path)?;
+        Ok(ProjectCtx {
+            id: project_id,
+            root: project.path.clone(),
+            data_dir: self.data_dir.clone(),
+        })
+    }
+
     fn lock(&self) -> Result<MutexGuard<'_, Inner>, CommandError> {
         let inner = self.inner.lock().map_err(|_| {
             CommandError::new(
@@ -267,8 +444,8 @@ impl AppState {
                 "L'état d'Arnod est indisponible : redémarrez l'application.",
             )
         })?;
-        match &inner.blocked {
-            Some(blocked) => Err(blocked.clone()),
+        match &inner.failure {
+            Some(failure) => Err(failure.to_command_error()),
             None => Ok(inner),
         }
     }
@@ -277,7 +454,16 @@ impl AppState {
     fn commit(&self, inner: &mut Inner, next: Catalog) -> Result<CatalogSnapshot, CommandError> {
         storage::save(&self.data_dir, &next)?;
         inner.catalog = next;
-        Ok(snapshot_of(&inner.catalog))
+        let snapshot = snapshot_of(&inner.catalog);
+        if let Some(listener) = self.listener.get() {
+            listener(&snapshot);
+        }
+        Ok(snapshot)
+    }
+
+    /// Fonction prévenue après chaque modification du catalogue (une seule).
+    pub fn on_change(&self, listener: ChangeListener) {
+        let _ = self.listener.set(listener);
     }
 }
 

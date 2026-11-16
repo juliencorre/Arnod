@@ -35,15 +35,19 @@ pub fn project_name(raw: &str) -> Result<String, CommandError> {
         ));
     }
     let stem = name.split('.').next().unwrap_or_default().trim_end();
-    if RESERVED_NAMES
-        .iter()
-        .any(|reserved| reserved.eq_ignore_ascii_case(stem))
-    {
+    if is_reserved(stem) {
         return Err(invalid(format!(
             "« {stem} » est un nom réservé par Windows : choisissez-en un autre."
         )));
     }
     Ok(name)
+}
+
+/// Nom de périphérique réservé par Windows (R10), sans tenir compte de la casse.
+pub fn is_reserved(stem: &str) -> bool {
+    RESERVED_NAMES
+        .iter()
+        .any(|reserved| reserved.eq_ignore_ascii_case(stem))
 }
 
 /// Indique si deux noms sont identiques sans tenir compte de la casse (R9).

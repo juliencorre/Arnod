@@ -14,6 +14,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Actions tierces épinglées par SHA de commit (le commentaire donne la version) : un tag
+# peut être déplacé, pas un commit. Dependabot met à jour SHA et commentaire à chaque
+# version taguée ; rust-toolchain n'a qu'un tag `v1` mobile, à remonter à la main.
+#
+# `npm ci --ignore-scripts` : aucune dépendance n'a besoin de ses scripts d'installation
+# (ceux d'edgedriver et geckodriver, tirés par webdriverio, téléchargent des pilotes dont
+# les tests e2e n'ont pas l'usage : ils passent par tauri-driver et WebKitWebDriver).
+
 env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: 22
@@ -30,13 +38,16 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
+          toolchain: stable
           components: rustfmt
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Versions concordantes
         run: node scripts/check-version.mjs
+      - name: Maquette et code
+        run: node scripts/check-maquette.mjs
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
@@ -56,12 +67,14 @@ jobs:
             # N3 : installeur inférieur à 15 Mo.
             max-mb: 15
             artifact: arnod-windows-nsis
+            dir: src-tauri/target/release/bundle/nsis
             path: src-tauri/target/release/bundle/nsis/*-setup.exe
           - name: Linux (AppImage)
             # Ubuntu 22.04 : glibc minimale visée par N6.
             os: ubuntu-22.04
             bundle: appimage
             artifact: arnod-linux-appimage
+            dir: src-tauri/target/release/bundle/appimage
             path: src-tauri/target/release/bundle/appimage/*.AppImage
     runs-on: ${{ matrix.os }}
     steps:
@@ -80,15 +93,16 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
+          toolchain: stable
           components: clippy
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: "./src-tauri -> target"
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Tests frontend (Vitest)
         run: npm test
@@ -101,8 +115,29 @@ jobs:
         working-directory: src-tauri
         run: cargo test --locked
 
+      # Lot L (docs/plan-mvp-l-mises-a-jour.md) : avec la clé privée, chaque paquet reçoit sa
+      # signature (.sig) pour la mise à jour par Arnod. Obligatoire pour un tag : une release non
+      # signée ne s'installerait pas depuis Arnod. Sans la clé (pull request de Dependabot) : build
+      # sans signature.
       - name: tauri build
-        run: npm run tauri build
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            npm run tauri build -- --config src-tauri/tauri.updater.conf.json
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY absent : une release doit être signée (README, « Publier une version »)."
+            exit 1
+          else
+            npm run tauri build
+          fi
+
+      - name: Signature du paquet
+        if: hashFiles(format('{0}/*.sig', matrix.dir)) != ''
+        shell: bash
+        run: node scripts/updater-manifest.mjs "${{ matrix.dir }}" --partiel --sortie "$RUNNER_TEMP/latest.json"
 
       - name: Taille du paquet
         run: node scripts/bundle-size.mjs ${{ matrix.bundle }} ${{ matrix.max-mb && format('--max-mb {0}', matrix.max-mb) || '' }}
@@ -111,7 +146,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.path }}
+          path: |
+            ${{ matrix.path }}
+            ${{ matrix.path }}.sig
           if-no-files-found: error
 
       - name: Test de fumée (AppImage sous Xvfb)
@@ -150,13 +187,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: "./src-tauri -> target"
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: tauri-driver
         run: cargo install tauri-driver --locked
@@ -192,17 +231,26 @@ jobs:
       - name: Vérifier que le tag correspond à la version
         run: node scripts/check-version.mjs "${GITHUB_REF_NAME}"
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: arnod-*
           path: dist
           merge-multiple: true
+
+      # Lot L : manifeste lu par Arnod pour s'installer (paquets, signatures, version). Échoue sans
+      # clé publique dans tauri.conf.json ou sans paquet signé pour chaque plateforme.
+      - name: Manifeste de mise à jour (latest.json)
+        run: node scripts/updater-manifest.mjs dist "${GITHUB_REF_NAME}"
 
       - name: Créer la release ou y ajouter les paquets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -l dist
+          # Un tag avec suffixe (v0.2.0-beta.1) publie une préversion : seul le canal
+          # « Préversions » la propose.
+          prerelease=()
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then prerelease=(--prerelease); fi
           # Release déjà créée (à la main ou par une exécution précédente) : on y ajoute les
           # paquets au lieu d'échouer.
           if gh release view "${GITHUB_REF_NAME}" > /dev/null 2>&1; then
@@ -210,5 +258,5 @@ jobs:
           else
             gh release create "${GITHUB_REF_NAME}" dist/* \
               --title "Arnod ${GITHUB_REF_NAME}" \
-              --generate-notes
+              --generate-notes "${prerelease[@]}"
           fi

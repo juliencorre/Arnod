@@ -62,6 +62,16 @@ const PAIRS: { foreground: string[]; background: string[]; minimum: number }[] =
     minimum: 4.5,
   },
   {
+    foreground: ["--color-success", "--color-text"],
+    background: ["--color-success-soft"],
+    minimum: 4.5,
+  },
+  {
+    foreground: ["--color-danger", "--color-text"],
+    background: ["--color-danger-soft"],
+    minimum: 4.5,
+  },
+  {
     foreground: ["--color-accent-text"],
     background: ["--color-accent", "--color-accent-hover"],
     minimum: 4.5,
@@ -69,6 +79,26 @@ const PAIRS: { foreground: string[]; background: string[]; minimum: number }[] =
   {
     foreground: ["--color-toast-text", "--color-toast-action"],
     background: ["--color-toast-bg"],
+    minimum: 4.5,
+  },
+  // Pastilles des natures d'étape : texte de la famille sur son fond.
+  ...["calls", "data", "messages", "jobs", "interface", "code", "files"].map((family) => ({
+    foreground: [`--color-family-${family}-text`],
+    background: [`--color-family-${family}-bg`, "--color-surface"],
+    minimum: 4.5,
+  })),
+  // Corps d'une réponse (lot A) : coloration sur le fond du corps et sur une valeur trouvée.
+  {
+    foreground: [
+      "--color-text",
+      "--color-muted",
+      "--color-code-string",
+      "--color-code-number",
+      "--color-code-keyword",
+      "--color-code-tag",
+      "--color-code-attr",
+    ],
+    background: ["--color-surface", "--color-bg", "--color-match"],
     minimum: 4.5,
   },
   {

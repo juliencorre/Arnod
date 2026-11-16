@@ -31,9 +31,10 @@ function onKeydown(event: KeyboardEvent): void {
 .search {
   box-sizing: border-box;
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font: inherit;
   color: var(--color-text);
   background: var(--color-surface);

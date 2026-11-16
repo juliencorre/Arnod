@@ -1,0 +1,425 @@
+<script setup lang="ts">
+/**
+ * Gestion des environnements du projet : variables partagées (versionnées),
+ * variables locales (hors du dépôt) dont les secrets vont dans le coffre du système.
+ */
+import { computed, ref, useId, watch } from "vue";
+
+import BaseButton from "@/components/ui/BaseButton.vue";
+import BaseDialog from "@/components/ui/BaseDialog.vue";
+import { useToastStore } from "@/stores/toasts";
+import { useWorkbenchStore } from "@/stores/workbench";
+import type { EnvironmentDoc, EnvironmentView } from "@/types/ipc";
+
+const props = withDefaults(
+  defineProps<{ open: boolean; projectId: string; startNew?: boolean }>(),
+  { startNew: false },
+);
+const emit = defineEmits<{ close: [] }>();
+
+const workbench = useWorkbenchStore();
+const toasts = useToastStore();
+const nameId = useId();
+const colorId = useId();
+
+const COLORS = [
+  ["gray", "Gris"],
+  ["blue", "Bleu"],
+  ["green", "Vert"],
+  ["orange", "Orange"],
+  ["red", "Rouge"],
+  ["purple", "Violet"],
+] as const;
+
+const editing = ref<string | null>(null);
+const draft = ref<EnvironmentDoc | null>(null);
+const newLocal = ref("");
+const localValues = ref<Record<string, string>>({});
+const error = ref<string | null>(null);
+
+const view = computed(() => workbench.environments[props.projectId] ?? null);
+const list = computed(() => view.value?.environments ?? []);
+const current = computed<EnvironmentView | null>(
+  () => list.value.find((e) => e.name === editing.value) ?? null,
+);
+
+function load(env: EnvironmentView | undefined): void {
+  error.value = null;
+  localValues.value = {};
+  if (!env) {
+    editing.value = null;
+    draft.value = null;
+    return;
+  }
+  editing.value = env.name;
+  draft.value = {
+    name: env.name,
+    color: env.color,
+    protected: env.protected ?? false,
+    variables: env.variables.map((v) => ({ ...v })),
+    locals: [...env.locals],
+  };
+}
+
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) return;
+    load(list.value.find((e) => e.name === view.value?.active) ?? list.value[0]);
+    // « + Nouvel environnement » du menu de la pastille : la gestion s'ouvre sur un nouveau.
+    if (props.startNew) void create();
+  },
+  { immediate: true },
+);
+
+async function guard(work: () => Promise<void>): Promise<void> {
+  error.value = null;
+  try {
+    await work();
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : String(caught);
+  }
+}
+
+async function save(): Promise<void> {
+  const doc = draft.value;
+  if (!doc) return;
+  await guard(async () => {
+    const previous = editing.value;
+    await workbench.saveEnvironment(props.projectId, doc, previous);
+    editing.value = doc.name;
+    toasts.show(`Environnement « ${doc.name} » enregistré.`);
+  });
+}
+
+async function create(): Promise<void> {
+  await guard(async () => {
+    let name = "Nouvel environnement";
+    for (let n = 2; list.value.some((e) => e.name === name); n++)
+      name = `Nouvel environnement ${n}`;
+    await workbench.saveEnvironment(
+      props.projectId,
+      { name, color: "gray", protected: false, variables: [], locals: [] },
+      null,
+    );
+    load(view.value?.environments.find((e) => e.name === name));
+  });
+}
+
+async function remove(): Promise<void> {
+  const name = editing.value;
+  if (name === null) return;
+  await guard(async () => {
+    await workbench.deleteEnvironment(props.projectId, name);
+    load(list.value[0]);
+    toasts.show(`Environnement « ${name} » supprimé.`);
+  });
+}
+
+async function move(delta: -1 | 1): Promise<void> {
+  const names = list.value.map((e) => e.name);
+  const index = names.findIndex((n) => n === editing.value);
+  const target = index + delta;
+  const a = names[index];
+  const b = names[target];
+  if (a === undefined || b === undefined) return;
+  names[index] = b;
+  names[target] = a;
+  await guard(() => workbench.reorderEnvironments(props.projectId, names));
+}
+
+function addVariable(): void {
+  draft.value?.variables.push({ name: "", value: "" });
+}
+
+function removeVariable(index: number): void {
+  draft.value?.variables.splice(index, 1);
+}
+
+function addLocal(): void {
+  const name = newLocal.value.trim();
+  if (name === "" || !draft.value || draft.value.locals.includes(name)) return;
+  draft.value.locals.push(name);
+  newLocal.value = "";
+}
+
+async function saveLocal(name: string, secret: boolean): Promise<void> {
+  const env = editing.value;
+  if (env === null) return;
+  await guard(async () => {
+    await workbench.setLocal(props.projectId, env, name, localValues.value[name] ?? "", secret);
+    localValues.value[name] = "";
+    toasts.show(
+      secret
+        ? `Secret « ${name} » enregistré dans le coffre du système.`
+        : `Valeur de « ${name} » enregistrée.`,
+    );
+  });
+}
+</script>
+
+<template>
+  <BaseDialog
+    :open="open"
+    title="Environnements"
+    wide
+    description="Les variables partagées sont enregistrées dans le projet. Les variables locales restent sur ce poste."
+    @close="emit('close')"
+  >
+    <div class="envs">
+      <ul class="envs__list" aria-label="Environnements du projet">
+        <li v-for="env in list" :key="env.name">
+          <button
+            type="button"
+            class="envs__item"
+            :aria-current="env.name === editing"
+            @click="load(env)"
+          >
+            {{ env.name }}
+          </button>
+        </li>
+        <li><BaseButton variant="link" @click="create">+ Nouvel environnement</BaseButton></li>
+      </ul>
+
+      <form v-if="draft" class="envs__form" novalidate @submit.prevent="save">
+        <label :for="nameId" class="envs__label">Nom</label>
+        <input :id="nameId" v-model="draft.name" type="text" autocomplete="off" />
+        <label :for="colorId" class="envs__label">Couleur</label>
+        <select :id="colorId" v-model="draft.color">
+          <option v-for="[id, label] in COLORS" :key="id" :value="id">{{ label }}</option>
+        </select>
+        <label class="envs__check">
+          <input v-model="draft.protected" type="checkbox" />
+          Environnement protégé (confirmation avant d'envoyer une requête qui modifie des données)
+        </label>
+
+        <h3 class="envs__title">Variables partagées</h3>
+        <div v-for="(variable, index) in draft.variables" :key="index" class="envs__var">
+          <input
+            v-model="variable.name"
+            type="text"
+            :aria-label="`Nom de la variable ${index + 1}`"
+          />
+          <input
+            v-model="variable.value"
+            type="text"
+            :aria-label="`Valeur de la variable ${index + 1}`"
+          />
+          <button
+            type="button"
+            :aria-label="`Supprimer la variable ${index + 1}`"
+            @click="removeVariable(index)"
+          >
+            ×
+          </button>
+        </div>
+        <button type="button" class="envs__add" @click="addVariable">+ Ajouter une variable</button>
+
+        <h3 class="envs__title">Variables locales</h3>
+        <p class="envs__hint">
+          Seuls leurs noms sont enregistrés dans le projet ; les valeurs restent sur ce poste.
+        </p>
+        <div v-for="name in draft.locals" :key="name" class="envs__local">
+          <code>{{ name }}</code>
+          <input
+            v-model="localValues[name]"
+            type="password"
+            autocomplete="off"
+            :placeholder="
+              current?.localVars.find((v) => v.name === name)?.hasValue
+                ? '•••• (définie)'
+                : 'Valeur'
+            "
+            :aria-label="`Valeur de ${name}`"
+          />
+          <span class="envs__local-actions">
+            <BaseButton @click="saveLocal(name, true)">Enregistrer comme secret</BaseButton>
+            <BaseButton @click="saveLocal(name, false)">Enregistrer</BaseButton>
+          </span>
+        </div>
+        <div class="envs__declare">
+          <input
+            v-model="newLocal"
+            type="text"
+            placeholder="Nom de la variable locale"
+            aria-label="Nouvelle variable locale"
+            @keydown.enter.prevent="addLocal"
+          />
+          <BaseButton @click="addLocal">Déclarer</BaseButton>
+        </div>
+
+        <p v-if="error" class="envs__error" role="alert">{{ error }}</p>
+        <div class="envs__actions">
+          <BaseButton variant="danger" @click="remove">Supprimer</BaseButton>
+          <BaseButton aria-label="Monter l'environnement" @click="move(-1)">↑</BaseButton>
+          <BaseButton aria-label="Descendre l'environnement" @click="move(1)">↓</BaseButton>
+          <span class="envs__spacer" />
+          <BaseButton @click="emit('close')">Fermer</BaseButton>
+          <BaseButton variant="primary" type="submit">Enregistrer</BaseButton>
+        </div>
+      </form>
+    </div>
+  </BaseDialog>
+</template>
+
+<style scoped>
+/* Le contenu suit la largeur de la fenêtre : aucune colonne n'impose de largeur minimale. */
+.envs {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+/* Fenêtre étroite : la liste passe au-dessus du formulaire. */
+@media (max-width: 40rem) {
+  .envs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.envs__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.envs__item {
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  color: var(--color-text);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.envs__item[aria-current="true"] {
+  font-weight: 600;
+  background: var(--color-accent-soft);
+}
+
+.envs__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.envs__form input[type="text"],
+.envs__form input[type="password"],
+.envs__form select {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+}
+
+.envs__form :focus-visible,
+.envs__item:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.envs__label {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+.envs__check {
+  display: flex;
+  gap: 0.5rem;
+  font-size: var(--text-body);
+}
+
+.envs__title {
+  margin: 0.5rem 0 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.envs__hint {
+  margin: 0;
+  font-size: var(--text-body);
+  color: var(--color-muted);
+}
+
+.envs__var {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto;
+  gap: 0.375rem;
+}
+
+.envs__declare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.375rem;
+}
+
+/* Nom, valeur, puis les deux boutons, qui passent ensemble à la ligne s'il manque de place. */
+.envs__local {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.envs__local code {
+  flex: 0 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.envs__local input {
+  flex: 1 1 10rem;
+}
+
+.envs__local-actions {
+  display: flex;
+  flex: none;
+  gap: 0.375rem;
+  margin-left: auto;
+}
+
+.envs__add {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--color-link);
+  cursor: pointer;
+}
+
+.envs__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.envs__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.envs__spacer {
+  flex: 1;
+}
+
+/* La flèche de la liste déroulante garde sa place (styles.css). */
+.envs__form select {
+  padding-right: 1.75rem;
+}
+</style>

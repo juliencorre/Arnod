@@ -1,30 +1,32 @@
-//! Dossier d'un projet et son manifeste `arnod.yml` (T8).
+//! Dossier d'un projet et sa racine `opencollection.yml` (T8, S1, S5).
 //!
-//! Un projet est un dossier qui contient `arnod.yml`. Le manifeste porte
-//! l'identifiant du projet : il permettra de reconnaître le dossier après un
-//! déplacement ou un clone (P12). Arnod n'initialise pas Git.
+//! Un projet est une collection OpenCollection : un dossier qui contient
+//! `opencollection.yml` (docs/plan-opencollection.md). Son identifiant Arnod est
+//! dans `extensions.arnod.id` : il permet de reconnaître le dossier après un
+//! déplacement ou un clone (P12). Un projet au format précédent (`arnod.yml`)
+//! est converti à la lecture (R6). Arnod n'initialise pas Git.
 
-use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{CommandError, CommandErrorKind};
+use crate::opencollection::ROOT_FILE;
+use crate::opencollection::collection;
+use crate::opencollection::migrate::{self, LEGACY_MANIFEST};
 
-/// Nom du manifeste à la racine du dossier d'un projet.
-pub const MANIFEST_FILE_NAME: &str = "arnod.yml";
+/// Fichier qui fait d'un dossier un projet.
+pub const MANIFEST_FILE_NAME: &str = ROOT_FILE;
 
-/// Version courante du format du manifeste.
+/// Version majeure d'OpenCollection lue et écrite.
 pub const MANIFEST_VERSION: u32 = 1;
 
-/// Commentaire placé en tête du manifeste.
-const HEADER: &str = "# Projet Arnod : ce fichier identifie le dossier comme un projet.\n";
-
-/// Contenu de `arnod.yml`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Identité d'un projet, lue dans `opencollection.yml`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Manifest {
+    /// Version majeure de la spécification.
     pub version: u32,
     pub id: Uuid,
     pub name: String,
@@ -56,18 +58,19 @@ impl CreatedFolder {
     }
 
     /// Défait la création : supprime le dossier s'il a été créé par Arnod, sinon
-    /// le seul manifeste. Au mieux : un échec ici laisse au pire un dossier vide
-    /// ou un manifeste orphelin, sans conséquence pour le référentiel.
+    /// ce qu'Arnod y a écrit. Au mieux : un échec ici laisse au pire un dossier
+    /// vide ou une racine orpheline, sans conséquence pour le référentiel.
     pub fn rollback(self) {
         let _ = if self.created_dir {
             fs::remove_dir_all(&self.folder)
         } else {
+            let _ = fs::remove_dir_all(self.folder.join(crate::tree::ENVIRONMENTS_DIR));
             fs::remove_file(self.folder.join(MANIFEST_FILE_NAME))
         };
     }
 }
 
-/// Crée le dossier d'un projet et son manifeste.
+/// Crée le dossier d'un projet et sa racine `opencollection.yml`.
 ///
 /// Le dossier peut déjà exister s'il est vide ; ses dossiers parents manquants
 /// sont créés. Un dossier non vide, ou qui contient déjà un projet, est refusé.
@@ -79,34 +82,39 @@ pub fn create_project_folder(
         folder: folder.to_path_buf(),
         created_dir: prepare_folder(folder)?,
     };
-    if let Err(error) = write_manifest(folder, manifest) {
+    if let Err(error) =
+        collection::write(folder, &collection::new_root(&manifest.name, manifest.id))
+    {
         created.rollback();
         return Err(error);
     }
     Ok(created)
 }
 
-/// Lit le manifeste d'un dossier de projet.
+/// Lit l'identité d'un projet (P12) ; un projet au format précédent est
+/// d'abord converti (R6). Une collection sans identifiant Arnod en reçoit un,
+/// écrit dans `extensions.arnod` (Q4).
 pub fn read_manifest(folder: &Path) -> Result<Manifest, CommandError> {
-    let path = folder.join(MANIFEST_FILE_NAME);
-    let text = fs::read_to_string(&path).map_err(|error| {
-        if error.kind() == io::ErrorKind::NotFound {
-            CommandError::new(
-                CommandErrorKind::NotAProject,
-                format!(
-                    "Le dossier {} ne contient pas de projet Arnod ({MANIFEST_FILE_NAME} absent).",
-                    folder.display()
-                ),
-            )
-        } else {
-            CommandError::io("Lecture du manifeste impossible", &path, &error)
+    migrate::run(folder)?;
+    let root = collection::read(folder)?;
+    let name = collection::name(&root).unwrap_or_else(|| {
+        folder
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    });
+    let id = match collection::meta(&root).id {
+        Some(id) => id,
+        None => {
+            let id = Uuid::new_v4();
+            collection::update_meta(folder, |meta| meta.id = Some(id))?;
+            id
         }
-    })?;
-    serde_saphyr::from_str(&text).map_err(|error| {
-        CommandError::new(
-            CommandErrorKind::NotAProject,
-            format!("Le manifeste {} est illisible : {error}", path.display()),
-        )
+    };
+    Ok(Manifest {
+        version: collection::spec_major(&root).map_or(MANIFEST_VERSION, |m| m as u32),
+        id,
+        name,
     })
 }
 
@@ -121,7 +129,7 @@ fn prepare_folder(folder: &Path) -> Result<bool, CommandError> {
     }
     match fs::read_dir(folder) {
         Ok(mut entries) => {
-            if folder.join(MANIFEST_FILE_NAME).exists() {
+            if folder.join(MANIFEST_FILE_NAME).exists() || folder.join(LEGACY_MANIFEST).exists() {
                 Err(not_empty(format!(
                     "Le dossier {} contient déjà un projet Arnod.",
                     folder.display()
@@ -149,26 +157,6 @@ fn prepare_folder(folder: &Path) -> Result<bool, CommandError> {
     }
 }
 
-fn write_manifest(folder: &Path, manifest: &Manifest) -> Result<(), CommandError> {
-    let path = folder.join(MANIFEST_FILE_NAME);
-    let yaml = serde_saphyr::to_string(manifest).map_err(|error| {
-        CommandError::new(
-            CommandErrorKind::Io,
-            format!("Écriture du manifeste impossible : {error}"),
-        )
-    })?;
-    OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)
-        .and_then(|mut file| {
-            file.write_all(HEADER.as_bytes())?;
-            file.write_all(yaml.as_bytes())?;
-            file.sync_all()
-        })
-        .map_err(|error| CommandError::io("Écriture du manifeste impossible", &path, &error))
-}
-
 #[cfg(test)]
 mod tests {
     use tempfile::TempDir;
@@ -192,9 +180,12 @@ mod tests {
 
         assert_eq!(created.path(), folder);
         let text = fs::read_to_string(folder.join(MANIFEST_FILE_NAME)).unwrap();
-        assert!(text.starts_with(HEADER), "{text}");
+        assert!(text.starts_with("opencollection: \"1.0.0\""), "{text}");
         assert!(text.contains("name: boutique-tests"), "{text}");
-        assert!(text.contains("version: 1"), "{text}");
+        assert!(
+            text.contains("id: 00000000-0000-0000-0000-000000000007"),
+            "{text}"
+        );
         assert_eq!(read_manifest(&folder).unwrap(), manifest());
     }
 
@@ -278,7 +269,7 @@ mod tests {
         let error = read_manifest(dir.path()).unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::NotAProject);
         assert!(
-            error.message.ends_with("(arnod.yml absent)."),
+            error.message.ends_with("(opencollection.yml absent)."),
             "{}",
             error.message
         );
@@ -287,5 +278,56 @@ mod tests {
         let error = read_manifest(dir.path()).unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::NotAProject);
         assert!(error.message.contains("est illisible"), "{}", error.message);
+
+        fs::write(dir.path().join(MANIFEST_FILE_NAME), "info:\n  name: x\n").unwrap();
+        let error = read_manifest(dir.path()).unwrap_err();
+        assert_eq!(error.kind, CommandErrorKind::NotAProject);
+        assert!(
+            error.message.contains("pas de version"),
+            "{}",
+            error.message
+        );
+
+        fs::write(
+            dir.path().join(MANIFEST_FILE_NAME),
+            "opencollection: 1.0.0\ninfo:\n  nom: x\n",
+        )
+        .unwrap();
+        let error = read_manifest(dir.path()).unwrap_err();
+        assert_eq!(error.kind, CommandErrorKind::NotAProject);
+        assert!(error.message.contains("non conforme"), "{}", error.message);
+    }
+
+    #[test]
+    fn version_majeure_superieure_refusee() {
+        let dir = workdir();
+        fs::write(
+            dir.path().join(MANIFEST_FILE_NAME),
+            "opencollection: 2.0.0\n",
+        )
+        .unwrap();
+        assert_eq!(
+            read_manifest(dir.path()).unwrap_err().kind,
+            CommandErrorKind::NewerVersion
+        );
+    }
+
+    #[test]
+    fn s5_une_collection_sans_identifiant_en_recoit_un() {
+        let dir = workdir();
+        let original = "opencollection: 1.0.0\ninfo:\n  name: API Bruno\nextensions:\n  bruno:\n    theme: sombre\n";
+        fs::write(dir.path().join(MANIFEST_FILE_NAME), original).unwrap();
+        let first = read_manifest(dir.path()).unwrap();
+        assert_eq!(first.name, "API Bruno");
+        assert_eq!(
+            read_manifest(dir.path()).unwrap().id,
+            first.id,
+            "identifiant écrit"
+        );
+        let text = fs::read_to_string(dir.path().join(MANIFEST_FILE_NAME)).unwrap();
+        assert!(
+            text.contains("theme: sombre"),
+            "extension d'un autre outil gardée : {text}"
+        );
     }
 }

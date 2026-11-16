@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import App from "@/App.vue";
 import type { CatalogSnapshot, CommandError } from "@/types/ipc";
 
+import { STEP_CATALOG } from "./fakeSteps";
+import { createFakeWindows, handleWindows } from "./fakeWindows";
 import { boutiqueSnapshot, firstRunSnapshot } from "./fixtures";
+import { currentWorkspace, switcherNames } from "./switcher";
 
 let titles: (string | null)[];
 
@@ -17,15 +20,22 @@ function mockCore(options: {
   failure?: CommandError;
 }): void {
   titles = [];
-  mockIPC((cmd, args) => {
-    if (cmd === "window_set_title") {
-      titles.push((args as { subject: string | null }).subject);
-      return null;
-    }
-    if (cmd !== "catalog_load") throw new Error(`commande inattendue : ${cmd}`);
-    if (options.failure) throw options.failure;
-    return { snapshot: options.snapshot, warning: options.warning ?? null };
-  });
+  const windows = createFakeWindows();
+  mockIPC(
+    (cmd, args) => {
+      if (cmd === "window_set_title") {
+        titles.push((args as { subject: string | null }).subject);
+        return null;
+      }
+      if (cmd === "windows_load") return handleWindows(windows, cmd, {});
+      if (cmd === "steps_catalog") return STEP_CATALOG;
+      if (cmd === "startup_status" || cmd === "window_ready") return null;
+      if (cmd !== "catalog_load") throw new Error(`commande inattendue : ${cmd}`);
+      if (options.failure) throw options.failure;
+      return { snapshot: options.snapshot, warning: options.warning ?? null };
+    },
+    { shouldMockEvents: true },
+  );
 }
 
 async function mountApp() {
@@ -40,30 +50,41 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("premier lancement : « Mes projets » par défaut et invitation à créer un projet (1a, W1)", async () => {
+  it("premier lancement : le sélecteur sur « Tous les projets », sans workspace, et l'invitation à créer (1a, R3)", async () => {
     mockCore({ snapshot: firstRunSnapshot() });
 
     const wrapper = await mountApp();
 
-    expect(wrapper.get("main h1").text()).toBe("Créez votre premier projet");
-    const sidebar = wrapper.get("aside");
-    expect(sidebar.text()).toContain("Arnod");
-    expect(sidebar.text()).toContain("Mes projets");
-    expect(sidebar.text()).toContain("par défaut");
-    expect(sidebar.text()).toContain("Créé automatiquement. Votre premier projet y sera rangé.");
+    expect(wrapper.get("main h1").text()).toBe("Bienvenue dans Arnod");
+    expect(currentWorkspace(wrapper)).toBe("Tous les projets");
+    expect(await switcherNames(wrapper)).toEqual(["Tous les projets"]);
+    expect(wrapper.get("aside").text()).toBe("Aucun projet pour l'instant.");
+    expect(wrapper.get("main").text()).toContain("Importer…");
     expect(titles).toEqual([null]);
   });
 
-  it("rouvre le dernier workspace utilisé (W2)", async () => {
+  it("rouvre « Tous les projets » si c'était le dernier onglet (R7)", async () => {
+    const snapshot = boutiqueSnapshot();
+    snapshot.lastWorkspaceId = null;
+    mockCore({ snapshot });
+
+    const wrapper = await mountApp();
+
+    expect(wrapper.get("main h1").text()).toBe("Tous les projets · 2");
+    expect(titles.at(-1)).toBe("Tous les projets");
+  });
+
+  it("rouvre le dernier workspace utilisé (R7)", async () => {
     mockCore({ snapshot: boutiqueSnapshot() });
 
     const wrapper = await mountApp();
 
     expect(wrapper.get("main h1").text()).toBe("Boutique");
     expect(wrapper.get("main").text()).toContain(
-      "2 projets du référentiel, regroupés ici pour travailler ensemble.",
+      "2 projets, regroupés ici pour travailler ensemble.",
     );
-    expect(wrapper.get("aside").text()).toContain("Workspace · 2 projets");
+    expect(currentWorkspace(wrapper)).toBe("Boutique");
+    expect(wrapper.get("aside").text()).toContain("boutique-tests");
     expect(titles.at(-1)).toBe("Boutique");
   });
 
@@ -82,7 +103,7 @@ describe("App", () => {
     wrapper.unmount();
   });
 
-  it("bloque avec le message du cœur si l'état est inutilisable", async () => {
+  it("bloque avec le message du cœur sur une erreur imprévue au chargement", async () => {
     const failure: CommandError = {
       kind: "newerVersion",
       message: "L'état d'Arnod a été écrit par une version plus récente (format 2).",
@@ -95,5 +116,7 @@ describe("App", () => {
     expect(alert.text()).toContain("Arnod ne peut pas démarrer");
     expect(alert.text()).toContain(failure.message);
     expect(wrapper.find("aside").exists()).toBe(false);
+    // Même structure que toute erreur bloquante (lot G) : seule issue, « Quitter ».
+    expect(wrapper.get("main footer").text()).toContain("Quitter");
   });
 });

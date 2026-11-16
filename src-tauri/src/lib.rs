@@ -6,19 +6,51 @@
 //! vivent dans [`catalog`], leur persistance dans [`storage`] et [`manifest`],
 //! l'état partagé dans [`state`].
 
+pub mod bruno;
 pub mod catalog;
 pub mod commands;
+pub mod contract;
+pub mod curl;
+pub mod environment;
 pub mod error;
+pub mod http;
+pub mod import;
+pub mod input;
+pub mod layout;
+pub mod local;
 pub mod manifest;
+// Lot H - Réseau et authentification.
 mod menu;
+pub mod network;
+pub mod opencollection;
+pub mod request;
+pub mod response;
+pub mod results;
+pub mod secrets;
+pub mod startup;
 pub mod state;
+pub mod statuses;
+pub mod steps;
 pub mod storage;
+pub mod tree;
+pub mod trial;
 #[cfg(test)]
 mod ts_contract;
+pub mod updates;
+pub mod watch;
+pub mod windows;
+pub mod workbench;
+
+use std::sync::{Arc, Mutex};
 
 use tauri::Manager;
 
+use crate::results::ResultBook;
+use crate::secrets::SystemSecretStore;
 use crate::state::{AppState, DEFAULT_LOCATION_DIR};
+use crate::watch::service::Watchers;
+use crate::windows::WindowsState;
+use crate::workbench::Workbench;
 
 /// Point d'entrée de l'application, appelé par `main.rs`.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -26,14 +58,53 @@ pub fn run() {
     tauri::Builder::default()
         // Sélecteur de dossier, appelé uniquement depuis Rust : aucune permission WebView.
         .plugin(tauri_plugin_dialog::init())
+        // Lot L : vérification et installation des mises à jour, appelées depuis Rust seulement
+        // (aucune permission WebView ; clé publique dans `tauri.conf.json`).
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(commands::updates::UpdatesState::default())
         .menu(menu::build)
         .on_menu_event(menu::handle_event)
         .setup(|app| {
             let data_dir = app.path().app_local_data_dir()?;
             let default_location = app.path().home_dir()?.join(DEFAULT_LOCATION_DIR);
-            app.manage(AppState::load(data_dir, default_location));
+            app.manage(AppState::load(data_dir.clone(), default_location));
+            let bench = Arc::new(Workbench::new(Arc::new(SystemSecretStore)));
+            // Lot H : préférences réseau du poste et cookies persistants (network.json).
+            bench.network().attach(&data_dir);
+            // Avancement des runs et statuts des requêtes diffusés aux fenêtres (R3, R4).
+            bench.set_notifier(Arc::new(windows::EventNotifier::new(app.handle().clone())));
+            app.manage(bench);
+            app.manage(WindowsState::load(data_dir));
+            app.manage(Mutex::new(ResultBook::default()));
+            // Dossiers des projets ouverts surveillés : changements faits hors d'Arnod diffusés
+            // aux fenêtres (lot I).
+            app.manage(Watchers::new(Arc::new(watch::app::AppSink::new(
+                app.handle().clone(),
+            ))));
+            // Chaque modification du catalogue est diffusée à toutes les fenêtres (F11).
+            let handle = app.handle().clone();
+            app.state::<AppState>().on_change(Box::new(move |snapshot| {
+                windows::catalog_changed(&handle, snapshot);
+                // Projet oublié ou dossier introuvable : plus de surveillance (lot I).
+                handle.state::<Watchers>().retain(|id| {
+                    snapshot.projects.iter().any(|project| {
+                        project.id == id && project.status == catalog::snapshot::ProjectStatus::Ok
+                    })
+                });
+            }));
+            // Lot G : une erreur de démarrage s'explique d'abord ; les fenêtres détachées
+            // reviennent une fois réglée (`startup_retry`, `startup_start_empty`).
+            app.manage(commands::startup::StartupAttempts::default());
+            if app.state::<AppState>().failure().is_none()
+                && app.state::<WindowsState>().failure().is_none()
+            {
+                windows::restore(app.handle());
+            }
+            // Fenêtre créée cachée, montrée prête (`window_ready`) ou après 300 ms (0.3-a).
+            windows::show_later(app.handle(), windows::MAIN_LABEL);
             Ok(())
         })
+        .on_window_event(windows::on_window_event)
         .invoke_handler(tauri::generate_handler![
             commands::hello::hello,
             commands::catalog::catalog_load,
@@ -48,12 +119,155 @@ pub fn run() {
             commands::workspaces::workspace_create,
             commands::workspaces::workspace_rename,
             commands::workspaces::workspace_set_color,
-            commands::workspaces::workspace_set_default,
             commands::workspaces::workspace_add_projects,
             commands::workspaces::workspace_remove_project,
             commands::workspaces::workspace_delete,
             commands::window::window_set_title,
+            commands::window::windows_load,
+            commands::window::layout_open,
+            commands::window::layout_open_selection,
+            commands::window::layout_activate,
+            commands::window::layout_close,
+            commands::window::layout_move,
+            commands::window::layout_split,
+            commands::window::layout_resize,
+            commands::window::layout_preset,
+            commands::window::layout_set_placement,
+            commands::window::layout_set_follow,
+            commands::window::layout_set_sidebar_width,
+            commands::window::window_detach_zone,
+            commands::window::window_detach_tab,
+            commands::window::window_detach_sidebar,
+            commands::window::window_detach_result,
+            commands::window::window_reattach,
+            commands::window::window_reattach_all,
+            commands::contracts::contract_list,
+            commands::contracts::contract_read,
+            commands::contracts::contract_add,
+            commands::contracts::contract_import_file,
+            commands::contracts::contract_save,
+            commands::contracts::contract_delete,
+            commands::contracts::contract_generate,
+            commands::contracts::contract_run,
+            commands::tree::tree_load,
+            commands::tree::tree_set_collapsed,
+            commands::tree::tree_create_folder,
+            commands::tree::tree_create_request,
+            commands::tree::tree_rename,
+            commands::tree::tree_move,
+            commands::tree::tree_duplicate,
+            commands::tree::tree_delete,
+            commands::requests::request_read,
+            commands::requests::request_save,
+            commands::requests::request_send,
+            commands::requests::request_cancel,
+            commands::requests::request_result,
+            commands::requests::request_statuses,
+            commands::requests::result_ignore_check,
+            commands::requests::request_propose_assertions,
+            commands::requests::request_example_from_response,
+            commands::environments::environments_load,
+            commands::environments::environment_select,
+            commands::environments::environment_save,
+            commands::environments::environment_delete,
+            commands::environments::environments_reorder,
+            commands::environments::local_set,
+            commands::runs::run_start,
+            commands::runs::run_status,
+            commands::runs::run_cancel,
+            commands::runs::run_retry_failures,
+            commands::runs::run_ignore_check,
+            commands::runs::run_last,
+            commands::runs::project_last_runs,
+            commands::steps::steps_catalog,
+            commands::steps::steps_detect,
+            commands::trial::trial_send,
+            commands::response::response_render,
+            commands::response::response_preview,
+            commands::response::response_filter,
+            commands::response::response_save,
+            commands::response::response_clear,
+            // Lot D - Barre latérale
+            commands::contracts::contract_count,
+            // Lot B : saisie et cURL (docs/plan-mvp-b-saisie-curl.md)
+            commands::input::request_input,
+            commands::input::request_curl,
+            commands::input::pairs_to_text,
+            commands::input::pairs_from_text,
+            // Lot C - Import Bruno.
+            commands::import::import_pick,
+            commands::import::import_detect,
+            commands::import::import_run,
+            commands::import::import_report,
+            // Lot E : tests et étapes.
+            commands::test_steps::test_read,
+            commands::test_steps::tree_create_test,
+            commands::test_steps::tree_add_step,
+            commands::test_steps::request_variable_users,
+            // Essais : chemins généralisés et transfert au référentiel (2.2-b et 2.2-c).
+            commands::trial::trial_generalization,
+            commands::trial::trial_generalize,
+            commands::trial::trial_keep_path,
+            commands::trial::trial_transfer,
+            // Essais rangés dans un projet (2.2-d).
+            commands::trial::trial_file,
+            commands::trial::trial_file_undo,
+            // Valeurs dynamiques proposées à la saisie (5.1-h).
+            commands::input::dynamic_values,
+            // Lot H - Réseau et authentification.
+            commands::network::network_load,
+            commands::network::network_save,
+            commands::network::network_pick_authority,
+            commands::network::network_add_authority,
+            commands::network::network_remove_authority,
+            commands::network::project_auth_load,
+            commands::network::project_auth_save,
+            commands::network::oauth2_token_renew,
+            commands::network::oauth2_token_forget,
+            commands::network::cookies_list,
+            commands::network::cookies_clear,
+            commands::network::cookies_set_sending,
+            // Lot F : onglets et clavier.
+            commands::window::layout_pin,
+            commands::window::layout_close_tabs,
+            commands::window::layout_set_sidebar_hidden,
+            // Lot I - Fichiers modifiés hors d'Arnod.
+            commands::files::request_conflict,
+            commands::files::request_conflict_resolve,
+            // Lot G - Démarrage et erreurs.
+            commands::startup::startup_status,
+            commands::startup::startup_retry,
+            commands::startup::startup_start_empty,
+            commands::startup::startup_open,
+            commands::startup::startup_quit,
+            commands::startup::window_ready,
+            // Lot J - Copier et déplacer.
+            commands::transfer::transfer_targets,
+            commands::transfer::transfer_preview,
+            commands::transfer::transfer_apply,
+            commands::transfer::transfer_undo,
+            // Lot L allégé - Mises à jour.
+            commands::updates::updates_load,
+            commands::updates::updates_save,
+            commands::updates::updates_check,
+            commands::updates::updates_open,
+            commands::updates::updates_download,
+            commands::updates::updates_cancel,
+            commands::updates::updates_install,
+            // Sélection multiple (4.1-a quater).
+            commands::batch::tree_batch,
+            commands::batch::tree_batch_undo,
+            commands::batch::run_selection,
         ])
-        .run(tauri::generate_context!())
-        .expect("erreur au lancement d'Arnod");
+        .build(tauri::generate_context!())
+        .expect("erreur au lancement d'Arnod")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Positions et tailles des fenêtres détachées, pour la restauration (F13).
+                app.state::<WindowsState>().flush();
+                // Lot L : version mise de côté pour « Au prochain lancement » (R9), que la
+                // sortie vienne de la fenêtre principale fermée ou de Fichier > Quitter.
+                commands::updates::install_on_exit(app);
+            }
+        });
 }

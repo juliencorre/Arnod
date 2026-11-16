@@ -1,0 +1,35 @@
+meta {
+  name: Obtenir un jeton
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/token
+  body: multipartForm
+  auth: oauth2
+}
+
+auth:oauth2 {
+  grant_type: client_credentials
+  access_token_url: {{baseUrl}}/oauth/token
+  client_id: arnod
+  client_secret: {{clientSecret}}
+  scope: 
+}
+
+body:multipart-form {
+  grant: password
+  avatar: @file(images/avatar.png)
+}
+
+script:post-response {
+  bru.setEnvVar("token", res.body.access_token);
+}
+
+docs {
+  Notes :
+  '''
+  Ceci n'est pas une valeur
+  '''
+}

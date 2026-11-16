@@ -7,9 +7,9 @@
  * projets et son `arnod.json` sur un vrai disque, isolé de l'utilisateur.
  */
 import { type ChildProcess, spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 
 import { remote } from "webdriverio";
@@ -26,6 +26,19 @@ export const ARTIFACTS = path.join(ROOT, "e2e", "artifacts");
 const IDENTIFIER = "io.github.juliencorre.arnod";
 const DRIVER_PORT = 4444;
 
+/**
+ * Chemin absolu de `tauri-driver`, lancé sans recherche dans PATH : variable
+ * `ARNOD_E2E_TAURI_DRIVER`, sinon le binaire de `cargo install` (`$CARGO_HOME/bin`,
+ * par défaut `~/.cargo/bin`).
+ */
+export const TAURI_DRIVER = process.env.ARNOD_E2E_TAURI_DRIVER
+  ? path.resolve(process.env.ARNOD_E2E_TAURI_DRIVER)
+  : path.join(
+      process.env.CARGO_HOME ?? path.join(homedir(), ".cargo"),
+      "bin",
+      process.platform === "win32" ? "tauri-driver.exe" : "tauri-driver",
+    );
+
 export type Browser = Awaited<ReturnType<typeof remote>>;
 
 /** Dossiers d'un bac à sable : personnel (projets) et données (arnod.json). */
@@ -39,7 +52,11 @@ export function createSandbox(): Sandbox {
   const root = mkdtempSync(path.join(tmpdir(), "arnod-e2e-"));
   const home = path.join(root, "home");
   mkdirSync(home, { recursive: true });
-  return { root, home, dataDir: path.join(root, "data", IDENTIFIER) };
+  const dataDir = path.join(root, "data", IDENTIFIER);
+  // Lot L : pas de vérification des mises à jour au démarrage (ni réseau, ni notification).
+  mkdirSync(dataDir, { recursive: true });
+  writeFileSync(path.join(dataDir, "updates.json"), JSON.stringify({ automatic: false }));
+  return { root, home, dataDir };
 }
 
 export function removeSandbox(sandbox: Sandbox): void {
@@ -51,11 +68,43 @@ export function removeSandbox(sandbox: Sandbox): void {
 export function readState(sandbox: Sandbox): {
   projects: { id: string; name: string; path: string }[];
   workspaces: { id: string; name: string; projectIds: string[] }[];
-  defaultWorkspaceId: string;
-  lastWorkspaceId: string;
+  /** Dernier onglet ouvert ; `null` pour « Tous les projets ». */
+  lastWorkspaceId: string | null;
+  /** Projet « Non classés », absent avant le premier essai. */
+  inboxProjectId?: string;
 } {
   return JSON.parse(readFileSync(path.join(sandbox.dataDir, "arnod.json"), "utf8")) as ReturnType<
     typeof readState
+  >;
+}
+
+/** Nœud de disposition enregistré (`windows.json`), réduit à ce que vérifie le parcours. */
+export type SavedNode =
+  | {
+      kind: "zone";
+      id: string;
+      tabs: { id: string; content: { kind: string; path?: string }; preview?: boolean }[];
+      activeTab: string | null;
+      /** Lot F : place du résultat (F6, 1.4-j). */
+      placement?: "auto" | "right" | "below";
+    }
+  | { kind: "split"; axis: "row" | "column"; ratio: number; first: SavedNode; second: SavedNode };
+
+/** État des fenêtres enregistré par l'application (`windows.json`). */
+export function readWindows(sandbox: Sandbox): {
+  windows: {
+    label: string;
+    kind: "main" | "content" | "sidebar";
+    layout: { root: SavedNode; activeZone: string } | null;
+    /** Fenêtre de contenu : suit la sélection de la barre latérale (F10). */
+    follow: boolean;
+    sidebarDetached: boolean;
+    /** Lot F : barre latérale masquée (Ctrl+\, 1.4-j). */
+    sidebarHidden?: boolean;
+  }[];
+} {
+  return JSON.parse(readFileSync(path.join(sandbox.dataDir, "windows.json"), "utf8")) as ReturnType<
+    typeof readWindows
   >;
 }
 
@@ -86,7 +135,13 @@ export async function startDriver(
   sandbox: Sandbox,
   extraEnv: Record<string, string> = {},
 ): Promise<ChildProcess> {
-  const driver = spawn("tauri-driver", ["--port", String(DRIVER_PORT)], {
+  if (!existsSync(TAURI_DRIVER)) {
+    throw new Error(
+      `tauri-driver introuvable (${TAURI_DRIVER}) : cargo install tauri-driver --locked, ` +
+        "ou chemin dans ARNOD_E2E_TAURI_DRIVER",
+    );
+  }
+  const driver = spawn(TAURI_DRIVER, ["--port", String(DRIVER_PORT)], {
     env: {
       ...process.env,
       HOME: sandbox.home,
@@ -123,7 +178,8 @@ export async function launchApp(): Promise<Browser> {
       "tauri:options": { application: APPLICATION },
     } as WebdriverIO.Capabilities,
   });
-  await browser.$("main h1").waitForDisplayed({ timeout: 30_000 });
+  // `main` paraît avec la vue ; son titre peut n'être lu que par les lecteurs d'écran.
+  await browser.$("main").waitForDisplayed({ timeout: 30_000 });
   return browser;
 }
 

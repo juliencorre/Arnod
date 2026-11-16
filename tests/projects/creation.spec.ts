@@ -14,6 +14,7 @@ import {
   workspace,
 } from "../fixtures";
 import { type AppWrapper, mountApp } from "../mountApp";
+import { chooseWorkspace, currentWorkspace, switcherNames } from "../switcher";
 
 let wrapper: AppWrapper | undefined;
 
@@ -28,43 +29,103 @@ function folderPreview(app: AppWrapper): string {
   return app.get('[data-testid="project-folder"]').text();
 }
 
-describe("premier lancement (1a, P1, P3, P4)", () => {
-  it("propose le dossier, crée le projet, l'ouvre et l'annonce", async () => {
+describe("premier lancement (1a, P1, P3, P4, O8)", () => {
+  it("propose le dossier, crée le projet sans workspace, l'ouvre et l'annonce", async () => {
     const core = installFakeCore(firstRunSnapshot());
     wrapper = await mountApp();
     expect(folderPreview(wrapper)).toBe(DEFAULT_LOCATION);
-    expect(wrapper.text()).toContain("Le workspace par défaut reçoit chaque nouveau projet.");
+    expect(wrapper.text()).toContain(
+      "Un projet est toujours dans « Tous les projets ». Un workspace est facultatif.",
+    );
+    expect(wrapper.findAll(".storage__chip").map((c) => c.text().replace(/\s+/g, " "))).toEqual([
+      "Tous les projets par défaut",
+    ]);
 
-    await wrapper.get("form input").setValue("boutique-tests");
+    await wrapper.get(".first-run__card form input").setValue("boutique-tests");
     await flushPromises();
     expect(folderPreview(wrapper)).toBe(`${DEFAULT_LOCATION}/boutique-tests`);
 
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
 
     expect(core.calls.find((call) => call.cmd === "project_create")?.args).toEqual({
       name: "boutique-tests",
       location: null,
-      workspaceId: MES_PROJETS,
+      workspaceId: null,
     });
     expect(wrapper.get("main h1").text()).toBe("boutique-tests");
-    expect(wrapper.get("main").text()).toContain("Aucune requête pour l'instant.");
-    expect(wrapper.get(".toast").text()).toContain(
-      "✓ « boutique-tests » créé dans le workspace Mes projets (par défaut).",
+    // Projet vide : quatre points de départ (1.2-d, lot D).
+    expect(wrapper.get("main").text()).toContain("Par où commencer ?");
+    expect(wrapper.findAll("main .start__card h3").map((h) => h.text())).toEqual([
+      "Reprendre l'existant",
+      "Décrire un contrat de service",
+      "Écrire un test",
+      "Configurer un environnement",
+    ]);
+    const toast = wrapper.get(".toast");
+    expect(toast.text()).toContain(
+      "✓ « boutique-tests » créé · visible dans « Tous les projets ».",
     );
+    expect(toast.text()).toContain("Ranger dans un workspace…");
+  });
+
+  it("crée un workspace sans quitter le formulaire et y range le projet (1a bis)", async () => {
+    const core = installFakeCore(firstRunSnapshot());
+    wrapper = await mountApp();
+
+    const add = wrapper.get(".storage__add");
+    (add.element as HTMLElement).focus();
+    await add.trigger("click");
+    await flushPromises();
+    const items = wrapper.findAll('[role="menuitem"]').map((item) => item.text());
+    expect(items).toEqual(["Aucun workspace pour l'instant", "Créer un workspace…"]);
+    await wrapper
+      .findAll('[role="menuitem"]')
+      .find((item) => item.text() === "Créer un workspace…")
+      ?.trigger("click");
+    await flushPromises();
+    expect(wrapper.text()).toContain(
+      "Il apparaîtra dans le sélecteur, après « Tous les projets ».",
+    );
+
+    const input = wrapper.get(".storage__create input");
+    expect(document.activeElement).toBe(input.element);
+    await input.setValue("E-commerce");
+    await input.trigger("keydown", { key: "Enter" });
+    await flushPromises();
+
+    expect(core.calls.find((c) => c.cmd === "workspace_create")?.args).toEqual({
+      name: "E-commerce",
+    });
+    expect(wrapper.findAll(".storage__chip").map((c) => c.text().replace(/\s+/g, " "))).toEqual([
+      "Tous les projets par défaut",
+      "E-commerce ×",
+    ]);
+    // Le workspace est déjà dans le sélecteur, après « Tous les projets ».
+    expect(await switcherNames(wrapper)).toEqual(["Tous les projets", "E-commerce"]);
+
+    await wrapper.get(".first-run__card form input").setValue("boutique-tests");
+    await wrapper.get(".first-run__card form").trigger("submit");
+    await flushPromises();
+    const created = core.calls.find((c) => c.cmd === "project_create")?.args;
+    expect(created?.workspaceId).toBe("ws-e-commerce");
+    expect(wrapper.get(".toast").text()).toContain(
+      "✓ « boutique-tests » créé dans « E-commerce » · visible dans « Tous les projets ».",
+    );
+    expect(currentWorkspace(wrapper)).toBe("E-commerce");
   });
 
   it("« Changer » choisit l'emplacement parent du dossier", async () => {
     const core = installFakeCore(firstRunSnapshot());
     core.pickedFolder = "/home/julien/dev";
     wrapper = await mountApp();
-    await wrapper.get("form input").setValue("auth-sso");
+    await wrapper.get(".first-run__card form input").setValue("auth-sso");
 
     await wrapper.get('button[aria-label="Changer l\'emplacement du dossier"]').trigger("click");
     await flushPromises();
 
     expect(folderPreview(wrapper)).toBe("/home/julien/dev/auth-sso");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
     expect(core.calls.find((call) => call.cmd === "project_create")?.args).toMatchObject({
       location: "/home/julien/dev",
@@ -84,10 +145,10 @@ describe("premier lancement (1a, P1, P3, P4)", () => {
   it("affiche l'erreur du cœur sous le champ concerné", async () => {
     const core = installFakeCore(firstRunSnapshot());
     wrapper = await mountApp();
-    const input = wrapper.get("form input");
+    const input = wrapper.get(".first-run__card form input");
 
     await input.setValue("api/v2");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
     expect(input.attributes("aria-invalid")).toBe("true");
     const nameError = wrapper.get(`#${input.attributes("aria-describedby") ?? ""}`);
@@ -99,20 +160,22 @@ describe("premier lancement (1a, P1, P3, P4)", () => {
     });
     await input.setValue("boutique");
     expect(input.attributes("aria-invalid")).toBe("false");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
     expect(wrapper.get('[role="group"] + [role="alert"]').text()).toBe(
       "Le dossier /home/julien/arnod/boutique existe déjà et n'est pas vide.",
     );
-    expect(wrapper.get("main h1").text()).toBe("Créez votre premier projet");
+    expect(wrapper.get("main h1").text()).toBe("Bienvenue dans Arnod");
   });
 
   it("n'envoie rien tant que le nom est vide", async () => {
     const core = installFakeCore(firstRunSnapshot());
     wrapper = await mountApp();
 
-    expect(wrapper.get('form button[type="submit"]').attributes("disabled")).toBeDefined();
-    await wrapper.get("form").trigger("submit");
+    expect(
+      wrapper.get('.first-run__card form button[type="submit"]').attributes("disabled"),
+    ).toBeDefined();
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
 
     expect(core.commands()).not.toContain("project_create");
@@ -120,7 +183,7 @@ describe("premier lancement (1a, P1, P3, P4)", () => {
 });
 
 describe("nouveau projet depuis un workspace (2a bis, R4)", () => {
-  it("préremplit le workspace ouvert et crée dans celui-ci et le défaut", async () => {
+  it("préremplit le workspace ouvert et crée dans celui-ci seulement", async () => {
     const core = installFakeCore(boutiqueSnapshot());
     wrapper = await mountApp();
     useDialogStore().openNewProject(BOUTIQUE);
@@ -128,14 +191,10 @@ describe("nouveau projet depuis un workspace (2a bis, R4)", () => {
 
     const dialog = wrapper.get<HTMLDialogElement>("dialog[open]");
     expect(dialog.get("h2").text()).toBe("Nouveau projet");
-    const select = dialog.get<HTMLSelectElement>("select");
-    expect(select.element.value).toBe(BOUTIQUE);
-    expect(dialog.text()).toContain("Aussi ajouté à");
-    expect(dialog.text()).toContain("Mes projets (par défaut)");
-
-    await select.setValue(MES_PROJETS);
-    expect(dialog.text()).not.toContain("Aussi ajouté à");
-    await select.setValue(BOUTIQUE);
+    expect(dialog.findAll(".storage__chip").map((c) => c.text().replace(/\s+/g, " "))).toEqual([
+      "Tous les projets par défaut",
+      "Boutique workspace ouvert ×",
+    ]);
 
     await dialog.get("input").setValue("paiements-v3");
     await dialog.get("form").trigger("submit");
@@ -149,8 +208,27 @@ describe("nouveau projet depuis un workspace (2a bis, R4)", () => {
     expect(wrapper.find("dialog[open]").exists()).toBe(false);
     expect(wrapper.get("main h1").text()).toBe("paiements-v3");
     expect(wrapper.get(".toast").text()).toContain(
-      "✓ « paiements-v3 » créé dans les workspaces Mes projets (par défaut) et Boutique.",
+      "✓ « paiements-v3 » créé dans « Boutique » · visible dans « Tous les projets ».",
     );
+    expect(core.snapshot().workspaces.find((w) => w.id === MES_PROJETS)?.projectIds).not.toContain(
+      "p-paiements-v3",
+    );
+  });
+
+  it("× retire le workspace : le projet n'est rangé nulle part", async () => {
+    const core = installFakeCore(boutiqueSnapshot());
+    wrapper = await mountApp();
+    useDialogStore().openNewProject(BOUTIQUE);
+    await flushPromises();
+    const dialog = wrapper.get("dialog[open]");
+
+    await dialog.get('button[aria-label="Ne pas ranger dans « Boutique »"]').trigger("click");
+    expect(dialog.find(".storage__add").exists()).toBe(true);
+    await dialog.get("input").setValue("paiements-v3");
+    await dialog.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(core.calls.find((c) => c.cmd === "project_create")?.args.workspaceId).toBeNull();
   });
 
   it("« Annuler » ferme la fenêtre sans rien créer", async () => {
@@ -199,22 +277,24 @@ describe("ajouter un projet à d'autres workspaces (P4, P6)", () => {
       projectIds: [BOUTIQUE_TESTS],
     });
     expect(wrapper.find("dialog[open]").exists()).toBe(false);
-    expect(wrapper.get(".toast").text()).toBe("« boutique-tests » ajouté à Recette.");
+    expect(wrapper.get(".toast").text()).toBe("« boutique-tests » ajouté à « Recette ».");
   });
 });
 
 describe("vue projet (1b, P5)", () => {
-  it("revient au workspace par le lien de retour", async () => {
+  it("revient à « Tous les projets » par le sélecteur", async () => {
     const core = installFakeCore(firstRunSnapshot());
     wrapper = await mountApp();
-    await wrapper.get("form input").setValue("boutique-tests");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get(".first-run__card form input").setValue("boutique-tests");
+    await wrapper.get(".first-run__card form").trigger("submit");
     await flushPromises();
+    expect(wrapper.get("main h1").text()).toBe("boutique-tests");
 
-    await wrapper.get(".project-view__back").trigger("click");
-    await flushPromises();
+    await chooseWorkspace(wrapper, "Tous les projets");
 
-    expect(core.commands()).toContain("workspace_open");
-    expect(wrapper.get("main h1").text()).toBe("Mes projets");
+    expect(core.calls.filter((c) => c.cmd === "workspace_open").at(-1)?.args).toEqual({
+      workspaceId: null,
+    });
+    expect(wrapper.get("main h1").text()).toBe("Tous les projets · 1");
   });
 });

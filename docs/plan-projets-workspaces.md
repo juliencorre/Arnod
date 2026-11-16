@@ -11,6 +11,10 @@ Source : maquette Claude Design « Arnod - Premier usage »
 « 1. Premier usage (MVP) » et « 2. Workspaces ». Les 12 écrans ont été capturés dans
 [`docs/maquettes/`](maquettes/) (1280 × 800, rendu × 2).
 
+> **Révision.** Les règles R3, R4, R7, R8 et R11, la notion de workspace par défaut et le
+> sélecteur de workspaces (2b) sont remplacés par [`plan-workspaces-onglets.md`](plan-workspaces-onglets.md) :
+> workspaces en onglets, onglet épinglé « Tous les projets », workspace facultatif.
+
 ## 1. Objectif
 
 À la fin de ce plan, Arnod :

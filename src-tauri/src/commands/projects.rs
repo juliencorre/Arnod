@@ -51,25 +51,25 @@ pub async fn project_pick_folder(
     Ok(Some(path.display().to_string()))
 }
 
-/// Crée un projet dans `<emplacement>/<nom>` et l'ajoute au workspace par
-/// défaut et à `workspace_id` (P1, P2, R4).
+/// Crée un projet dans `<emplacement>/<nom>` ; il entre dans « Tous les
+/// projets » et, si `workspace_id` est donné, dans ce workspace (P1, P2, R4).
 #[tauri::command]
 pub fn project_create(
     state: State<'_, AppState>,
     name: String,
     location: Option<String>,
-    workspace_id: Uuid,
+    workspace_id: Option<Uuid>,
 ) -> Result<ProjectCreated, CommandError> {
     state.create_project(&name, location.as_deref(), workspace_id)
 }
 
-/// Inscrit un dossier projet existant (contenant `arnod.yml`) au référentiel et
-/// l'ajoute au workspace par défaut et à `workspace_id` (P12).
+/// Inscrit un dossier projet existant (contenant `arnod.yml`) dans « Tous les
+/// projets » et, si `workspace_id` est donné, dans ce workspace (P12, R4).
 #[tauri::command]
 pub fn project_add_existing(
     state: State<'_, AppState>,
     path: String,
-    workspace_id: Uuid,
+    workspace_id: Option<Uuid>,
 ) -> Result<ProjectCreated, CommandError> {
     state.add_existing_project(&path, workspace_id)
 }

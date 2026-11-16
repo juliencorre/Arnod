@@ -1,0 +1,608 @@
+//! Fenêtres du système et synchronisation entre elles (F8 à F13, Z5 à Z8).
+//!
+//! [`WindowsState`] garde les fenêtres ([`Windows`], module pur) et les
+//! enregistre dans `windows.json`. [`apply`] applique une opération puis met
+//! les fenêtres du système en accord : création des nouvelles, fermeture des
+//! disparues, et diffusion de l'instantané à toutes les fenêtres.
+
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
+
+use serde::Serialize;
+use tauri::{
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, Window, WindowEvent,
+};
+use uuid::Uuid;
+
+use crate::catalog::snapshot::CatalogSnapshot;
+use crate::error::{CommandError, CommandErrorKind};
+use crate::layout::windows::{
+    ActiveRequest, Bounds, MAIN, WINDOWS_VERSION, WindowKind, WindowState, Windows, WindowsFile,
+};
+use crate::startup::{Cause, Failure, StateFile};
+use crate::statuses::Statuses;
+use crate::workbench::{Notifier, RunView};
+
+/// Étiquette de la fenêtre principale.
+pub const MAIN_LABEL: &str = MAIN;
+
+/// Fichier des fenêtres, dans les données locales (Z8).
+pub const WINDOWS_FILE: &str = "windows.json";
+
+/// Événements diffusés aux fenêtres (F11).
+pub mod events {
+    /// Toutes les fenêtres et leurs zones (`WindowsFile`).
+    pub const WINDOWS: &str = "arnod://fenetres";
+    /// Nouvel instantané du catalogue (`CatalogSnapshot`).
+    pub const CATALOG: &str = "arnod://catalogue";
+    /// Modification d'un projet (`ProjectChange`).
+    pub const PROJECT: &str = "arnod://projet";
+    /// Demande de fermeture d'une fenêtre détachée : elle enregistre puis se rattache (Z6).
+    pub const CLOSE: &str = "arnod://fermer";
+    /// Requête active, que montre la fenêtre de résultat (`ActiveRequest` ou `null`).
+    pub const ACTIVE_REQUEST: &str = "arnod://requete-active";
+    /// Début ou fin d'un envoi (`ResultChange`).
+    pub const RESULT: &str = "arnod://resultat";
+    /// Run démarré ou avancé (`RunChange`) : toutes les fenêtres le suivent (R7 ;
+    /// `docs/plan-fin-premier-usage.md`, R3).
+    pub const RUN: &str = "arnod://run";
+    /// Statuts des requêtes d'un projet (`StatusesChange`, R4).
+    pub const STATUSES: &str = "arnod://statuts";
+    /// Raccourci choisi dans le menu natif (`Shortcut`) : la fenêtre visée agit
+    /// comme au clavier (lot F, R7).
+    pub const SHORTCUT: &str = "arnod://raccourci";
+    /// Lot L : version trouvée et installation (`UpdatesView`), à chaque étape et au plus une
+    /// fois par pour cent téléchargé (`docs/plan-mvp-l-mises-a-jour.md`, R8).
+    pub const UPDATES: &str = "arnod://mise-a-jour";
+}
+
+/// Statuts des requêtes d'un projet, diffusés à chaque changement (R4, R5).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusesChange {
+    pub project_id: Uuid,
+    pub statuses: Statuses,
+}
+
+/// Diffuse aux fenêtres les changements de l'établi : avancement des runs (R3)
+/// et statuts des requêtes (R4). L'origine vide dit que le cœur en est l'auteur.
+pub struct EventNotifier<R: Runtime> {
+    app: AppHandle<R>,
+}
+
+impl<R: Runtime> EventNotifier<R> {
+    pub fn new(app: AppHandle<R>) -> Self {
+        Self { app }
+    }
+}
+
+impl<R: Runtime> Notifier for EventNotifier<R> {
+    fn run_changed(&self, project_id: Uuid, run: &RunView) {
+        let _ = self.app.emit(
+            events::RUN,
+            RunChange {
+                project_id,
+                run: run.clone(),
+                origin: String::new(),
+            },
+        );
+    }
+
+    fn statuses_changed(&self, project_id: Uuid, statuses: &Statuses) {
+        let _ = self.app.emit(
+            events::STATUSES,
+            StatusesChange {
+                project_id,
+                statuses: statuses.clone(),
+            },
+        );
+    }
+}
+
+/// Run démarré dans une fenêtre, diffusé aux autres (R7).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunChange {
+    pub project_id: Uuid,
+    pub run: RunView,
+    /// Fenêtre à l'origine du run, qui le suit déjà.
+    pub origin: String,
+}
+
+/// Partie d'un projet modifiée.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectScope {
+    Tree,
+    Request,
+    Environments,
+    /// Contrats du projet (ajout, source, suppression).
+    Contracts,
+}
+
+/// Modification d'un projet, diffusée aux autres fenêtres (F11).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectChange {
+    pub project_id: Uuid,
+    pub scope: ProjectScope,
+    /// Requête concernée (portée `request`).
+    pub path: Option<String>,
+    /// Fenêtre à l'origine du changement, qui l'a déjà appliqué.
+    pub origin: String,
+}
+
+/// Fenêtres de l'application et leur fichier.
+pub struct WindowsState {
+    data_dir: PathBuf,
+    inner: Mutex<Windows>,
+    /// Échec de lecture de `windows.json` au démarrage : rien n'est lu ni écrit tant que
+    /// l'utilisateur ne l'a pas réglé (lot G).
+    failure: Mutex<Option<Failure>>,
+}
+
+fn file(data_dir: &Path) -> PathBuf {
+    data_dir.join(WINDOWS_FILE)
+}
+
+/// Lit `windows.json` : absent, la disposition par défaut.
+fn read_file(data_dir: &Path) -> Result<Windows, Failure> {
+    let path = file(data_dir);
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Windows::default()),
+        Err(error) => return Err(Failure::io(StateFile::Windows, &path, &error)),
+    };
+    let failure = |cause| Failure {
+        file: StateFile::Windows,
+        path: path.clone(),
+        cause,
+    };
+    let corrupt = |error: serde_json::Error| {
+        failure(Cause::Corrupt {
+            reason: format!("JSON invalide : {error}"),
+        })
+    };
+    let value: serde_json::Value = serde_json::from_str(&text).map_err(corrupt)?;
+    if let Some(format) = value
+        .get("version")
+        .and_then(serde_json::Value::as_u64)
+        .filter(|v| *v > u64::from(WINDOWS_VERSION))
+    {
+        return Err(failure(Cause::Newer {
+            format,
+            written_by: None,
+            modified: crate::storage::modified_secs(&path),
+        }));
+    }
+    let file: WindowsFile = serde_json::from_value(value).map_err(|error| {
+        failure(Cause::Corrupt {
+            reason: format!("contenu invalide : {error}"),
+        })
+    })?;
+    Ok(Windows::from_file(file))
+}
+
+fn busy() -> CommandError {
+    CommandError::new(
+        CommandErrorKind::Io,
+        "L'état des fenêtres est indisponible : redémarrez l'application.",
+    )
+}
+
+impl WindowsState {
+    /// Charge `windows.json` ; absent : une seule fenêtre, une zone vide. Illisible, plus
+    /// récent ou verrouillé : l'échec est gardé pour l'écran de démarrage, le fichier intact.
+    pub fn load(data_dir: PathBuf) -> Self {
+        let (windows, failure) = match read_file(&data_dir) {
+            Ok(windows) => (windows, None),
+            Err(failure) => (Windows::default(), Some(failure)),
+        };
+        Self {
+            data_dir,
+            inner: Mutex::new(windows),
+            failure: Mutex::new(failure),
+        }
+    }
+
+    /// Échec de lecture au démarrage, s'il n'est pas réglé.
+    pub fn failure(&self) -> Option<Failure> {
+        self.failure.lock().map_or(None, |failure| failure.clone())
+    }
+
+    /// Relit `windows.json` après un échec ; renvoie l'échec restant. Sans échec, ne relit rien.
+    pub fn reload(&self) -> Option<Failure> {
+        let mut failure = self.failure.lock().ok()?;
+        failure.as_ref()?;
+        match read_file(&self.data_dir) {
+            Ok(windows) => {
+                if let Ok(mut inner) = self.inner.lock() {
+                    *inner = windows;
+                }
+                *failure = None;
+            }
+            Err(next) => *failure = Some(next),
+        }
+        failure.clone()
+    }
+
+    fn lock(&self) -> Result<MutexGuard<'_, Windows>, CommandError> {
+        if let Some(failure) = self.failure() {
+            return Err(failure.to_command_error());
+        }
+        self.inner.lock().map_err(|_| busy())
+    }
+
+    pub fn snapshot(&self) -> Result<WindowsFile, CommandError> {
+        Ok(self.lock()?.to_file())
+    }
+
+    pub fn read<T>(&self, read: impl FnOnce(&Windows) -> T) -> Result<T, CommandError> {
+        Ok(read(&*self.lock()?))
+    }
+
+    /// Applique une opération ; en cas d'erreur, rien ne change. Renvoie la
+    /// valeur, les étiquettes avant et l'instantané après.
+    pub fn update<T>(
+        &self,
+        change: impl FnOnce(&mut Windows) -> Result<T, CommandError>,
+    ) -> Result<(T, Vec<String>, WindowsFile), CommandError> {
+        let mut windows = self.lock()?;
+        let mut next = windows.clone();
+        let value = change(&mut next)?;
+        let before = windows.labels();
+        *windows = next;
+        let file = windows.to_file();
+        // Une écriture manquée n'empêche pas de travailler : la suivante rattrape.
+        let _ = self.save(&file);
+        Ok((value, before, file))
+    }
+
+    /// Modification sans conséquence visible (focus, position) : ni écriture, ni diffusion.
+    pub fn quietly(&self, change: impl FnOnce(&mut Windows)) {
+        if let Ok(mut windows) = self.lock() {
+            change(&mut windows);
+        }
+    }
+
+    /// Écrit `windows.json` de façon atomique (fichier temporaire puis renommage).
+    pub fn save(&self, windows: &WindowsFile) -> io::Result<()> {
+        fs::create_dir_all(&self.data_dir)?;
+        let target = file(&self.data_dir);
+        let tmp = target.with_extension("json.tmp");
+        fs::write(&tmp, serde_json::to_vec_pretty(windows)?)?;
+        fs::rename(&tmp, &target)
+    }
+
+    /// Enregistre l'état courant (positions comprises), à la sortie. Un fichier qui n'a pas
+    /// pu être lu n'est jamais écrasé : `snapshot` échoue alors.
+    pub fn flush(&self) {
+        if let Ok(file) = self.snapshot() {
+            let _ = self.save(&file);
+        }
+    }
+}
+
+/// Applique une opération sur les fenêtres puis met le système en accord :
+/// fenêtres créées ou fermées, instantané diffusé à toutes (F11).
+pub fn apply<R: Runtime, T>(
+    app: &AppHandle<R>,
+    change: impl FnOnce(&mut Windows) -> Result<T, CommandError>,
+) -> Result<(T, WindowsFile), CommandError> {
+    let state = app.state::<WindowsState>();
+    let active_before = state.read(Windows::active_request).ok().flatten();
+    let (value, before, file) = state.update(change)?;
+    for window in file.windows.iter().filter(|w| !before.contains(&w.label)) {
+        spawn(app, window.clone());
+    }
+    for label in before
+        .iter()
+        .filter(|label| !file.windows.iter().any(|w| &w.label == *label))
+    {
+        if let Some(window) = app.get_webview_window(label) {
+            let _ = window.destroy();
+        }
+    }
+    let _ = app.emit(events::WINDOWS, &file);
+    emit_active_if_changed(app, active_before);
+    Ok((value, file))
+}
+
+/// Diffuse la requête active si elle a changé depuis `before` (D2).
+fn emit_active_if_changed<R: Runtime>(app: &AppHandle<R>, before: Option<ActiveRequest>) {
+    let after = app
+        .state::<WindowsState>()
+        .read(Windows::active_request)
+        .ok()
+        .flatten();
+    if after != before {
+        let _ = app.emit(events::ACTIVE_REQUEST, &after);
+    }
+}
+
+/// Crée la fenêtre du système d'une fenêtre détachée, hors du fil principal
+/// (une création depuis une commande synchrone bloquerait sous Windows).
+pub fn spawn<R: Runtime>(app: &AppHandle<R>, window: WindowState) {
+    if window.kind == WindowKind::Main {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let result_only = window.layout.as_ref().is_some_and(|layout| {
+            layout
+                .tabs()
+                .iter()
+                .all(|tab| tab.content == crate::layout::Content::Result)
+        });
+        let (title, width, height, min_width) = match window.kind {
+            WindowKind::Sidebar => ("Arnod — Barre latérale", 320.0, 760.0, 240.0),
+            _ if result_only => ("Arnod — Résultat", 620.0, 720.0, 360.0),
+            _ => ("Arnod", 980.0, 720.0, 480.0),
+        };
+        let mut builder =
+            WebviewWindowBuilder::new(&app, &window.label, WebviewUrl::App("index.html".into()))
+                .title(title)
+                .inner_size(width, height)
+                .min_inner_size(min_width, 360.0)
+                // Glisser-déposer HTML (onglets, projets), comme la fenêtre principale.
+                .disable_drag_drop_handler()
+                // Montrée prête (`window_ready`), ou au plus tard après 300 ms (lot G, 0.3-a).
+                .visible(false);
+        if let Some(bounds) = window.bounds {
+            builder = builder
+                .position(f64::from(bounds.x), f64::from(bounds.y))
+                .inner_size(f64::from(bounds.width), f64::from(bounds.height));
+        }
+        // Échec de création (écran indisponible…) : la fenêtre se rattache.
+        if builder.build().is_err() {
+            let label = window.label.clone();
+            let _ = apply(&app, |windows| windows.reattach(&label));
+        } else {
+            show_later(&app, &window.label);
+        }
+    });
+}
+
+/// Délai au-delà duquel une fenêtre encore cachée est montrée avec son squelette (0.3-a).
+pub const SHOW_AFTER: std::time::Duration = std::time::Duration::from_millis(300);
+
+/// Montre la fenêtre `label` après [`SHOW_AFTER`] si l'interface ne l'a pas déjà fait
+/// (`window_ready`) : un démarrage lent montre le squelette de l'écran attendu (lot G, 0.3-a).
+pub fn show_later<R: Runtime>(app: &AppHandle<R>, label: &str) {
+    let app = app.clone();
+    let label = label.to_owned();
+    std::thread::spawn(move || {
+        std::thread::sleep(SHOW_AFTER);
+        if let Some(window) = app.get_webview_window(&label)
+            && !window.is_visible().unwrap_or(true)
+        {
+            let _ = window.show();
+        }
+    });
+}
+
+/// Recrée au démarrage les fenêtres détachées enregistrées (F13).
+pub fn restore<R: Runtime>(app: &AppHandle<R>) {
+    let state = app.state::<WindowsState>();
+    if let Ok(file) = state.snapshot() {
+        for window in file.windows {
+            spawn(app, window);
+        }
+    }
+}
+
+/// Position et taille logiques d'une fenêtre, pour la restauration (F13).
+fn bounds_of<R: Runtime>(window: &Window<R>) -> Option<Bounds> {
+    let scale = window.scale_factor().ok()?;
+    let position: LogicalPosition<f64> = window.outer_position().ok()?.to_logical(scale);
+    let size: LogicalSize<f64> = window.inner_size().ok()?.to_logical(scale);
+    // Conversions bornées : des coordonnées d'écran tiennent dans un i32.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    Some(Bounds {
+        x: position.x.round() as i32,
+        y: position.y.round() as i32,
+        width: size.width.round().max(0.0) as u32,
+        height: size.height.round().max(0.0) as u32,
+    })
+}
+
+/// Événements des fenêtres : focus (Z5), position (F13), fermetures (Z6, Z7).
+pub fn on_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
+    let app = window.app_handle();
+    let state = app.state::<WindowsState>();
+    let label = window.label().to_owned();
+    match event {
+        WindowEvent::Focused(true) => {
+            // Le focus change la requête active que suit la fenêtre de résultat (D2).
+            let before = state.read(Windows::active_request).ok().flatten();
+            state.quietly(|windows| windows.focus(&label));
+            emit_active_if_changed(app, before);
+        }
+        WindowEvent::Moved(_) | WindowEvent::Resized(_) if label != MAIN => {
+            if let Some(bounds) = bounds_of(window) {
+                state.quietly(|windows| windows.set_bounds(&label, bounds));
+            }
+        }
+        WindowEvent::CloseRequested { api, .. } if label != MAIN => {
+            // La fenêtre enregistre ses requêtes modifiées puis se rattache (Z6).
+            if state
+                .read(|windows| windows.get(&label).is_ok())
+                .unwrap_or(false)
+            {
+                api.prevent_close();
+                let _ = app.emit_to(label.as_str(), events::CLOSE, ());
+            }
+        }
+        WindowEvent::Destroyed => {
+            if label == MAIN {
+                // Fermer la fenêtre principale quitte Arnod (Z7).
+                state.flush();
+                app.exit(0);
+            } else if state
+                .read(|windows| windows.get(&label).is_ok())
+                .unwrap_or(false)
+            {
+                // Fenêtre détruite sans se rattacher (plantage) : ses onglets reviennent.
+                let _ = apply(app, |windows| windows.reattach(&label));
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Diffuse un nouvel instantané du catalogue et ferme les onglets des projets
+/// oubliés (F11).
+pub fn catalog_changed<R: Runtime>(app: &AppHandle<R>, snapshot: &CatalogSnapshot) {
+    let _ = app.emit(events::CATALOG, snapshot);
+    let known: Vec<Uuid> = snapshot.projects.iter().map(|p| p.id).collect();
+    let forgotten = app
+        .state::<WindowsState>()
+        .read(|windows| {
+            windows.to_file().windows.iter().any(|w| {
+                w.layout.as_ref().is_some_and(|layout| {
+                    layout.tabs().iter().any(|tab| {
+                        tab.content
+                            .project_id()
+                            .is_some_and(|id| !known.contains(&id))
+                    })
+                })
+            })
+        })
+        .unwrap_or(false);
+    if forgotten {
+        let _ = apply(app, |windows| Ok(windows.retain_projects(&known)));
+    }
+}
+
+/// Diffuse un run démarré : les autres fenêtres le suivent aussi (R7).
+pub fn run_started<R: Runtime>(window: &WebviewWindow<R>, project_id: Uuid, run: &RunView) {
+    let _ = window.app_handle().emit(
+        events::RUN,
+        RunChange {
+            project_id,
+            run: run.clone(),
+            origin: window.label().to_owned(),
+        },
+    );
+}
+
+/// Diffuse la modification d'un projet aux fenêtres (F11).
+pub fn project_changed<R: Runtime>(
+    app: &AppHandle<R>,
+    origin: &str,
+    project_id: Uuid,
+    scope: ProjectScope,
+    path: Option<&str>,
+) {
+    let _ = app.emit(
+        events::PROJECT,
+        ProjectChange {
+            project_id,
+            scope,
+            path: path.map(str::to_owned),
+            origin: origin.to_owned(),
+        },
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::layout::Content;
+
+    #[test]
+    fn enregistre_et_recharge_windows_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = WindowsState::load(dir.path().to_path_buf());
+        let (label, before, file) = state
+            .update(|windows| {
+                windows.layout_mut(MAIN)?.open(
+                    Content::Run {
+                        project_id: Uuid::from_u128(1),
+                    },
+                    None,
+                )?;
+                Ok(windows.detach_sidebar(None))
+            })
+            .unwrap();
+
+        assert_eq!(before, [MAIN]);
+        assert!(file.windows.iter().any(|w| w.label == label));
+        let reloaded = WindowsState::load(dir.path().to_path_buf());
+        assert_eq!(reloaded.snapshot().unwrap(), file);
+    }
+
+    #[test]
+    fn une_operation_refusee_ne_change_rien() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = WindowsState::load(dir.path().to_path_buf());
+        let before = state.snapshot().unwrap();
+
+        let error = state.update(|windows| windows.reattach(MAIN)).unwrap_err();
+
+        assert_eq!(error.kind, CommandErrorKind::InvalidRequest);
+        assert_eq!(state.snapshot().unwrap(), before);
+        assert!(!file(dir.path()).exists());
+    }
+
+    #[test]
+    fn fichier_illisible_garde_intact_jusqu_au_choix() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(file(dir.path()), "{").unwrap();
+
+        let state = WindowsState::load(dir.path().to_path_buf());
+
+        let failure = state.failure().unwrap();
+        assert!(
+            matches!(failure.cause, Cause::Corrupt { .. }),
+            "{failure:?}"
+        );
+        assert_eq!(
+            state.snapshot().unwrap_err().kind,
+            CommandErrorKind::CorruptState
+        );
+        state.flush();
+        assert_eq!(fs::read_to_string(file(dir.path())).unwrap(), "{");
+        assert_eq!(state.reload(), Some(failure));
+
+        crate::startup::set_aside(&file(dir.path()), "illisible").unwrap();
+        assert_eq!(state.reload(), None);
+        assert_eq!(state.read(Windows::labels).unwrap(), [MAIN]);
+    }
+
+    #[test]
+    fn format_plus_recent_ni_lu_ni_reecrit() {
+        let dir = tempfile::tempdir().unwrap();
+        let content = r#"{ "version": 9, "windows": [] }"#;
+        fs::write(file(dir.path()), content).unwrap();
+
+        let state = WindowsState::load(dir.path().to_path_buf());
+        state.flush();
+
+        let failure = state.failure().unwrap();
+        assert!(matches!(failure.cause, Cause::Newer { format: 9, .. }));
+        assert_eq!(fs::read_to_string(file(dir.path())).unwrap(), content);
+    }
+
+    #[test]
+    fn modification_de_projet_en_camel_case() {
+        let change = ProjectChange {
+            project_id: Uuid::from_u128(1),
+            scope: ProjectScope::Request,
+            path: Some("a.yml".into()),
+            origin: MAIN.into(),
+        };
+        assert_eq!(
+            serde_json::to_value(change).unwrap(),
+            serde_json::json!({
+                "projectId": Uuid::from_u128(1).to_string(),
+                "scope": "request",
+                "path": "a.yml",
+                "origin": "main"
+            })
+        );
+    }
+}

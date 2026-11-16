@@ -7,11 +7,35 @@
 //! Les commandes sont des façades : la logique vit dans [`crate::catalog`] et
 //! [`crate::state`].
 
+pub mod batch;
 pub mod catalog;
+pub mod contracts;
+pub mod environments;
 pub mod hello;
 pub mod projects;
+pub mod requests;
+pub mod runs;
+pub mod steps;
+pub mod transfer;
+pub mod tree;
+pub mod trial;
+pub mod updates;
 pub mod window;
 pub mod workspaces;
+// Lot A - Réponse (docs/plan-mvp-a-reponse.md).
+pub mod response;
+// Lot B : saisie, texte et cURL.
+pub mod input;
+// Lot C - Import Bruno.
+pub mod import;
+// Lot E : tests et étapes.
+pub mod test_steps;
+// Lot H - Réseau et authentification.
+pub mod network;
+// Lot I - Fichiers modifiés hors d'Arnod.
+pub mod files;
+// Lot G - Démarrage et erreurs.
+pub mod startup;
 
 #[cfg(test)]
 mod tests {

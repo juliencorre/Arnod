@@ -1,22 +1,33 @@
 <script setup lang="ts">
-/** Interrupteur (`role="switch"`), libellé dans le slot par défaut. */
+/**
+ * Interrupteur (`role="switch"`), libellé dans le slot par défaut. Le libellé est associé
+ * explicitement : `for` le relie au bouton (un clic sur le texte bascule) et
+ * `aria-labelledby` donne au bouton son nom accessible.
+ */
+import { useId } from "vue";
+
 const model = defineModel<boolean>({ required: true });
 defineProps<{ disabled?: boolean }>();
+
+const switchId = useId();
+const labelId = useId();
 </script>
 
 <template>
-  <label class="toggle" :class="{ 'toggle--disabled': disabled }">
+  <label class="toggle" :class="{ 'toggle--disabled': disabled }" :for="switchId">
     <button
+      :id="switchId"
       type="button"
       role="switch"
       class="toggle__switch"
       :aria-checked="model"
+      :aria-labelledby="labelId"
       :disabled="disabled"
       @click="model = !model"
     >
       <span class="toggle__thumb" />
     </button>
-    <span class="toggle__label"><slot /></span>
+    <span :id="labelId" class="toggle__label"><slot /></span>
   </label>
 </template>
 
@@ -39,7 +50,7 @@ defineProps<{ disabled?: boolean }>();
   height: 1.25rem;
   padding: 0;
   border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-chip);
   cursor: inherit;
   transition: background-color 120ms ease;

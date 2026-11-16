@@ -1,0 +1,24 @@
+meta {
+  name: Note longue
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/notes/1
+  body: text
+  auth: none
+}
+
+headers {
+  x-signature: '''
+    ligne 1
+    ligne 2
+  '''
+}
+
+body:text {
+  Bonjour,
+    indenté
+  fin
+}

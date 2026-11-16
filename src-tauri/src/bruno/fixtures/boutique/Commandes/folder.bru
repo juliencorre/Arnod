@@ -1,0 +1,16 @@
+meta {
+  name: Commandes
+  seq: 1
+}
+
+headers {
+  x-tenant: boutique
+}
+
+auth {
+  mode: inherit
+}
+
+script:pre-request {
+  bru.setVar("start", Date.now());
+}

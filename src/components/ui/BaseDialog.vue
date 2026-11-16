@@ -2,11 +2,17 @@
 /**
  * Fenêtre modale sur l'élément `<dialog>` natif : focus piégé, fermeture par
  * Échap ou clic sur le fond. Le parent garde la main sur `open` : Échap et le
- * clic sur le fond émettent `close` sans fermer d'eux-mêmes.
+ * clic sur le fond émettent `close` sans fermer d'eux-mêmes. `wide` : une fenêtre
+ * plus large, pour un contenu en deux colonnes (liste et formulaire).
  */
 import { onMounted, useId, useTemplateRef, watch } from "vue";
 
-const props = defineProps<{ open: boolean; title: string; description?: string }>();
+const props = defineProps<{
+  open: boolean;
+  title: string;
+  description?: string;
+  wide?: boolean;
+}>();
 const emit = defineEmits<{ close: [] }>();
 
 const dialog = useTemplateRef<HTMLDialogElement>("dialog");
@@ -35,6 +41,7 @@ function onClick(event: MouseEvent): void {
   <dialog
     ref="dialog"
     class="dialog"
+    :class="{ 'dialog--wide': wide }"
     :aria-labelledby="titleId"
     :aria-describedby="description ? descriptionId : undefined"
     @cancel.prevent="emit('close')"
@@ -61,10 +68,14 @@ function onClick(event: MouseEvent): void {
   max-height: calc(100vh - 4rem);
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   color: var(--color-text);
   background: var(--color-surface);
   box-shadow: var(--shadow-dialog);
+}
+
+.dialog--wide {
+  width: min(46rem, calc(100vw - 2rem));
 }
 
 .dialog::backdrop {
@@ -91,8 +102,8 @@ function onClick(event: MouseEvent): void {
 
 .dialog__title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 650;
+  font-size: var(--text-title);
+  font-weight: 600;
 }
 
 .dialog__description {

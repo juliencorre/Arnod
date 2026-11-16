@@ -1,187 +1,199 @@
 <script setup lang="ts">
 /**
- * Barre latérale. Au premier lancement (1a) : la marque et le workspace par
- * défaut créé automatiquement. Ensuite (2a) : le sélecteur de workspaces (2b),
- * les projets du workspace courant et « + Ajouter un projet » (W6).
+ * Barre latérale. Au premier lancement (1a) : « Aucun projet pour l'instant. ».
+ * Ensuite (2a) : « Projets · N », les projets du workspace ouvert (ou tous), chacun
+ * avec ses actions, son environnement et son arborescence (`SidebarProject`,
+ * docs/plan-barre-laterale-projet.md) ; « + Ajouter un projet » (W6), ou
+ * « + Ouvrir un projet » hors workspace ; un dossier introuvable est signalé (P10).
+ * Sur « Tous les projets » (2e, 2f), un rappel dit comment en sortir. Ctrl+N crée une
+ * requête, Ctrl+Maj+N un dossier et Ctrl+Maj+E ouvre les environnements du projet sélectionné
+ * (B6, M2 du lot D) ; Ctrl+F, quand la barre latérale a le focus, met le focus dans le filtre de
+ * son référentiel (F5).
  */
-import { computed, useId } from "vue";
+import { computed, onBeforeUnmount, onMounted, useId, useTemplateRef, watch } from "vue";
 
-import ColorDot from "@/components/ui/ColorDot.vue";
-import WorkspaceSwitcher from "@/components/workspaces/WorkspaceSwitcher.vue";
+import SidebarProject from "@/components/layout/SidebarProject.vue";
 import { useProjectActions } from "@/composables/useProjectActions";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
 import { useNavigationStore } from "@/stores/navigation";
+import { contentProject, useWindowsStore } from "@/stores/windows";
+import { useWorkbenchStore } from "@/stores/workbench";
 
 const catalog = useCatalogStore();
 const dialogs = useDialogStore();
 const navigation = useNavigationStore();
-const { openProject } = useProjectActions();
-const labelId = useId();
+const workbench = useWorkbenchStore();
+const windows = useWindowsStore();
+const { addExistingProject } = useProjectActions();
 const projectsLabelId = useId();
 
-const isFirstRun = computed(() => navigation.view.kind === "firstRun");
-const workspace = computed(() =>
-  navigation.currentWorkspaceId === null
-    ? null
-    : catalog.workspaceById(navigation.currentWorkspaceId),
+const workspaceId = computed(() => navigation.currentWorkspaceId);
+const projects = computed(() =>
+  workspaceId.value === null ? catalog.projects : catalog.projectsOf(workspaceId.value),
 );
-const projectCount = computed(() => workspace.value?.projectIds.length ?? 0);
-const projects = computed(() => (workspace.value ? catalog.projectsOf(workspace.value.id) : []));
 const openProjectId = computed(() =>
   navigation.view.kind === "project" ? navigation.view.projectId : null,
 );
+
+// Un projet replié montre son environnement : il est lu sans déplier le projet.
+watch(
+  () => projects.value.filter((p) => p.status !== "missing").map((p) => p.id),
+  (ids) => {
+    for (const id of ids) void workbench.peekEnvironments(id);
+  },
+  { immediate: true },
+);
+
+/**
+ * Sur « Tous les projets » de la fenêtre principale : on en sort en ouvrant un projet
+ * de la liste ou en choisissant un workspace (la barre détachée n'ouvre pas de projet).
+ */
+const showHint = computed(() => navigation.view.kind === "all" && windows.kind !== "sidebar");
+
+/** Hors workspace, ouvre un dossier projet existant ; sinon, ajoute au workspace (W6). */
+function add(): void {
+  if (workspaceId.value === null) void addExistingProject(null);
+  else dialogs.openAddProjects(workspaceId.value);
+}
+
+type ProjectBlock = InstanceType<typeof SidebarProject>;
+const blocks = new Map<string, ProjectBlock>();
+
+function register(projectId: string, block: unknown): void {
+  if (block) blocks.set(projectId, block as ProjectBlock);
+  else blocks.delete(projectId);
+}
+
+/** Projet sélectionné : celui de l'onglet actif, sinon le projet ouvert, sinon le premier déplié. */
+function selectedProject(): string | null {
+  const content = windows.activeTab?.content;
+  const candidates = [
+    content ? contentProject(content) : null,
+    openProjectId.value,
+    projects.value.find((p) => workbench.isExpanded(p.id))?.id,
+  ];
+  return candidates.find((id) => id !== undefined && id !== null && blocks.has(id)) ?? null;
+}
+
+const aside = useTemplateRef<HTMLElement>("aside");
+
+type Shortcut = "test" | "folder" | "env" | "filter";
+
+/** Raccourci voulu ; le code de la touche sert pour la disposition AZERTY. */
+function shortcutOf(event: KeyboardEvent): Shortcut | null {
+  const key = event.key.toLowerCase();
+  const is = (letter: string): boolean =>
+    key === letter || event.code === `Key${letter.toUpperCase()}`;
+  if (is("n")) return event.shiftKey ? "folder" : "test";
+  if (is("e") && event.shiftKey) return "env";
+  // Ctrl+F ne vaut que dans la barre latérale : ailleurs, il reste au navigateur ou à l'éditeur.
+  if (is("f") && !event.shiftKey && aside.value?.contains(document.activeElement)) return "filter";
+  return null;
+}
+
+function onKeydown(event: KeyboardEvent): void {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+  const wanted = shortcutOf(event);
+  if (wanted === null) return;
+  const projectId = selectedProject();
+  const block = projectId === null ? undefined : blocks.get(projectId);
+  if (!block) return;
+  event.preventDefault();
+  if (wanted === "test") void block.newTest();
+  else if (wanted === "folder") void block.newFolder();
+  else if (wanted === "filter") void block.focusFilter();
+  else void block.manageEnvironments();
+}
+
+onMounted(() => {
+  window.addEventListener("keydown", onKeydown);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeydown);
+});
 </script>
 
 <template>
-  <aside class="sidebar" aria-label="Barre latérale">
-    <template v-if="isFirstRun">
-      <div class="sidebar__brand">
-        <span class="sidebar__logo" aria-hidden="true" />
-        Arnod
-      </div>
-      <section v-if="workspace" class="sidebar__section" :aria-labelledby="labelId">
-        <h2 :id="labelId" class="sidebar__label">Workspace</h2>
-        <div class="sidebar__workspace">
-          <ColorDot :color="workspace.color" size="sm" />
-          <span class="sidebar__name">{{ workspace.name }}</span>
-          <span v-if="workspace.isDefault" class="sidebar__badge">par défaut</span>
-          <span class="sidebar__count">
-            <span class="visually-hidden">Projets : </span>{{ projectCount }}
-          </span>
-        </div>
-        <p class="sidebar__note">Créé automatiquement. Votre premier projet y sera rangé.</p>
-      </section>
-    </template>
-
-    <template v-else-if="workspace">
-      <WorkspaceSwitcher :workspace="workspace" />
-      <nav class="sidebar__section sidebar__section--scroll" :aria-labelledby="projectsLabelId">
-        <h2 :id="projectsLabelId" class="sidebar__label">Projets</h2>
-        <ul class="sidebar__projects">
-          <li v-for="project in projects" :key="project.id">
-            <button
-              type="button"
-              class="sidebar__project"
-              :class="{ 'sidebar__project--open': project.id === openProjectId }"
-              :aria-current="project.id === openProjectId ? 'page' : undefined"
-              @click="openProject(project.id, workspace.id)"
-            >
-              <span class="sidebar__initial" aria-hidden="true">{{
-                project.name.charAt(0).toUpperCase()
-              }}</span>
-              <span class="sidebar__project-name">{{ project.name }}</span>
-              <span
-                v-if="project.status === 'missing'"
-                class="sidebar__missing"
-                title="Dossier introuvable"
-              >
-                <span aria-hidden="true">!</span>
-                <span class="visually-hidden">(dossier introuvable)</span>
-              </span>
-            </button>
-          </li>
-        </ul>
-        <button type="button" class="sidebar__add" @click="dialogs.openAddProjects(workspace.id)">
-          + Ajouter un projet
-        </button>
-      </nav>
-    </template>
+  <aside ref="aside" class="sidebar" aria-label="Barre latérale">
+    <p v-if="catalog.isFirstRun" class="sidebar__empty">Aucun projet pour l'instant.</p>
+    <nav v-else class="sidebar__section" :aria-labelledby="projectsLabelId">
+      <h2 :id="projectsLabelId" class="sidebar__label">
+        Projets <span class="sidebar__count">· {{ projects.length }}</span>
+      </h2>
+      <ul class="sidebar__projects">
+        <SidebarProject
+          v-for="project in projects"
+          :key="project.id"
+          :ref="(block) => register(project.id, block)"
+          :project="project"
+          :workspace-id="workspaceId"
+          :current="project.id === openProjectId"
+        />
+      </ul>
+      <button type="button" class="sidebar__add" @click="add">
+        {{ workspaceId === null ? "+ Ouvrir un projet" : "+ Ajouter un projet" }}
+      </button>
+      <p v-if="showHint" class="sidebar__hint">
+        Ouvrez un projet ici, ou choisissez un workspace dans le sélecteur.
+      </p>
+    </nav>
+    <slot name="footer" />
   </aside>
 </template>
 
 <style scoped>
 /*
- * La barre latérale ne défile pas : le menu du sélecteur de workspace (2b),
- * plus large qu'elle, doit déborder sur la zone principale. Un `overflow-y`
- * ici le rognerait (l'axe horizontal passe alors aussi en `auto`) et le focus
- * de sa recherche ferait défiler la barre de côté. Seule la liste des projets
- * défile (`sidebar__section--scroll`).
+ * Grille des lignes de la barre latérale (plan de la barre latérale du projet, B1) : chaque
+ * ligne commence à --tree-pad ; une colonne de tête de --tree-lead (chevron et pastille d'un
+ * projet, chevron et dossier, méthode, « + ») ; le libellé commence --tree-gap plus loin ;
+ * chaque profondeur décale de --tree-indent, la largeur d'un chevron et de son espace.
  */
 .sidebar {
+  --tree-pad: 0.375rem;
+  --tree-indent: 1.25rem;
+  --tree-lead: 2.5rem;
+  --tree-gap: 0.5rem;
+
   box-sizing: border-box;
   display: flex;
   flex: none;
   flex-direction: column;
   gap: 1.25rem;
-  width: 260px;
-  padding: 1rem 0.75rem;
-  border-right: 1px solid var(--color-border);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 1rem 0.5rem 0.75rem;
   background: var(--color-sidebar);
-}
-
-.sidebar__brand {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0 0.375rem;
-  font-size: 0.9375rem;
-  font-weight: 700;
-}
-
-.sidebar__logo {
-  width: 1.375rem;
-  height: 1.375rem;
-  border-radius: 6px;
-  background: var(--color-accent);
 }
 
 .sidebar__section {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-.sidebar__section--scroll {
-  flex: 1;
   min-height: 0;
   overflow-y: auto;
 }
 
+.sidebar__empty {
+  margin: 0;
+  padding: 0 var(--tree-pad);
+  font-size: var(--text-body);
+  color: var(--color-muted);
+}
+
 .sidebar__label {
   margin: 0;
-  padding: 0 0.5rem;
-  font: 600 0.65625rem / 1.4 var(--font-mono);
+  padding: 0 var(--tree-pad);
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-muted);
 }
 
-.sidebar__workspace {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 0.8125rem;
-  background: var(--color-surface);
-}
-
-.sidebar__name {
-  font-weight: 600;
-}
-
-.sidebar__badge {
-  padding: 0.0625rem 0.375rem;
-  border-radius: 4px;
-  font-size: 0.65625rem;
-  color: var(--color-muted);
-  background: var(--color-chip);
-}
-
 .sidebar__count {
-  margin-left: auto;
-  font-size: 0.75rem;
-  color: var(--color-muted);
-}
-
-.sidebar__note {
-  margin: 0;
-  padding: 0 0.5rem;
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--color-muted);
+  font-weight: 400;
 }
 
 .sidebar__projects {
@@ -193,74 +205,30 @@ const openProjectId = computed(() =>
   list-style: none;
 }
 
-.sidebar__project {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.375rem 0.5rem;
-  border: none;
-  border-radius: 6px;
-  font: inherit;
-  font-size: 0.875rem;
-  text-align: left;
-  color: var(--color-text);
-  background: none;
-  cursor: pointer;
-}
-
-.sidebar__project:hover {
-  background: var(--color-surface);
-}
-
-.sidebar__project--open {
-  font-weight: 600;
-  background: var(--color-surface);
-}
-
-.sidebar__project:focus-visible,
-.sidebar__add:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: -2px;
-}
-
-.sidebar__initial {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 4px;
-  font: 600 0.6875rem var(--font-mono);
-  color: var(--color-muted);
-  background: var(--color-chip);
-}
-
-.sidebar__project-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sidebar__missing {
-  font-weight: 700;
-  color: var(--color-danger);
-}
-
 .sidebar__add {
   margin-top: 0.25rem;
-  padding: 0.5rem 0.625rem;
+  padding: 0.5rem calc(var(--tree-pad) - 1px);
   border: 1px dashed var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-body);
   font-weight: 600;
   text-align: left;
   color: var(--color-link);
   background: none;
   cursor: pointer;
+}
+
+.sidebar__hint {
+  margin: 0;
+  padding: 0 var(--tree-pad);
+  font-size: var(--text-body);
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+
+.sidebar__add:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
 }
 </style>

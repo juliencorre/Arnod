@@ -1,0 +1,719 @@
+/* Styles des composants d'Arnod, recopiés du code par scripts/design-system.mjs (ne pas modifier). */
+
+/* src/styles.css : tailles de texte, règles de base des contrôles natifs */
+:root {
+  --text-display: 1.5rem;
+  --text-title: 1.125rem;
+  --text-body-large: 0.9375rem;
+  --text-body: 0.8125rem;
+  --text-small: 0.75rem;
+  --text-caption: 0.6875rem;
+  accent-color: var(--color-accent);
+}
+/*
+ * Liste déroulante : le style des champs, flèche dessinée en CSS (la CSP interdit les images
+ * distantes). Un composant qui change son fond utilise `background-color`, pas `background`.
+ */
+select {
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0 1.75rem 0 0.625rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-muted) 50%),
+    linear-gradient(135deg, var(--color-muted) 50%, transparent 50%);
+  background-repeat: no-repeat;
+  background-position:
+    right 0.875rem center,
+    right 0.5625rem center;
+  background-size:
+    0.3125rem 0.3125rem,
+    0.3125rem 0.3125rem;
+  appearance: none;
+  cursor: pointer;
+}
+
+/*
+ * Case à cocher : la couleur d'accent et une coche foncée (7:1), comme l'interrupteur ; la case
+ * native du système tirait sur le bleu.
+ */
+input[type="checkbox"] {
+  display: inline-grid;
+  flex: none;
+  place-content: center;
+  box-sizing: border-box;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="checkbox"]:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+input[type="checkbox"]:checked::after {
+  width: 0.25rem;
+  height: 0.5rem;
+  margin-top: -0.125rem;
+  border: solid var(--color-accent-text);
+  border-width: 0 2px 2px 0;
+  content: "";
+  transform: rotate(45deg);
+}
+
+input[type="checkbox"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[type="checkbox"]:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -1px;
+}
+
+/* Texte réservé aux lecteurs d'écran. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * Variable inconnue d'un champ (directive v-variables, src/lib/variables.ts) : calque posé sur
+ * le champ, texte transparent, seul le soulignement ondulé se voit.
+ */
+.variable-marks {
+  position: absolute;
+  z-index: 1;
+  margin: 0;
+  overflow: hidden;
+  border-style: solid;
+  border-color: transparent;
+  color: transparent;
+  background: none;
+  pointer-events: none;
+}
+
+.variable-marks mark {
+  color: transparent;
+  background: none;
+  text-decoration: underline wavy var(--color-danger);
+  text-decoration-skip-ink: none;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.25em;
+}
+
+/* src/components/ui/BaseButton.vue */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-height: var(--control-md);
+  padding: 0 0.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.button--primary {
+  color: var(--color-accent-text);
+  background: var(--color-accent);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.button--secondary {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.button--secondary:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+}
+
+.button--danger {
+  color: var(--color-danger);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.button--danger:hover:not(:disabled) {
+  border-color: var(--color-danger);
+}
+
+.button--link {
+  min-height: 0;
+  padding: 0.25rem 0;
+  color: var(--color-link);
+  background: none;
+}
+
+.button--link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+/* src/components/ui/ToggleSwitch.vue */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  cursor: pointer;
+}
+
+.toggle--disabled {
+  cursor: not-allowed;
+}
+
+.toggle__switch {
+  position: relative;
+  flex: none;
+  width: 2.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-chip);
+  cursor: inherit;
+  transition: background-color 120ms ease;
+}
+
+.toggle__switch[aria-checked="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.toggle__switch:disabled {
+  opacity: 0.55;
+}
+
+/* Activé mais non modifiable (workspace déjà par défaut) : l'état reste lisible. */
+.toggle__switch[aria-checked="true"]:disabled {
+  opacity: 0.8;
+}
+
+.toggle__switch:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.toggle__thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--color-surface);
+  transition: transform 120ms ease;
+}
+
+.toggle__switch[aria-checked="true"] .toggle__thumb {
+  transform: translateX(1rem);
+}
+
+/* src/components/ui/SearchInput.vue */
+.search {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--control-md);
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.search::placeholder {
+  color: var(--color-subtle);
+}
+
+.search:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -1px;
+}
+
+/* src/components/ui/BaseMenu.vue */
+.menu {
+  display: inline-block;
+}
+
+/* Position fixe : `top` et `left` viennent de place(). */
+.menu__popover {
+  position: fixed;
+  z-index: 20;
+  width: max-content;
+  min-width: 15rem;
+  max-width: min(26rem, 90vw);
+  padding: 0.375rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+
+.menu__heading {
+  margin: 0.25rem 0.625rem 0.375rem;
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.menu__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menu__list--sub {
+  position: fixed;
+  z-index: 21;
+  width: max-content;
+  min-width: 13rem;
+  max-width: min(26rem, 90vw);
+  padding: 0.375rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+
+.menu__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: var(--control-sm);
+  box-sizing: border-box;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  cursor: pointer;
+  outline: none;
+}
+
+.menu__item--active {
+  background: var(--color-accent-soft);
+}
+
+.menu__item:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.menu__item[aria-disabled="true"] {
+  cursor: default;
+  color: var(--color-subtle);
+  background: none;
+}
+
+.menu__item--danger {
+  color: var(--color-danger);
+}
+
+.menu__check {
+  width: 1rem;
+  text-align: center;
+}
+
+.menu__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.menu__hint {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+.menu__shortcut,
+.menu__detail {
+  font: var(--text-small) var(--font-mono);
+  color: var(--color-muted);
+}
+
+.menu__detail {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu__badge {
+  flex: none;
+  min-width: 2.25rem;
+  font: 600 var(--text-caption) var(--font-mono);
+  color: var(--color-muted);
+}
+
+.menu__badge--get {
+  color: var(--color-success);
+}
+
+.menu__badge--post,
+.menu__badge--put,
+.menu__badge--patch {
+  color: var(--color-link);
+}
+
+.menu__badge--delete {
+  color: var(--color-danger);
+}
+
+.menu__swatch {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--radius-sm);
+}
+
+/* L'espace avant la mention fait partie du nom accessible (« Recette protégé »). */
+.menu__tag::before {
+  content: " ";
+}
+
+.menu__tag {
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-link);
+}
+
+.menu__arrow {
+  color: var(--color-muted);
+}
+
+.menu__separator {
+  height: 1px;
+  margin: 0.375rem 0.5rem;
+  background: var(--color-border);
+}
+
+/* src/components/ui/BaseDialog.vue */
+.dialog {
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 4rem);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-dialog);
+}
+
+.dialog--wide {
+  width: min(46rem, calc(100vw - 2rem));
+}
+
+.dialog::backdrop {
+  background: var(--backdrop);
+}
+
+/* Fenêtre basse : le titre et les boutons restent visibles, le corps défile. */
+.dialog__panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: calc(100vh - 4rem);
+  padding: 1.5rem;
+}
+
+/* Marge rendue par le retrait : les contours de focus ne sont pas rognés. */
+.dialog__body {
+  min-height: 0;
+  margin: -0.25rem;
+  padding: 0.25rem;
+  overflow-y: auto;
+}
+
+.dialog__title {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: 600;
+}
+
+.dialog__description {
+  margin: -0.5rem 0 0;
+  color: var(--color-muted);
+}
+
+.dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* src/components/ui/ToastHost.vue */
+.toast-host {
+  position: fixed;
+  z-index: 50;
+  right: 1rem;
+  bottom: 1.5rem;
+  left: 1rem;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  max-width: 48rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-lg);
+  color: var(--color-toast-text);
+  background: var(--color-toast-bg);
+  box-shadow: var(--shadow-popover);
+  pointer-events: auto;
+}
+
+.toast--error {
+  border-left: 4px solid var(--color-danger);
+}
+
+.toast__action {
+  flex: none;
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-toast-action);
+  background: none;
+  cursor: pointer;
+}
+
+.toast__action:hover {
+  text-decoration: underline;
+}
+
+.toast__action:focus-visible {
+  outline: 2px solid var(--color-toast-action);
+}
+
+/* src/components/ui/SectionHeading.vue */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--tree-gap, 0.5rem);
+  min-height: 1.875rem;
+  margin-top: 0.25rem;
+  padding: 0 var(--tree-pad, 0.375rem) 0
+    calc(var(--tree-pad, 0.375rem) + var(--tree-indent, 1.25rem));
+}
+
+/* L'icône occupe la colonne de la pastille du projet ; le nom s'aligne sur celui du projet. */
+.section-head__lead {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: calc(var(--tree-lead, 2.5rem) - var(--tree-indent, 1.25rem));
+  color: var(--color-muted);
+}
+
+.section-head__title {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-body);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.section-head__count {
+  flex: none;
+  font: 400 var(--text-caption) var(--font-mono);
+  color: var(--color-muted);
+}
+
+/* Section repliable : chevron, icône, nom et nombre forment un seul bouton. */
+.section-head__toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--tree-gap, 0.5rem);
+  min-width: 0;
+  min-height: 1.875rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+.section-head__toggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.section-head__chevron {
+  flex: none;
+  width: var(--tree-indent, 1.25rem);
+  margin-right: calc(0px - var(--tree-gap, 0.5rem));
+  font-size: var(--text-small);
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.section-head__actions {
+  display: flex;
+  flex: none;
+  margin-left: auto;
+}
+
+/* src/components/ui/SectionIcon.vue */
+.section-icon {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* src/components/ui/ColorDot.vue */
+.dot {
+  display: inline-block;
+  flex: none;
+  border-radius: var(--radius-sm);
+}
+
+.dot--sm {
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+.dot--md {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: var(--radius-sm);
+}
+
+/* src/components/workbench/StatusMark.vue */
+.status-mark {
+  flex: none;
+  width: 1rem;
+  font-size: var(--text-small);
+  font-weight: 700;
+  text-align: center;
+}
+
+.status-mark--ok {
+  color: var(--color-success);
+}
+
+.status-mark--ko {
+  color: var(--color-danger);
+}
+
+/* src/components/steps/NaturePill.vue */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  border: 1px solid var(--pill-border);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--pill-text);
+  background: var(--pill-bg);
+}
+
+.pill--sm {
+  height: 1.25rem;
+  padding: 0 0.5rem;
+  font-size: var(--text-caption);
+}
+
+.pill--md {
+  height: 1.5rem;
+  padding: 0 0.5625rem;
+  font-size: var(--text-small);
+}
+
+.pill--calls {
+  --pill-bg: var(--color-family-calls-bg);
+  --pill-border: var(--color-family-calls-border);
+  --pill-text: var(--color-family-calls-text);
+}
+
+.pill--data {
+  --pill-bg: var(--color-family-data-bg);
+  --pill-border: var(--color-family-data-border);
+  --pill-text: var(--color-family-data-text);
+}
+
+.pill--messages {
+  --pill-bg: var(--color-family-messages-bg);
+  --pill-border: var(--color-family-messages-border);
+  --pill-text: var(--color-family-messages-text);
+}
+
+.pill--jobs {
+  --pill-bg: var(--color-family-jobs-bg);
+  --pill-border: var(--color-family-jobs-border);
+  --pill-text: var(--color-family-jobs-text);
+}
+
+.pill--interface {
+  --pill-bg: var(--color-family-interface-bg);
+  --pill-border: var(--color-family-interface-border);
+  --pill-text: var(--color-family-interface-text);
+}
+
+.pill--code {
+  --pill-bg: var(--color-family-code-bg);
+  --pill-border: var(--color-family-code-border);
+  --pill-text: var(--color-family-code-text);
+}
+
+.pill--files {
+  --pill-bg: var(--color-family-files-bg);
+  --pill-border: var(--color-family-files-border);
+  --pill-text: var(--color-family-files-text);
+}
