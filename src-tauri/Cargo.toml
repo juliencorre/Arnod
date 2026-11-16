@@ -69,6 +69,14 @@ cookie = "0.18"
 tower-layer = "0.3"
 tower-service = "0.3"
 
+# Lot L - Mises à jour (docs/plan-mvp-l-mises-a-jour.md, décision Q1). Vérification de la
+# signature minisign et installation (NSIS passif, AppImage remplacée), appelées depuis Rust
+# seulement : ni paquet npm, ni permission WebView. Arnod télécharge par son propre client (proxy,
+# autorités internes) : ni zip ni proxy du système ; `rustls-tls` seulement parce que le plugin ne
+# compile pas sans client TLS (même rustls que reqwest 0.12, pas d'OpenSSL).
+# Épinglé en 2.14 : `Updater::restore_update` et `Update::verify` y sont apparus.
+tauri-plugin-updater = { version = "~2.14", default-features = false, features = ["rustls-tls"] }
+
 # Lot H : proxy du système lu dans le registre (`Internet Settings`), crate de Microsoft sans
 # autre dépendance que les liaisons Windows déjà tirées par Tauri.
 [target.'cfg(windows)'.dependencies]
@@ -76,6 +84,8 @@ windows-registry = "0.6"
 
 [dev-dependencies]
 tempfile = "3"
+# Lot L : application simulée (`tauri::test`) pour vérifier les signatures par le plugin.
+tauri = { version = "2", features = ["test"] }
 # Serveur HTTP simulé pour les tests des envois et des runs.
 wiremock = "0.6"
 

@@ -1,14 +1,16 @@
 <script setup lang="ts">
 /**
- * Préférences → Mises à jour (lot L allégé, écran 1.6-g) : version installée, version plus
- * récente trouvée et ses points, vérification au démarrage puis chaque jour, « Vérifier
- * maintenant », canal stable ou préversions. Arnod ne télécharge ni n'installe rien : « Voir la
- * version » ouvre la page de la release ; l'installeur se lance à la main, sans droits
- * administrateur. Tout s'enregistre seul.
+ * Préférences → Mises à jour (écran 1.6-g) : version installée, version plus récente trouvée et
+ * ses points, vérification au démarrage puis chaque jour, « Vérifier maintenant », canal stable
+ * ou préversions (lot L allégé). Lot L (`docs/plan-mvp-l-mises-a-jour.md`) : une version
+ * installable se télécharge (progression, « Annuler »), puis s'installe sur « Redémarrer
+ * maintenant » ou « Au prochain lancement » ; sinon « Voir la version » ouvre la page de la
+ * release. Tout s'enregistre seul.
  */
 import { computed, onMounted } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import { formatBytes } from "@/lib/format";
 import { useToastStore } from "@/stores/toasts";
 import { useUpdatesStore } from "@/stores/updates";
 import type { UpdateChannel } from "@/types/ipc";
@@ -18,6 +20,39 @@ const toasts = useToastStore();
 
 const view = computed(() => updates.view);
 const latest = computed(() => view.value?.latest ?? null);
+const install = computed(() => updates.install);
+
+/** « Arnod 0.10.0 est disponible (préversion) », puis « … est prête ». */
+const title = computed(() => {
+  const release = latest.value;
+  if (!release) return "";
+  if (install.value.state === "ready") return `Arnod ${install.value.version} est prête`;
+  return `Arnod ${release.version} est disponible${release.prerelease ? " (préversion)" : ""}`;
+});
+
+/** « 3,1 Mo sur 9,8 Mo », ou « 3,1 Mo » sans taille annoncée. */
+const progressText = computed(() => {
+  const state = install.value;
+  if (state.state !== "downloading") return "";
+  const received = formatBytes(state.received);
+  return state.total === null ? received : `${received} sur ${formatBytes(state.total)}`;
+});
+
+/** Annoncé aux lecteurs d'écran à chaque changement d'étape, pas à chaque pour cent. */
+const announcement = computed(() => {
+  const state = install.value;
+  const version = latest.value?.version ?? "";
+  switch (state.state) {
+    case "downloading":
+      return `Téléchargement d'Arnod ${version}…`;
+    case "ready":
+      return `Arnod ${state.version} est prête.`;
+    case "failed":
+      return state.message;
+    default:
+      return "";
+  }
+});
 
 onMounted(() => {
   updates.load().catch(toasts.showError);
@@ -59,6 +94,23 @@ function openRelease(): void {
   const url = latest.value?.url;
   if (url) updates.open(url).catch(toasts.showError);
 }
+
+/** L'échec reste affiché dans la carte (`install.state === "failed"`). */
+function download(): void {
+  updates.download().catch(() => undefined);
+}
+
+function cancel(): void {
+  updates.cancel().catch(toasts.showError);
+}
+
+function installNow(): void {
+  updates.installNow().catch(toasts.showError);
+}
+
+function installOnExit(): void {
+  updates.installOnExit().catch(toasts.showError);
+}
 </script>
 
 <template>
@@ -70,22 +122,71 @@ function openRelease(): void {
       </p>
     </div>
 
-    <div v-if="latest" class="updates__card" role="status">
+    <div v-if="latest" class="updates__card">
       <p class="updates__card-title">
         <span class="updates__dot" aria-hidden="true">●</span>
-        Arnod {{ latest.version }} est disponible{{ latest.prerelease ? " (préversion)" : "" }}
+        {{ title }}
       </p>
-      <p class="updates__card-text">
-        Publiée{{ latest.published ? ` le ${day(latest.published)}` : "" }}. Téléchargez
-        l'installeur depuis sa page : il s'installe dans votre profil, sans droits administrateur,
-        et Arnod rouvre vos projets, onglets et brouillons.
-      </p>
-      <ul v-if="latest.highlights.length > 0" class="updates__list">
-        <li v-for="item in latest.highlights" :key="item">{{ item }}</li>
-      </ul>
-      <div class="updates__actions">
-        <BaseButton variant="primary" @click="openRelease">Voir la version</BaseButton>
-      </div>
+      <p class="visually-hidden" aria-live="polite">{{ announcement }}</p>
+
+      <template v-if="install.state === 'downloading'">
+        <progress
+          class="updates__progress"
+          :value="install.received"
+          :max="install.total ?? undefined"
+          :aria-label="`Téléchargement d'Arnod ${latest.version}`"
+        ></progress>
+        <p class="updates__card-text">Téléchargement… {{ progressText }}</p>
+        <div class="updates__actions">
+          <BaseButton @click="cancel">Annuler</BaseButton>
+        </div>
+      </template>
+
+      <template v-else-if="install.state === 'ready'">
+        <p class="updates__card-text">
+          Téléchargée et vérifiée. Elle s'installe dans votre profil, sans droits administrateur, et
+          Arnod rouvre vos projets, onglets et brouillons.
+          <template v-if="install.onExit">Elle s'installera à la fermeture d'Arnod.</template>
+        </p>
+        <div class="updates__actions">
+          <BaseButton variant="primary" @click="installNow">Redémarrer maintenant</BaseButton>
+          <BaseButton v-if="!install.onExit" @click="installOnExit">
+            Au prochain lancement
+          </BaseButton>
+          <BaseButton variant="link" @click="openRelease">Notes de version</BaseButton>
+        </div>
+      </template>
+
+      <template v-else>
+        <p class="updates__card-text">
+          Publiée{{ latest.published ? ` le ${day(latest.published)}` : "" }}.
+          <template v-if="view?.installable">
+            Arnod la télécharge, vérifie sa signature et l'installe dans votre profil, sans droits
+            administrateur ; vos projets, onglets et brouillons sont rouverts.
+          </template>
+          <template v-else>
+            Téléchargez l'installeur depuis sa page : il s'installe dans votre profil, sans droits
+            administrateur, et Arnod rouvre vos projets, onglets et brouillons.
+          </template>
+        </p>
+        <ul v-if="latest.highlights.length > 0" class="updates__list">
+          <li v-for="item in latest.highlights" :key="item">{{ item }}</li>
+        </ul>
+        <p v-if="install.state === 'failed'" class="updates__error updates__error--card">
+          {{ install.message }}
+        </p>
+        <div class="updates__actions">
+          <template v-if="view?.installable">
+            <BaseButton variant="primary" @click="download">
+              {{ install.state === "failed" ? "Réessayer" : "Installer" }}
+            </BaseButton>
+            <BaseButton variant="link" @click="openRelease">
+              {{ install.state === "failed" ? "Voir la version" : "Notes de version" }}
+            </BaseButton>
+          </template>
+          <BaseButton v-else variant="primary" @click="openRelease">Voir la version</BaseButton>
+        </div>
+      </template>
     </div>
     <p v-else-if="view?.checked" class="updates__uptodate" role="status">
       ✓ Arnod est à jour sur le canal
@@ -102,7 +203,7 @@ function openRelease(): void {
           >
           <span class="updates__detail">
             Arnod lit seulement la liste des versions publiées ; rien ne se télécharge ni ne
-            s'installe sans vous.
+            s'installe sans votre accord.
           </span>
         </span>
       </label>
@@ -151,7 +252,8 @@ function openRelease(): void {
     </fieldset>
 
     <p class="updates__note">
-      La vérification passe par le proxy et les autorités de « Réseau et certificats ».
+      La vérification et le téléchargement passent par le proxy et les autorités de « Réseau et
+      certificats ».
     </p>
   </section>
 </template>
@@ -208,8 +310,32 @@ function openRelease(): void {
 
 .updates__actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 0.25rem;
+}
+
+.updates__progress {
+  width: 100%;
+  height: 0.5rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-border);
+  accent-color: var(--color-accent);
+  overflow: hidden;
+}
+
+.updates__progress::-webkit-progress-bar {
+  background-color: var(--color-border);
+}
+
+.updates__progress::-webkit-progress-value {
+  background-color: var(--color-accent);
+}
+
+.updates__progress::-moz-progress-bar {
+  background-color: var(--color-accent);
 }
 
 .updates__uptodate {
@@ -283,6 +409,11 @@ function openRelease(): void {
   margin: 0 0 0 1.6rem;
   font-size: var(--text-small);
   color: var(--color-danger);
+}
+
+.updates__error--card {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .updates__note {

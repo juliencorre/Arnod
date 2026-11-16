@@ -1545,3 +1545,63 @@ Object.assign(SCENARIOS, {
     },
   },
 } satisfies Record<string, Scenario>);
+
+// --- Lot L : mises à jour installées par Arnod (1.6-g) ------------------------------
+
+/** « boutique » avec Arnod 0.10.0 trouvée, installable. */
+function versionInstallable(): FakeCore {
+  const core = boutique();
+  core.updates.view.prefs.lastCheck = Date.now();
+  core.updates.view.checked = true;
+  core.updates.view.installable = true;
+  core.updates.installable = true;
+  core.updates.view.latest = {
+    version: "0.10.0",
+    prerelease: false,
+    highlights: [
+      "Valeurs dynamiques dans l'adresse, les en-têtes et le corps",
+      "Filtre de l'arborescence",
+      "4 corrections, dont les cookies d'un environnement protégé",
+    ],
+    url: "https://github.com/juliencorre/Arnod/releases/tag/v0.10.0",
+    published: "2026-11-14",
+  };
+  return core;
+}
+
+Object.assign(SCENARIOS, {
+  "1.6-g installer": {
+    description: "Mises à jour : version installable, « Installer » et « Notes de version »",
+    setup: versionInstallable,
+    play: async (g: Gestes) => {
+      await g.touche(",", { ctrlKey: true });
+      await g.cliquer(".preferences__section", "Mises à jour");
+      await g.attendre(150);
+    },
+  },
+  "1.6-g telechargement": {
+    description: "Mises à jour : téléchargement en cours, progression et « Annuler »",
+    setup: () => {
+      const core = versionInstallable();
+      core.updates.downloadOutcome = "pending";
+      return core;
+    },
+    play: async (g: Gestes) => {
+      await g.touche(",", { ctrlKey: true });
+      await g.cliquer(".preferences__section", "Mises à jour");
+      await g.cliquer(".updates__card button", "Installer");
+      await g.attendre(150);
+    },
+  },
+  "1.6-g prete": {
+    description:
+      "Mises à jour : version prête, « Redémarrer maintenant » ou « Au prochain lancement »",
+    setup: versionInstallable,
+    play: async (g: Gestes) => {
+      await g.touche(",", { ctrlKey: true });
+      await g.cliquer(".preferences__section", "Mises à jour");
+      await g.cliquer(".updates__card button", "Installer");
+      await g.attendre(150);
+    },
+  },
+} satisfies Record<string, Scenario>);

@@ -640,3 +640,103 @@ async fn k5_chronologie_dns_d_un_nom() {
     );
     assert!(response.timeline.connect_ms.is_some());
 }
+
+// ------------------------------------------------------------ téléchargements (lot L)
+
+async fn download(
+    net: &Network,
+    url: &str,
+    max_bytes: u64,
+    cancel: &Cancel,
+) -> (Result<Vec<u8>, CommandError>, Vec<(u64, Option<u64>)>) {
+    let mut seen = Vec::new();
+    let result = net
+        .download(url, max_bytes, Duration::from_secs(5), cancel, |r, t| {
+            seen.push((r, t));
+        })
+        .await;
+    (result, seen)
+}
+
+#[tokio::test]
+async fn l_telechargement_binaire_avec_progression_et_redirection() {
+    let server = MockServer::start().await;
+    let bytes: Vec<u8> = (0..=255u8).cycle().take(300_000).collect();
+    Mock::given(path("/latest/paquet"))
+        .respond_with(
+            ResponseTemplate::new(302)
+                .insert_header("Location", format!("{}/stockage/paquet", server.uri())),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(path("/stockage/paquet"))
+        .and(header("accept", "application/octet-stream"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(bytes.clone()))
+        .mount(&server)
+        .await;
+    let (result, seen) = download(
+        &network(),
+        &format!("{}/latest/paquet", server.uri()),
+        1_000_000,
+        &Cancel::new(),
+    )
+    .await;
+    assert_eq!(result.unwrap(), bytes);
+    assert_eq!(seen.last(), Some(&(300_000, Some(300_000))));
+}
+
+#[tokio::test]
+async fn l_telechargement_refuse_trop_gros_statut_ou_annule() {
+    let server = MockServer::start().await;
+    Mock::given(path("/gros"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![0u8; 2_000]))
+        .mount(&server)
+        .await;
+    Mock::given(path("/absent"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+    let net = network();
+
+    let (big, _) = download(
+        &net,
+        &format!("{}/gros", server.uri()),
+        1_000,
+        &Cancel::new(),
+    )
+    .await;
+    let big = big.unwrap_err();
+    assert_eq!(big.kind, CommandErrorKind::InvalidRequest);
+    assert!(big.message.contains("refusé"), "{}", big.message);
+
+    let (missing, _) = download(
+        &net,
+        &format!("{}/absent", server.uri()),
+        1_000,
+        &Cancel::new(),
+    )
+    .await;
+    let missing = missing.unwrap_err();
+    assert_eq!(missing.kind, CommandErrorKind::Network);
+    assert!(
+        missing.message.contains("réponse 404"),
+        "{}",
+        missing.message
+    );
+
+    let cancel = Cancel::new();
+    cancel.cancel();
+    let (cancelled, _) = download(&net, &format!("{}/gros", server.uri()), 10_000, &cancel).await;
+    assert_eq!(cancelled.unwrap_err().kind, CommandErrorKind::Cancelled);
+}
+
+#[tokio::test]
+async fn l_telechargement_par_le_proxy_du_poste() {
+    // R4 : un proxy injoignable fait échouer le téléchargement comme un envoi, expliqué.
+    let net = network();
+    with_manual_proxy(&net, "127.0.0.1:1");
+    let (result, _) = download(&net, "http://github.test/paquet", 1_000, &Cancel::new()).await;
+    let failure = result.unwrap_err().failure.unwrap();
+    assert_eq!(failure.cause, FailureCause::Proxy);
+    assert_eq!(failure.proxy.as_deref(), Some("http://127.0.0.1:1"));
+}

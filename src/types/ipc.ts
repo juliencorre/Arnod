@@ -157,7 +157,10 @@ export type CommandName =
   | "updates_open"
   | "tree_batch"
   | "tree_batch_undo"
-  | "run_selection";
+  | "run_selection"
+  | "updates_download"
+  | "updates_cancel"
+  | "updates_install";
 
 /**
  * Nature d'une erreur de commande.
@@ -1875,6 +1878,10 @@ export interface UpdatesView {
   latest: Release | null;
   /** Une vérification a eu lieu pendant la session. */
   checked: boolean;
+  /** Lot L : `latest` s'installe depuis Arnod ; sinon « Voir la version ». */
+  installable: boolean;
+  /** Lot L : installation de `latest`. */
+  install: InstallState;
 }
 
 // --- Lot K - Vocabulaire et finitions (4.2-c, 5.1-c) ------------------------------
@@ -1906,3 +1913,15 @@ export interface BatchResult {
   /** Jeton de « Annuler » (`tree_batch_undo`). */
   undoToken: string;
 }
+
+// --- Lot L - Mises à jour installées par Arnod (1.6-g) -----------------------------
+
+/** Installation de la version trouvée (`updates::InstallState`). */
+export type InstallState =
+  | { state: "idle" }
+  /** Octets reçus, taille annoncée. */
+  | { state: "downloading"; received: number; total: number | null }
+  /** Paquet téléchargé et vérifié ; `onExit` : il s'installera à la fermeture d'Arnod. */
+  | { state: "ready"; version: string; onExit: boolean }
+  /** Échec du téléchargement ou de l'installation, message prêt à afficher. */
+  | { state: "failed"; message: string };

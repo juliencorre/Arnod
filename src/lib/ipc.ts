@@ -771,6 +771,18 @@ export const ipc = {
     environment: string,
     confirmed: boolean,
   ): Promise<RunView> => call<RunView>("run_selection", { project, paths, environment, confirmed }),
+
+  // Lot L - Mises à jour installées par Arnod (1.6-g).
+  /** Télécharge et vérifie la version trouvée ; la progression arrive par `onUpdates`. */
+  updatesDownload: (): Promise<UpdatesView> => call<UpdatesView>("updates_download"),
+  /** Arrête le téléchargement et oublie le paquet téléchargé. */
+  updatesCancel: (): Promise<UpdatesView> => call<UpdatesView>("updates_cancel"),
+  /**
+   * Installe le paquet vérifié : `now`, Arnod se ferme et redémarre (la promesse ne se résout
+   * pas) ; sinon, à la fermeture d'Arnod.
+   */
+  updatesInstall: (now: boolean): Promise<UpdatesView> =>
+    call<UpdatesView>("updates_install", { now }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
@@ -789,6 +801,8 @@ export const EVENTS = {
   shortcut: "arnod://raccourci",
   // Lot I : fichiers modifiés hors d'Arnod.
   files: "arnod://fichiers",
+  // Lot L : version trouvée et installation.
+  updates: "arnod://mise-a-jour",
 } as const;
 
 /** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
@@ -855,6 +869,12 @@ export const events = {
   /** Fichiers d'un projet modifiés hors d'Arnod : renommés, supprimés… (lot I, R6). */
   onFiles: (handler: (change: FilesChange) => void): Promise<UnlistenFn> =>
     listen<FilesChange>(EVENTS.files, (event) => {
+      handler(event.payload);
+    }),
+
+  /** Lot L : version trouvée et installation, à chaque étape du téléchargement (R8). */
+  onUpdates: (handler: (view: UpdatesView) => void): Promise<UnlistenFn> =>
+    listen<UpdatesView>(EVENTS.updates, (event) => {
       handler(event.payload);
     }),
 };
