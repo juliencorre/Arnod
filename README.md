@@ -268,8 +268,25 @@ Les versions suivent [SemVer](https://semver.org/lang/fr/). `Develop` reçoit le
 3. **Poser le tag sur `main`** et le pousser :
    `git tag -a vX.Y.Z -m "Arnod X.Y.Z" && git push origin vX.Y.Z`.
 4. **La CI publie la release** : build, tests, contrôle tag = version, puis release GitHub avec
-   l'installeur Windows, l'AppImage et des notes générées à partir des pull requests. Ne pas
-   créer la release à la main ; si elle existe déjà, la CI y ajoute les paquets.
+   l'installeur Windows, l'AppImage, leurs signatures (`.sig`), le manifeste `latest.json` et des
+   notes générées à partir des pull requests. Un tag avec suffixe (`v0.2.0-beta.1`) publie une
+   préversion, proposée seulement sur le canal « Préversions ». Ne pas créer la release à la main ;
+   si elle existe déjà, la CI y ajoute les paquets.
+
+### Clé de signature des mises à jour
+
+Arnod installe ses nouvelles versions lui-même (Préférences → Mises à jour) et refuse tout paquet
+qui n'est pas signé par la clé du projet. À préparer une fois, avant la première release :
+
+1. Générer la paire de clés : `npm run tauri signer generate -- -w ~/.tauri/arnod.key` (un mot de
+   passe est demandé). Ce n'est pas un certificat : rien à acheter.
+2. Copier la **clé publique** (`~/.tauri/arnod.key.pub`) dans `plugins.updater.pubkey` de
+   `src-tauri/tauri.conf.json`, par une pull request. Elle n'a rien de secret ; seules les versions
+   qui l'embarquent savent installer les suivantes.
+3. Ajouter les secrets du dépôt `TAURI_SIGNING_PRIVATE_KEY` (contenu de `~/.tauri/arnod.key`) et
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Sans eux, la CI refuse de publier un tag.
+4. Garder la clé privée et son mot de passe aussi dans un gestionnaire de mots de passe : perdue,
+   plus aucun poste installé n'accepterait de mise à jour automatique (réinstallation à la main).
 
 ## Installation
 
