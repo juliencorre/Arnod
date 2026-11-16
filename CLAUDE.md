@@ -144,6 +144,7 @@ src-tauri/              Cœur Rust
   src/state.rs          AppState : catalogue + stockage + annulation (app.manage)
   src/menu.rs           Menu natif (Fichier > Quitter, Fenêtre > Dispositions, détacher, rattacher)
   src/commands/         Commandes, un fichier par domaine
+  tests/                Tests d'intégration (application Tauri simulée : mises à jour)
 docs/                   Plans, modèle de plan, maquettes, captures du README, schéma
                         OpenCollection 1.0.0 (docs/opencollection/), design system
                         (docs/design-system/)
@@ -232,6 +233,10 @@ Linux : installer d'abord les dépendances système
 - Hors périmètre actuel : SOAP (et donc WSDL), mocks, scripts, CLI, signature de code. Les
   requêtes HTTP sont livrées (premier usage), les contrats OpenAPI aussi ; les secrets vont dans le
   coffre du système, jamais dans le projet.
+- Un test Rust qui construit une application Tauri, même simulée (`tauri::test`), vit dans
+  `src-tauri/tests/` (test d'intégration) : sous Windows, seuls ces binaires de test reçoivent le
+  manifeste Common Controls v6 (`build.rs`, `tests-manifest.xml`) ; un test unitaire qui le fait
+  ne démarre pas (STATUS_ENTRYPOINT_NOT_FOUND).
 - Une tâche de fond lancée depuis une commande passe par `tauri::async_runtime::spawn` : une
   commande synchrone ne s'exécute pas dans un contexte tokio (`tokio::spawn` y panique).
 - Une annulation (envoi, run) passe par `http::Cancel`, qui la mémorise : un `Notify` seul ne
