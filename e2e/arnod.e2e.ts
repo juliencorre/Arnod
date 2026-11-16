@@ -3030,6 +3030,63 @@ describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
   });
 });
 
+describe("Sélection multiple (4.1-a quater)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const names = ["Sel A", "Sel B"];
+  const files = ["sel-a.yml", "sel-b.yml"];
+
+  beforeAll(() => {
+    names.forEach((name, i) => {
+      writeFileSync(
+        path.join(project(), files[i] ?? ""),
+        `info:\n  name: ${name}\n  type: http\nhttp:\n  method: GET\n  url: http://127.0.0.1:9/${String(i)}\n`,
+      );
+    });
+  });
+
+  it("Ctrl+clic choisit deux requêtes ; « Dupliquer » puis « Annuler » remet le projet", async () => {
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          (wanted) =>
+            wanted.every((n) =>
+              Array.from(document.querySelectorAll('aside [role="treeitem"]')).some((i) =>
+                i.textContent.includes(n),
+              ),
+            ),
+          names,
+        ),
+      { timeout: 10_000, timeoutMsg: "requêtes écrites sur disque attendues dans l'arborescence" },
+    );
+    await browser.execute((wanted) => {
+      for (const name of wanted) {
+        Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'))
+          .find((i) => i.textContent.includes(name))
+          ?.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: true }));
+      }
+    }, names);
+    await browser.$(".selection").waitForDisplayed({ timeout: 10_000 });
+    expect(
+      await browser.execute(
+        () => document.querySelector(".selection__count")?.textContent.trim() ?? "",
+      ),
+    ).toBe("2 sélectionnés");
+    await screenshot(browser, "35-selection-multiple");
+    await clickText(".selection button", "Dupliquer");
+    const copies = files.map((f) => path.join(project(), f.replace(".yml", "-copie.yml")));
+    await browser.waitUntil(() => copies.every((c) => existsSync(c)), {
+      timeout: 10_000,
+      timeoutMsg: "copies attendues",
+    });
+    await clickText(".toast button", "Annuler");
+    await browser.waitUntil(() => copies.every((c) => !existsSync(c)), {
+      timeout: 10_000,
+      timeoutMsg: "copies retirées attendues",
+    });
+    expect(files.every((f) => existsSync(path.join(project(), f)))).toBe(true);
+  });
+});
+
 describe("Lot G - Démarrage et erreurs (0.3)", () => {
   const statePath = () => path.join(sandbox.dataDir, "arnod.json");
 

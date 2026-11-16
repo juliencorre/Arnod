@@ -93,7 +93,9 @@ export type PendingConfirmation =
   | { kind: "send"; key: string }
   | { kind: "run"; projectId: string; folder: string }
   | { kind: "contractRun"; projectId: string; path: string }
-  | { kind: "retry"; projectId: string };
+  | { kind: "retry"; projectId: string }
+  /** Sélection multiple (4.1-a quater). */
+  | { kind: "selection"; projectId: string; paths: string[] };
 
 /** Lot I : résumé d'un lot de changements faits hors d'Arnod (« 4 requêtes modifiées, 1 ajoutée »). */
 export function filesSummary(change: FilesChange): string {
@@ -832,6 +834,25 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     }
   }
 
+  /** Sélection multiple (4.1-a quater) : exécute les éléments choisis et ouvre l'onglet du run. */
+  async function runSelection(
+    projectId: string,
+    paths: string[],
+    confirmed = false,
+  ): Promise<void> {
+    const environment = activeEnvironment(projectId);
+    if (environment === null) return;
+    await saveAll();
+    try {
+      follow(projectId, await ipc.runSelection(projectId, paths, environment, confirmed));
+      await windows.openSelection({ kind: "run", projectId });
+    } catch (caught) {
+      if (caught instanceof IpcError && caught.kind === "protectedEnvironment") {
+        pending.value = { kind: "selection", projectId, paths };
+      } else throw caught;
+    }
+  }
+
   async function cancelRun(projectId: string): Promise<void> {
     const current = runs.value[projectId];
     if (current && !current.finished) await ipc.runCancel(current.id);
@@ -857,6 +878,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     if (action.kind === "send") await send(action.key, true);
     else if (action.kind === "run") await runFolder(action.projectId, action.folder, true);
     else if (action.kind === "contractRun") await runContract(action.projectId, action.path, true);
+    else if (action.kind === "selection") await runSelection(action.projectId, action.paths, true);
     else await retryFailures(action.projectId, true);
   }
 
@@ -1247,5 +1269,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     reloadIn,
     // Lot K : secret en clair.
     holdSecret,
+    // Sélection multiple.
+    runSelection,
   };
 });

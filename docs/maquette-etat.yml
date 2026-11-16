@@ -654,7 +654,6 @@ pages:
       - "plan-mvp-e-tests-etapes (NT1, NT2)"
       - "plan-mvp-i-fichiers-externes (FE1–FE7)"
     liees: ["4.2", "3.1"]
-    reste: "sélection multiple (a quater)."
     journal:
       - "2026-11-09 : Arborescence livrée avec le premier usage."
       - "2026-11-11 : Devient le référentiel : les requêtes liées à un contrat sont rangées sous lui (PR #40)."
@@ -662,11 +661,22 @@ pages:
       - "2026-11-13 : « Nouveau test » crée le dossier et son étape 1, ouverte, curseur dans l'adresse ; « + Étape » ajoute la suivante (b, plan-mvp-e-tests-etapes, PR #51)."
       - "2026-11-13 : Fichiers modifiés hors d'Arnod : dossier surveillé, arborescence et onglets rechargés, brouillon en conflit réglé élément par élément (e, plan-mvp-i-fichiers-externes, PR #54)."
       - "2026-11-14 : Copier ou déplacer une requête vers un dossier, une place dans un test, une opération ou un autre projet, avec « Ce qui change » et « Annuler » ; Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Z et Ctrl+glisser dans la barre latérale (f, g, lot J, PR #62)."
+      - "2026-11-16 : Sélection multiple : Ctrl+clic, Maj+clic, barre Déplacer vers…, Dupliquer, Exécuter, Supprimer, avec « Annuler » (a quater, PR #66)."
     ecrans:
       a: { etat: livré, pr: [27, 40, 42], captures: [19-verification-en-echec] }
       "a bis": { etat: livré, pr: [27] }
       "a ter": { etat: livré, pr: [27] }
-      "a quater": { etat: à faire }
+      "a quater":
+        {
+          etat: livré,
+          pr: [66],
+          captures: [35-selection-multiple],
+          ecart:
+            {
+              texte: "La sélection se fait dans l'arborescence seulement : pas encore de vue en tableau d'un dossier avec cases à cocher ni « Tout sélectionner » ; la barre d'actions est la même.",
+              aligner: à décider,
+            },
+        }
       b:
         {
           etat: livré,

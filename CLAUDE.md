@@ -776,3 +776,16 @@ Référence : lot K, écrans 1.2-a ter, 4.2-c, 5.1-b bis et 5.1-c.
   `tower-service`) dans une variable locale à la tâche de l'envoi ; `http::Timeline` (DNS,
   connexion et TLS, attente du serveur, réception) va dans `HttpResponse.timeline`, onglet
   « Chronologie » (`TimelinePanel.vue`). Une connexion reprise du pool n'a ni DNS ni connexion.
+
+## Sélection multiple
+
+Référence : écran 4.1-a quater.
+
+- Le cœur applique l'action d'un coup (`tree/batch.rs`, `tree_batch`) : déplacer vers un dossier,
+  dupliquer (« (copie) » pour un dossier), mettre à la corbeille ; un élément sous un dossier choisi
+  n'est pris qu'une fois (`normalize`), un échec remet ce qui a été fait. « Annuler »
+  (`tree_batch_undo`) reprend `tree::undo::Undo` ; `run_selection` lance un run des requêtes
+  choisies et du contenu des dossiers choisis.
+- Interface : store `selection` (propre à la fenêtre, un seul projet), `TreeRow` (Ctrl+clic,
+  Maj+clic dans l'ordre affiché, Ctrl+Espace ou Maj+Espace au clavier), `SelectionBar.vue` (monté
+  par `SharedDialogs`, Échap vide la sélection).

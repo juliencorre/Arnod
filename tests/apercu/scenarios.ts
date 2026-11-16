@@ -19,7 +19,7 @@ import type { StartupProblem } from "@/types/ipc";
 /** Gestes dans la page, par sélecteur CSS et texte visible. */
 export interface Gestes {
   /** Clique le premier élément qui correspond (et contient `texte`, s'il est donné). */
-  cliquer: (selecteur: string, texte?: string) => Promise<void>;
+  cliquer: (selecteur: string, texte?: string, options?: MouseEventInit) => Promise<void>;
   /** Saisit une valeur dans un champ (événements `input` et `change`). */
   saisir: (selecteur: string, valeur: string) => Promise<void>;
   /** Envoie une touche au document ou à l'élément ciblé. */
@@ -814,6 +814,16 @@ Object.assign(SCENARIOS, {
       await g.cliquer(".startup-problem__toggle");
     },
   },
+  "4.1-a quater": {
+    description: "Sélection multiple : Ctrl+clic sur deux requêtes, barre d'actions en bas",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Lister les clients", { ctrlKey: true });
+      await g.cliquer('[role="treeitem"]', "Santé", { ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
 } satisfies Record<string, Scenario>);
 
 /** Lot F : référentiel « commandes/v2 », et un envoi de « Santé » en cours (◐). */
@@ -1040,6 +1050,16 @@ Object.assign(SCENARIOS, {
       await g.attendre(150);
     },
   },
+  "4.1-a quater": {
+    description: "Sélection multiple : Ctrl+clic sur deux requêtes, barre d'actions en bas",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Lister les clients", { ctrlKey: true });
+      await g.cliquer('[role="treeitem"]', "Santé", { ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
 } satisfies Record<string, Scenario>);
 // --- Lot I - Fichiers modifiés hors d'Arnod (docs/plan-mvp-i-fichiers-externes.md) ------------
 
@@ -1147,6 +1167,16 @@ Object.assign(SCENARIOS, {
       await g.attendre(200);
     },
   },
+  "4.1-a quater": {
+    description: "Sélection multiple : Ctrl+clic sur deux requêtes, barre d'actions en bas",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Lister les clients", { ctrlKey: true });
+      await g.cliquer('[role="treeitem"]', "Santé", { ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
 } satisfies Record<string, Scenario>);
 /** Lot G : erreur bloquante servie par le faux cœur au démarrage. */
 function erreurLotG(problem: StartupProblem): FakeCore {
@@ -1172,6 +1202,16 @@ Object.assign(SCENARIOS, {
         '{\n  "externalRef": "{{$randomUUID}}",\n  "customerId": "cus_31",\n  "customerEmail": "{{$randomEmail}}",\n  "deliveryDate": "{{$date:+3d}}",\n  "requestedAt": "{{$',
       );
       await g.attendre(200);
+    },
+  },
+  "4.1-a quater": {
+    description: "Sélection multiple : Ctrl+clic sur deux requêtes, barre d'actions en bas",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Lister les clients", { ctrlKey: true });
+      await g.cliquer('[role="treeitem"]', "Santé", { ctrlKey: true });
+      await g.attendre(100);
     },
   },
 } satisfies Record<string, Scenario>);
@@ -1209,6 +1249,16 @@ Object.assign(SCENARIOS, {
       await g.cliquer(".tag__add");
       await g.saisir(".tag__input", "no");
       await g.attendre(150);
+    },
+  },
+  "4.1-a quater": {
+    description: "Sélection multiple : Ctrl+clic sur deux requêtes, barre d'actions en bas",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Lister les clients", { ctrlKey: true });
+      await g.cliquer('[role="treeitem"]', "Santé", { ctrlKey: true });
+      await g.attendre(100);
     },
   },
 } satisfies Record<string, Scenario>);
@@ -1276,6 +1326,16 @@ Object.assign(SCENARIOS, {
       await g.attendre(100);
     },
   },
+  "4.1-a quater": {
+    description: "Sélection multiple : Ctrl+clic sur deux requêtes, barre d'actions en bas",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Lister les clients", { ctrlKey: true });
+      await g.cliquer('[role="treeitem"]', "Santé", { ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
 } satisfies Record<string, Scenario>);
 
 Object.assign(SCENARIOS, {
@@ -1287,6 +1347,16 @@ Object.assign(SCENARIOS, {
       await g.cliquer('button[aria-label="Actions pour le contrat api.boutique.dev"]');
       await g.cliquer('[role="menuitem"]', "Ranger dans un projet…");
       await g.attendre(150);
+    },
+  },
+  "4.1-a quater": {
+    description: "Sélection multiple : Ctrl+clic sur deux requêtes, barre d'actions en bas",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Lister les clients", { ctrlKey: true });
+      await g.cliquer('[role="treeitem"]', "Santé", { ctrlKey: true });
+      await g.attendre(100);
     },
   },
 } satisfies Record<string, Scenario>);
@@ -1362,6 +1432,16 @@ Object.assign(SCENARIOS, {
       await g.attendre(100);
     },
   },
+  "4.1-a quater": {
+    description: "Sélection multiple : Ctrl+clic sur deux requêtes, barre d'actions en bas",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Lister les clients", { ctrlKey: true });
+      await g.cliquer('[role="treeitem"]', "Santé", { ctrlKey: true });
+      await g.attendre(100);
+    },
+  },
 } satisfies Record<string, Scenario>);
 
 // --- Lot L allégé : mises à jour (1.6-g) -------------------------------------------
@@ -1390,6 +1470,16 @@ Object.assign(SCENARIOS, {
       await g.touche(",", { ctrlKey: true });
       await g.cliquer(".preferences__section", "Mises à jour");
       await g.attendre(150);
+    },
+  },
+  "4.1-a quater": {
+    description: "Sélection multiple : Ctrl+clic sur deux requêtes, barre d'actions en bas",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Lister les clients", { ctrlKey: true });
+      await g.cliquer('[role="treeitem"]', "Santé", { ctrlKey: true });
+      await g.attendre(100);
     },
   },
 } satisfies Record<string, Scenario>);
@@ -1441,6 +1531,16 @@ Object.assign(SCENARIOS, {
     play: async (g: Gestes) => {
       await ouvrirProjet(g);
       await g.cliquer('[aria-label="Ajouter au projet boutique-tests"]');
+      await g.attendre(100);
+    },
+  },
+  "4.1-a quater": {
+    description: "Sélection multiple : Ctrl+clic sur deux requêtes, barre d'actions en bas",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Lister les clients", { ctrlKey: true });
+      await g.cliquer('[role="treeitem"]', "Santé", { ctrlKey: true });
       await g.attendre(100);
     },
   },

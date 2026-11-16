@@ -7,6 +7,7 @@
 //! Les commandes sont des façades : la logique vit dans [`crate::catalog`] et
 //! [`crate::state`].
 
+pub mod batch;
 pub mod catalog;
 pub mod contracts;
 pub mod environments;
