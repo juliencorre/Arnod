@@ -315,7 +315,8 @@ async fn r6_delai_depasse_la_requete_a_pu_arriver() {
         .send(&mut p, None, &Cancel::new())
         .await
         .unwrap_err();
-    assert_eq!(error.kind, CommandErrorKind::Timeout);
+    // Le message et la cause complète disent ce qui a échoué si le délai n'est pas reconnu.
+    assert_eq!(error.kind, CommandErrorKind::Timeout, "{error:?}");
     let failure = error.failure.unwrap();
     assert_eq!(failure.cause, FailureCause::Timeout);
     assert!(!failure.not_sent);

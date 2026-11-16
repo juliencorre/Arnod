@@ -663,7 +663,8 @@ def main() -> None:
         done += 1
         for e in (page.get("ecrans") or {}).values():
             for capture in e.get("captures") or []:
-                if not re.fullmatch(r"[0-9a-z-]+", capture):
+                # Un repère d'écran peut nommer la capture (0.3-b-illisible) ; jamais « .. ».
+                if not re.fullmatch(r"[0-9a-z][0-9a-z.-]*", capture) or ".." in capture:
                     raise SystemExit(f"Nom de capture refusé : {capture}")
                 used.add(capture)
     (OUT / "reel").mkdir(exist_ok=True)
