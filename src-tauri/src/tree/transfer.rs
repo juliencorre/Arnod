@@ -408,8 +408,8 @@ fn follows(request: &Request) -> String {
     }
     match request.assertions.len() {
         0 => {}
-        1 => parts.push("1 vérification".to_owned()),
-        n => parts.push(format!("{n} vérifications")),
+        1 => parts.push("1 assertion".to_owned()),
+        n => parts.push(format!("{n} assertions")),
     }
     if !request.extractions.is_empty() {
         parts.push("extractions".to_owned());

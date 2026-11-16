@@ -185,7 +185,7 @@ const run = (): Promise<void> => guard(() => workbench.runFolder(props.projectId
             >→ {{ name }}</span
           >
           <span class="step__checks">{{
-            countLabel(step.assertionCount, "vérification", "vérifications")
+            countLabel(step.assertionCount, "assertion", "assertions")
           }}</span>
           <span
             v-if="mark(step)"

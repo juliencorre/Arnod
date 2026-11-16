@@ -76,18 +76,18 @@ describe("éditer et envoyer une requête", () => {
     expect(app.get(".response").text()).toContain("200 OK");
   });
 
-  it("propose des vérifications d'après la réponse", async () => {
+  it("propose des assertions d'après la réponse", async () => {
     ({ app } = await openProject());
     await click(app, '[role="treeitem"]', "Santé");
     await app.get(".editor__line").trigger("submit");
     await flushPromises();
-    await click(app, ".response__tab", "Vérifications");
-    await click(app, ".response button", "Proposer des vérifications");
-    await click(app, ".editor__tab", "Vérifications");
+    await click(app, ".response__tab", "Assertions");
+    await click(app, ".response button", "Proposer des assertions");
+    await click(app, ".editor__tab", "Assertions");
     expect(app.findAll(".assertion")).toHaveLength(2);
 
     // Une vérification déjà présente n'est pas proposée deux fois.
-    await click(app, ".response button", "Proposer des vérifications");
+    await click(app, ".response button", "Proposer des assertions");
     expect(app.findAll(".assertion")).toHaveLength(2);
   });
 
@@ -106,8 +106,8 @@ describe("éditer et envoyer une requête", () => {
     expect(app.get(".path-param__name").text()).toContain("id");
     await app.get('[aria-label="Valeur de id"]').setValue("ord_1042");
 
-    await click(app, ".editor__tab", "Vérifications");
-    await app.get('[aria-label="Activer la vérification 1"]').setValue(false);
+    await click(app, ".editor__tab", "Assertions");
+    await app.get(`[aria-label="Activer l'assertion 1"]`).setValue(false);
     expect(app.get(".assertion").classes()).toContain("assertion--off");
 
     await waitAutosave();
@@ -128,13 +128,13 @@ describe("éditer et envoyer une requête", () => {
   it("propose les opérateurs d'OpenCollection et masque la valeur inutile", async () => {
     ({ app } = await openProject());
     await click(app, '[role="treeitem"]', "Santé");
-    await click(app, ".editor__tab", "Vérifications");
-    const select = app.get('[aria-label="Opérateur de la vérification 1"]');
+    await click(app, ".editor__tab", "Assertions");
+    const select = app.get(`[aria-label="Opérateur de l'assertion 1"]`);
     expect(select.findAll("option")).toHaveLength(28);
     await select.setValue("isArray");
-    expect(app.find('[aria-label="Valeur de la vérification 1"]').exists()).toBe(false);
+    expect(app.find(`[aria-label="Valeur de l'assertion 1"]`).exists()).toBe(false);
     await select.setValue("between");
-    expect(app.find('[aria-label="Valeur de la vérification 1"]').exists()).toBe(true);
+    expect(app.find(`[aria-label="Valeur de l'assertion 1"]`).exists()).toBe(true);
   });
 
   it("signale ce que le fichier garde sans qu'Arnod le gère", async () => {

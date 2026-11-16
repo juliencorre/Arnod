@@ -163,14 +163,14 @@ describe("projet créé (1.2-d) et menu « + » (1.2-a ter)", () => {
       wrapper()
         .findAll("main .start__action")
         .map((b) => b.text()),
-    ).toEqual(["Importer…", "+ Contrat", "+ Requête", "+ Environnement"]);
+    ).toEqual(["Importer…", "+ Contrat", "+ Test", "+ Environnement"]);
 
     // Au clavier : Entrée sur l'en-tête déplie la section et montre sa ligne d'ajout.
     await toggles[1]?.trigger("click");
-    expect(wrapper().get(".tree__ghost").text()).toBe("+ Nouvelle requête");
+    expect(wrapper().get(".tree__ghost").text()).toBe("+ Nouveau test");
   });
 
-  it("les points de départ créent un contrat, une requête, un environnement", async () => {
+  it("les points de départ créent un contrat, un test, un environnement", async () => {
     const core = await emptyProject();
     await click(wrapper(), "main .start__action", "+ Contrat");
     expect(wrapper().get("dialog[open] h2").text()).toBe("Nouveau contrat");
@@ -180,9 +180,9 @@ describe("projet créé (1.2-d) et menu « + » (1.2-a ter)", () => {
     expect(wrapper().get("dialog[open]").text()).toContain("Environnements");
     await click(wrapper(), "dialog[open] button", "Fermer");
 
-    await click(wrapper(), "main .start__action", "+ Requête");
-    expect(core.calls.find((c) => c.cmd === "tree_create_request")?.args).toMatchObject({
-      folder: "",
+    await click(wrapper(), "main .start__action", "+ Test");
+    expect(core.calls.find((c) => c.cmd === "tree_create_test")?.args).toMatchObject({
+      parent: "",
     });
   });
 

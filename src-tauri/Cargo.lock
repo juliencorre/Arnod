@@ -87,6 +87,8 @@ dependencies = [
  "tauri-plugin-dialog",
  "tempfile",
  "tokio",
+ "tower-layer",
+ "tower-service",
  "trash",
  "uuid",
  "webpki-roots",

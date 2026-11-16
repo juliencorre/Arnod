@@ -59,7 +59,7 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
     expect(wrapper.findAll("main .start__card h3").map((h) => h.text())).toEqual([
       "Reprendre l'existant",
       "Décrire un contrat de service",
-      "Écrire une requête",
+      "Écrire un test",
       "Configurer un environnement",
     ]);
     const toast = wrapper.get(".toast");

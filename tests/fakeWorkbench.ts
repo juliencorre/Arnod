@@ -82,6 +82,14 @@ export function okOutcome(overrides: Partial<SendOutcome> = {}): SendOutcome {
       waitMs: 40,
       receiveMs: 5,
       totalMs: 45,
+      timeline: {
+        dnsMs: null,
+        connectMs: null,
+        secure: false,
+        serverMs: 40,
+        receiveMs: 5,
+        totalMs: 45,
+      },
     },
     assertions: [
       {

@@ -1303,7 +1303,7 @@ impl Workbench {
         path: &str,
         check: &str,
     ) -> Result<RunView, CommandError> {
-        let missing = || not_found("Cette vérification n'est plus dans le run.");
+        let missing = || not_found("Cette assertion n'est plus dans le run.");
         let apply = |view: &mut RunView| -> Result<Option<bool>, CommandError> {
             let item = view
                 .items

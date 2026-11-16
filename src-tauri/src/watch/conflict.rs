@@ -67,7 +67,7 @@ const FIELDS: [(&str, &str); 11] = [
 const LISTS: [(&str, &str); 4] = [
     ("params", "Paramètre"),
     ("headers", "En-tête"),
-    ("assertions", "Vérification"),
+    ("assertions", "Assertion"),
     ("extractions", "Extraction"),
 ];
 

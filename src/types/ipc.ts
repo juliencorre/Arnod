@@ -576,6 +576,22 @@ export interface HttpResponse {
   waitMs: number;
   receiveMs: number;
   totalMs: number;
+  /** Lot K (5.1-c) : où le temps est passé. */
+  timeline: Timeline;
+}
+
+/** Chronologie d'un envoi (`http::Timeline`, 5.1-c), en ms. */
+export interface Timeline {
+  /** Résolution DNS ; `null` sans résolution (connexion réutilisée, adresse IP). */
+  dnsMs: number | null;
+  /** Connexion après le DNS (TCP, puis TLS) ; `null` si une connexion du pool a servi. */
+  connectMs: number | null;
+  /** Connexion chiffrée (HTTPS). */
+  secure: boolean;
+  /** Envoi et attente du premier octet, connexion déduite. */
+  serverMs: number;
+  receiveMs: number;
+  totalMs: number;
 }
 
 /** Résultat d'un envoi. */
@@ -1204,6 +1220,8 @@ export interface RequestInput {
   /** Variables utilisées et inconnues, valeurs dynamiques `$…` exclues (R2). */
   unknown: UnknownVariable[];
   added: AddedHeader[];
+  /** Lot K (4.2-c) : secrets saisis en clair dans l'authentification. */
+  secrets: ClearSecret[];
 }
 
 /** Réponse de `request_curl` : la requête en commande cURL (R8 à R10). */
@@ -1854,4 +1872,16 @@ export interface UpdatesView {
   latest: Release | null;
   /** Une vérification a eu lieu pendant la session. */
   checked: boolean;
+}
+
+// --- Lot K - Vocabulaire et finitions (4.2-c, 5.1-c) ------------------------------
+
+/** Secret saisi en clair dans l'authentification (`input::secret::ClearSecret`, 4.2-c). */
+export interface ClearSecret {
+  /** Champ de `Auth` : `token`, `password`, `value` ou `oauth2.clientSecret`. */
+  field: string;
+  /** « jeton », « mot de passe », « clé d'API », « secret client ». */
+  label: string;
+  /** Nom proposé pour la variable locale, libre parmi les variables connues. */
+  suggested: string;
 }

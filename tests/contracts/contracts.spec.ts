@@ -189,7 +189,7 @@ describe("onglet du contrat (C5, C6, C10)", () => {
     expect(chip?.text()).toBe("Petstore · GET /pets");
 
     // La conformité est déduite du lien : aucune vérification écrite pour elle (R8).
-    await click(app as AppWrapper, ".editor__tab", "Vérifications");
+    await click(app as AppWrapper, ".editor__tab", "Assertions");
     const selects = app?.findAll(".assertion select") ?? [];
     expect(selects.map((s) => (s.element as HTMLSelectElement).value)).toEqual([
       "lessThan",

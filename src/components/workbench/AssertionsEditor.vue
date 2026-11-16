@@ -120,7 +120,7 @@ function resultFor(id: string): boolean | null {
 <template>
   <div class="stack">
     <p v-if="assertions.length === 0 && !linked" class="hint">
-      Sans vérification, la requête réussit si le statut est inférieur à 400.
+      Sans assertion, la requête réussit si le statut est inférieur à 400.
     </p>
     <p
       v-if="linked"
@@ -148,17 +148,17 @@ function resultFor(id: string): boolean | null {
           v-model="assertion.enabled"
           type="checkbox"
           class="assertion__check"
-          :aria-label="`Activer la vérification ${index + 1}`"
+          :aria-label="`Activer l'assertion ${index + 1}`"
         />
         <input
           v-model="assertion.target"
           type="text"
           spellcheck="false"
-          :aria-label="`Cible de la vérification ${index + 1}`"
+          :aria-label="`Cible de l'assertion ${index + 1}`"
         />
         <select
           :value="assertion.operator"
-          :aria-label="`Opérateur de la vérification ${index + 1}`"
+          :aria-label="`Opérateur de l'assertion ${index + 1}`"
           @change="
             setOperator(index, ($event.target as HTMLSelectElement).value as AssertionOperator)
           "
@@ -169,7 +169,7 @@ function resultFor(id: string): boolean | null {
           v-if="!NO_VALUE.includes(assertion.operator)"
           :value="scalarText(assertion.value)"
           type="text"
-          :aria-label="`Valeur de la vérification ${index + 1}`"
+          :aria-label="`Valeur de l'assertion ${index + 1}`"
           @input="setValue(index, ($event.target as HTMLInputElement).value)"
         />
         <span v-else />
@@ -177,14 +177,14 @@ function resultFor(id: string): boolean | null {
         <button
           type="button"
           class="assertion__remove"
-          :aria-label="`Supprimer la vérification ${index + 1}`"
+          :aria-label="`Supprimer l'assertion ${index + 1}`"
           @click="remove(index)"
         >
           ✕
         </button>
       </li>
     </ul>
-    <button type="button" class="link" @click="add">+ Ajouter une vérification</button>
+    <button type="button" class="link" @click="add">+ Assertion</button>
   </div>
 </template>
 

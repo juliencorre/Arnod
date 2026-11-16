@@ -37,20 +37,23 @@ describe("barre latérale du projet", () => {
     );
   });
 
-  it("le menu « + » se parcourt au clavier et crée une requête (B3)", async () => {
+  it("le menu « + » se parcourt au clavier et crée une requête libre (B3, 1.2-a ter)", async () => {
     let core;
     ({ app, core } = await openProject());
     await app.get(ADD).trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
     expect(menuTexts(app)).toEqual([
-      "Nouvelle requêteCtrl+N",
+      "Nouveau testCtrl+N",
+      "Requête libre",
       "Nouveau dossierCtrl+Maj+N",
       "Ajouter un contrat▸",
       "Nouvel environnement…",
     ]);
     const first = app.findAll('[role="menuitem"]')[0];
     expect(document.activeElement).toBe(first?.element);
-    await first?.trigger("keydown", { key: "Enter" });
+    await first?.trigger("keydown", { key: "ArrowDown" });
+    await flushPromises();
+    await app.findAll('[role="menuitem"]')[1]?.trigger("keydown", { key: "Enter" });
     await flushPromises();
     await app.get("dialog[open] input").setValue("Supprimer");
     await app.get("dialog[open] form").trigger("submit");
@@ -78,8 +81,9 @@ describe("barre latérale du projet", () => {
     expect(app.get("dialog[open] h2").text()).toBe("Coller un contrat");
   });
 
-  it("un projet vide propose « Nouvelle requête » à la place d'un texte d'aide (B4)", async () => {
-    ({ app } = await openProject((core) => {
+  it("un projet vide propose « Nouveau test » à la place d'un texte d'aide (B4, 1.2-a ter)", async () => {
+    let core;
+    ({ app, core } = await openProject((core) => {
       core.workbench.folders.clear();
       core.workbench.requests.clear();
     }));
@@ -87,22 +91,23 @@ describe("barre latérale du projet", () => {
     expect(app.find(".tree__ghost").exists()).toBe(false);
     await click(app, ".tree .section-head__toggle");
     const ghost = app.get(".tree__ghost");
-    expect(ghost.text()).toBe("+ Nouvelle requête");
+    expect(ghost.text()).toBe("+ Nouveau test");
     expect(app.get('[aria-label^="Exécuter"]').attributes("aria-label")).toBe(
       "Exécuter 0 requête sur Local",
     );
     await ghost.trigger("click");
     await flushPromises();
-    expect(app.get("dialog[open] h2").text()).toBe("Nouvelle requête");
+    expect(core.calls.some((c) => c.cmd === "tree_create_test")).toBe(true);
   });
 
-  it("Ctrl+N crée une requête et Ctrl+Maj+E ouvre les environnements du projet (B6)", async () => {
-    ({ app } = await openProject());
+  it("Ctrl+N crée un test et Ctrl+Maj+E ouvre les environnements du projet (B6, 1.2-a ter)", async () => {
+    let core;
+    ({ app, core } = await openProject());
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "n", ctrlKey: true }));
     await flushPromises();
-    expect(app.get("dialog[open] h2").text()).toBe("Nouvelle requête");
-    await app.get("dialog[open] form").trigger("reset");
-    await click(app, "dialog[open] button", "Annuler");
+    expect(core.calls.find((c) => c.cmd === "tree_create_test")?.args).toMatchObject({
+      parent: "",
+    });
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "E", ctrlKey: true, shiftKey: true }));
     await flushPromises();
@@ -166,13 +171,15 @@ describe("sections d'un projet", () => {
     await add.trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
     expect(menuTexts(app)).toEqual([
-      "Nouvelle requêteCtrl+N",
+      "Nouveau testCtrl+N",
+      "Requête libre",
       "Nouveau dossierCtrl+Maj+N",
-      "Nouveau test",
     ]);
     await app.findAll('[role="menuitem"]')[0]?.trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
-    await app.findAll('[role="menuitem"]')[1]?.trigger("keydown", { key: "Enter" });
+    await app.findAll('[role="menuitem"]')[1]?.trigger("keydown", { key: "ArrowDown" });
+    await flushPromises();
+    await app.findAll('[role="menuitem"]')[2]?.trigger("keydown", { key: "Enter" });
     await flushPromises();
     expect(app.get("dialog[open] h2").text()).toBe("Nouveau dossier");
     await app.get("dialog[open] input").setValue("Paiements");

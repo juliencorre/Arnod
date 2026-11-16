@@ -130,7 +130,7 @@ impl ResultBook {
         let missing = || {
             CommandError::new(
                 CommandErrorKind::NotFound,
-                "Cette vérification n'est plus dans le dernier résultat : renvoyez la requête.",
+                "Cette assertion n'est plus dans le dernier résultat : renvoyez la requête.",
             )
         };
         let entry = self
@@ -211,6 +211,7 @@ mod tests {
                 wait_ms: 1,
                 receive_ms: 1,
                 total_ms: 2,
+                timeline: Default::default(),
             },
             assertions: Vec::new(),
             passed: true,

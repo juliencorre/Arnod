@@ -42,7 +42,7 @@ function elementsLotI(request: RequestDoc): Elements {
         ? ""
         : ` ${String(assertion.value)}`;
     out.set(`assertions:${assertion.target}#0`, {
-      label: `Vérification ${assertion.target}`,
+      label: `Assertion ${assertion.target}`,
       value: `${assertion.operator === "equals" ? "égal à" : assertion.operator}${value}`,
     });
   }

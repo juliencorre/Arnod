@@ -347,6 +347,14 @@ function commandesLotE(): FakeCore {
       waitMs: 40,
       receiveMs: 2,
       totalMs: 42,
+      timeline: {
+        dnsMs: null,
+        connectMs: null,
+        secure: false,
+        serverMs: 40,
+        receiveMs: 2,
+        totalMs: 42,
+      },
     },
     sent: {
       method: "POST",
@@ -458,6 +466,14 @@ export const SCENARIOS: Record<string, Scenario> = {
           waitMs: 112,
           receiveMs: 6,
           totalMs: 118,
+          timeline: {
+            dnsMs: null,
+            connectMs: null,
+            secure: false,
+            serverMs: 112,
+            receiveMs: 6,
+            totalMs: 118,
+          },
         },
       });
       return core;
@@ -654,6 +670,14 @@ function commande(body: string, type: string, status = 201, statusText = "Create
       waitMs: 38,
       receiveMs: 4,
       totalMs: 42,
+      timeline: {
+        dnsMs: null,
+        connectMs: null,
+        secure: false,
+        serverMs: 38,
+        receiveMs: 4,
+        totalMs: 42,
+      },
     },
   });
   return core;
@@ -995,6 +1019,14 @@ Object.assign(SCENARIOS, {
           waitMs: 40,
           receiveMs: 2,
           totalMs: 42,
+          timeline: {
+            dnsMs: null,
+            connectMs: null,
+            secure: false,
+            serverMs: 40,
+            receiveMs: 2,
+            totalMs: 42,
+          },
         },
       });
       return core;
@@ -1358,6 +1390,58 @@ Object.assign(SCENARIOS, {
       await g.touche(",", { ctrlKey: true });
       await g.cliquer(".preferences__section", "Mises à jour");
       await g.attendre(150);
+    },
+  },
+} satisfies Record<string, Scenario>);
+
+// --- Lot K : vocabulaire et finitions (4.2-c, 5.1-c, 1.2-a ter) -------------------------
+
+/** « Créer une commande » envoyée sur une nouvelle connexion HTTPS. */
+function chronologie(): FakeCore {
+  const core = commande('{"id":"ord_8F2kQ","status":"pending"}', "application/json");
+  const sent = core.workbench.nextSend;
+  if ("response" in sent) {
+    sent.response.timeline = {
+      dnsMs: 2,
+      connectMs: 23,
+      secure: true,
+      serverMs: 16,
+      receiveMs: 1,
+      totalMs: 42,
+    };
+  }
+  return core;
+}
+
+Object.assign(SCENARIOS, {
+  "5.1-c": {
+    description: "Onglet Chronologie : DNS, connexion et TLS, attente du serveur, réception",
+    setup: chronologie,
+    play: async (g: Gestes) => {
+      await envoyerCommande(g);
+      await g.cliquer('[role="tab"]', "Chronologie");
+      await g.attendre(100);
+    },
+  },
+  "4.2-c": {
+    description: "Jeton saisi en clair dans Auth : proposé en variable locale",
+    setup: () => commande("{}", "application/json"),
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[role="treeitem"]', "Créer une commande");
+      await g.cliquer(".editor__tab", "Auth");
+      await g.saisir(".auth select", "bearer");
+      await g.saisir('.auth input[type="text"]', "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOi");
+      await g.attendre(400);
+    },
+  },
+  "1.2-a ter": {
+    description: "Menu « + » du projet : Nouveau test (Ctrl+N), Requête libre, Nouveau dossier",
+    setup: boutique,
+    play: async (g: Gestes) => {
+      await ouvrirProjet(g);
+      await g.cliquer('[aria-label="Ajouter au projet boutique-tests"]');
+      await g.attendre(100);
     },
   },
 } satisfies Record<string, Scenario>);

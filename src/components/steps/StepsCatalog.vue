@@ -117,7 +117,7 @@ onMounted(() => {
           <li v-for="(rule, index) in selected.detect" :key="index">{{ ruleLabel(rule) }}</li>
         </ul>
         <p class="detail__note">
-          Le bouton de l'essai devient « {{ selected.action }} ». Les vérifications sans code sont
+          Le bouton de l'essai devient « {{ selected.action }} ». Les assertions sans code sont
           proposées d'après le résultat reçu.
         </p>
       </aside>

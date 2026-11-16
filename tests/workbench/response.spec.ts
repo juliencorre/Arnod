@@ -38,6 +38,14 @@ function respond(core: FakeCore, body: string, type: string, truncated = false):
       waitMs: 30,
       receiveMs: 2,
       totalMs: 32,
+      timeline: {
+        dnsMs: null,
+        connectMs: null,
+        secure: false,
+        serverMs: 30,
+        receiveMs: 2,
+        totalMs: 32,
+      },
     },
   });
 }
@@ -133,14 +141,14 @@ describe("corps de la réponse (5.1-b bis)", () => {
     expect(app.get(".filter [role='alert']").text()).toContain("Crochet « [ » non fermé");
   });
 
-  it("un résultat devient une vérification de la requête (R6)", async () => {
+  it("un résultat devient une assertion de la requête (R6)", async () => {
     let core;
     ({ app, core } = await sent());
     await filter("$.items[*].sku");
     await app.get(".filter__input").trigger("keydown", { key: "Enter" });
     expect(app.get(".filter__hint").text()).toContain('body.items[1].sku égal à "MUG-NOIR"');
-    await click(app, ".filter__actions button", "+ Vérification");
-    expect(app.get(".toast").text()).toContain("Vérification ajoutée");
+    await click(app, ".filter__actions button", "+ Assertion");
+    expect(app.get(".toast").text()).toContain("Assertion ajoutée");
 
     await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_MS + 50));
     await flushPromises();
@@ -153,7 +161,7 @@ describe("corps de la réponse (5.1-b bis)", () => {
 
     // Une deuxième fois : déjà présente, rien n'est ajouté.
     const count = saved?.assertions.length;
-    await click(app, ".filter__actions button", "+ Vérification");
+    await click(app, ".filter__actions button", "+ Assertion");
     await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_MS + 50));
     await flushPromises();
     expect(core.workbench.requests.get("Clients/creer.yml")?.assertions.length).toBe(count);

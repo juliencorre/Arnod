@@ -89,9 +89,11 @@ pub fn request_input(
     }
     Ok(RequestInput {
         environment: active.name.clone(),
+        added: input::added_headers(&request, &values),
+        // Lot K (4.2-c) : le nom proposé ne reprend aucune variable connue.
+        secrets: input::secret::clear_secrets(&request, &known),
         known,
         unknown,
-        added: input::added_headers(&request, &values),
     })
 }
 

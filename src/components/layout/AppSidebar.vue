@@ -78,14 +78,14 @@ function selectedProject(): string | null {
 
 const aside = useTemplateRef<HTMLElement>("aside");
 
-type Shortcut = "request" | "folder" | "env" | "filter";
+type Shortcut = "test" | "folder" | "env" | "filter";
 
 /** Raccourci voulu ; le code de la touche sert pour la disposition AZERTY. */
 function shortcutOf(event: KeyboardEvent): Shortcut | null {
   const key = event.key.toLowerCase();
   const is = (letter: string): boolean =>
     key === letter || event.code === `Key${letter.toUpperCase()}`;
-  if (is("n")) return event.shiftKey ? "folder" : "request";
+  if (is("n")) return event.shiftKey ? "folder" : "test";
   if (is("e") && event.shiftKey) return "env";
   // Ctrl+F ne vaut que dans la barre latérale : ailleurs, il reste au navigateur ou à l'éditeur.
   if (is("f") && !event.shiftKey && aside.value?.contains(document.activeElement)) return "filter";
@@ -100,7 +100,7 @@ function onKeydown(event: KeyboardEvent): void {
   const block = projectId === null ? undefined : blocks.get(projectId);
   if (!block) return;
   event.preventDefault();
-  if (wanted === "request") void block.newRequest();
+  if (wanted === "test") void block.newTest();
   else if (wanted === "folder") void block.newFolder();
   else if (wanted === "filter") void block.focusFilter();
   else void block.manageEnvironments();

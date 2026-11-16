@@ -112,7 +112,7 @@ async function submit(): Promise<void> {
         <div class="transfer__summary">
           <p>
             Repris tels quels : la requête et ses
-            <strong>{{ checked }} vérification{{ checked > 1 ? "s" : "" }}</strong>
+            <strong>{{ checked }} assertion{{ checked > 1 ? "s" : "" }}</strong>
             deviennent la première étape du test.
           </p>
           <p>

@@ -623,15 +623,18 @@ describe("Fenêtres et zones", () => {
     await browser.$("aside nav").$("button*=boutique-tests").click();
     await waitForHeading(browser, "boutique-tests");
 
-    await browser.$("main").$("button=+ Requête").click();
+    // « + » de la ligne du projet, puis « Requête libre » (barre latérale du projet, B3, 1.2-a ter).
+    const freeRequest = async (name: string): Promise<void> => {
+      await browser.$('aside button[aria-label="Ajouter au projet boutique-tests"]').click();
+      await browser.$('[role="menuitem"]*=Requête libre').click();
+      const dialog = browser.$("dialog[open]");
+      await dialog.waitForDisplayed();
+      await dialog.$("input").setValue(name);
+      await browser.keys("Enter");
+    };
+    await freeRequest("Nouvelle requête");
     await waitForZoneTabs([["Nouvelle requête"]]);
-    // « + » de la ligne du projet, puis « Nouvelle requête » (barre latérale du projet, B3).
-    await browser.$('aside button[aria-label="Ajouter au projet boutique-tests"]').click();
-    await browser.$('[role="menuitem"]*=Nouvelle requête').click();
-    const dialog = browser.$("dialog[open]");
-    await dialog.waitForDisplayed();
-    await dialog.$("input").setValue("lister");
-    await browser.keys("Enter");
+    await freeRequest("lister");
     await waitForZoneTabs([["Nouvelle requête", "lister"]]);
 
     await browser.$('button[aria-label="Diviser à droite"]').click();
@@ -953,18 +956,18 @@ describe("Contrats de services", () => {
         if (!editor) throw new Error("éditeur de la requête liée introuvable");
         const buttons = Array.from(editor.querySelectorAll<HTMLButtonElement>("button"));
         if (step === "verifications")
-          buttons.find((b) => b.textContent.includes("Vérifications"))?.click();
+          buttons.find((b) => b.textContent.includes("Assertions"))?.click();
         if (step === "send") buttons.find((b) => b.textContent.trim() === "Envoyer")?.click();
         const contract = editor.querySelector(".assertion--contract");
         return {
           contract: contract?.className ?? null,
-          operators: editor.querySelectorAll('[aria-label="Opérateur de la vérification 1"] option')
+          operators: editor.querySelectorAll(`[aria-label="Opérateur de l'assertion 1"] option`)
             .length,
         };
       }, action);
     await browser.waitUntil(async () => (await inEditor("verifications")).contract !== null, {
       timeout: 10_000,
-      timeoutMsg: "conformité au contrat absente des vérifications",
+      timeoutMsg: "conformité au contrat absente des assertions",
     });
     expect((await inEditor("state")).operators).toBe(28);
     await inEditor("send");
@@ -1341,7 +1344,7 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
   });
 });
 
-describe("Premier usage : vérifications, run et statuts", () => {
+describe("Premier usage : assertions, run et statuts", () => {
   let server: Server;
   let url = "";
 
@@ -1448,19 +1451,19 @@ describe("Premier usage : vérifications, run et statuts", () => {
         // Onglet « Vérifications » de l'éditeur (celui de la réponse a son propre onglet).
         const editorChecks = (): void => {
           Array.from(tab.querySelectorAll<HTMLButtonElement>('.editor [role="tab"]'))
-            .find((b) => b.textContent.includes("Vérifications"))
+            .find((b) => b.textContent.includes("Assertions"))
             ?.click();
         };
         if (action.kind === "editorChecks") editorChecks();
         if (action.kind === "addCheck") {
           editorChecks();
           const rows = tab.querySelectorAll(".assertions .assertion").length;
-          button("+ Ajouter une vérification")?.click();
+          button("+ Assertion")?.click();
           const n = String(rows + 1);
           setTimeout(() => {
-            input(tab.querySelector(`[aria-label="Cible de la vérification ${n}"]`), action.target);
+            input(tab.querySelector(`[aria-label="Cible de l'assertion ${n}"]`), action.target);
             input(
-              tab.querySelector(`[aria-label="Opérateur de la vérification ${n}"]`),
+              tab.querySelector(`[aria-label="Opérateur de l'assertion ${n}"]`),
               action.operator,
             );
           }, 50);
@@ -1499,7 +1502,7 @@ describe("Premier usage : vérifications, run et statuts", () => {
     );
   }
 
-  it("crée un dossier et une requête, l'envoie et accepte les vérifications proposées (B1, X1, V1)", async () => {
+  it("crée un dossier et une requête, l'envoie et accepte les assertions proposées (B1, X1, V1)", async () => {
     // La notification de l'essai précédent ne doit pas masquer les captures.
     await dismissToast();
     await browser.$(".toast").waitForExist({ reverse: true, timeout: 15_000 });
@@ -1519,18 +1522,18 @@ describe("Premier usage : vérifications, run et statuts", () => {
     await createRequest("Lister les commandes");
     await inRequest("Lister les commandes", { kind: "url", value: `${url}/commandes` });
     await sendAndWait("Lister les commandes", "200");
-    await inRequest("Lister les commandes", { kind: "click", value: "Vérifications (" });
-    await inRequest("Lister les commandes", { kind: "click", value: "Proposer des vérifications" });
+    await inRequest("Lister les commandes", { kind: "click", value: "Assertions (" });
+    await inRequest("Lister les commandes", { kind: "click", value: "Proposer des assertions" });
     await inRequest("Lister les commandes", { kind: "editorChecks" });
     await browser.waitUntil(
       async () =>
         (await inRequest("Lister les commandes", { kind: "state" })).checks.includes("status"),
-      { timeoutMsg: "vérification de statut proposée attendue" },
+      { timeoutMsg: "assertion de statut proposée attendue" },
     );
     expect((await treeRow("Lister les commandes"))?.status).toBe("✓, réussie");
   });
 
-  it("une vérification en échec se détaille, s'ignore pour ce run et reste dans la requête (VT1, VT2)", async () => {
+  it("une assertion en échec se détaille, s'ignore pour ce run et reste dans la requête (VT1, VT2)", async () => {
     await createRequest("Créer une commande");
     await inRequest("Créer une commande", { kind: "method", value: "POST" });
     await inRequest("Créer une commande", { kind: "url", value: `${url}/commandes` });
@@ -1544,12 +1547,12 @@ describe("Premier usage : vérifications, run et statuts", () => {
         (await inRequest("Créer une commande", { kind: "state" })).checks.includes(
           "headers.Location",
         ),
-      { timeoutMsg: "vérification ajoutée attendue" },
+      { timeoutMsg: "assertion ajoutée attendue" },
     );
     await sendAndWait("Créer une commande", "201");
     const failed = await inRequest("Créer une commande", { kind: "state" });
     expect(failed.failures).toEqual(["✕ headers.Location"]);
-    expect(failed.verdict).toBe("Échec · 1 vérification(s)");
+    expect(failed.verdict).toBe("Échec · 1 assertion(s)");
     expect((await treeRow("Créer une commande"))?.status).toBe("✕, en échec");
     await screenshot(browser, "19-verification-en-echec");
 
@@ -1685,7 +1688,7 @@ describe("Lot A - Réponse : format, aperçu, filtre JSONPath (5.1-b bis)", () =
     );
   }
 
-  it("met en forme le JSON, filtre en JSONPath et ajoute une vérification (F1 à F4)", async () => {
+  it("met en forme le JSON, filtre en JSONPath et ajoute une assertion (F1 à F4)", async () => {
     await openRequest();
     await sendTo(`${url}/commande`, "200");
     expect(await browser.$('select[aria-label="Format du corps"]').getValue()).toBe("json");
@@ -1709,11 +1712,11 @@ describe("Lot A - Réponse : format, aperçu, filtre JSONPath (5.1-b bis)", () =
     await browser.waitUntil(
       async () => (await browser.$(".filter__count").getText()) === "1 résultat",
     );
-    await clickText(".filter__actions button", "+ Vérification");
+    await clickText(".filter__actions button", "+ Assertion");
     const file = path.join(project(), "Commandes", "lister-les-commandes.yml");
     await browser.waitUntil(() => readFileSync(file, "utf8").includes("res.body.items[1].sku"), {
       timeout: 10_000,
-      timeoutMsg: "vérification écrite dans le fichier attendue",
+      timeoutMsg: "assertion écrite dans le fichier attendue",
     });
   });
 
@@ -1789,7 +1792,8 @@ describe("Lot D - Barre latérale", () => {
   it("le menu « + » du projet propose ses créations avec leurs raccourcis (1.2-a ter)", async () => {
     await clickHidden('aside button[aria-label="Ajouter au projet boutique-tests"]');
     const items = await browser.$$('aside [role="menuitem"]').map((i) => i.getText());
-    expect(items.some((t) => t.includes("Nouvelle requête") && t.includes("Ctrl+N"))).toBe(true);
+    expect(items.some((t) => t.includes("Nouveau test") && t.includes("Ctrl+N"))).toBe(true);
+    expect(items.some((t) => t.includes("Requête libre"))).toBe(true);
     expect(items.some((t) => t.includes("Nouveau dossier") && t.includes("Ctrl+Maj+N"))).toBe(true);
     expect(items.some((t) => t.includes("Nouvel environnement"))).toBe(true);
     await screenshot(browser, "22-menu-ajouter");
@@ -2923,6 +2927,93 @@ describe("Lot L allégé - Mises à jour (1.6-g)", () => {
     ).toBe(false);
     await screenshot(browser, "32-mises-a-jour");
     await browser.keys("Escape");
+  });
+});
+
+describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const file = () => path.join(project(), "chrono-k.yml");
+  let server: Server;
+
+  beforeAll(async () => {
+    server = createServer((_request, response) => {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ etat: "ok" }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = String((server.address() as AddressInfo).port);
+    writeFileSync(
+      file(),
+      `info:\n  name: Chrono K\n  type: http\nhttp:\n  method: GET\n  url: http://127.0.0.1:${port}/sante\n`,
+    );
+  });
+
+  afterAll(async () => {
+    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  it("l'onglet Chronologie dit où le temps est passé (5.1-c)", async () => {
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]')).some((i) =>
+            i.textContent.includes("Chrono K"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "requête écrite sur disque attendue dans l'arborescence" },
+    );
+    await browser.execute(() => {
+      Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'))
+        .find((i) => i.textContent.includes("Chrono K"))
+        ?.click();
+    });
+    await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+    await clickText(".request-tab button", "Envoyer");
+    await clickText('[role="tab"]', "Chronologie");
+    await browser.$(".timeline").waitForDisplayed({ timeout: 15_000 });
+    const labels = await browser.execute(() =>
+      Array.from(document.querySelectorAll(".timeline__label")).map((l) => l.textContent.trim()),
+    );
+    expect(labels).toContain("Attente du serveur");
+    expect(labels).toContain("Réception");
+    await screenshot(browser, "34-chronologie");
+  });
+
+  it("un jeton saisi en clair est proposé en variable locale, rien n'est écrit avant (4.2-c)", async () => {
+    await clickText(".request-tab .editor__tab", "Auth");
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".request-tab .auth select");
+      if (!select) throw new Error("mode d'authentification introuvable");
+      select.value = "bearer";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await browser.$('.request-tab .auth input[type="text"]').waitForExist();
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        '.request-tab .auth input[type="text"]',
+      );
+      if (!input) throw new Error("jeton introuvable");
+      input.value = "eyJhbGciOiJIUzI1NiJ9.e2e";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await browser
+      .$(".secret")
+      .waitForDisplayed({ timeout: 10_000, timeoutMsg: "proposition attendue" });
+    // Le jeton n'est jamais écrit dans le projet tant que l'utilisateur n'a pas choisi.
+    expect(readFileSync(file(), "utf8")).not.toContain("eyJhbGciOiJIUzI1NiJ9");
+    await screenshot(browser, "33-secret-en-clair");
+    await clickText(".secret button", "Mettre dans une variable locale");
+    await browser.waitUntil(() => readFileSync(file(), "utf8").includes("{{token}}"), {
+      timeout: 10_000,
+      timeoutMsg: "référence {{token}} écrite dans le fichier attendue",
+    });
+    expect(readFileSync(file(), "utf8")).not.toContain("eyJhbGciOiJIUzI1NiJ9");
   });
 });
 

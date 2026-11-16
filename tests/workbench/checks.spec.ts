@@ -65,13 +65,13 @@ async function sendFailing() {
   return opened;
 }
 
-describe("vérifications en échec (VT1 à VT4)", () => {
+describe("assertions en échec (VT1 à VT4)", () => {
   it("détaille l'échec sous la réponse (VT1)", async () => {
     await sendFailing();
     const failure = app?.get(".failure");
     expect(failure?.get(".failure__title").text()).toBe("✕ headers.Location");
     expect(failure?.get(".failure__message").text()).toBe("en-tête absent de la réponse");
-    expect(app?.get(".response__verdict").text()).toBe("Échec · 1 vérification(s)");
+    expect(app?.get(".response__verdict").text()).toBe("Échec · 1 assertion(s)");
   });
 
   it("ignore l'échec pour ce run, sans toucher à la requête (VT2)", async () => {
@@ -90,9 +90,9 @@ describe("vérifications en échec (VT1 à VT4)", () => {
     expect(row?.get(".row__status").text()).toContain("✓");
   });
 
-  it("retire la vérification de la requête (VT3)", async () => {
+  it("retire l'assertion de la requête (VT3)", async () => {
     const { core } = await sendFailing();
-    await click(app as AppWrapper, ".failure__link", "Retirer la vérification");
+    await click(app as AppWrapper, ".failure__link", "Retirer l'assertion");
     expect(app?.find(".failure").exists()).toBe(false);
     await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_MS + 50));
     await flushPromises();
@@ -106,7 +106,7 @@ describe("vérifications en échec (VT1 à VT4)", () => {
     const ignore = app?.findAll(".failure__link").find((b) => b.text() === "Ignorer pour ce run");
     expect(ignore?.element.tagName).toBe("BUTTON");
     expect(ignore?.attributes("aria-label")).toBe("Ignorer headers.Location pour ce run");
-    await click(app as AppWrapper, '.editor [role="tab"]', "Vérifications");
+    await click(app as AppWrapper, '.editor [role="tab"]', "Assertions");
     const origins = app?.findAll(".assertion__origin").map((o) => o.text());
     expect(origins).toEqual(["par défaut", "manuelle"]);
   });

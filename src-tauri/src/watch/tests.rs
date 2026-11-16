@@ -379,7 +379,7 @@ fn r9_compare_les_elements_qui_different() {
     );
     assert_eq!(body.suggested, Some(ConflictSide::Draft));
     let total = &items[2];
-    assert_eq!(total.label, "Vérification body.total");
+    assert_eq!(total.label, "Assertion body.total");
     assert_eq!(total.disk, None);
     assert_eq!(total.draft.as_deref(), Some("égal à 59"));
     // Même changement des deux côtés : identique, en fin de liste.

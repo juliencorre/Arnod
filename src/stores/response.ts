@@ -216,7 +216,7 @@ export const useResponseStore = defineStore("response", () => {
       (a) => a.target === assertion.target && a.operator === assertion.operator,
     );
     if (exists) {
-      toasts.show(`La vérification sur ${assertion.target} existe déjà.`);
+      toasts.show(`L'assertion sur ${assertion.target} existe déjà.`);
       return false;
     }
     const taken = new Set(draft.assertions.map((a) => a.id));
@@ -226,7 +226,7 @@ export const useResponseStore = defineStore("response", () => {
         ? { ...assertion, id: `${assertion.id}-${crypto.randomUUID().slice(0, 8)}` }
         : { ...assertion },
     ];
-    toasts.show(`Vérification ajoutée sur ${assertion.target}.`);
+    toasts.show(`Assertion ajoutée sur ${assertion.target}.`);
     return true;
   }
 

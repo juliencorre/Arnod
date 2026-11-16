@@ -582,3 +582,60 @@ fn unions_typescript_concordantes() {
         names([T::Header, T::Query])
     );
 }
+
+#[tokio::test]
+async fn k4_chronologie_connexion_mesuree_puis_reutilisee() {
+    let server = MockServer::start().await;
+    Mock::given(path("/ok"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+        .mount(&server)
+        .await;
+    let net = network();
+    let first = net
+        .send(
+            &mut prepared(format!("{}/ok", server.uri())),
+            None,
+            &Cancel::new(),
+        )
+        .await
+        .unwrap();
+    let again = net
+        .send(
+            &mut prepared(format!("{}/ok", server.uri())),
+            None,
+            &Cancel::new(),
+        )
+        .await
+        .unwrap();
+    // Adresse IP : pas de DNS ; la première connexion est mesurée, la suivante reprise du pool.
+    assert_eq!(first.timeline.dns_ms, None);
+    assert!(first.timeline.connect_ms.is_some(), "{:?}", first.timeline);
+    assert!(!first.timeline.secure);
+    assert_eq!(again.timeline.connect_ms, None, "{:?}", again.timeline);
+    assert_eq!(again.timeline.total_ms, again.total_ms);
+    assert!(again.timeline.server_ms <= again.wait_ms);
+}
+
+#[tokio::test]
+async fn k5_chronologie_dns_d_un_nom() {
+    let server = MockServer::start().await;
+    Mock::given(path("/ok"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&server)
+        .await;
+    let port = server.address().port();
+    let response = network()
+        .send(
+            &mut prepared(format!("http://localhost:{port}/ok")),
+            None,
+            &Cancel::new(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        response.timeline.dns_ms.is_some(),
+        "{:?}",
+        response.timeline
+    );
+    assert!(response.timeline.connect_ms.is_some());
+}

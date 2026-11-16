@@ -9,6 +9,7 @@ pub mod cert;
 pub mod cookies;
 pub mod failure;
 pub mod oauth;
+pub mod phases;
 pub mod prefs;
 pub mod project_auth;
 pub mod proxy;
@@ -325,7 +326,10 @@ impl Network {
             .redirect(policy)
             .user_agent(USER_AGENT)
             .connect_timeout(Duration::from_millis(built.connect_timeout_ms))
-            .use_preconfigured_tls(built.tls.clone());
+            .use_preconfigured_tls(built.tls.clone())
+            // Lot K (5.1-c) : DNS et connexion chronométrés pour la chronologie.
+            .dns_resolver(std::sync::Arc::new(phases::TimedResolver))
+            .connector_layer(phases::TimedConnectLayer);
         if built.proxy.is_direct() {
             builder = builder.no_proxy();
         } else {
@@ -369,8 +373,10 @@ impl Network {
             .as_ref()
             .and_then(|u| effective.for_url(u.scheme(), &host));
         let started = Instant::now();
-        match http::send_with(&client, prepared, cancel).await {
-            Ok(response) => {
+        let (sent, measured) = phases::measured(http::send_with(&client, prepared, cancel)).await;
+        match sent {
+            Ok(mut response) => {
+                response.timeline = http::Timeline::of(&response, measured, &prepared.url);
                 if response.status == 407
                     && let Some(proxy) = &used_proxy
                 {

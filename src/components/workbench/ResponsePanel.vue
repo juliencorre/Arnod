@@ -10,6 +10,7 @@ import { computed, ref } from "vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import ResponseBody from "@/components/workbench/ResponseBody.vue";
 import SentPanel from "@/components/workbench/SentPanel.vue";
+import TimelinePanel from "@/components/workbench/TimelinePanel.vue";
 import NetworkFailurePanel from "@/components/workbench/NetworkFailurePanel.vue";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -20,7 +21,8 @@ const props = defineProps<{ editorKey: string }>();
 const workbench = useWorkbenchStore();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
 const outcome = computed(() => editor.value?.outcome ?? null);
-const view = ref<"body" | "headers" | "checks" | "sent">("body");
+// Lot K (5.1-c) : la chronologie remplace la ligne « Attente · Réception ».
+const view = ref<"body" | "headers" | "checks" | "sent" | "timeline">("body");
 
 /** Identifiant du résultat de conformité au contrat lié (`CONTRACT_CHECK`, R8). */
 const CONTRACT_CHECK = "contrat";
@@ -82,21 +84,18 @@ function removable(check: AssertionResult): boolean {
           class="response__verdict"
           :class="outcome.passed ? 'response__verdict--ok' : 'response__verdict--ko'"
         >
-          {{ outcome.passed ? "Réussie" : `Échec · ${failed} vérification(s)` }}
+          {{ outcome.passed ? "Réussie" : `Échec · ${failed} assertion(s)` }}
         </span>
         <span v-if="outcome.slow" class="response__slow">Lente</span>
       </div>
-      <p class="response__timeline">
-        Attente {{ formatDuration(outcome.response.waitMs) }} · Réception
-        {{ formatDuration(outcome.response.receiveMs) }}
-      </p>
       <div role="tablist" aria-label="Contenu de la réponse" class="response__tabs">
         <button
           v-for="[id, label] in [
             ['body', 'Corps'],
             ['headers', `En-têtes (${outcome.response.headers.length})`],
-            ['checks', `Vérifications (${outcome.assertions.length})`],
+            ['checks', `Assertions (${outcome.assertions.length})`],
             ['sent', 'Envoyé'],
+            ['timeline', 'Chronologie'],
           ] as const"
           :key="id"
           type="button"
@@ -128,6 +127,11 @@ function removable(check: AssertionResult): boolean {
       </p>
       <!-- Lot E (5.1-h) : ce qui est parti, valeurs tirées et extraites. -->
       <SentPanel v-else-if="view === 'sent'" :editor-key="editorKey" />
+      <TimelinePanel
+        v-else-if="view === 'timeline'"
+        :timeline="outcome.response.timeline"
+        :duration-check="outcome.assertions.some((a) => a.target === 'responseTime')"
+      />
       <div v-else>
         <ul class="response__checks">
           <li
@@ -142,10 +146,10 @@ function removable(check: AssertionResult): boolean {
           </li>
         </ul>
         <BaseButton @click="workbench.proposeAssertions(editorKey)">
-          Proposer des vérifications
+          Proposer des assertions
         </BaseButton>
       </div>
-      <ul v-if="failures.length > 0" class="failures" aria-label="Vérifications en échec">
+      <ul v-if="failures.length > 0" class="failures" aria-label="Assertions en échec">
         <li v-for="check in failures" :key="check.id" class="failure">
           <p class="failure__title"><span aria-hidden="true">✕</span> {{ labelOf(check) }}</p>
           <p v-if="check.message" class="failure__message">{{ check.message }}</p>
@@ -163,10 +167,10 @@ function removable(check: AssertionResult): boolean {
               <button
                 type="button"
                 class="failure__link"
-                :aria-label="`Retirer la vérification ${labelOf(check)}`"
+                :aria-label="`Retirer l'assertion ${labelOf(check)}`"
                 @click="workbench.removeCheck(editorKey, check.id)"
               >
-                Retirer la vérification
+                Retirer l'assertion
               </button>
             </template>
           </p>
@@ -185,12 +189,6 @@ function removable(check: AssertionResult): boolean {
 }
 
 .response__info,
-.response__timeline {
-  margin: 0;
-  font-size: var(--text-body);
-  color: var(--color-muted);
-}
-
 .response__error {
   margin: 0;
   padding: 0.625rem 0.75rem;

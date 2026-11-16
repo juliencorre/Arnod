@@ -33,6 +33,7 @@ fn response(status: u16, body: &str) -> HttpResponse {
         wait_ms: 10,
         receive_ms: 2,
         total_ms: 12,
+        timeline: Default::default(),
     }
 }
 

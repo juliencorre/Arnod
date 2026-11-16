@@ -12,7 +12,7 @@ export const REST: StepNature = {
   name: "REST",
   title: "Une requête HTTP",
   description:
-    "Appelle une API par HTTP : méthode, adresse, corps. Les vérifications portent sur le statut, les en-têtes, le corps et la durée.",
+    "Appelle une API par HTTP : méthode, adresse, corps. Les assertions portent sur le statut, les en-têtes, le corps et la durée.",
   family: "calls",
   publisher: "Arnod",
   engine: { kind: "builtin", id: "http", abi: 1 },

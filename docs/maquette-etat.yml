@@ -93,10 +93,11 @@ pages:
     journal:
       - "2026-11-09 : Thème clair ou sombre selon Windows, livré avec le premier usage."
       - "2026-11-12 : Les écrans b et c montrent des pages encore à faire (6.3, 6.7)."
+      - "2026-11-16 : b et c prennent la version des pages qu'ils montrent (6.3 en V7, 6.7 en V8) : le thème sombre de l'application est livré."
     ecrans:
       a: { etat: livré, pr: [4, 27] }
-      b: { etat: à faire }
-      c: { etat: à faire }
+      b: { etat: à faire, version: V7 }
+      c: { etat: à faire, version: V8 }
   "0.5":
     nom: "Design system"
     version: Cadre
@@ -154,25 +155,26 @@ pages:
       - "plan-selecteur-workspace (I1, I2)"
       - "plan-mvp-d-barre-laterale (F1–F5, D1, D2, M1, M2)"
     liees: ["3.3", "3.1", "4.1"]
-    reste: "« Nouveau test » et « Requête libre » du menu « + » avec le modèle test = dossier d'étapes (lots E, K) ; « Plus » en V4 (d bis)."
+    reste: "« Plus » en V4 (d bis)."
     journal:
       - "2026-11-10 : Option a retenue et livrée (PR #33) ; b et c restent des variantes."
       - "2026-11-11 : Sections « Contrats de service » puis « Référentiel de tests » (PR #40)."
       - "2026-11-12 : Page ajoutée à la liste ; écrans repris de « Premier usage » (b → d, b bis → d bis)."
       - "2026-11-13 : Filtre du référentiel, sections repliables, quatre points de départ, menu « + » avec raccourcis (lot D, PR #48)."
+      - "2026-11-16 : Menu « + » : « Nouveau test » (Ctrl+N), « Requête libre », « Nouveau dossier » ; un projet vide propose « + Nouveau test » (a ter, lot K, PR #65)."
     ecrans:
       "0": { etat: remplacé }
       a: { etat: livré, pr: [33], captures: [03-workspace-boutique] }
       "a bis": { etat: livré, pr: [33], captures: [08b-menu-environnement] }
       "a ter":
         {
-          etat: en partie,
-          pr: [33, 48],
+          etat: livré,
+          pr: [33, 48, 65],
           captures: [22-menu-ajouter],
           ecart:
             {
-              texte: "Le menu « + » dit « Nouvelle requête » (Ctrl+N) et « Nouveau dossier » (Ctrl+Maj+N), sans « Nouveau test » ni « Requête libre » (vocabulaire inchangé, R4 du plan de finalisation) ; « Ajouter un contrat » ouvre ses quatre façons dans un sous-menu.",
-              aligner: code,
+              texte: "« Ajouter un contrat » ouvre ses quatre façons dans un sous-menu ; la zone principale d'un projet vide garde ses quatre points de départ (1.2-d), dont « + Test ».",
+              aligner: maquette,
             },
         }
       b: { etat: variante }
@@ -336,17 +338,18 @@ pages:
       - "plan-workspaces-onglets (O8)"
       - "plan-mvp-b-saisie-curl (CU1–CU4)"
     liees: ["2.2", "4.4", "0.3"]
-    reste: "natures autres que REST (a ter à a quinquies)."
+    reste: "natures autres que REST, en V6 (a ter à a quinquies)."
     journal:
       - "2026-11-10 : Accueil « Essayer une étape », REST seule (PR #35)."
       - "2026-11-12 : Ancienne page « Premier usage » : démarrage et erreurs → 0.3, projet créé → 1.2, Non classés → 2.2."
       - "2026-11-13 : Commande cURL collée reconnue REST, jeton au coffre (lot B, PR #49)."
+      - "2026-11-16 : a ter à a quinquies (SQL, Kafka, Batch) passent en V6 : seule l'entrée REST est du MVP."
     ecrans:
       a: { etat: livré, pr: [8, 35], captures: [01-premier-lancement] }
       "a bis": { etat: livré, pr: [27] }
-      "a ter": { etat: en partie, pr: [35], captures: [01b-accueil-rest] }
-      "a quater": { etat: en partie, pr: [35] }
-      "a quinquies": { etat: en partie, pr: [35] }
+      "a ter": { etat: en partie, version: V6, pr: [35], captures: [01b-accueil-rest] }
+      "a quater": { etat: en partie, version: V6, pr: [35] }
+      "a quinquies": { etat: en partie, version: V6, pr: [35] }
       "a sexies":
         {
           etat: livré,
@@ -718,10 +721,11 @@ pages:
       - "plan-fin-premier-usage (VT1–VT4)"
       - "plan-mvp-e-tests-etapes (TE1–TE5, EX1–EX5, MV1, MV2)"
     liees: ["0.2", "4.1", "4.3"]
-    reste: "secret proposé en variable locale (c)."
+    reste: "réglage « Si une étape échoue » et campagnes sous la liste (V4)."
     journal:
       - "2026-11-12 : Encart de vocabulaire → 0.2 ; écrans repris du référentiel (c → b, c bis → b bis, d → c)."
       - "2026-11-13 : Test = dossier d'étapes : verdict, arrêt à la première étape en échec, extractions OpenCollection passées aux étapes suivantes, onglet du test, onglet « Variables », « modifié, pas encore envoyé » (plan-mvp-e-tests-etapes, PR #51)."
+      - "2026-11-16 : Vocabulaire « assertion » partout ; secret saisi en clair dans l'authentification proposé en variable locale, rien n'est écrit avant le choix ; temps de la réponse dans l'onglet Chronologie (lot K, PR #65)."
     ecrans:
       a:
         {
@@ -734,17 +738,7 @@ pages:
               aligner: maquette,
             },
         }
-      b:
-        {
-          etat: livré,
-          pr: [27, 42, 51],
-          captures: [19-verification-en-echec],
-          ecart:
-            {
-              texte: "Temps de la réponse sur une ligne au lieu d'un onglet Chronologie (5.1-c, lot K).",
-              aligner: code,
-            },
-        }
+      b: { etat: livré, pr: [27, 42, 51, 65], captures: [19-verification-en-echec] }
       "b bis":
         {
           etat: livré,
@@ -756,7 +750,17 @@ pages:
               aligner: code,
             },
         }
-      c: { etat: à faire }
+      c:
+        {
+          etat: livré,
+          pr: [65],
+          captures: [33-secret-en-clair],
+          ecart:
+            {
+              texte: "Rien de la requête n'est écrit avant le choix (« Non enregistré : choisissez où va le jeton » au lieu de « Enregistré, sauf le jeton ») ; la variable locale va dans l'environnement actif ; jeton, mot de passe, clé d'API et secret client OAuth 2 sont repérés.",
+              aligner: maquette,
+            },
+        }
   "4.3":
     nom: "Tests en schéma"
     version: [V4, V5, V6]
@@ -871,7 +875,7 @@ pages:
       - "plan-mvp-e-tests-etapes (VD1–VD4)"
       - "plan-mvp-h-reseau-auth (EC1–EC6)"
     liees: ["5.2", "1.4"]
-    reste: "chronologie détaillée DNS, connexion, TLS (c) ; historique en V1 (c bis)."
+    reste: "historique en V1 (c bis)."
     journal:
       - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
       - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
@@ -880,18 +884,19 @@ pages:
       - "2026-11-13 : Valeurs dynamiques tirées à chaque envoi par le cœur, montrées dans « Envoyé », « Garder » en fait une extraction (h, plan-mvp-e-tests-etapes, PR #51)."
       - "2026-11-13 : Liste des valeurs dynamiques proposée à la frappe de {{$ dans tout champ à variables, avec description et exemple tirés par le cœur (h, PR #55)."
       - "2026-11-13 : Échec réseau expliqué : certificat, proxy, nom, serveur, délai ; ce qui n'est pas parti et l'action qui règle le poste (i, lot H, PR #58)."
+      - "2026-11-16 : Onglet Chronologie : DNS, connexion et TLS, attente du serveur, réception, mesurés par le cœur ; « + Assertion » (c, b bis, lot K, PR #65)."
     ecrans:
       a: { etat: livré, pr: [27] }
       b: { etat: livré, pr: [27, 42], captures: [19-verification-en-echec] }
       "b bis":
         {
-          etat: en partie,
+          etat: livré,
           version: MVP,
-          pr: [47, 51],
+          pr: [47, 51, 65],
           captures: [a1-reponse-filtre, a2-reponse-apercu-html],
           ecart:
             {
-              texte: "« + Assertion » devient « + Vérification » (vocabulaire, lot K) et porte sur la correspondance courante (body.items[0].sku égal à …, ↑ ↓ ou Entrée pour changer) au lieu de body.items[*].sku contient … : une vérification ne lit pas de joker ; l'interrupteur « Aperçu » ne rend qu'un corps HTML ; « Extraire dans une variable » range la correspondance courante dans une extraction (lot E, PR #51) ; l'icône Ctrl+J attend le lot F.",
+              texte: "« + Assertion » porte sur la correspondance courante (body.items[0].sku égal à …, ↑ ↓ ou Entrée pour changer) au lieu de body.items[*].sku contient … : une assertion ne lit pas de joker ; l'interrupteur « Aperçu » ne rend qu'un corps HTML ; « Extraire dans une variable » range la correspondance courante dans une extraction (lot E, PR #51).",
               aligner: maquette,
             },
         }
@@ -919,7 +924,17 @@ pages:
               aligner: maquette,
             },
         }
-      c: { etat: en partie, pr: [27] }
+      c:
+        {
+          etat: livré,
+          pr: [27, 65],
+          captures: [34-chronologie],
+          ecart:
+            {
+              texte: "TCP et TLS forment une seule ligne « Connexion et TLS » : le client HTTP ne les mesure pas à part ; une connexion reprise du pool n'a ni DNS ni connexion, ce qui est dit sous le total.",
+              aligner: maquette,
+            },
+        }
       "c bis": { etat: à faire, version: V1 }
       h:
         {

@@ -5,6 +5,7 @@
 //! Module pur : il reçoit les environnements et les données locales déjà lus.
 
 pub mod added;
+pub mod secret;
 pub mod text;
 pub mod variables;
 
@@ -33,4 +34,6 @@ pub struct RequestInput {
     pub unknown: Vec<UnknownVariable>,
     /// En-têtes ajoutés par Arnod à l'envoi (R3).
     pub added: Vec<AddedHeader>,
+    /// Lot K (4.2-c) : secrets saisis en clair dans l'authentification.
+    pub secrets: Vec<secret::ClearSecret>,
 }

@@ -367,7 +367,7 @@ fn defaults(file: &BruFile, at: &At<'_>, ctx: &mut Ctx) -> Map<String, Value> {
     }
     for (block, kind, label) in [
         ("vars:post-response", ItemKind::Extraction, "Extractions"),
-        ("assert", ItemKind::Assertion, "Vérifications"),
+        ("assert", ItemKind::Assertion, "Assertions"),
     ] {
         let entries = file.dict(block);
         if !entries.is_empty() {
@@ -454,7 +454,7 @@ fn assertion(entry: &Entry, at: &At<'_>, ctx: &mut Ctx) -> Value {
             ItemStatus::ToCheck,
             Some("assert"),
             format!(
-                "Vérification « {} {name} » reprise, mais pas encore évaluée par Arnod (expression régulière).",
+                "Assertion « {} {name} » reprise, mais pas encore évaluée par Arnod (expression régulière).",
                 entry.key
             ),
             Some(format!("{}: {}", entry.key, entry.value)),
