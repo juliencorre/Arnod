@@ -154,7 +154,10 @@ export type CommandName =
   | "updates_load"
   | "updates_save"
   | "updates_check"
-  | "updates_open";
+  | "updates_open"
+  | "tree_batch"
+  | "tree_batch_undo"
+  | "run_selection";
 
 /**
  * Nature d'une erreur de commande.
@@ -1884,4 +1887,22 @@ export interface ClearSecret {
   label: string;
   /** Nom proposé pour la variable locale, libre parmi les variables connues. */
   suggested: string;
+}
+
+// --- Sélection multiple (4.1-a quater) ----------------------------------------------
+
+/** Action sur une sélection de l'arborescence (`tree::batch::BatchAction`). */
+export type BatchAction =
+  /** Vers le dossier `target` (`""` : racine du projet). */
+  | { kind: "move"; target: string }
+  | { kind: "duplicate" }
+  /** Corbeille du système, ou définitivement. */
+  | { kind: "delete"; permanent: boolean };
+
+/** Résultat d'une action sur la sélection (`commands::batch::BatchResult`). */
+export interface BatchResult {
+  /** Chemins d'avant et d'après (`null` après une mise à la corbeille). */
+  items: [string, string | null][];
+  /** Jeton de « Annuler » (`tree_batch_undo`). */
+  undoToken: string;
 }

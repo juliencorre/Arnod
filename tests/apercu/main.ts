@@ -28,8 +28,10 @@ function trouver(selecteur: string, texte?: string): HTMLElement {
 }
 
 const gestes: Gestes = {
-  cliquer: async (selecteur, texte) => {
-    trouver(selecteur, texte).click();
+  cliquer: async (selecteur, texte, options) => {
+    const cible = trouver(selecteur, texte);
+    if (options) cible.dispatchEvent(new MouseEvent("click", { bubbles: true, ...options }));
+    else cible.click();
     await attendre();
   },
   saisir: async (selecteur, valeur) => {

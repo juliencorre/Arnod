@@ -11,6 +11,8 @@ import PreferencesDialog from "@/components/preferences/PreferencesDialog.vue";
 import ProjectSettingsDialog from "@/components/projects/ProjectSettingsDialog.vue";
 // Lot J - Copier et déplacer.
 import CopyMoveDialog from "@/components/workbench/CopyMoveDialog.vue";
+// Sélection multiple (4.1-a quater).
+import SelectionBar from "@/components/workbench/SelectionBar.vue";
 </script>
 
 <template>
@@ -22,4 +24,5 @@ import CopyMoveDialog from "@/components/workbench/CopyMoveDialog.vue";
   <PreferencesDialog />
   <ProjectSettingsDialog />
   <CopyMoveDialog />
+  <SelectionBar />
 </template>

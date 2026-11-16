@@ -589,6 +589,7 @@ pub fn requests_in(root: &Path, folder: &str) -> Result<Vec<String>, CommandErro
     Ok(out)
 }
 
+pub mod batch;
 pub mod transfer;
 pub mod undo;
 

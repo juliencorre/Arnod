@@ -93,6 +93,8 @@ import type {
   TransferTargets,
   UpdateChannel,
   UpdatesView,
+  BatchAction,
+  BatchResult,
 } from "@/types/ipc";
 
 /** Natures connues : le type impose d'y lister chaque membre de `CommandErrorKind`. */
@@ -754,6 +756,21 @@ export const ipc = {
   /** Ouvre la page d'une release dans le navigateur du système. */
   updatesOpen: (url: string): Promise<void> =>
     call<null>("updates_open", { url }).then(() => undefined),
+
+  // Sélection multiple (4.1-a quater).
+  /** Déplace, duplique ou met à la corbeille les éléments `paths` ; le jeton sert à « Annuler ». */
+  treeBatch: (project: string, paths: string[], action: BatchAction): Promise<BatchResult> =>
+    call<BatchResult>("tree_batch", { project, paths, action }),
+  /** « Annuler » une action sur la sélection. */
+  treeBatchUndo: (undoToken: string): Promise<void> =>
+    call<null>("tree_batch_undo", { undoToken }).then(() => undefined),
+  /** Exécute les requêtes de la sélection, contenu des dossiers compris. */
+  runSelection: (
+    project: string,
+    paths: string[],
+    environment: string,
+    confirmed: boolean,
+  ): Promise<RunView> => call<RunView>("run_selection", { project, paths, environment, confirmed }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

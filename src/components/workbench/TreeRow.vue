@@ -19,6 +19,7 @@ import { countStatuses, requestPaths } from "@/lib/status";
 import { highlight, matchedByUrl, type TreeFilter } from "@/lib/treeFilter";
 import { REQUEST_DRAG, dragged, startRequestDrag } from "@/lib/requestDrag";
 import { useToastStore } from "@/stores/toasts";
+import { useSelectionStore } from "@/stores/selection";
 import { useTransferStore } from "@/stores/transfer";
 import { useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -211,6 +212,63 @@ async function onDrop(event: DragEvent): Promise<void> {
  * Simple clic : la requête ou le test s'ouvre en aperçu ; double-clic : l'onglet reste
  * (lot F, 1.3-a).
  */
+// --- Sélection multiple (4.1-a quater) --------------------------------------------
+
+const selection = useSelectionStore();
+const picked = computed(() => selection.has(props.projectId, props.node.path));
+
+/** Élément ouvert dans l'onglet actif, qui entre dans la sélection avec le premier Ctrl+clic. */
+function currentPath(): string | null {
+  const content = windows.activeTab?.content;
+  return (content?.kind === "request" || content?.kind === "test") &&
+    content.projectId === props.projectId
+    ? content.path
+    : null;
+}
+
+/** Ordre affiché des éléments de l'arborescence, pour une plage (Maj+clic). */
+function shownOrder(element: Element): string[] {
+  const tree = element.closest('[role="tree"]');
+  return Array.from(tree?.querySelectorAll<HTMLElement>("[data-path]") ?? []).map(
+    (item) => item.dataset.path ?? "",
+  );
+}
+
+/** Ctrl+clic ajoute ou retire, Maj+clic prend la plage ; un clic simple vide la sélection. */
+function onClick(event: MouseEvent): void {
+  if (event.ctrlKey || event.metaKey) {
+    selection.toggle(props.projectId, props.node.path, currentPath());
+    return;
+  }
+  if (event.shiftKey && event.currentTarget instanceof Element) {
+    selection.range(
+      props.projectId,
+      props.node.path,
+      shownOrder(event.currentTarget),
+      currentPath(),
+    );
+    return;
+  }
+  if (selection.count > 0) selection.clear();
+  activate();
+}
+
+/** Au clavier : Ctrl+Espace ajoute ou retire, Maj+Espace prend la plage. */
+function onSpace(event: KeyboardEvent): void {
+  if (event.ctrlKey || event.metaKey) {
+    event.preventDefault();
+    selection.toggle(props.projectId, props.node.path, currentPath());
+  } else if (event.shiftKey && event.currentTarget instanceof Element) {
+    event.preventDefault();
+    selection.range(
+      props.projectId,
+      props.node.path,
+      shownOrder(event.currentTarget),
+      currentPath(),
+    );
+  }
+}
+
 function activate(preview = true): void {
   // Un test s'ouvre dans son onglet ; son chevron le replie (lot E, TE1).
   if (isTest.value) void workbench.openTest(props.projectId, props.node.path, preview);
@@ -226,7 +284,7 @@ function activate(preview = true): void {
   <li role="presentation">
     <div
       class="row"
-      :class="{ 'row--selected': isSelected, 'row--drop': dropping }"
+      :class="{ 'row--selected': isSelected, 'row--drop': dropping, 'row--picked': picked }"
       :style="{ '--depth': depth + 1 }"
       @dragover="onDragOver"
       @dragleave="dropping = false"
@@ -237,12 +295,14 @@ function activate(preview = true): void {
         class="row__main"
         role="treeitem"
         :aria-expanded="node.kind === 'folder' ? isOpen : undefined"
-        :aria-selected="isSelected"
+        :aria-selected="isSelected || picked"
         :aria-level="depth + 1"
+        :data-path="node.path"
         :draggable="node.kind === 'request'"
         @dragstart="onDragStart"
         @keydown="onKeydown"
-        @click="activate()"
+        @click="onClick"
+        @keydown.space="onSpace"
         @dblclick="activate(false)"
         @keydown.right="isTest && !isOpen && workbench.toggleFolder(projectId, node.path)"
         @keydown.left="isTest && isOpen && workbench.toggleFolder(projectId, node.path)"
@@ -323,6 +383,12 @@ function activate(preview = true): void {
 .row:hover,
 .row--selected {
   background: var(--color-accent-soft);
+}
+
+/* 4.1-a quater : élément de la sélection multiple. */
+.row--picked {
+  background: var(--color-accent-soft);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 /* Lot J : une requête glissée sera déposée ici. */

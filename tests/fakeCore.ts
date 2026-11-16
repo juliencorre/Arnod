@@ -19,6 +19,7 @@ import {
 import { handleInput } from "./fakeInput";
 import { handleTrials } from "./fakeTrials";
 import { handleTransfer } from "./fakeTransfer";
+import { handleBatch } from "./fakeBatch";
 import { createFakeUpdates, type FakeUpdates, handleUpdates } from "./fakeUpdates";
 import { STEP_CATALOG, detect } from "./fakeSteps";
 // Lot C - Import Bruno.
@@ -396,6 +397,9 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           // Lot L allégé - Mises à jour.
           const updated = handleUpdates(core.updates, cmd, args);
           if (updated !== undefined) return updated;
+          // Sélection multiple (4.1-a quater).
+          const batched = handleBatch(core.workbench, cmd, args);
+          if (batched !== undefined) return batched;
           const contracts = handleContracts(core.contracts, core.workbench, cmd, args);
           const handled =
             contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);

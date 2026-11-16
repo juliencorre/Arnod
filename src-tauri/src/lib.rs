@@ -247,6 +247,10 @@ pub fn run() {
             commands::updates::updates_save,
             commands::updates::updates_check,
             commands::updates::updates_open,
+            // Sélection multiple (4.1-a quater).
+            commands::batch::tree_batch,
+            commands::batch::tree_batch_undo,
+            commands::batch::run_selection,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")
