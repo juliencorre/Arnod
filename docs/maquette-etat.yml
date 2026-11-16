@@ -298,11 +298,13 @@ pages:
     version: [MVP, V1]
     plans:
       - "plan-mvp-h-reseau-auth (PR1–PR6)"
+      - "plan-mvp-l-mises-a-jour (MJ1–MJ7)"
     liees: ["3.4"]
     journal:
       - "2026-11-12 : Écrans repris de « Authentification et Préférences » (e, f, f bis)."
       - "2026-11-13 : Préférences (Ctrl+, et Fichier → Préférences…) → Réseau et certificats : proxy du système, aucun ou manuel, délai de connexion, autorités internes ajoutées après avoir montré leur empreinte (e, lot H, PR #58)."
       - "2026-11-14 : Préférences → Mises à jour : versions publiées lues par le réseau du poste, au démarrage puis chaque jour ou à la demande, canal stable ou préversions ; « Voir la version » ouvre la page de la release (g, lot L allégé, PR #63)."
+      - "2026-11-16 : Mises à jour installées par Arnod : « Installer » (notification et section), téléchargement par le réseau du poste avec progression et « Annuler », signature vérifiée, « Redémarrer maintenant » ou « Au prochain lancement » ; « Voir la version » si la release n'est pas installable (g, lot L)."
     ecrans:
       e:
         {
@@ -320,14 +322,14 @@ pages:
       "f bis": { etat: à faire, version: V1 }
       g:
         {
-          etat: en partie,
+          etat: livré,
           version: MVP,
           pr: [63],
           captures: [32-mises-a-jour],
           ecart:
             {
-              texte: "Ni téléchargement ni installation automatique (Q1 ouverte : signature, updater) : la version trouvée ouvre la page de sa release (« Voir la version ») au lieu de « Redémarrer maintenant » ou « Au prochain lancement » ; pas de stratégie de groupe pour couper les vérifications.",
-              aligner: à décider,
+              texte: "L'installation demande une release qui porte latest.json et une clé publique embarquée ; sinon « Voir la version » ouvre la page de la release. Pas de stratégie de groupe pour couper les vérifications (V2) ; pas de pastille en bas de la barre latérale (notification et section seulement).",
+              aligner: maquette,
             },
         }
   "2.1":

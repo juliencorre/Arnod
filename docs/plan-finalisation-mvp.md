@@ -32,7 +32,7 @@ ou porte un écart tranché.
 | Réseau d'entreprise            | À faire   | 1.6-e, 5.1-i                                                                     | H         |
 | Fichiers modifiés hors d'Arnod | À faire   | 4.1-e                                                                            | I         |
 | Filtrer l'arborescence         | À faire   | 1.2-e                                                                            | D         |
-| Mises à jour de l'application  | À faire   | 1.6-g                                                                            | L         |
+| Mises à jour de l'application  | En cours  | 1.6-g ([`plan-mvp-l-mises-a-jour.md`](plan-mvp-l-mises-a-jour.md))               | L         |
 | Copier et déplacer une requête | À faire   | 4.1-f, g                                                                         | J         |
 
 S'y ajoutent les écrans MVP en partie ou à faire hors de ces fonctions (0.3, 1.3, 1.4-j, 1.2-d,
@@ -144,7 +144,9 @@ détaillée autant que le client HTTP la mesure. En dernier : il touche tous les
 
 **Lot L - Mises à jour** (`1.6-g`). Nouvelle version téléchargée, signature vérifiée, signalée en
 bas de la barre latérale, installée sans droits administrateur. Suppose `tauri-plugin-updater`, une
-paire de clés de signature et les secrets de la CI : décision Q1.
+paire de clés de signature et les secrets de la CI : décision Q1. Plan :
+[`plan-mvp-l-mises-a-jour.md`](plan-mvp-l-mises-a-jour.md) (la pastille de la barre latérale y est
+hors périmètre).
 
 ## 5. Hors périmètre
 
@@ -174,7 +176,7 @@ le comportement du cœur, que vérifient `cargo test` et l'e2e.
 | `scripts/check-maquette.mjs`                                   | Versions V2 à V9 acceptées.                                                                                                                                                  |
 | `tests/apercu/`, `scripts/apercu.mjs`, `vite.apercu.config.ts` | Aperçu sur le faux cœur et captures Playwright.                                                                                                                              |
 | `CLAUDE.md`                                                    | Travail en cours, commande de l'aperçu ; chaque lot y ajoute sa section.                                                                                                     |
-| `src-tauri/capabilities/default.json`                          | Inchangé (lot L : à décider).                                                                                                                                                |
+| `src-tauri/capabilities/default.json`                          | Inchangé (lot L : `tauri-plugin-updater` appelé depuis Rust seulement, aucune permission).                                                                                   |
 
 ## 8. Tâches
 
@@ -207,10 +209,10 @@ le comportement du cœur, que vérifient `cargo test` et l'e2e.
 
 ## 11. Décisions
 
-| ID  | Question                                                                       | Décision                                                                                                |
-| --- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| Q1  | Mises à jour : `tauri-plugin-updater`, clés de signature et secrets de la CI ? | À trancher par Julien : il faut générer la paire de clés et poser les secrets ; le lot L attend.        |
-| Q2  | Arrêt sur échec réglable dès le MVP ?                                          | 2026-11-13 : non, un test s'arrête toujours à la première étape en échec (R3) ; le réglage vient en V4. |
-| Q3  | Où vit une extraction ?                                                        | 2026-11-13 : action `set-variable` du schéma OpenCollection (R2), sans extension Arnod.                 |
-| Q4  | Filtre de l'arborescence : dans le cœur ou dans l'interface ?                  | 2026-11-13 : dans l'interface, c'est un filtre d'affichage (`CLAUDE.md`).                               |
-| Q5  | Écarts « à décider » de la maquette                                            | 2026-11-13 : hors de ce plan (R9) ; à trancher écran par écran.                                         |
+| ID  | Question                                                                       | Décision                                                                                                                                                  |
+| --- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Mises à jour : `tauri-plugin-updater`, clés de signature et secrets de la CI ? | 2026-11-16 : oui, selon [`plan-mvp-l-mises-a-jour.md`](plan-mvp-l-mises-a-jour.md) ; Julien génère la paire de clés, pose la clé publique et les secrets. |
+| Q2  | Arrêt sur échec réglable dès le MVP ?                                          | 2026-11-13 : non, un test s'arrête toujours à la première étape en échec (R3) ; le réglage vient en V4.                                                   |
+| Q3  | Où vit une extraction ?                                                        | 2026-11-13 : action `set-variable` du schéma OpenCollection (R2), sans extension Arnod.                                                                   |
+| Q4  | Filtre de l'arborescence : dans le cœur ou dans l'interface ?                  | 2026-11-13 : dans l'interface, c'est un filtre d'affichage (`CLAUDE.md`).                                                                                 |
+| Q5  | Écarts « à décider » de la maquette                                            | 2026-11-13 : hors de ce plan (R9) ; à trancher écran par écran.                                                                                           |

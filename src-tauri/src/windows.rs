@@ -54,6 +54,9 @@ pub mod events {
     /// Raccourci choisi dans le menu natif (`Shortcut`) : la fenêtre visée agit
     /// comme au clavier (lot F, R7).
     pub const SHORTCUT: &str = "arnod://raccourci";
+    /// Lot L : version trouvée et installation (`UpdatesView`), à chaque étape et au plus une
+    /// fois par pour cent téléchargé (`docs/plan-mvp-l-mises-a-jour.md`, R8).
+    pub const UPDATES: &str = "arnod://mise-a-jour";
 }
 
 /// Statuts des requêtes d'un projet, diffusés à chaque changement (R4, R5).

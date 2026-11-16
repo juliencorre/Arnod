@@ -52,7 +52,13 @@ async function boot(): Promise<void> {
   try {
     const warning = await catalog.load();
     await windows.load();
-    await Promise.all([catalog.subscribe(), workbench.subscribe(), contracts.subscribe()]);
+    await Promise.all([
+      catalog.subscribe(),
+      workbench.subscribe(),
+      contracts.subscribe(),
+      // Lot L : progression d'une mise à jour, annoncée par la fenêtre principale.
+      useUpdatesStore().subscribe(windows.kind === "main"),
+    ]);
     if (windows.kind !== "main") {
       // Fermeture d'une fenêtre détachée : enregistrer, puis se rattacher (Z6).
       await events.onClose(() => {
@@ -88,7 +94,7 @@ watch(
 onMounted(async () => {
   if (await startup.check()) await boot();
   await reveal();
-  // Lot L allégé (1.6-g) : une version plus récente s'annonce, si la vérification est due.
+  // Lot L (1.6-g) : une version plus récente s'annonce, si la vérification est due.
   if (ready.value && windows.kind === "main") void useUpdatesStore().checkAtStartup();
 });
 </script>

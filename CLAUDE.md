@@ -30,7 +30,8 @@ leur contrat selon `docs/plan-requetes-dans-contrats.md` (sections « Contrats d
 Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
 **Travail en cours** : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots A à L en
-trois vagues, règles communes R1 à R10). Un lot = une branche `claude/mvp-<lot>` et une pull request ;
+trois vagues, règles communes R1 à R10) ; lot L (installation des mises à jour) selon
+`docs/plan-mvp-l-mises-a-jour.md`. Un lot = une branche `claude/mvp-<lot>` et une pull request ;
 il respecte les règles communes, notamment les ajouts en fin de liste dans les fichiers partagés (R5)
 et la comparaison avec la maquette par l'aperçu (R6).
 
@@ -110,7 +111,8 @@ e2e/                    Tests e2e sur l'application réelle (tauri-driver, Webdr
 src-tauri/              Cœur Rust
   tauri.conf.json       Fenêtre, CSP, bundles (NSIS currentUser, AppImage)
   capabilities/         Permissions de la WebView
-  src/lib.rs            Builder Tauri, plugin dialog, état, enregistrement des commandes
+  src/lib.rs            Builder Tauri, plugins dialog et updater, état, enregistrement des
+                        commandes
   src/error.rs          CommandError, erreur commune des commandes
   src/catalog/          Règles des projets et workspaces (pur : ni Tauri, ni disque)
   src/storage.rs        Lecture / écriture atomique d'arnod.json
@@ -137,13 +139,17 @@ src-tauri/              Cœur Rust
   src/opencollection/   Format OpenCollection 1.0.0 : schéma embarqué, YAML, requêtes, racine
                         (opencollection.yml, extensions.arnod), conversion de l'ancien format
   src/manifest.rs       Dossier d'un projet et sa racine opencollection.yml
+  src/updates.rs        Mises à jour : version du canal, manifeste latest.json, état de
+                        l'installation (pur)
   src/state.rs          AppState : catalogue + stockage + annulation (app.manage)
   src/menu.rs           Menu natif (Fichier > Quitter, Fenêtre > Dispositions, détacher, rattacher)
   src/commands/         Commandes, un fichier par domaine
+  tests/                Tests d'intégration (application Tauri simulée : mises à jour)
 docs/                   Plans, modèle de plan, maquettes, captures du README, schéma
                         OpenCollection 1.0.0 (docs/opencollection/), design system
                         (docs/design-system/)
-scripts/                Mesure de taille, concordance des versions, tests de fumée (CI), état de
+scripts/                Mesure de taille, concordance des versions, tests de fumée (CI),
+                        manifeste des mises à jour (updater-manifest.mjs), état de
                         la maquette (check-maquette.mjs, maquette-sync.py, maquette-couleurs.py),
                         design system (design-system.mjs), aperçu Playwright (apercu.mjs)
 .github/                Modèles d'issue et de pull request, Dependabot
@@ -214,17 +220,23 @@ Linux : installer d'abord les dépendances système
   `embedBootstrapper` (+1,8 Mo).
 - Installeur Windows < 15 Mo (vérifié par la CI, `scripts/bundle-size.mjs`).
 - CSP stricte dans `tauri.conf.json` : pas de ressource distante, pas de `unsafe-eval`.
-- Pas de nouveau plugin Tauri ni de nouvelle permission sans besoin explicite. Seul ajout
-  validé : `tauri-plugin-dialog`, appelé uniquement depuis Rust (ni paquet npm, ni
-  permission WebView). `reqwest`, `keyring`, `trash` et `tokio` sont des crates Rust, sans permission WebView.
+- Pas de nouveau plugin Tauri ni de nouvelle permission sans besoin explicite. Ajouts validés :
+  `tauri-plugin-dialog` et `tauri-plugin-updater` (lot L, sans ses options par défaut sauf
+  `rustls-tls`), appelés uniquement depuis Rust (ni paquet npm, ni permission WebView : les
+  commandes du plugin ne sont pas appelables par l'interface). `reqwest`, `keyring`, `trash` et
+  `tokio` sont des crates Rust, sans permission WebView.
 - Thème clair/sombre suivant le système via les variables de `src/styles.css` (palette des
   maquettes, accent orange) : utiliser `var(--color-*)`, jamais de couleur codée en dur dans
   les composants. Tout nouveau jeton est défini pour les deux thèmes, en `#rrggbb`, et reçoit sa
   note d'usage dans `scripts/design-system.mjs` ; `tests/theme.spec.ts` vérifie les contrastes.
 - Police système uniquement : la CSP interdit les polices distantes des maquettes.
-- Hors périmètre actuel : SOAP (et donc WSDL), mocks, scripts, CLI, signature de code, updater. Les
+- Hors périmètre actuel : SOAP (et donc WSDL), mocks, scripts, CLI, signature de code. Les
   requêtes HTTP sont livrées (premier usage), les contrats OpenAPI aussi ; les secrets vont dans le
   coffre du système, jamais dans le projet.
+- Un test Rust qui construit une application Tauri, même simulée (`tauri::test`), vit dans
+  `src-tauri/tests/` (test d'intégration) : sous Windows, seuls ces binaires de test reçoivent le
+  manifeste Common Controls v6 (`build.rs`, `tests-manifest.xml`) ; un test unitaire qui le fait
+  ne démarre pas (STATUS_ENTRYPOINT_NOT_FOUND).
 - Une tâche de fond lancée depuis une commande passe par `tauri::async_runtime::spawn` : une
   commande synchrone ne s'exécute pas dans un contexte tokio (`tokio::spawn` y panique).
 - Une annulation (envoi, run) passe par `http::Cancel`, qui la mémorise : un `Notify` seul ne
@@ -742,19 +754,41 @@ Référence : écrans 4.1-f, 4.1-g et 3.2-c (lot J).
 
 ## Mises à jour
 
-Référence : écran 1.6-g (lot L allégé). Q1 reste ouverte : ni téléchargement ni installation
-automatique, ni plugin `updater` ni signature.
+Référence : écran 1.6-g, lot L allégé (vérification) puis `docs/plan-mvp-l-mises-a-jour.md`
+(installation : cas MJ1 à MJ7, règles R1 à R9 ; décision Q1 du plan d'ensemble).
 
-- `src-tauri/src/updates.rs` : version la plus récente du canal (`pick`, stable ou préversions,
-  brouillons ignorés), échéance d'une vérification automatique (`due` : au démarrage, puis au plus
-  une fois par jour), points des notes (`highlights`) ; préférences du poste dans `updates.json`
-  (dossier de données, écriture atomique). La liste vient de l'API des releases GitHub, lue par
-  `network::Network` (proxy et autorités du poste).
-- Commandes `updates_load`, `updates_save`, `updates_check` (`automatic` : seulement si c'est dû),
-  `updates_open` (page d'une release du dépôt seulement, par `startup::open_external`).
-- Interface : section « Mises à jour » des préférences (`UpdatesSection.vue`, store `updates`) ;
-  au démarrage, la fenêtre principale appelle `checkAtStartup` : une version plus récente
-  s'annonce par une notification « Voir ». Le bac à sable e2e coupe la vérification automatique.
+- `src-tauri/src/updates.rs` (pur) : version la plus récente du canal (`pick`, stable ou
+  préversions, brouillons ignorés), échéance d'une vérification automatique (`due` : au démarrage,
+  puis au plus une fois par jour), points des notes (`highlights`), adresse du manifeste
+  `latest.json` de la release (`Release.manifest`, jamais envoyée à l'interface), contrôle du
+  manifeste (`check_manifest` : version de la release), état `InstallState`, pas de la
+  progression (`progress_due`), messages du plugin (`install_message`) ; préférences du poste dans
+  `updates.json` (dossier de données, écriture atomique). La liste vient de l'API des releases
+  GitHub, lue par `network::Network` (proxy et autorités du poste).
+- Installable (R1) : la release porte `latest.json`, `plugins.updater.pubkey` de `tauri.conf.json`
+  n'est pas vide, et le poste est installé par NSIS (Windows) ou lancé en AppImage (Linux). Sinon,
+  « Voir la version » ouvre la page de la release.
+- Arnod télécharge le manifeste et le paquet par `Network::download` (proxy, autorités internes,
+  200 Mo au plus, annulation par `http::Cancel`) ; `tauri-plugin-updater` ne fait que reprendre le
+  manifeste (`Updater::restore_update`), vérifier la signature minisign avec la clé embarquée
+  (`Update::verify`, `requireSignedVersion`) et installer (`Update::install` : NSIS passif
+  `currentUser`, AppImage remplacée). Un paquet refusé n'est jamais gardé ni lancé.
+- État de la session dans `commands::updates::UpdatesState` (version trouvée, état, paquet vérifié,
+  annulation), diffusé par `arnod://mise-a-jour` (`UpdatesView`). Commandes `updates_load`,
+  `updates_save`, `updates_check` (`automatic` : seulement si c'est dû), `updates_open` (page d'une
+  release du dépôt seulement), `updates_download`, `updates_cancel`, `updates_install` (`now` :
+  installe et relance Arnod sans répondre ; sinon à la sortie d'Arnod, `install_on_exit` appelé
+  sur `RunEvent::Exit` dans `lib.rs`).
+- Interface : section « Mises à jour » des préférences (`UpdatesSection.vue`, store `updates`,
+  abonné dans chaque fenêtre) ; au démarrage, la fenêtre principale appelle `checkAtStartup` : une
+  version plus récente s'annonce par une notification « Installer » (ou « Voir »), puis « Arnod X
+  est prête » avec « Redémarrer maintenant ». Avant d'installer, la fenêtre enregistre ses
+  contrats et requêtes ; un brouillon non enregistré arrête l'installation (R6). Le bac à sable e2e
+  coupe la vérification automatique.
+- Publication : un tag est construit avec la clé privée (secrets `TAURI_SIGNING_PRIVATE_KEY` et
+  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, configuration `src-tauri/tauri.updater.conf.json`) ;
+  `scripts/updater-manifest.mjs` écrit `latest.json` (signature de la version du tag exigée) et la
+  release le reçoit ; un tag avec suffixe (`-beta.1`) publie une préversion.
 
 ## Vocabulaire et finitions
 

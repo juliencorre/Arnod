@@ -47,6 +47,10 @@ use self::tls::Rejections;
 /// Bornes du délai de connexion réglable (1 s à 5 min).
 const CONNECT_TIMEOUT_RANGE: (u64, u64) = (1_000, 300_000);
 
+/// Redirections suivies par un téléchargement (les paquets des releases GitHub passent par une
+/// adresse de stockage).
+const DOWNLOAD_REDIRECTS: u32 = 10;
+
 pub fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -390,25 +394,143 @@ impl Network {
                 Ok(response)
             }
             Err(Failed::Command(error)) => Err(error),
-            Err(Failed::Http(error, elapsed_ms)) => {
-                let rejection = self
-                    .rejections
-                    .lock()
-                    .ok()
-                    .and_then(|mut all| all.remove(&host))
-                    .filter(|r| r.at >= started);
-                Err(failure::classify(
-                    &error,
-                    &Attempt {
-                        url: &prepared.url,
-                        proxy: used_proxy,
-                        connect_timeout_ms,
-                        elapsed_ms,
-                        rejection,
-                    },
-                ))
-            }
+            Err(Failed::Http(error, elapsed_ms)) => Err(self.explain(
+                &error,
+                &prepared.url,
+                used_proxy,
+                connect_timeout_ms,
+                (started, elapsed_ms),
+            )),
         }
+    }
+
+    /// Explique l'échec du client pour `url` (R5 à R7) : certificat refusé depuis `started`,
+    /// proxy utilisé, délai de connexion.
+    fn explain(
+        &self,
+        error: &reqwest::Error,
+        url: &str,
+        proxy: Option<String>,
+        connect_timeout_ms: u64,
+        (started, elapsed_ms): (Instant, u64),
+    ) -> CommandError {
+        let host = Url::parse(url)
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
+            .unwrap_or_default();
+        let rejection = self
+            .rejections
+            .lock()
+            .ok()
+            .and_then(|mut all| all.remove(&host))
+            .filter(|r| r.at >= started);
+        failure::classify(
+            error,
+            &Attempt {
+                url,
+                proxy,
+                connect_timeout_ms,
+                elapsed_ms,
+                rejection,
+            },
+        )
+    }
+
+    /// Lot L (`docs/plan-mvp-l-mises-a-jour.md`, R4) : télécharge `url` en binaire par le client
+    /// du poste (proxy, autorités internes, délai de connexion), redirections comprises.
+    /// `progress(reçus, total annoncé)` suit chaque morceau. Refusé : un statut autre que 2xx,
+    /// plus de `max_bytes`, aucune donnée pendant `stall`. `cancel` l'interrompt.
+    pub async fn download(
+        &self,
+        url: &str,
+        max_bytes: u64,
+        stall: Duration,
+        cancel: &Cancel,
+        mut progress: impl FnMut(u64, Option<u64>) + Send,
+    ) -> Result<Vec<u8>, CommandError> {
+        let (client, effective, connect_timeout_ms) = self.client(DOWNLOAD_REDIRECTS)?;
+        let parsed = Url::parse(url).map_err(|_| {
+            CommandError::new(
+                CommandErrorKind::InvalidRequest,
+                format!("L'adresse du téléchargement « {url} » est invalide."),
+            )
+        })?;
+        let host = parsed.host_str().unwrap_or_default().to_ascii_lowercase();
+        let used_proxy = effective.for_url(parsed.scheme(), &host);
+        let started = Instant::now();
+        let millis = || u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let too_big = || {
+            Failed::Command(CommandError::new(
+                CommandErrorKind::InvalidRequest,
+                format!(
+                    "Le fichier téléchargé dépasse {} Mo : il est refusé.",
+                    max_bytes / (1024 * 1024)
+                ),
+            ))
+        };
+        let fetch = async {
+            let mut response = client
+                .get(parsed.clone())
+                .header(reqwest::header::ACCEPT, "application/octet-stream")
+                .send()
+                .await
+                .map_err(|e| Failed::Http(e, millis()))?;
+            let status = response.status();
+            if !status.is_success() {
+                return Err(Failed::Command(CommandError::new(
+                    CommandErrorKind::Network,
+                    format!(
+                        "Le téléchargement a échoué : réponse {} de {host}.",
+                        status.as_u16()
+                    ),
+                )));
+            }
+            let total = response.content_length();
+            if total.is_some_and(|t| t > max_bytes) {
+                return Err(too_big());
+            }
+            let capacity = usize::try_from(total.unwrap_or(0).min(max_bytes)).unwrap_or(0);
+            let mut bytes: Vec<u8> = Vec::with_capacity(capacity);
+            loop {
+                let chunk = tokio::time::timeout(stall, response.chunk())
+                    .await
+                    .map_err(|_| {
+                        Failed::Command(CommandError::new(
+                            CommandErrorKind::Timeout,
+                            format!(
+                                "Le téléchargement s'est arrêté : rien reçu de {host} depuis {} s.",
+                                stall.as_secs()
+                            ),
+                        ))
+                    })?
+                    .map_err(|e| Failed::Http(e, millis()))?;
+                let Some(chunk) = chunk else { break };
+                if (bytes.len() + chunk.len()) as u64 > max_bytes {
+                    return Err(too_big());
+                }
+                bytes.extend_from_slice(&chunk);
+                progress(bytes.len() as u64, total);
+            }
+            Ok(bytes)
+        };
+        let result = tokio::select! {
+            biased;
+            () = cancel.cancelled() => Err(Failed::Command(CommandError::new(
+                CommandErrorKind::Cancelled,
+                "Téléchargement annulé.",
+            ))),
+            result = fetch => result,
+        };
+        result.map_err(|failed| match failed {
+            Failed::Command(error) => error,
+            Failed::Http(error, elapsed_ms) => self.explain(
+                &error,
+                url,
+                used_proxy,
+                connect_timeout_ms,
+                (started, elapsed_ms),
+            ),
+        })
     }
 
     /// Envoie `prepared` : jeton OAuth 2 et cookies ajoutés, cookies reçus gardés (R9, R12).

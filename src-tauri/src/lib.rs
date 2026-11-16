@@ -58,6 +58,10 @@ pub fn run() {
     tauri::Builder::default()
         // Sélecteur de dossier, appelé uniquement depuis Rust : aucune permission WebView.
         .plugin(tauri_plugin_dialog::init())
+        // Lot L : vérification et installation des mises à jour, appelées depuis Rust seulement
+        // (aucune permission WebView ; clé publique dans `tauri.conf.json`).
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(commands::updates::UpdatesState::default())
         .menu(menu::build)
         .on_menu_event(menu::handle_event)
         .setup(|app| {
@@ -247,6 +251,9 @@ pub fn run() {
             commands::updates::updates_save,
             commands::updates::updates_check,
             commands::updates::updates_open,
+            commands::updates::updates_download,
+            commands::updates::updates_cancel,
+            commands::updates::updates_install,
             // Sélection multiple (4.1-a quater).
             commands::batch::tree_batch,
             commands::batch::tree_batch_undo,
@@ -258,6 +265,9 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 // Positions et tailles des fenêtres détachées, pour la restauration (F13).
                 app.state::<WindowsState>().flush();
+                // Lot L : version mise de côté pour « Au prochain lancement » (R9), que la
+                // sortie vienne de la fenêtre principale fermée ou de Fichier > Quitter.
+                commands::updates::install_on_exit(app);
             }
         });
 }

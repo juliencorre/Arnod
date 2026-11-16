@@ -67,12 +67,14 @@ jobs:
             # N3 : installeur inférieur à 15 Mo.
             max-mb: 15
             artifact: arnod-windows-nsis
+            dir: src-tauri/target/release/bundle/nsis
             path: src-tauri/target/release/bundle/nsis/*-setup.exe
           - name: Linux (AppImage)
             # Ubuntu 22.04 : glibc minimale visée par N6.
             os: ubuntu-22.04
             bundle: appimage
             artifact: arnod-linux-appimage
+            dir: src-tauri/target/release/bundle/appimage
             path: src-tauri/target/release/bundle/appimage/*.AppImage
     runs-on: ${{ matrix.os }}
     steps:
@@ -113,8 +115,29 @@ jobs:
         working-directory: src-tauri
         run: cargo test --locked
 
+      # Lot L (docs/plan-mvp-l-mises-a-jour.md) : avec la clé privée, chaque paquet reçoit sa
+      # signature (.sig) pour la mise à jour par Arnod. Obligatoire pour un tag : une release non
+      # signée ne s'installerait pas depuis Arnod. Sans la clé (pull request de Dependabot) : build
+      # sans signature.
       - name: tauri build
-        run: npm run tauri build
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            npm run tauri build -- --config src-tauri/tauri.updater.conf.json
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY absent : une release doit être signée (README, « Publier une version »)."
+            exit 1
+          else
+            npm run tauri build
+          fi
+
+      - name: Signature du paquet
+        if: hashFiles(format('{0}/*.sig', matrix.dir)) != ''
+        shell: bash
+        run: node scripts/updater-manifest.mjs "${{ matrix.dir }}" --partiel --sortie "$RUNNER_TEMP/latest.json"
 
       - name: Taille du paquet
         run: node scripts/bundle-size.mjs ${{ matrix.bundle }} ${{ matrix.max-mb && format('--max-mb {0}', matrix.max-mb) || '' }}
@@ -123,7 +146,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.path }}
+          path: |
+            ${{ matrix.path }}
+            ${{ matrix.path }}.sig
           if-no-files-found: error
 
       - name: Test de fumée (AppImage sous Xvfb)
@@ -212,11 +237,20 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # Lot L : manifeste lu par Arnod pour s'installer (paquets, signatures, version). Échoue sans
+      # clé publique dans tauri.conf.json ou sans paquet signé pour chaque plateforme.
+      - name: Manifeste de mise à jour (latest.json)
+        run: node scripts/updater-manifest.mjs dist "${GITHUB_REF_NAME}"
+
       - name: Créer la release ou y ajouter les paquets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -l dist
+          # Un tag avec suffixe (v0.2.0-beta.1) publie une préversion : seul le canal
+          # « Préversions » la propose.
+          prerelease=()
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then prerelease=(--prerelease); fi
           # Release déjà créée (à la main ou par une exécution précédente) : on y ajoute les
           # paquets au lieu d'échouer.
           if gh release view "${GITHUB_REF_NAME}" > /dev/null 2>&1; then
@@ -224,5 +258,5 @@ jobs:
           else
             gh release create "${GITHUB_REF_NAME}" dist/* \
               --title "Arnod ${GITHUB_REF_NAME}" \
-              --generate-notes
+              --generate-notes "${prerelease[@]}"
           fi
