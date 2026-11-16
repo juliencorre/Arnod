@@ -3095,6 +3095,14 @@ describe("Sélection multiple (4.1-a quater)", () => {
       timeout: 10_000,
       timeoutMsg: "copies attendues",
     });
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document.querySelector(".toast__message")?.textContent.includes("dupliqués") ?? false,
+        ),
+      { timeout: 10_000, timeoutMsg: "notification « 2 éléments dupliqués » attendue" },
+    );
     await clickText(".toast button", "Annuler");
     await browser.waitUntil(() => copies.every((c) => !existsSync(c)), {
       timeout: 10_000,
