@@ -70,7 +70,9 @@ const runLabel = computed(() => {
 
 /** Menu « + » du projet (1.2-a ter, M1) : ce que le projet sait créer, avec ses raccourcis. */
 const ADD_ITEMS: MenuItem[] = [
-  { id: "request", label: "Nouvelle requête", shortcut: "Ctrl+N" },
+  // Lot K (1.2-a ter) : un test d'abord (Ctrl+N), puis une requête libre, hors de tout test.
+  { id: "test", label: "Nouveau test", shortcut: "Ctrl+N" },
+  { id: "request", label: "Requête libre" },
   { id: "folder", label: "Nouveau dossier", shortcut: "Ctrl+Maj+N" },
   {
     id: "contract",
@@ -143,7 +145,8 @@ async function run(): Promise<void> {
 
 async function onAdd(item: string): Promise<void> {
   if (!(await ensureExpanded())) return;
-  if (item === "request") tree.value?.newRequest();
+  if (item === "test") await tree.value?.newTest();
+  else if (item === "request") tree.value?.newRequest();
   else if (item === "folder") tree.value?.newFolder();
   else if (item === "environment") environment.value?.manage(true);
   else if (item.startsWith("contract:")) contracts.value?.add(item.slice("contract:".length));
@@ -179,6 +182,7 @@ async function focusFilter(): Promise<boolean> {
 
 /** Raccourcis de la barre latérale : Ctrl+N, Ctrl+Maj+N, Ctrl+Maj+E (B6, M2) et Ctrl+F (F5). */
 defineExpose({
+  newTest: () => onAdd("test"),
   newRequest: () => onAdd("request"),
   newFolder: () => onAdd("folder"),
   manageEnvironments: () => onMore("environments"),

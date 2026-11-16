@@ -35,6 +35,53 @@ pub struct HttpResponse {
     /// Réception du corps, en ms.
     pub receive_ms: u64,
     pub total_ms: u64,
+    /// Lot K (5.1-c) : où le temps est passé.
+    pub timeline: Timeline,
+}
+
+/// Chronologie d'un envoi (lot K, écran 5.1-c), en ms : DNS, connexion (TCP et TLS), attente du
+/// serveur, réception. DNS et connexion sont absents quand une connexion du pool a servi.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Timeline {
+    pub dns_ms: Option<u64>,
+    /// Connexion après le DNS : TCP, puis TLS en HTTPS (ou le tunnel d'un proxy).
+    pub connect_ms: Option<u64>,
+    /// La connexion est chiffrée (HTTPS).
+    pub secure: bool,
+    /// Envoi et attente du premier octet de la réponse, connexion déduite.
+    pub server_ms: u64,
+    pub receive_ms: u64,
+    pub total_ms: u64,
+}
+
+impl Timeline {
+    /// Chronologie d'une réponse et des phases mesurées pendant son envoi.
+    pub fn of(response: &HttpResponse, phases: crate::network::phases::Phases, url: &str) -> Self {
+        let dns = phases.dns_ms;
+        let connect = phases
+            .connect_ms
+            .map(|c| c.saturating_sub(dns.unwrap_or(0)));
+        let before = phases.connect_ms.or(dns).unwrap_or(0);
+        Self {
+            dns_ms: dns,
+            connect_ms: connect,
+            secure: url.trim_start().to_ascii_lowercase().starts_with("https:"),
+            server_ms: response.wait_ms.saturating_sub(before),
+            receive_ms: response.receive_ms,
+            total_ms: response.total_ms,
+        }
+    }
+
+    /// Sans mesure des phases : tout le temps avant le premier octet est l'attente.
+    fn plain(wait_ms: u64, receive_ms: u64, total_ms: u64) -> Self {
+        Self {
+            server_ms: wait_ms,
+            receive_ms,
+            total_ms,
+            ..Self::default()
+        }
+    }
 }
 
 impl HttpResponse {
@@ -297,6 +344,11 @@ async fn run(client: &reqwest::Client, prepared: &Prepared) -> Result<HttpRespon
         wait_ms: millis(wait),
         receive_ms: millis(total.saturating_sub(wait)),
         total_ms: millis(total),
+        timeline: Timeline::plain(
+            millis(wait),
+            millis(total.saturating_sub(wait)),
+            millis(total),
+        ),
     })
 }
 

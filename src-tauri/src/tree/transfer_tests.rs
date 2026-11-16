@@ -350,7 +350,7 @@ fn j9_ce_qui_change_etape_lien_variables_et_copie() {
     );
     assert_eq!(
         changes[4].detail,
-        "En-têtes, 2 vérifications et étiquettes. Les secrets restent au coffre : ils ne sont jamais copiés."
+        "En-têtes, 2 assertions et étiquettes. Les secrets restent au coffre : ils ne sont jamais copiés."
     );
     assert_eq!(
         changes[5].detail,

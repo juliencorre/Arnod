@@ -4,6 +4,8 @@ import { reactive, ref } from "vue";
 import { ipc } from "@/lib/ipc";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type {
+  Auth,
+  ClearSecret,
   CurlCopy,
   DynamicValue,
   Pair,
@@ -39,7 +41,11 @@ export const useInputStore = defineStore("input", () => {
         editor.path,
         editor.draft,
       );
-      if (asked.get(key) === ticket) inputs.set(key, input);
+      if (asked.get(key) === ticket) {
+        inputs.set(key, input);
+        // Lot K (4.2-c) : un secret en clair suspend l'enregistrement jusqu'au choix.
+        workbench.holdSecret(key, pendingSecrets(key).length > 0);
+      }
     } catch {
       // Environnement disparu, projet fermé : rien n'est souligné.
       if (asked.get(key) === ticket) inputs.delete(key);
@@ -49,6 +55,7 @@ export const useInputStore = defineStore("input", () => {
   function forget(key: string): void {
     asked.delete(key);
     inputs.delete(key);
+    kept.delete(key);
   }
 
   /** La requête ouverte `key` en commande cURL, dans son environnement actif (R8). */
@@ -108,6 +115,75 @@ export const useInputStore = defineStore("input", () => {
     return dynamicLoad;
   }
 
+  // --- Lot K : secret saisi en clair dans l'authentification (4.2-c) ---------------
+
+  /** Valeurs que l'utilisateur a choisi de laisser dans la requête, par clé et champ. */
+  const kept = reactive(new Map<string, Set<string>>());
+
+  function authOf(key: string): Auth | null {
+    return workbench.editors[key]?.draft?.auth ?? null;
+  }
+
+  /** Valeur du champ `field` de l'authentification. */
+  function fieldValue(auth: Auth, field: string): string {
+    if (field === "oauth2.clientSecret") return auth.oauth2.clientSecret;
+    if (field === "token" || field === "password" || field === "value") return auth[field];
+    return "";
+  }
+
+  /** Secrets en clair de la requête `key` qui attendent un choix. */
+  function pendingSecrets(key: string): ClearSecret[] {
+    const auth = authOf(key);
+    const secrets = inputs.get(key)?.secrets ?? [];
+    if (!auth) return [];
+    return secrets.filter((s) => !kept.get(key)?.has(`${s.field}\n${fieldValue(auth, s.field)}`));
+  }
+
+  /** « Laisser dans le test » : la valeur est écrite telle quelle. */
+  function keepSecrets(key: string): void {
+    const auth = authOf(key);
+    if (!auth) return;
+    const set = kept.get(key) ?? new Set<string>();
+    for (const s of inputs.get(key)?.secrets ?? [])
+      set.add(`${s.field}\n${fieldValue(auth, s.field)}`);
+    kept.set(key, set);
+    workbench.holdSecret(key, false);
+  }
+
+  /**
+   * « Mettre dans une variable locale » : la valeur va au coffre du système, dans une variable
+   * locale secrète de l'environnement actif, et le champ devient `{{nom}}`.
+   */
+  async function secretToLocal(key: string, secret: ClearSecret): Promise<string> {
+    const editor = workbench.editors[key];
+    const auth = authOf(key);
+    const view = editor ? workbench.environments[editor.projectId] : undefined;
+    const env = view?.environments.find((e) => e.name === view.active);
+    if (!editor || !auth || !env) throw new Error("Aucun environnement actif.");
+    const value = fieldValue(auth, secret.field);
+    const name = secret.suggested;
+    if (!env.locals.includes(name)) {
+      await workbench.saveEnvironment(
+        editor.projectId,
+        {
+          name: env.name,
+          color: env.color,
+          protected: env.protected,
+          variables: env.variables,
+          locals: [...env.locals, name],
+        },
+        env.name,
+      );
+    }
+    await workbench.setLocal(editor.projectId, env.name, name, value, true);
+    const reference = `{{${name}}}`;
+    if (secret.field === "oauth2.clientSecret") auth.oauth2.clientSecret = reference;
+    else if (secret.field === "token" || secret.field === "password" || secret.field === "value")
+      auth[secret.field] = reference;
+    workbench.holdSecret(key, false);
+    return env.name;
+  }
+
   return {
     inputs,
     inspect,
@@ -118,5 +194,9 @@ export const useInputStore = defineStore("input", () => {
     fromText,
     dynamicValues,
     loadDynamicValues,
+    // Lot K : secret en clair.
+    pendingSecrets,
+    keepSecrets,
+    secretToLocal,
   };
 });

@@ -127,9 +127,7 @@ defineExpose({
     </p>
     <template v-else-if="current">
       <div class="filter__actions">
-        <BaseButton :disabled="current.assertion === null" @click="add">
-          + Vérification
-        </BaseButton>
+        <BaseButton :disabled="current.assertion === null" @click="add"> + Assertion </BaseButton>
         <BaseButton :disabled="current.assertion === null" @click="extract">
           Extraire dans une variable
         </BaseButton>
@@ -137,10 +135,10 @@ defineExpose({
       </div>
       <p class="filter__hint">
         <template v-if="current.assertion">
-          « + Vérification » ajoute <code>{{ describe(current.assertion) }}</code> à la requête.
+          « + Assertion » ajoute <code>{{ describe(current.assertion) }}</code> à la requête.
         </template>
         <template v-else>
-          Ce chemin ne s'écrit pas en notation pointée : il ne peut pas devenir une vérification.
+          Ce chemin ne s'écrit pas en notation pointée : il ne peut pas devenir une assertion.
         </template>
         Entrée passe au résultat suivant ; Ctrl+F ouvre le filtre.
       </p>

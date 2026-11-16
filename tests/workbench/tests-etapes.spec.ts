@@ -86,10 +86,9 @@ describe("nouveau test (4.1-b)", () => {
     await add.trigger("keydown", { key: "ArrowDown" });
     await flushPromises();
     const items = app.findAll('[role="menuitem"]');
-    expect(items[2]?.text()).toBe("Nouveau test");
-    await items[0]?.trigger("keydown", { key: "ArrowDown" });
-    await items[1]?.trigger("keydown", { key: "ArrowDown" });
-    await items[2]?.trigger("keydown", { key: "Enter" });
+    // Lot K (1.2-a ter) : « Nouveau test » en tête, Ctrl+N.
+    expect(items[0]?.text()).toBe("Nouveau testCtrl+N");
+    await items[0]?.trigger("keydown", { key: "Enter" });
     await flushPromises();
     expect(core.calls.find((c) => c.cmd === "tree_create_test")?.args).toMatchObject({
       parent: "",

@@ -117,7 +117,7 @@ Cas C1 à C12 de [`docs/plan-contrats-services.md`](docs/plan-contrats-services.
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C1 à C4  | « + Ajouter un contrat » : importer un fichier, coller un contrat, le lire à une adresse ou en créer un vide ; OpenAPI 3.0, 3.1 ou Swagger 2.0, JSON ou YAML, rangé dans `contracts/`. |
 | C5       | Onglet du contrat : version, format, serveurs, opérations groupées par tag, couverture « n opérations · m avec requête ».                                                              |
-| C6, C7   | « Créer les requêtes » : une requête prête à envoyer par opération cochée (exemples, authentification, vérifications), liée au contrat ; `baseUrl` vide prend le serveur du contrat.   |
+| C6, C7   | « Créer les requêtes » : une requête prête à envoyer par opération cochée (exemples, authentification, assertions), liée au contrat ; `baseUrl` vide prend le serveur du contrat.      |
 | C8       | Toute requête liée est vérifiée « conforme au contrat » : statut prévu et corps conforme au schéma, avec le chemin du premier écart ; « Délier » retire le lien.                       |
 | C9       | Vue « Source » : texte modifiable, enregistré seulement s'il reste un contrat lisible (Ctrl+S), ou remplacé par un fichier.                                                            |
 | C10      | « Exécuter » lance le run des requêtes du contrat.                                                                                                                                     |
@@ -131,29 +131,29 @@ Cas C1 à C12 de [`docs/plan-contrats-services.md`](docs/plan-contrats-services.
 Cas RU1 à RU6, ST1 à ST4 et VT1 à VT4 de
 [`docs/plan-fin-premier-usage.md`](docs/plan-fin-premier-usage.md) (maquettes 1e et 1f).
 
-| Run d'un dossier                                                | Vérification en échec                                                         |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| ![Run d'un dossier, thème clair](docs/screenshot-run.png)       | ![Vérification en échec, thème clair](docs/screenshot-verification.png)       |
-| ![Run d'un dossier, thème sombre](docs/screenshot-run-dark.png) | ![Vérification en échec, thème sombre](docs/screenshot-verification-dark.png) |
+| Run d'un dossier                                                | Assertion en échec                                                         |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| ![Run d'un dossier, thème clair](docs/screenshot-run.png)       | ![Assertion en échec, thème clair](docs/screenshot-verification.png)       |
+| ![Run d'un dossier, thème sombre](docs/screenshot-run-dark.png) | ![Assertion en échec, thème sombre](docs/screenshot-verification-dark.png) |
 
 | ID        | Comportement                                                                                                                                          |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | RU1       | « 56 réussis, 4 en échec », `run #3 · Recette · 8 en même temps · 4,1 s`, barre verte et rouge ; avancement suivi en direct dans toutes les fenêtres. |
-| RU2, RU3  | Onglets « Échecs », « Tous », « Lents » ; chaque échec donne la vérification, l'attendu et le reçu, et s'ignore pour ce run.                          |
+| RU2, RU3  | Onglets « Échecs », « Tous », « Lents » ; chaque échec donne l'assertion, l'attendu et le reçu, et s'ignore pour ce run.                              |
 | RU4       | « Résultat par dossier » : barre et « 15/16 » par dossier ; un clic filtre la liste ; « Grouper par dossier » ou « À plat ».                          |
 | ST1 à ST4 | Dans la barre latérale, ✓ ou ✕ par requête et « réussies / exécutées » par dossier ou ressource de contrat, gardés d'une session à l'autre.           |
-| VT1 à VT3 | Sous la réponse, chaque vérification en échec : « Ignorer pour ce run » (la requête n'est pas modifiée) ou « Retirer la vérification ».               |
+| VT1 à VT3 | Sous la réponse, chaque assertion en échec : « Ignorer pour ce run » (la requête n'est pas modifiée) ou « Retirer l'assertion ».                      |
 
 ### Barre latérale du projet
 
 Cas B1 à B6 de [`docs/plan-barre-laterale-projet.md`](docs/plan-barre-laterale-projet.md).
 
-| ID     | Comportement                                                                                                                           |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| B1, B5 | La ligne du projet porte ▶ (exécuter), + (ajouter) et ⋯ ; un projet replié montre son environnement à droite de son nom.               |
-| B2     | Une pastille sous le nom ouvre le menu des environnements : couleur, adresse, protégé, gestion et création.                            |
-| B3, B4 | « + » : nouvelle requête, dossier, contrat, environnement ; un projet vide propose « + Nouvelle requête » et « + Ajouter un contrat ». |
-| B6     | Ctrl+N crée une requête, Ctrl+Maj+E ouvre les environnements du projet sélectionné.                                                    |
+| ID     | Comportement                                                                                                                                  |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1, B5 | La ligne du projet porte ▶ (exécuter), + (ajouter) et ⋯ ; un projet replié montre son environnement à droite de son nom.                      |
+| B2     | Une pastille sous le nom ouvre le menu des environnements : couleur, adresse, protégé, gestion et création.                                   |
+| B3, B4 | « + » : nouveau test, requête libre, dossier, contrat, environnement ; un projet vide propose « + Nouveau test » et « + Ajouter un contrat ». |
+| B6     | Ctrl+N crée un test, Ctrl+Maj+E ouvre les environnements du projet sélectionné.                                                               |
 
 ### Configuration d'un endpoint
 
@@ -190,7 +190,7 @@ boutique-tests/
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | S1, S5 | Un projet est un dossier contenant `opencollection.yml` ; une collection Bruno s'ajoute comme projet existant.                                 |
 | S2     | Enregistrer ne change que ce qu'Arnod gère : scripts, exemples, documentation, descriptions, autres authentifications et corps sont conservés. |
-| S3     | Vérifications avec les 28 opérateurs d'OpenCollection et de Bruno (`eq`, `lt`, `isDefined`, `between`…), activables une à une.                 |
+| S3     | Assertions avec les 28 opérateurs d'OpenCollection et de Bruno (`eq`, `lt`, `isDefined`, `between`…), activables une à une.                    |
 | S6     | Un projet d'une version précédente d'Arnod (`arnod.yml`) est converti à l'ouverture, une fois, sans perte.                                     |
 | S7     | Lien au contrat écrit en étiquette (`contract:contracts/petstore.yaml#GET /pets`).                                                             |
 | S8     | Paramètres de chemin (`:id`) remplacés à l'envoi.                                                                                              |

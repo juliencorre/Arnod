@@ -272,11 +272,7 @@ async function submit(): Promise<void> {
           <dt>Scripts</dt>
           <dd>
             {{
-              countLabel(
-                source.counts.assertions,
-                "vérification deviendra",
-                "vérifications deviendront",
-              )
+              countLabel(source.counts.assertions, "assertion deviendra", "assertions deviendront")
             }}
             sans code, {{ countLabel(source.counts.extractions, "extraction", "extractions") }} ;
             {{

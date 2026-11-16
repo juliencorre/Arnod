@@ -91,15 +91,15 @@ const requestCount = computed(() => {
 });
 
 const ADD_ITEMS: MenuItem[] = [
-  { id: "request", label: "Nouvelle requête", shortcut: "Ctrl+N" },
+  // Lot E (4.1-b) : le dossier du test et son étape 1 ; lot K (1.2-a ter) : en premier, Ctrl+N.
+  { id: "test", label: "Nouveau test", shortcut: "Ctrl+N" },
+  { id: "request", label: "Requête libre" },
   { id: "folder", label: "Nouveau dossier", shortcut: "Ctrl+Maj+N" },
-  // Lot E (4.1-b) : le dossier du test et son étape 1.
-  { id: "test", label: "Nouveau test" },
 ];
 
 function onAdd(id: string): void {
   if (id === "request") newRequest();
-  else if (id === "test") void guard(() => workbench.createTest(props.projectId, ""));
+  else if (id === "test") void newTest();
   else newFolder();
 }
 
@@ -203,7 +203,13 @@ function newFolder(): void {
   openName({ kind: "new-folder", parent: "" });
 }
 
-defineExpose({ newRequest, newFolder, focusFilter });
+/** Lot K (1.2-a ter) : « Nouveau test » à la racine, son étape 1 ouverte (Ctrl+N). */
+async function newTest(): Promise<void> {
+  reveal();
+  await guard(() => workbench.createTest(props.projectId, ""));
+}
+
+defineExpose({ newTest, newRequest, newFolder, focusFilter });
 
 async function submitName(name: string): Promise<void> {
   const action = nameAction.value;
@@ -279,9 +285,9 @@ async function submitName(name: string): Promise<void> {
         />
       </ul>
       <p v-else-if="filter" class="tree__none">Aucune requête ne correspond.</p>
-      <button v-else type="button" class="tree__ghost" @click="newRequest">
+      <button v-else type="button" class="tree__ghost" @click="newTest">
         <span class="tree__lead" aria-hidden="true">+</span>
-        Nouvelle requête
+        Nouveau test
       </button>
       <p v-if="requestCount > 0 && (filterFocused || filter)" class="tree__help">
         Nom, adresse, #étiquette, méthode · Échap efface

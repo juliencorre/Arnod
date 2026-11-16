@@ -4,6 +4,7 @@
  * comportement est testé côté Rust).
  */
 import type {
+  ClearSecret,
   AddedHeader,
   CurlCopy,
   DynamicValue,
@@ -150,7 +151,13 @@ export function handleInput(
               return e.locals.includes(name) ? [{ environment: e.name, value: null }] : [];
             }),
         }));
-      return { environment, known, unknown, added: added(request) } satisfies RequestInput;
+      return {
+        environment,
+        known,
+        unknown,
+        added: added(request),
+        secrets: clearSecrets(request, known),
+      } satisfies RequestInput;
     }
     case "request_curl":
       return curl(wb, args.request as RequestDoc);
@@ -185,3 +192,24 @@ export const FAKE_DYNAMIC_VALUES: DynamicValue[] = [
   { name: "$randomFirstName", description: "Prénom", example: "Léa" },
   { name: "$randomLastName", description: "Nom de famille", example: "Martin" },
 ];
+
+/** Lot K (4.2-c) : secret en clair de l'authentification, nom proposé libre (règle du cœur). */
+function clearSecrets(request: RequestDoc, known: string[]): ClearSecret[] {
+  const auth = request.auth;
+  const found: [string, string, string, string] | null =
+    auth.type === "bearer"
+      ? ["token", "jeton", auth.token, "token"]
+      : auth.type === "basic"
+        ? ["password", "mot de passe", auth.password, "password"]
+        : auth.type === "apiKey"
+          ? ["value", "clé d'API", auth.value, "apiKey"]
+          : null;
+  if (!found) return [];
+  const [field, label, value, base] = found;
+  if (value.trim() === "" || value.includes("{{")) return [];
+  let suggested = base;
+  for (let n = 2; known.some((k) => k.toLowerCase() === suggested.toLowerCase()); n++) {
+    suggested = `${base}${String(n)}`;
+  }
+  return [{ field, label, suggested }];
+}

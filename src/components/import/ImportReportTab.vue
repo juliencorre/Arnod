@@ -79,7 +79,7 @@ const stats = computed(() => {
     { value: c.environments, label: c.environments > 1 ? "environnements" : "environnement" },
     {
       value: c.assertions,
-      label: c.assertions > 1 ? "vérifications sans code" : "vérification sans code",
+      label: c.assertions > 1 ? "assertions sans code" : "assertion sans code",
     },
     { value: c.extractions, label: c.extractions > 1 ? "extractions" : "extraction" },
     {
@@ -243,8 +243,8 @@ const before = computed(() => (current.value ? originalBlock(current.value) : nu
               <strong>{{ STATUS_HEADLINES[current.status] }}</strong> {{ current.detail }}
             </p>
             <p v-if="current.status === 'notRun'" class="report__hint">
-              Les vérifications et extractions de la requête sont reprises sans code : elle
-              s'exécute sans ce script.
+              Les assertions et extractions de la requête sont reprises sans code : elle s'exécute
+              sans ce script.
             </p>
           </div>
         </aside>

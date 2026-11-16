@@ -64,6 +64,10 @@ webpki-roots = "1"
 ring = "0.17"
 # Lecture des en-têtes Set-Cookie (déjà tirée par Tauri).
 cookie = "0.18"
+# Lot K (5.1-c) : couche autour du connecteur de reqwest pour chronométrer la connexion
+# (`network::phases`) ; traits déjà tirés par reqwest, mêmes versions.
+tower-layer = "0.3"
+tower-service = "0.3"
 
 # Lot H : proxy du système lu dans le registre (`Internet Settings`), crate de Microsoft sans
 # autre dépendance que les liaisons Windows déjà tirées par Tauri.

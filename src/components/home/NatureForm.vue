@@ -47,7 +47,7 @@ const origin = computed(() => {
   const n = props.nature;
   const engine =
     n.engine.kind === "builtin" ? `moteur ${engineLabel(n.engine)} ${n.engine.id}` : "moteur WASM";
-  return `Intégrée à Arnod · ${engine} · version ${n.version}. Les vérifications sont proposées d'après la réponse reçue.`;
+  return `Intégrée à Arnod · ${engine} · version ${n.version}. Les assertions sont proposées d'après la réponse reçue.`;
 });
 </script>
 

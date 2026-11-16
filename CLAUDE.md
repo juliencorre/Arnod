@@ -755,3 +755,24 @@ automatique, ni plugin `updater` ni signature.
 - Interface : section « Mises à jour » des préférences (`UpdatesSection.vue`, store `updates`) ;
   au démarrage, la fenêtre principale appelle `checkAtStartup` : une version plus récente
   s'annonce par une notification « Voir ». Le bac à sable e2e coupe la vérification automatique.
+
+## Vocabulaire et finitions
+
+Référence : lot K, écrans 1.2-a ter, 4.2-c, 5.1-b bis et 5.1-c.
+
+- Vocabulaire de l'interface selon 0.2 : « test », « étape », « assertion » (« + Assertion »,
+  « Retirer l'assertion », onglet « Assertions »). « Vérification » reste pour le certificat TLS et
+  les mises à jour. Un texte d'interface nouveau suit ces mots.
+- Menu « + » d'un projet ou du référentiel : « Nouveau test » (Ctrl+N), « Requête libre »,
+  « Nouveau dossier » (Ctrl+Maj+N) ; un projet vide propose « + Nouveau test ».
+- Secret en clair (4.2-c) : `input::secret::clear_secrets` (pur) repère le jeton, le mot de passe,
+  la clé d'API ou le secret client OAuth 2 qui n'est pas une référence `{{…}}` et propose un nom
+  libre ; `RequestInput.secrets` le porte. Tant que l'utilisateur n'a pas choisi,
+  `Editor.secretHold` suspend l'enregistrement (`workbench.holdSecret`) ; `SecretNotice.vue`
+  range la valeur au coffre (variable locale secrète déclarée dans l'environnement actif) ou la
+  laisse dans la requête (`input.keepSecrets`).
+- Chronologie (5.1-c) : `network::phases` chronomètre le DNS (résolveur `TimedResolver`) et la
+  connexion (couche `TimedConnectLayer` autour du connecteur de reqwest, crates `tower-layer` et
+  `tower-service`) dans une variable locale à la tâche de l'envoi ; `http::Timeline` (DNS,
+  connexion et TLS, attente du serveur, réception) va dans `HttpResponse.timeline`, onglet
+  « Chronologie » (`TimelinePanel.vue`). Une connexion reprise du pool n'a ni DNS ni connexion.

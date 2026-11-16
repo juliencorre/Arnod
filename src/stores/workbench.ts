@@ -70,6 +70,11 @@ export interface Editor {
    * dire « modifié, pas encore envoyé » et y revenir. `null` avant le premier envoi.
    */
   sent: string | null;
+  /**
+   * Lot K (4.2-c) : un secret est saisi en clair dans l'authentification. Rien n'est enregistré
+   * tant que l'utilisateur n'a pas choisi : variable locale ou laisser dans la requête.
+   */
+  secretHold?: boolean;
 }
 
 /** JSON aux clés triées : deux requêtes égales ont le même texte, quel que soit l'ordre. */
@@ -387,8 +392,9 @@ export const useWorkbenchStore = defineStore("workbench", () => {
         const editor = editors[key];
         if (!editor || text === editor.saved) continue;
         editor.draftSince ??= new Date();
-        // Conflit ou fichier supprimé : rien n'est enregistré avant le choix (lot I, R9).
-        if (editor.conflict || editor.removedOnDisk) continue;
+        // Conflit ou fichier supprimé : rien n'est enregistré avant le choix (lot I, R9) ; de
+        // même pour un secret en clair (lot K, 4.2-c).
+        if (editor.conflict || editor.removedOnDisk || editor.secretHold) continue;
         scheduleSave(key);
       }
     },
@@ -402,7 +408,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     const running = saving.get(key);
     if (running) await running.catch(() => undefined);
     const editor = editors[key];
-    if (editor && (editor.conflict || editor.removedOnDisk)) return;
+    if (editor && (editor.conflict || editor.removedOnDisk || editor.secretHold)) return;
     const snapshot = editor?.draft ? draftText(key) : null;
     if (!editor || snapshot === null || snapshot === editor.saved) {
       if (editor && editor.saveState !== "error") editor.saveState = "saved";
@@ -1121,6 +1127,19 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return moved;
   }
 
+  // --- Lot K : secret saisi en clair (4.2-c) -----------------------------------------
+
+  /** Suspend ou reprend l'enregistrement de la requête `key` ; repris, il part aussitôt. */
+  function holdSecret(key: string, hold: boolean): void {
+    const editor = editors[key];
+    if (!editor || Boolean(editor.secretHold) === hold) return;
+    editor.secretHold = hold;
+    if (hold) {
+      clearSaveTimer(key);
+      if (isDirty(key)) editor.saveState = "pending";
+    } else if (isDirty(key)) scheduleSave(key);
+  }
+
   // --- Lot J : copier et déplacer -------------------------------------------------
 
   /** Une requête déplacée : ses éditeurs suivent (`to`) ou sont oubliés (autre projet). */
@@ -1226,5 +1245,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     // Lot J : copier et déplacer.
     followTransfer,
     reloadIn,
+    // Lot K : secret en clair.
+    holdSecret,
   };
 });

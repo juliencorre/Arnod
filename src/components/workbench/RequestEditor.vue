@@ -23,6 +23,7 @@ import BaseButton from "@/components/ui/BaseButton.vue";
 import AssertionsEditor from "@/components/workbench/AssertionsEditor.vue";
 import CookiesSection from "@/components/workbench/CookiesSection.vue";
 import AuthEditor from "@/components/workbench/AuthEditor.vue";
+import SecretNotice from "@/components/workbench/SecretNotice.vue";
 import BodyEditor from "@/components/workbench/BodyEditor.vue";
 import DynamicValuesMenu from "@/components/workbench/DynamicValuesMenu.vue";
 import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
@@ -101,6 +102,9 @@ const saveLabel = computed(() => {
   if (editor.value?.reloaded && editor.value.saveState === "saved") {
     return "⟳ Rechargé depuis le disque";
   }
+  // Lot K (4.2-c) : rien n'est écrit tant que le secret en clair attend un choix.
+  const held = editor.value?.secretHold ? inputs.pendingSecrets(props.editorKey)[0] : null;
+  if (held) return `Non enregistré : choisissez où va le ${held.label}`;
   switch (editor.value?.saveState) {
     case "pending":
       return "Modifications en attente…";
@@ -293,7 +297,7 @@ const tabs = computed<{ id: Tab; label: string; count?: number; filled?: boolean
     { id: "docs", label: "Docs", filled: r !== null && r.docs.trim() !== "" },
     { id: "settings", label: "Réglages", filled: settings },
     { id: "variables", label: "Variables", count: r?.extractions.length },
-    { id: "assertions", label: "Vérifications", count: r?.assertions.length },
+    { id: "assertions", label: "Assertions", count: r?.assertions.length },
   ];
 });
 // --- Lot E : modifié depuis l'envoi (écart 4.2-b), curseur dans l'adresse (4.1-b) ---------
@@ -573,11 +577,11 @@ watch(
         <CookiesSection :editor-key="editorKey" />
       </div>
 
-      <AuthEditor
-        v-else-if="tab === 'auth'"
-        v-model="request.auth"
-        :inherited="request.inherited"
-      />
+      <div v-else-if="tab === 'auth'" class="stack">
+        <AuthEditor v-model="request.auth" :inherited="request.inherited" />
+        <!-- Lot K (4.2-c) : secret saisi en clair, proposé en variable locale. -->
+        <SecretNotice :editor-key="editorKey" />
+      </div>
 
       <div v-else-if="tab === 'docs'" class="stack">
         <label class="section" :for="ids.docs">Documentation, en Markdown</label>

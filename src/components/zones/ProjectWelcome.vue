@@ -37,15 +37,16 @@ const adding = useContractAdd(() => props.projectId);
 const { mode, error, busy } = adding;
 const creatingEnvironment = ref(false);
 
-async function newRequest(): Promise<void> {
+/** Lot K (1.2-a ter) : le premier test, son étape 1 ouverte. */
+async function newTest(): Promise<void> {
   try {
-    await workbench.createRequest(props.projectId, "");
+    await workbench.createTest(props.projectId, "");
   } catch (caught) {
     toasts.showError(caught);
   }
 }
 
-type Start = "import" | "contract" | "request" | "environment";
+type Start = "import" | "contract" | "test" | "environment";
 
 /**
  * Points de départ, dans l'ordre de la maquette. « Importer… » ouvre l'import (lot C, 2.3-b) :
@@ -65,10 +66,10 @@ const STARTS: { id: Start; title: string; text: string; action: string }[] = [
     action: "+ Contrat",
   },
   {
-    id: "request",
-    title: "Écrire une requête",
-    text: "Directement dans le référentiel de tests, sans contrat.",
-    action: "+ Requête",
+    id: "test",
+    title: "Écrire un test",
+    text: "Ses étapes dans le référentiel de tests, sans contrat.",
+    action: "+ Test",
   },
   {
     id: "environment",
@@ -81,7 +82,7 @@ const STARTS: { id: Start; title: string; text: string; action: string }[] = [
 function start(id: Start): void {
   if (id === "import") imports.open(props.projectId, navigation.currentWorkspaceId);
   else if (id === "contract") adding.choose("template");
-  else if (id === "request") void newRequest();
+  else if (id === "test") void newTest();
   else creatingEnvironment.value = true;
 }
 </script>
@@ -123,7 +124,7 @@ function start(id: Start): void {
     <p class="welcome__text">
       Un contrat OpenAPI ? « + Ajouter un contrat » dans la barre latérale crée ses requêtes.
     </p>
-    <BaseButton variant="primary" @click="newRequest">+ Nouvelle requête</BaseButton>
+    <BaseButton variant="primary" @click="newTest">+ Nouveau test</BaseButton>
   </div>
 </template>
 

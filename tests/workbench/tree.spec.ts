@@ -43,9 +43,9 @@ describe("arborescence du projet", () => {
   it("crée une requête depuis la fenêtre de nom", async () => {
     let core;
     ({ app, core } = await openProject());
-    // « + » de la ligne du projet, puis « Nouvelle requête » (B3).
+    // « + » de la ligne du projet, puis « Requête libre » (B3, 1.2-a ter).
     await click(app, '[aria-label="Ajouter au projet boutique-tests"]');
-    await click(app, '[role="menuitem"]', "Nouvelle requête");
+    await click(app, '[role="menuitem"]', "Requête libre");
     const input = app.get("dialog[open] input");
     await input.setValue("Supprimer");
     await app.get("dialog[open] form").trigger("submit");

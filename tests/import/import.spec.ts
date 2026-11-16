@@ -72,7 +72,7 @@ describe("importer (2.3-a)", () => {
       "2dossiers",
       "6requêtes",
       "2environnements",
-      "10vérifications sans code",
+      "10assertions sans code",
       "2extractions",
       "3secrets en variables locales",
     ]);
