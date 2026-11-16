@@ -306,19 +306,9 @@ pages:
       - "2026-11-14 : Préférences → Mises à jour : versions publiées lues par le réseau du poste, au démarrage puis chaque jour ou à la demande, canal stable ou préversions ; « Voir la version » ouvre la page de la release (g, lot L allégé, PR #63)."
       - "2026-11-16 : Mises à jour installées par Arnod : « Installer » (notification et section), téléchargement par le réseau du poste avec progression et « Annuler », signature vérifiée, « Redémarrer maintenant » ou « Au prochain lancement » ; « Voir la version » si la release n'est pas installable (g, lot L)."
       - "2026-11-16 : Écran g aligné sur le code : plus de pastille en bas de la barre latérale, la version prête s'annonce par une notification « Redémarrer maintenant » ; textes de la section repris de l'application (carte « prête » sans liste des points, « Notes de version »), sans stratégie de groupe (V2)."
+      - "2026-11-16 : Écran e aligné sur le code : les préférences sont une fenêtre modale à deux sections (« Réseau et certificats », « Mises à jour »), sans onglet ; proxy du système, aucun ou manuel, délai de connexion seul, autorités du système et autorités ajoutées, vérification toujours faite (ni PAC ni identification Windows). L'écran g passe dans la même fenêtre modale."
     ecrans:
-      e:
-        {
-          etat: livré,
-          version: MVP,
-          pr: [58],
-          captures: [h1-preferences-reseau],
-          ecart:
-            {
-              texte: "Préférences en fenêtre modale (une seule section, « Réseau et certificats ») plutôt qu'en onglet ; « Celui de Windows » devient « Celui du système » ; ni configuration automatique (PAC) ni identification Windows auprès du proxy (V3) ; délai de réponse réglé par requête ou dossier ; la case « Vérifier les certificats » est une mention fixe : la vérification n'est jamais coupée.",
-              aligner: maquette,
-            },
-        }
+      e: { etat: livré, version: MVP, pr: [58], captures: [h1-preferences-reseau] }
       f: { etat: à faire, version: V1 }
       "f bis": { etat: à faire, version: V1 }
       g: { etat: livré, version: MVP, pr: [63, 67], captures: [32-mises-a-jour] }
