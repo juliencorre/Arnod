@@ -3058,13 +3058,30 @@ describe("Sélection multiple (4.1-a quater)", () => {
         ),
       { timeout: 10_000, timeoutMsg: "requêtes écrites sur disque attendues dans l'arborescence" },
     );
-    await browser.execute((wanted) => {
-      for (const name of wanted) {
-        Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'))
-          .find((i) => i.textContent.includes(name))
-          ?.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: true }));
-      }
-    }, names);
+    // Un simple clic ouvre la première ; le Ctrl+clic suivant la prend avec la seconde (la ligne
+    // ouverte entre dans la sélection, comme dans un explorateur de fichiers).
+    const clickRow = (name: string, ctrlKey: boolean) =>
+      browser.execute(
+        (n, ctrl) => {
+          Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'))
+            .find((item) => item.textContent.includes(n))
+            ?.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: ctrl }));
+        },
+        name,
+        ctrlKey,
+      );
+    await clickRow("Sel A", false);
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document
+              .querySelector('.zone__tab-button[aria-selected="true"]')
+              ?.textContent.includes("Sel A") ?? false,
+        ),
+      { timeout: 10_000, timeoutMsg: "onglet « Sel A » actif attendu" },
+    );
+    await clickRow("Sel B", true);
     await browser.$(".selection").waitForDisplayed({ timeout: 10_000 });
     expect(
       await browser.execute(
