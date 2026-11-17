@@ -1,0 +1,600 @@
+//! Audit (novembre 2026) : preuves des constats, un test par constat. Chaque test échoue ou
+//! panique sur le code audité (version 0.0.3, commit 512f194).
+//!
+//! À déclarer dans `lib.rs` : `#[cfg(test)] mod audit_constats;`
+//! Lancer : `cargo test --manifest-path src-tauri/Cargo.toml --locked --lib audit_constats -- --nocapture --test-threads=1`
+//! Le test `apercu_html_imbrication_profonde` déborde la pile : il est ignoré, à lancer seul avec
+//! `-- --ignored`.
+
+use std::collections::BTreeMap;
+use std::fs;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::path::Path;
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
+
+use serde_json::{Value, json};
+
+use crate::request::assertions::ResponseData;
+use crate::tree::TreeNode;
+
+fn panic_message(panic: &(dyn std::any::Any + Send)) -> String {
+    panic
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| panic.downcast_ref::<&str>().map(|s| (*s).to_owned()))
+        .unwrap_or_default()
+}
+
+fn response(status: u16, body: &str) -> ResponseData {
+    ResponseData {
+        status,
+        duration_ms: 1,
+        headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+        body: body.to_owned(),
+    }
+}
+
+/// Dossiers de premier niveau que la barre latérale montre.
+fn listed(root: &Path) -> Vec<String> {
+    crate::tree::read(root)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|node| match node {
+            TreeNode::Folder { path, .. } => Some(path),
+            TreeNode::Request { .. } => None,
+        })
+        .collect()
+}
+
+/// Fichiers sous `path`, liens non suivis.
+fn count_files(path: &Path) -> usize {
+    let Ok(meta) = fs::symlink_metadata(path) else {
+        return 0;
+    };
+    if meta.is_dir() {
+        fs::read_dir(path)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|entry| count_files(&entry.path()))
+            .sum()
+    } else {
+        usize::from(meta.is_file())
+    }
+}
+
+/// `true` si `work` finit avant `limit`.
+fn finishes_within(limit: Duration, work: impl FnOnce() + Send + 'static) -> bool {
+    let (done, wait) = mpsc::channel();
+    std::thread::spawn(move || {
+        work();
+        let _ = done.send(());
+    });
+    wait.recv_timeout(limit).is_ok()
+}
+
+// --- Paniques et gels ----------------------------------------------------------------------------
+
+/// Une expression JSONPath en cours de frappe fait paniquer le filtre.
+#[test]
+fn filtre_jsonpath_echappement_incomplet() {
+    let body = r#"{"a": 1}"#;
+    let mut paniques = Vec::new();
+    for expression in ["$['\\u", "$[\"\\u", "$[?@.a=='\\u"] {
+        if let Err(panic) =
+            catch_unwind(AssertUnwindSafe(|| crate::response::filter(body, expression)))
+        {
+            eprintln!("{expression:?} -> PANIQUE : {}", panic_message(&*panic));
+            paniques.push(expression);
+        }
+    }
+    assert!(paniques.is_empty(), "expressions qui paniquent : {paniques:?}");
+}
+
+/// Un corps HTML fait de balises ouvertes jamais fermées donne un aperçu aussi profond que le
+/// corps est long : la sérialisation (et la libération) récursives débordent la pile.
+#[test]
+#[ignore = "déborde la pile et arrête le processus de test : à lancer seul"]
+fn apercu_html_imbrication_profonde() {
+    // 1 Mo ; la limite d'un corps est de 5 Mo.
+    let body = "<div>".repeat(200_000);
+    let handle = std::thread::Builder::new()
+        // Pile du fil principal sous Linux (1 Mo sous Windows).
+        .stack_size(8 * 1024 * 1024)
+        .spawn(move || {
+            let nodes = crate::response::preview(&body);
+            eprintln!("aperçu construit");
+            let size = serde_json::to_string(&nodes).map(|text| text.len());
+            eprintln!("aperçu sérialisé : {size:?}");
+            drop(nodes);
+            eprintln!("aperçu libéré");
+        });
+    assert!(handle.is_ok_and(|h| h.join().is_ok()));
+}
+
+/// La mise en forme indente chaque ligne de sa profondeur : des balises ouvertes sans
+/// fermeture (`<li>`, `<p>`, `<td>` du HTML courant) coûtent le carré de leur nombre.
+#[test]
+fn mise_en_forme_html_indentation_quadratique() {
+    let size = |items: usize| -> (usize, usize) {
+        let body = "<li>x".repeat(items);
+        let rendered = crate::response::render(
+            &body,
+            &[],
+            Some(crate::response::ResponseFormat::Html),
+        );
+        let bytes: usize = rendered
+            .lines
+            .iter()
+            .flatten()
+            .map(|token| token.text.len())
+            .sum();
+        (body.len(), bytes)
+    };
+    let (small_body, small) = size(1000);
+    let (body, bytes) = size(4000);
+    eprintln!("1000 <li> : corps {small_body} octets, jetons {small} octets");
+    eprintln!("4000 <li> : corps {body} octets, jetons {bytes} octets");
+    assert!(
+        bytes < body * 50,
+        "4000 <li> sans </li> ({body} octets) donnent {bytes} octets de jetons ; à 200 000 (1 Mo) : {} Go",
+        2 * 200_000usize * 200_000 / 1_000_000_000
+    );
+}
+
+/// Un contrat reçu d'un collègue peut figer Arnod : `minLength` très grand (exemple construit
+/// caractère par caractère), ou `anyOf` qui se référence deux fois (2^64 essais).
+#[test]
+fn contrat_qui_fige_arnod() {
+    let sample = finishes_within(Duration::from_secs(5), || {
+        let contract = crate::contract::parse::load(
+            r##"openapi: 3.0.3
+info: { title: T, version: "1" }
+paths:
+  /a:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { note: { type: string, minLength: 4000000 } } }
+      responses: { "200": { description: ok } }
+"##,
+        )
+        .expect("contrat lisible");
+        let _ = crate::contract::generate::request_for(
+            &contract,
+            &contract.operations[0],
+            "contracts/t.yaml",
+        );
+    });
+    let conformance = finishes_within(Duration::from_secs(5), || {
+        let contract = crate::contract::parse::load(
+            r##"openapi: 3.0.3
+info: { title: T, version: "1" }
+paths:
+  /a:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Boucle" }
+components:
+  schemas:
+    Boucle:
+      anyOf:
+        - { $ref: "#/components/schemas/Boucle" }
+        - { $ref: "#/components/schemas/Boucle" }
+"##,
+        )
+        .expect("contrat lisible");
+        let _ = crate::contract::conformance::check(&contract, "GET /a", &response(200, "{}"));
+    });
+    assert!(
+        sample && conformance,
+        "en 5 s : requête créée (minLength 4 000 000) finie = {sample}, conformité (anyOf en boucle) finie = {conformance}"
+    );
+}
+
+/// `decode_entities` cherche le `;` jusqu'à la fin du texte pour chaque `&` : quadratique.
+#[test]
+fn entites_html_quadratiques() {
+    let time = |count: usize| {
+        let text = "&a=1 ".repeat(count);
+        let start = Instant::now();
+        let _ = crate::response::markup::decode_entities(&text);
+        start.elapsed()
+    };
+    let small = time(40_000);
+    let large = time(160_000);
+    eprintln!("200 Ko : {small:?} ; 800 Ko : {large:?}");
+    assert!(
+        large < small * 8,
+        "texte 4 fois plus long, {:.0} fois plus lent (200 Ko : {small:?}, 800 Ko : {large:?})",
+        large.as_secs_f64() / small.as_secs_f64()
+    );
+}
+
+// --- Fichiers ------------------------------------------------------------------------------------
+
+/// Renommer ou déplacer un dossier vers un nom réservé ou caché le fait disparaître.
+#[test]
+fn dossier_renomme_en_nom_reserve_disparait() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let mut gaps = Vec::new();
+    for (index, name) in ["contracts", "environments", ".archive"].iter().enumerate() {
+        let folder = crate::tree::create_folder(root, "", &format!("Dossier {index}")).unwrap();
+        crate::tree::create_request(root, &folder, Some("Requête")).unwrap();
+        let renamed = crate::tree::rename(root, &folder, name);
+        let shown = listed(root);
+        if let Ok(path) = &renamed
+            && !shown.contains(path)
+        {
+            gaps.push(format!("renommé en « {name} » : accepté, absent de l'arborescence"));
+        }
+        // Le dossier est remis à l'écart pour le cas suivant.
+        let _ = fs::rename(root.join(name), root.join(format!("fait-{index}")));
+    }
+    let parent = crate::tree::create_folder(root, "", "Parent").unwrap();
+    let inner = crate::tree::create_folder(root, &parent, "contracts").unwrap();
+    crate::tree::create_request(root, &inner, Some("Requête")).unwrap();
+    if let Ok(path) = crate::tree::move_to(root, &inner, "")
+        && !listed(root).contains(&path)
+    {
+        gaps.push("« Parent/contracts » déplacé à la racine : accepté, absent de l'arborescence".to_owned());
+    }
+    assert!(gaps.is_empty(), "{gaps:#?}");
+}
+
+/// Une collection Bruno dont un dossier s'appelle `contracts` : ses requêtes sont écrites dans
+/// le dossier réservé aux contrats d'un nouveau projet.
+#[test]
+fn import_bruno_dossier_contracts() {
+    use crate::bruno::read::{Collection, Folder, Source};
+    let file = crate::bruno::parse::parse(
+        "meta {\n  name: Signer\n  type: http\n}\n\nget {\n  url: https://api.test/contracts\n}\n",
+    )
+    .unwrap();
+    let collection = Collection {
+        name: "Juridique".to_owned(),
+        tree: Folder {
+            folders: vec![Folder {
+                dir: "contracts".to_owned(),
+                path: "contracts".to_owned(),
+                requests: vec![Source {
+                    path: "contracts/Signer.bru".to_owned(),
+                    file,
+                }],
+                ..Folder::default()
+            }],
+            ..Folder::default()
+        },
+        bru_files: 1,
+        ..Collection::default()
+    };
+    let converted = crate::bruno::convert::convert(&collection);
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    fs::write(
+        root.join("opencollection.yml"),
+        "opencollection: 1.0.0\ninfo:\n  name: Juridique\n",
+    )
+    .unwrap();
+    crate::import::write_new_project(root, &converted).unwrap();
+    let requests = crate::tree::requests_in(root, "").unwrap();
+    let contracts = crate::contract::file::list(root);
+    assert!(
+        requests.len() == 1 && contracts.is_empty(),
+        "requêtes visibles : {requests:?} ; « contrats » listés : {:?}",
+        contracts
+            .iter()
+            .map(|c| (c.path.clone(), c.error.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+/// Renommage d'un dossier en deux temps : si le second échoue, le dossier reste caché sous
+/// `.arnod-rename-<uuid>`. Ici le nom (64 caractères, 256 octets) est refusé par le système.
+#[cfg(unix)]
+#[test]
+fn renommage_de_dossier_a_moitie_fait() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let folder = crate::tree::create_folder(root, "", "Commandes").unwrap();
+    crate::tree::create_request(root, &folder, Some("Requête")).unwrap();
+    let result = crate::tree::rename(root, &folder, &"😀".repeat(64));
+    let hidden: Vec<String> = fs::read_dir(root)
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        result.is_ok() || root.join("Commandes").is_dir(),
+        "renommage refusé ({:?}) mais « Commandes » n'existe plus ; arborescence : {:?} ; disque : {hidden:?}",
+        result.err().map(|e| e.message),
+        listed(root)
+    );
+}
+
+/// « Annuler » après une suppression définitive groupée ne remet que les fichiers texte.
+#[test]
+fn annuler_une_suppression_groupee_perd_des_fichiers() {
+    use crate::tree::batch::{BatchAction, apply};
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let folder = crate::tree::create_folder(root, "", "Commandes").unwrap();
+    crate::tree::create_request(root, &folder, Some("Requête")).unwrap();
+    // Pièce jointe binaire, requête d'un collègue en ISO-8859-1, sous-dossier encore vide.
+    fs::write(root.join("Commandes/logo.png"), [0x89, b'P', b'N', b'G', 0xff, 0x00]).unwrap();
+    fs::write(root.join("Commandes/ancien.yml"), b"info:\n  name: Cr\xe9er\n").unwrap();
+    fs::create_dir(root.join("Commandes/À faire")).unwrap();
+    let (_, undo) = apply(
+        root,
+        &[folder],
+        &BatchAction::Delete { permanent: true },
+    )
+    .unwrap();
+    undo.apply().unwrap();
+    let missing: Vec<&str> = ["requete.yml", "logo.png", "ancien.yml", "À faire"]
+        .into_iter()
+        .filter(|name| !root.join("Commandes").join(name).exists())
+        .collect();
+    assert!(missing.is_empty(), "non remis par « Annuler » : {missing:?}");
+}
+
+/// Un lien vers le dossier lui-même (cas R2 de l'audit précédent, corrigé pour la lecture) :
+/// la suppression groupée lit le dossier 41 fois et « Annuler » écrit 41 copies ; la
+/// duplication échoue. Deux liens : 2^40.
+#[cfg(unix)]
+#[test]
+fn lien_en_boucle_dans_une_action_groupee() {
+    use crate::tree::batch::{BatchAction, apply};
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let folder = crate::tree::create_folder(root, "", "Commandes").unwrap();
+    crate::tree::create_request(root, &folder, Some("Requête")).unwrap();
+    std::os::unix::fs::symlink(".", root.join("Commandes/boucle")).unwrap();
+    let duplicated = apply(root, std::slice::from_ref(&folder), &BatchAction::Duplicate)
+        .map(|(done, _)| done.items)
+        .map_err(|e| e.message);
+    eprintln!("dupliquer : {duplicated:?}");
+    let before = count_files(&root.join("Commandes"));
+    let (_, undo) = apply(root, &[folder], &BatchAction::Delete { permanent: true }).unwrap();
+    undo.apply().unwrap();
+    let after = count_files(&root.join("Commandes"));
+    assert!(
+        duplicated.is_ok() && after == before,
+        "dupliquer : {duplicated:?} ; fichiers avant suppression : {before}, après « Annuler » : {after}"
+    );
+}
+
+// --- Fidélité des formats ------------------------------------------------------------------------
+
+/// Les commentaires YAML d'une requête écrite à la main disparaissent au premier
+/// enregistrement ; la partie `request` d'une réponse attendue disparaît si on la renomme.
+#[test]
+fn enregistrer_perd_commentaires_et_requete_d_exemple() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("lire.yml");
+    let text = "# Ne pas lancer en production (voir ticket 4512)\ninfo:\n  name: Lire\n  type: http\nhttp:\n  method: GET\n  url: \"{{baseUrl}}/orders\" # liste paginée\nexamples:\n  - name: 200 OK\n    request:\n      url: \"{{baseUrl}}/orders?page=2\"\n      method: GET\n    response:\n      status: 200\n";
+    fs::write(&path, text).unwrap();
+    let mut request = crate::request::file::read(&path).unwrap();
+    request.description = "Liste des commandes".to_owned();
+    request.examples[0].name = "200 page 2".to_owned();
+    crate::request::file::write(&path, &request).unwrap();
+    let written = fs::read_to_string(&path).unwrap();
+    let mut gaps = Vec::new();
+    if !written.contains("ticket 4512") || !written.contains("liste paginée") {
+        gaps.push("commentaires perdus");
+    }
+    if !written.contains("page=2") {
+        gaps.push("partie « request » de la réponse attendue renommée perdue");
+    }
+    assert!(gaps.is_empty(), "{gaps:?}\n--- fichier écrit ---\n{written}");
+}
+
+// --- Résultats faux ------------------------------------------------------------------------------
+
+/// Le contrat déduit d'une réponse la déclare non conforme dès que les éléments d'un tableau
+/// diffèrent (champ optionnel, `null`) : le schéma vient du seul premier élément.
+#[test]
+fn contrat_deduit_refuse_la_reponse_dont_il_vient() {
+    use crate::contract::deduce::{Exchange, add_exchange, new_document};
+    let url = reqwest::Url::parse("https://api.boutique.dev/products").unwrap();
+    let body = r#"[{"id":1,"promo":null},{"id":2,"promo":"ETE"},{"id":3}]"#;
+    let mut doc = new_document(&url);
+    let key = add_exchange(
+        &mut doc,
+        &Exchange {
+            method: "GET",
+            url: &url,
+            status: 200,
+            status_text: "OK",
+            headers: &[],
+            body,
+        },
+    );
+    let contract = crate::contract::parse::load(&doc.to_string()).unwrap();
+    let verdict = crate::contract::conformance::check(&contract, &key, &response(200, body));
+    assert_eq!(verdict, Ok(()));
+}
+
+/// Un chemin littéral est rattaché au chemin généralisé voisin, même s'il a sa propre opération.
+#[test]
+fn chemin_litteral_rattache_au_chemin_generalise() {
+    use crate::contract::deduce::{Exchange, add_exchange, new_document};
+    let export = reqwest::Url::parse("https://api.boutique.dev/orders/export").unwrap();
+    let exchange = |url: &'static reqwest::Url| Exchange {
+        method: "GET",
+        url,
+        status: 200,
+        status_text: "OK",
+        headers: &[],
+        body: "",
+    };
+    let export: &'static reqwest::Url = Box::leak(Box::new(export));
+    let mut doc = new_document(export);
+    assert_eq!(add_exchange(&mut doc, &exchange(export)), "GET /orders/export");
+    // « Généraliser » sur /orders/42 a donné /orders/{id}.
+    doc["paths"]["/orders/{id}"] =
+        json!({ "get": { "responses": { "200": { "description": "OK" } } } });
+    assert_eq!(add_exchange(&mut doc, &exchange(export)), "GET /orders/export");
+}
+
+/// Assertions Bruno dont l'expression n'est pas un simple chemin (`.length`) : reprises sans
+/// avertissement, elles passent à tort (`neq`) ou échouent à tort (`gt`).
+#[test]
+fn assertion_bruno_sur_une_expression() {
+    use crate::bruno::read::{Collection, Folder, Source};
+    use crate::bruno::{ItemKind, ItemStatus};
+    let file = crate::bruno::parse::parse(
+        "meta {\n  name: Lister\n  type: http\n}\n\nget {\n  url: https://api.test/items\n}\n\nassert {\n  res.body.items.length: neq 0\n  res.body.items.length: gt 0\n}\n",
+    )
+    .unwrap();
+    let collection = Collection {
+        name: "C".to_owned(),
+        tree: Folder {
+            requests: vec![Source {
+                path: "Lister.bru".to_owned(),
+                file,
+            }],
+            ..Folder::default()
+        },
+        bru_files: 1,
+        ..Collection::default()
+    };
+    let converted = crate::bruno::convert::convert(&collection);
+    let request =
+        crate::opencollection::request::from_value(&converted.files[0].value, "x").unwrap();
+    let passed = |body: &str| -> Vec<bool> {
+        crate::request::assertions::evaluate_all(&request.assertions, &response(200, body))
+            .iter()
+            .map(|r| r.passed)
+            .collect()
+    };
+    let warned = converted.items.iter().any(|item| {
+        item.kind == ItemKind::Assertion
+            && matches!(item.status, ItemStatus::ToCheck | ItemStatus::Skipped)
+    });
+    let empty = passed(r#"{"items":[]}"#);
+    let full = passed(r#"{"items":[1,2]}"#);
+    assert!(
+        warned || (empty == [false, false] && full == [true, true]),
+        "signalé dans le rapport : {warned} ; liste vide [neq 0, gt 0] = {empty:?} (attendu [false, false]) ; 2 éléments = {full:?} (attendu [true, true])"
+    );
+}
+
+/// Deux grands entiers différents sont « égaux » : la comparaison passe par `f64`.
+#[test]
+fn egalite_de_grands_entiers() {
+    use crate::request::model::{Assertion, Operator, Origin, Scalar};
+    let assertion = Assertion {
+        id: "a".to_owned(),
+        target: "body.id".to_owned(),
+        operator: Operator::Equals,
+        value: Some(Scalar::Int(1_234_567_890_123_456_789)),
+        origin: Origin::Manual,
+        enabled: true,
+    };
+    let results = crate::request::assertions::evaluate_all(
+        std::slice::from_ref(&assertion),
+        &response(200, r#"{"id": 1234567890123456800}"#),
+    );
+    assert!(!results[0].passed, "1234567890123456789 == 1234567890123456800 : réussi");
+}
+
+/// Une variable dont la valeur cite une autre variable part telle quelle, sans erreur.
+#[test]
+fn variable_imbriquee_envoyee_telle_quelle() {
+    use crate::request::model::Request;
+    use crate::request::resolve::{Variables, prepare};
+    let variables = Variables {
+        values: BTreeMap::from([
+            ("baseUrl".to_owned(), "https://api.test/{{version}}".to_owned()),
+            ("version".to_owned(), "v2".to_owned()),
+        ]),
+        environment: "Recette".to_owned(),
+        ..Variables::default()
+    };
+    let mut request = Request::new("t");
+    request.url = "{{baseUrl}}/orders".to_owned();
+    let prepared = prepare(&request, &variables).map(|p| p.url).map_err(|e| e.message);
+    assert_eq!(prepared, Ok("https://api.test/v2/orders".to_owned()));
+}
+
+/// Un champ `writeOnly` obligatoire (mot de passe) n'a pas à figurer dans une réponse.
+#[test]
+fn conformite_champ_write_only_obligatoire() {
+    let contract = crate::contract::parse::load(
+        r##"openapi: 3.0.3
+info: { title: T, version: "1" }
+paths:
+  /users/1:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, password]
+                properties:
+                  id: { type: integer }
+                  password: { type: string, writeOnly: true }
+"##,
+    )
+    .unwrap();
+    let verdict =
+        crate::contract::conformance::check(&contract, "GET /users/1", &response(200, r#"{"id":1}"#));
+    assert_eq!(verdict, Ok(()));
+}
+
+// --- Mineurs -------------------------------------------------------------------------------------
+
+/// Un gros contrat YAML (ici 1 500 opérations de 40 paramètres) dépasse le budget par défaut
+/// de `serde-saphyr` (250 000 nœuds) et est dit « illisible ».
+#[test]
+fn gros_contrat_yaml_refuse() {
+    let mut text = String::from("openapi: 3.0.3\ninfo: { title: Gros, version: \"1\" }\npaths:\n");
+    for operation in 0..1500 {
+        text.push_str(&format!("  /r{operation}:\n    get:\n      parameters:\n"));
+        for parameter in 0..40 {
+            text.push_str(&format!(
+                "        - name: p{parameter}\n          in: query\n          schema:\n            type: string\n"
+            ));
+        }
+        text.push_str("      responses:\n        \"200\":\n          description: ok\n");
+    }
+    eprintln!("contrat de {} Mo", text.len() / 1_000_000);
+    let loaded = crate::contract::parse::load(&text).map(|c| c.operations.len());
+    assert_eq!(loaded, Ok(1500));
+}
+
+/// Divers : échappement octal de `$'…'`, `oauth2` pris pour un identifiant, nom de dossier `..`.
+#[test]
+fn mineurs() {
+    let mut gaps: Vec<String> = Vec::new();
+    let words = crate::curl::parse::words("curl $'a\\041b' $'c\\x'");
+    if words != Ok(vec!["curl".to_owned(), "a!b".to_owned(), "c\\x".to_owned()]) {
+        gaps.push(format!("$'a\\041b' $'c\\x' lu {words:?} (bash : a!b, c\\x)"));
+    }
+    for path in ["/oauth2/token", "/apis/v2beta1/pods", "/office365/users"] {
+        if let Some(found) = crate::trial::generalize::template(path) {
+            gaps.push(format!("{path} généralisé en {}", found.path));
+        }
+    }
+    let name = crate::contract::generate::safe_name(" .. .. ", "Autres");
+    if name == ".." || name.ends_with('.') {
+        gaps.push(format!("étiquette « .. .. » → dossier {name:?}"));
+    }
+    let value: Value = json!(crate::request::dynamic::draw(
+        "$date:+99999999999d",
+        &mut crate::request::dynamic::Dice::seeded(7, 1_794_495_731_000)
+    ));
+    eprintln!("$date:+99999999999d -> {value}");
+    assert!(gaps.is_empty(), "{gaps:#?}");
+}
