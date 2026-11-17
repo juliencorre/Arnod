@@ -3,8 +3,8 @@
  * enregistrant), diviser, déplacer, détacher dans une fenêtre (F1 à F8) ; fermer les
  * autres ou tout (lot F, 1.3-b).
  */
+import { useDrafts } from "@/composables/useDrafts";
 import { useContractsStore } from "@/stores/contracts";
-import { useToastStore } from "@/stores/toasts";
 import { contentKey, useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { ContentTab, Side, WindowBounds } from "@/types/ipc";
@@ -16,7 +16,7 @@ export function useTabActions() {
   const windows = useWindowsStore();
   const workbench = useWorkbenchStore();
   const contracts = useContractsStore();
-  const toasts = useToastStore();
+  const drafts = useDrafts();
 
   function tab(id: string): ContentTab | null {
     for (const zone of windows.zones) {
@@ -27,22 +27,14 @@ export function useTabActions() {
   }
 
   /**
-   * Enregistre la requête ou la source du contrat de l'onglet si elle a changé :
-   * rien n'est perdu. `false` si une source de contrat illisible n'a pas pu l'être (R10).
+   * Enregistre la requête ou la source du contrat de l'onglet si elle a changé : rien n'est
+   * perdu. `false` (et la raison montrée) si elle n'a pas pu l'être : échec, conflit, secret en
+   * attente, source illisible (R6, R10).
    */
   async function saveTab(id: string): Promise<boolean> {
     const found = tab(id);
-    if (found?.content.kind === "request") await workbench.save(contentKey(found.content));
-    if (found?.content.kind === "contract") {
-      const key = contentKey(found.content);
-      if (!(await contracts.save(key))) {
-        toasts.show(
-          `Source du contrat non enregistrée : ${contracts.open[key]?.saveError ?? "illisible"}`,
-          { tone: "error" },
-        );
-        return false;
-      }
-    }
+    if (found?.content.kind === "request") return drafts.saveRequest(contentKey(found.content));
+    if (found?.content.kind === "contract") return drafts.saveContract(contentKey(found.content));
     return true;
   }
 
@@ -62,7 +54,7 @@ export function useTabActions() {
 
   /** L'onglet seul devient une fenêtre, à l'endroit d'un dépôt s'il est connu (F8). */
   async function detach(id: string, at: { x: number; y: number } | null = null): Promise<void> {
-    await saveTab(id);
+    if (!(await saveTab(id))) return;
     const bounds: WindowBounds | null = at
       ? { x: Math.round(at.x), y: Math.round(at.y), ...DROPPED_WINDOW }
       : null;
@@ -72,13 +64,13 @@ export function useTabActions() {
   /** La zone devient une fenêtre (F8). */
   async function detachZone(zone: string): Promise<void> {
     const found = windows.zones.find((z) => z.id === zone);
-    for (const t of found?.tabs ?? []) await saveTab(t.id);
+    for (const t of found?.tabs ?? []) if (!(await saveTab(t.id))) return;
     await windows.detachZone(zone, null);
   }
 
   /**
    * Ferme plusieurs onglets (« Fermer les autres », « Fermer tout », 1.3-b) après avoir
-   * enregistré leurs requêtes et contrats ; un contrat illisible garde tout ouvert.
+   * enregistré leurs requêtes et contrats ; un brouillon non enregistré garde tout ouvert.
    */
   async function closeMany(ids: string[]): Promise<void> {
     const found = ids.map((id) => tab(id)).filter((t): t is ContentTab => t !== null);

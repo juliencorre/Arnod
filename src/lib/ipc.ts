@@ -783,6 +783,11 @@ export const ipc = {
    */
   updatesInstall: (now: boolean): Promise<UpdatesView> =>
     call<UpdatesView>("updates_install", { now }),
+
+  // --- Plan qualité, lot C : sortie sans perdre un brouillon (R6) ---
+  /** Réponse à `arnod://quitter` : `saved` faux abandonne la sortie d'Arnod. */
+  windowQuitReady: (saved: boolean): Promise<void> =>
+    call<null>("window_quit_ready", { saved }).then(() => undefined),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
@@ -803,6 +808,8 @@ export const EVENTS = {
   files: "arnod://fichiers",
   // Lot L : version trouvée et installation.
   updates: "arnod://mise-a-jour",
+  // Plan qualité, lot C : sortie demandée, chaque fenêtre enregistre puis répond (R6).
+  quit: "arnod://quitter",
 } as const;
 
 /** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
@@ -858,6 +865,12 @@ export const events = {
   /** Fermeture demandée pour cette fenêtre détachée : enregistrer puis se rattacher. */
   onClose: (handler: () => void): Promise<UnlistenFn> =>
     listen(EVENTS.close, () => {
+      handler();
+    }),
+
+  /** Sortie d'Arnod demandée : enregistrer, puis répondre par `windowQuitReady` (R6). */
+  onQuit: (handler: () => void): Promise<UnlistenFn> =>
+    listen(EVENTS.quit, () => {
       handler();
     }),
 

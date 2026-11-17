@@ -11,9 +11,11 @@ import SharedDialogs from "@/components/layout/SharedDialogs.vue";
 import WorkspaceSwitcher from "@/components/layout/WorkspaceSwitcher.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import { countLabel } from "@/lib/format";
+import { useDrafts } from "@/composables/useDrafts";
 import { useWindowsStore } from "@/stores/windows";
 
 const windows = useWindowsStore();
+const drafts = useDrafts();
 const pilot = computed(
   () => `Pilote ${countLabel(windows.followers, "fenêtre de contenu", "fenêtres de contenu")}`,
 );
@@ -31,7 +33,7 @@ const pilot = computed(
       <span class="sidebar-window__pilot"
         ><span class="sidebar-window__dot" aria-hidden="true" />{{ pilot }}</span
       >
-      <BaseButton @click="windows.reattach()">Rattacher</BaseButton>
+      <BaseButton @click="drafts.reattach()">Rattacher</BaseButton>
     </footer>
     <SharedDialogs />
   </div>

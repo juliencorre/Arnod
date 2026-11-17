@@ -32,6 +32,13 @@ export const AUTOSAVE_MS = 600;
 /** État d'enregistrement d'une requête ouverte (EP1). */
 export type SaveState = "saved" | "pending" | "saving" | "error";
 
+/**
+ * Issue d'un enregistrement (plan qualité, R6) : écrit (ou rien à écrire), suspendu (conflit,
+ * fichier supprimé hors d'Arnod, secret en attente d'un choix) ou en échec. L'appelant qui
+ * ferme, détache, déplace ou quitte s'arrête sur tout autre résultat que `saved`.
+ */
+export type SaveOutcome = "saved" | "held" | "failed";
+
 /** Requête ouverte : brouillon, version enregistrée, dernière réponse. */
 export interface Editor {
   projectId: string;
@@ -283,11 +290,21 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     if (result && editor && !editor.sending && editor.outcome === null) applyResult(result);
   }
 
+  /**
+   * Relit la requête du disque. Une frappe faite pendant la lecture n'est pas écrasée (IN9) : le
+   * brouillon reste et, si le fichier a changé depuis sa base, le conflit se règle élément par
+   * élément (lot I).
+   */
   async function reload(key: string): Promise<void> {
     const editor = editors[key];
     if (!editor) return;
+    const before = editor.draft ? draftText(key) : null;
     try {
       const request = await ipc.requestRead(editor.projectId, editor.path);
+      if (before !== null && editor.draft && draftText(key) !== before) {
+        if (JSON.stringify(request) !== editor.saved) await detectConflict(key);
+        return;
+      }
       editor.draft = request;
       editor.saved = JSON.stringify(request);
       editor.loadError = null;
@@ -404,20 +421,24 @@ export const useWorkbenchStore = defineStore("workbench", () => {
 
   /**
    * Enregistre une requête modifiée. Le contenu envoyé est figé avant l'écriture : une frappe
-   * pendant l'enregistrement en relance un autre. Un échec est signalé (B7) puis relancé.
+   * pendant l'enregistrement en relance un autre. Un échec est signalé (B7) et rendu (R6).
    */
-  async function save(key: string): Promise<void> {
+  async function save(key: string): Promise<SaveOutcome> {
     const running = saving.get(key);
     if (running) await running.catch(() => undefined);
     const editor = editors[key];
-    if (editor && (editor.conflict || editor.removedOnDisk || editor.secretHold)) return;
+    if (editor && (editor.conflict || editor.removedOnDisk || editor.secretHold)) {
+      return isDirty(key) || editor.removedOnDisk ? "held" : "saved";
+    }
     const snapshot = editor?.draft ? draftText(key) : null;
     if (!editor || snapshot === null || snapshot === editor.saved) {
       if (editor && editor.saveState !== "error") editor.saveState = "saved";
-      return;
+      return editor?.saveState === "error" ? "failed" : "saved";
     }
     clearSaveTimer(key);
     editor.saveState = "saving";
+    // Écrite par la tâche d'écriture ci-dessous.
+    let outcome = "saved" as SaveOutcome;
     const write = (async () => {
       try {
         await ipc.requestSave(editor.projectId, editor.path, JSON.parse(snapshot) as RequestDoc);
@@ -429,12 +450,14 @@ export const useWorkbenchStore = defineStore("workbench", () => {
         // Fichier modifié hors d'Arnod depuis sa lecture : conflit, rien d'écrasé (lot I, R8).
         if (caught instanceof IpcError && caught.kind === "changedOnDisk") {
           editor.saveState = "pending";
+          outcome = "held";
           await detectConflict(key);
           return;
         }
         editor.saveState = "error";
         editor.saveError = caught instanceof Error ? caught.message : String(caught);
-        throw caught;
+        outcome = "failed";
+        return;
       }
       if (trees.value[editor.projectId]) await refreshTree(editor.projectId);
     })();
@@ -444,13 +467,33 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     } finally {
       if (saving.get(key) === write) saving.delete(key);
     }
+    // Une frappe pendant l'écriture : elle part aussitôt, l'appelant attend son issue.
+    if (outcome === "saved" && isDirty(key)) return save(key);
+    return outcome;
   }
 
-  /** Enregistre toutes les requêtes modifiées de la fenêtre (avant fermeture, Z6). */
-  async function saveAll(): Promise<void> {
+  /**
+   * Enregistre toutes les requêtes modifiées de la fenêtre (avant fermeture, Z6) ; rend celles
+   * qui ne le sont pas (R6).
+   */
+  async function saveAll(): Promise<string[]> {
+    const unsaved: string[] = [];
     for (const key of Object.keys(editors)) {
-      if (isDirty(key)) await save(key);
+      const editor = editors[key];
+      if (!isDirty(key) && !editor?.removedOnDisk && editor?.saveState !== "error") continue;
+      if ((await save(key)) !== "saved") unsaved.push(key);
     }
+    return unsaved;
+  }
+
+  /** Pourquoi la requête `key` n'est pas enregistrée, en quelques mots (R6). */
+  function unsavedReason(key: string): string {
+    const editor = editors[key];
+    if (!editor) return "requête fermée";
+    if (editor.secretHold) return "choisissez où va le secret saisi en clair";
+    if (editor.conflict) return "réglez le conflit avec le fichier modifié sur le disque";
+    if (editor.removedOnDisk) return "son fichier a été supprimé hors d'Arnod";
+    return editor.saveError ?? "l'enregistrement a échoué";
   }
 
   /** Oublie une requête qui n'est plus ouverte dans aucun onglet de la fenêtre. */
@@ -905,6 +948,10 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       if (environments.value[projectId]) await refreshEnvironments(projectId);
       return;
     }
+    // Renommée, déplacée ou retirée dans une autre fenêtre : l'éditeur suit ou est oublié, pour
+    // que l'enregistrement automatique ne réécrive jamais l'ancien chemin (IN5).
+    for (const renamed of change.renamed) moveEditors(projectId, renamed.from, renamed.to);
+    forgetRemoved(projectId, change.removed);
     if (trees.value[projectId]) await refreshTree(projectId);
     if (change.scope === "request" && change.path !== null) {
       const key = requestKey(projectId, change.path);
@@ -918,6 +965,49 @@ export const useWorkbenchStore = defineStore("workbench", () => {
         if (change.origin === "") flashReloaded(key);
       }
     }
+  }
+
+  /**
+   * Requêtes retirées dans une autre fenêtre (corbeille, autre projet) : le cœur a fermé leurs
+   * onglets, leurs éditeurs sont oubliés. Un brouillon perdu ainsi est signalé (R11).
+   */
+  function forgetRemoved(projectId: string, removed: string[]): void {
+    const lost: string[] = [];
+    for (const [key, editor] of Object.entries(editors)) {
+      if (editor.projectId !== projectId) continue;
+      if (!removed.some((path) => editor.path === path || editor.path.startsWith(`${path}/`))) {
+        continue;
+      }
+      if (isDirty(key)) lost.push(editor.draft?.name ?? editor.path);
+      forget(key);
+    }
+    if (lost.length > 0) {
+      useToastStore().show(
+        lost.length === 1
+          ? `« ${lost[0] ?? ""} » a été retirée dans une autre fenêtre : sa modification non enregistrée n'a pas été gardée.`
+          : `${String(lost.length)} requêtes retirées dans une autre fenêtre : leurs modifications non enregistrées n'ont pas été gardées.`,
+        { tone: "error" },
+      );
+    }
+  }
+
+  /**
+   * Oublie les requêtes ouvertes qu'aucun onglet de la fenêtre ne montre plus : onglet fermé ou
+   * remplacé par le cœur, aperçu remplacé (IN6). Un brouillon non enregistré est gardé ; la
+   * requête active, que montre l'onglet de résultat, aussi.
+   */
+  function pruneEditors(): void {
+    const shown = new Set<string>();
+    for (const zone of windows.zones) {
+      for (const tab of zone.tabs) {
+        if (tab.content.kind === "request") {
+          shown.add(requestKey(tab.content.projectId, tab.content.path));
+        }
+      }
+    }
+    const active = windows.activeRequest;
+    if (active) shown.add(requestKey(active.projectId, active.path));
+    for (const key of Object.keys(editors)) if (!shown.has(key)) release(key);
   }
 
   // --- Fichiers modifiés hors d'Arnod (lot I, docs/plan-mvp-i-fichiers-externes.md) ---
@@ -1089,6 +1179,16 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     await events.onFiles((change) => {
       void onFiles(change);
     });
+    // Onglets de la fenêtre changés (fermés, remplacés, déplacés) : les éditeurs qu'ils ne
+    // montrent plus sont libérés (IN6).
+    watch(
+      () =>
+        [
+          ...windows.zones.flatMap((zone) => zone.tabs.map((tab) => tab.id)),
+          windows.activeRequest?.path ?? "",
+        ].join("\n"),
+      pruneEditors,
+    );
   }
 
   // --- Essais : chemins généralisés et transfert (2.2-b, 2.2-c) -------------------
@@ -1212,6 +1312,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     isDirty,
     save,
     saveAll,
+    unsavedReason,
     release,
     send,
     cancelSend,

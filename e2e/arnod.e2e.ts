@@ -708,8 +708,26 @@ describe("Fenêtres et zones", () => {
     expect(await browser.$(".content-window__follow").getAttribute("aria-pressed")).toBe("true");
     await screenshot(browser, "07-fenetre-contenu");
 
+    // Plan qualité, IN2 : une frappe faite juste avant « Rattacher » (moins de 600 ms) est
+    // enregistrée avant que l'onglet ne quitte la fenêtre.
+    const detachedLayout = readWindows(sandbox).windows[1]?.layout;
+    const listerPath = detachedLayout
+      ? zonesOf(detachedLayout.root)
+          .flatMap((z) => z.tabs)
+          .find((t) => t.content.kind === "request")?.content.path
+      : undefined;
+    if (!listerPath) throw new Error("requête de la fenêtre détachée introuvable");
+    const listerFile = path.join(sandbox.home, "arnod", "boutique-tests", listerPath);
+    await browser.$(".editor__url").waitForExist({ timeout: 10_000 });
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(".editor__url");
+      if (!input) throw new Error("adresse introuvable");
+      input.value = `${input.value}?rattache=1`;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     await browser.$(".content-window__bar").$("button=Rattacher").click();
     await waitForWindows(1);
+    expect(readFileSync(listerFile, "utf8")).toContain("rattache=1");
     await browser.switchToWindow(mainWindow);
     await waitForZoneTabs([["Nouvelle requête", "lister"]]);
     expect(readWindows(sandbox).windows.map((w) => w.kind)).toEqual(["main"]);

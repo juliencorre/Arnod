@@ -89,7 +89,14 @@ function lastOpened(core: FakeCore): unknown {
 }
 
 function change(scope: ProjectChange["scope"]): ProjectChange {
-  return { projectId: BOUTIQUE_TESTS, scope, path: null, origin: "fenetre-autre" };
+  return {
+    projectId: BOUTIQUE_TESTS,
+    scope,
+    path: null,
+    origin: "fenetre-autre",
+    renamed: [],
+    removed: [],
+  };
 }
 
 describe("contrats et référentiel de tests (RC1, RC6)", () => {

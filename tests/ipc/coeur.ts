@@ -243,7 +243,7 @@ export type Project = { id: string, name: string, path: string, };
 
 export type ProjectAuthView = { auth: Auth, environment: string, token: TokenStatus | null, hasClientSecret: boolean, usage: AuthUsage, };
 
-export type ProjectChange = { projectId: string, scope: ProjectScope, path: string | null, origin: string, };
+export type ProjectChange = { projectId: string, scope: ProjectScope, path: string | null, origin: string, renamed: Array<RenamedFile>, removed: Array<string>, };
 
 export type ProjectCreated = { snapshot: CatalogSnapshot, projectId: string, };
 

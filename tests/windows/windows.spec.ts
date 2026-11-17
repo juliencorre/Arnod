@@ -58,6 +58,8 @@ function change(overrides: Partial<ProjectChange>): ProjectChange {
     scope: "tree",
     path: null,
     origin: "fenetre-autre",
+    renamed: [],
+    removed: [],
     ...overrides,
   };
 }

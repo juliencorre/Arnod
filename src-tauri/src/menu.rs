@@ -111,8 +111,9 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 pub fn handle_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     let id = event.id().as_ref();
     if id == QUIT_ID {
-        // Fermeture propre : déclenche `RunEvent::ExitRequested` puis `RunEvent::Exit`.
-        app.exit(0);
+        // Chaque fenêtre enregistre ses brouillons, puis Arnod quitte (R6) : `RunEvent::Exit`
+        // suit comme pour une fermeture de la fenêtre principale.
+        crate::windows::request_quit(app);
         return;
     }
     // Lot H : les préférences s'ouvrent dans la fenêtre au premier plan.
