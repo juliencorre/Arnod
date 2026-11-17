@@ -139,6 +139,7 @@ pages:
       - "2026-11-09 : Workspaces en onglets."
       - "2026-11-10 : Sélecteur de workspace à la place des onglets (PR #36)."
       - "2026-11-13 : Nombre de contrats de service sur les cartes de projet (lot D, PR #48)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a: { etat: livré, pr: [9, 27, 48], captures: [03-workspace-boutique, 24-cartes-contrats] }
       "a bis": { etat: livré, pr: [27] }
@@ -173,6 +174,7 @@ pages:
       - "2026-11-12 : Page ajoutée à la liste ; écrans repris de « Premier usage » (b → d, b bis → d bis)."
       - "2026-11-13 : Filtre du référentiel, sections repliables, quatre points de départ, menu « + » avec raccourcis (lot D, PR #48)."
       - "2026-11-16 : Menu « + » : « Nouveau test » (Ctrl+N), « Requête libre », « Nouveau dossier » ; un projet vide propose « + Nouveau test » (a ter, lot K, PR #65)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : nom long coupé avec son infobulle, ⋯ au survol et au focus, sélection en fond accent doux, compteur en pastille (DE5, DE7) ; d inchangé, déjà sur quatre colonnes."
     ecrans:
       "0": { etat: remplacé }
       a:
@@ -272,6 +274,7 @@ pages:
       - "2026-11-09 : Fenêtres et zones (PR #27)."
       - "2026-11-10 : Résultat détachable, écran i (PR #34)."
       - "2026-11-13 : Ctrl+J et Ctrl+\\, dans le menu Fenêtre et sur l'icône de l'en-tête du résultat, gardés par fenêtre (plan-mvp-f-onglets-clavier, PR #57)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a: { etat: livré, pr: [27], captures: [06-zones] }
       b: { etat: livré, pr: [27], captures: [06-zones] }
@@ -320,6 +323,7 @@ pages:
       - "2026-11-16 : Mises à jour installées par Arnod : « Installer » (notification et section), téléchargement par le réseau du poste avec progression et « Annuler », signature vérifiée, « Redémarrer maintenant » ou « Au prochain lancement » ; « Voir la version » si la release n'est pas installable (g, lot L)."
       - "2026-11-16 : Écran g aligné sur le code : plus de pastille en bas de la barre latérale, la version prête s'annonce par une notification « Redémarrer maintenant » ; textes de la section repris de l'application (carte « prête » sans liste des points, « Notes de version »), sans stratégie de groupe (V2)."
       - "2026-11-16 : Écran e aligné sur le code : les préférences sont une fenêtre modale à deux sections (« Réseau et certificats », « Mises à jour »), sans onglet ; proxy du système, aucun ou manuel, délai de connexion seul, autorités du système et autorités ajoutées, vérification toujours faite (ni PAC ni identification Windows). L'écran g passe dans la même fenêtre modale."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : e et g : bouton ✕ « Fermer » dans l'en-tête des préférences (ER4) ; g : « Vérifier maintenant » en couleur de lien et la même section en thème sombre, cases et radios au bord de contrôle (DE2, DE4)."
     ecrans:
       e:
         etat: livré
@@ -353,6 +357,7 @@ pages:
       - "2026-11-12 : Ancienne page « Premier usage » : démarrage et erreurs → 0.3, projet créé → 1.2, Non classés → 2.2."
       - "2026-11-13 : Commande cURL collée reconnue REST, jeton au coffre (lot B, PR #49)."
       - "2026-11-16 : a ter à a quinquies (SQL, Kafka, Batch) passent en V6 : seule l'entrée REST est du MVP."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : « Essayer » seul bouton plein, « Créer le projet » et « Choisir un dossier ou un fichier… » en boutons secondaires, champs et boutons à 32 px (DE9)."
     ecrans:
       a:
         etat: livré
@@ -392,6 +397,7 @@ pages:
       - "2026-11-12 : Partie 2 de « Premier usage » devenue une page."
       - "2026-11-13 : Chemin généralisé proposé et appliqué au contrat déduit (c) ; essai transféré au référentiel de tests, étape 1 d'un test (b)."
       - "2026-11-13 : Essais d'un contrat déduit rangés dans un projet, sous une copie du contrat ou sous un contrat du projet, avec « Annuler » (d)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a:
         {
@@ -453,6 +459,7 @@ pages:
     journal:
       - "2026-11-09 : Un projet Bruno au format OpenCollection s'ouvre (PR #29)."
       - "2026-11-13 : Collections Bruno .bru converties en OpenCollection, rapport d'import, « Reprendre l'existant » (PR #50)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a:
         {
@@ -537,6 +544,7 @@ pages:
       - "2026-11-12 : Page « Contrats de service » (fichier « Endpoints ») recentrée sur l'endpoint ; e, f, g → 3.1."
       - "2026-11-13 : Réponses attendues listées sous l'endpoint dans la barre latérale (lot D, PR #48)."
       - "2026-11-14 : « Requête au point ? » sous toute requête liée : transférée au référentiel de tests, elle devient l'étape 1 d'un test (c, lot J, PR #62)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a:
         {
@@ -593,6 +601,7 @@ pages:
     liees: ["1.2", "3.4"]
     journal:
       - "2026-11-09 : Environnements livrés avec le premier usage."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : « ✓ Enregistré » au lieu d'« Enregistrer », × pour retirer une variable, « + Variable » en bouton secondaire, sélection en fond accent doux, case au bord de contrôle (ER2, DE4, DE7)."
     ecrans:
       "0": { etat: livré, pr: [33], captures: [08b-menu-environnement] }
       a:
@@ -617,6 +626,7 @@ pages:
       - "2026-11-09 : Basic, Bearer, clé d'API et héritage des dossiers."
       - "2026-11-12 : Préférences (e, f, f bis) → 1.6."
       - "2026-11-13 : OAuth 2 par identifiants client réglé au projet, jeton obtenu et renouvelé ; cookies gardés par environnement, listés et vidables (a, g, lot H, PR #58)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : « ✓ Enregistré » au lieu d'« Enregistrer » (ER2) ; cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a:
         etat: livré
@@ -671,6 +681,7 @@ pages:
       - "2026-11-13 : Fichiers modifiés hors d'Arnod : dossier surveillé, arborescence et onglets rechargés, brouillon en conflit réglé élément par élément (e, plan-mvp-i-fichiers-externes, PR #54)."
       - "2026-11-14 : Copier ou déplacer une requête vers un dossier, une place dans un test, une opération ou un autre projet, avec « Ce qui change » et « Annuler » ; Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Z et Ctrl+glisser dans la barre latérale (f, g, lot J, PR #62)."
       - "2026-11-16 : Sélection multiple : Ctrl+clic, Maj+clic, barre Déplacer vers…, Dupliquer, Exécuter, Supprimer, avec « Annuler » (a quater, PR #66)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : g : note « après l'étape n » en couleur de texte, sélection en fond accent doux (DE2, DE7) ; cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a: { etat: livré, pr: [27, 40, 42], captures: [19-verification-en-echec] }
       "a bis": { etat: livré, pr: [27] }
@@ -743,6 +754,7 @@ pages:
       - "2026-11-12 : Encart de vocabulaire → 0.2 ; écrans repris du référentiel (c → b, c bis → b bis, d → c)."
       - "2026-11-13 : Test = dossier d'étapes : verdict, arrêt à la première étape en échec, extractions OpenCollection passées aux étapes suivantes, onglet du test, onglet « Variables », « modifié, pas encore envoyé » (plan-mvp-e-tests-etapes, PR #51)."
       - "2026-11-16 : Vocabulaire « assertion » partout ; secret saisi en clair dans l'authentification proposé en variable locale, rien n'est écrit avant le choix ; temps de la réponse dans l'onglet Chronologie (lot K, PR #65)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : barre des étapes d'un test de six étapes sur une rangée qui défile, étape active visible, fondu au bord coupé (DE8) ; b : échec d'assertion affiché une fois dans une liste dépliable, « Ignorer pour ce résultat », liens d'action en couleur de lien (DE10, ER3) ; c : note du coffre en couleur de texte (DE2) ; compteurs en pastille, sélection en fond accent doux (DE7)."
     ecrans:
       a:
         etat: livré
@@ -842,6 +854,8 @@ pages:
     nom: "Jeux de données"
     version: V4
     liees: ["4.2", "5.2"]
+    journal:
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a: { etat: à faire }
       "a bis": { etat: à faire }
@@ -853,6 +867,8 @@ pages:
     nom: "Templates"
     version: V4
     liees: ["3.2", "4.2"]
+    journal:
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a: { etat: à faire }
       b: { etat: à faire }
@@ -868,6 +884,7 @@ pages:
     journal:
       - "2026-11-09 : Étiquettes libres d'une requête (PR #32)."
       - "2026-11-13 : Étiquettes du projet proposées avec leur nombre de requêtes à la saisie, puis « + Créer » (a, PR #56)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a:
         {
@@ -904,6 +921,7 @@ pages:
       - "2026-11-13 : Liste des valeurs dynamiques proposée à la frappe de {{$ dans tout champ à variables, avec description et exemple tirés par le cœur (h, PR #55)."
       - "2026-11-13 : Échec réseau expliqué : certificat, proxy, nom, serveur, délai ; ce qui n'est pas parti et l'action qui règle le poste (i, lot H, PR #58)."
       - "2026-11-16 : Onglet Chronologie : DNS, connexion et TLS, attente du serveur, réception, mesurés par le cœur ; « + Assertion » (c, b bis, lot K, PR #65)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : b : réponse vide et envoi en cours en texte secondaire neutre, erreur d'envoi avec son action (« Ajouter », « Environnements… »), vue partagée à 1280 px sur une ligne (DE1, DE3, ER6) ; h : barre des étapes sur une rangée qui défile (DE8) ; compteurs en pastille, sélection en fond accent doux, interrupteur éteint au bord de contrôle (DE4, DE7)."
     ecrans:
       a: { etat: livré, pr: [27] }
       b:
@@ -1047,6 +1065,7 @@ pages:
     liees: ["6.1", "6.5", "5.2"]
     journal:
       - "2026-11-12 : Écran « Depuis une campagne » repris de « Exécution » (g → f)."
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       "0": { etat: à faire }
       a: { etat: à faire }
@@ -1071,6 +1090,8 @@ pages:
     nom: "Critères de sortie et PV"
     version: V8
     liees: ["6.3", "6.4"]
+    journal:
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a: { etat: à faire }
       b: { etat: à faire }
@@ -1082,6 +1103,8 @@ pages:
     nom: "Impact des changements"
     version: V8
     liees: ["6.2", "3.1"]
+    journal:
+      - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
     ecrans:
       a: { etat: à faire }
       b: { etat: à faire }
