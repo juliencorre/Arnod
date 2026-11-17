@@ -8,6 +8,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EVENTS } from "@/lib/ipc";
+import { useSelectionStore } from "@/stores/selection";
 import { requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type { ProjectChange } from "@/types/ipc";
 
@@ -144,6 +145,42 @@ describe("sortie d'Arnod : la fenêtre principale enregistre d'abord (IN3)", () 
         "« Lister » n'est pas enregistrée : choisissez où va le secret saisi en clair.",
       ) as unknown,
     });
+  });
+});
+
+describe("actions sur l'arborescence et brouillons en attente (R6)", () => {
+  /** Requête « Lister » ouverte avec un jeton en clair en attente d'un choix. */
+  async function heldSecret(): Promise<FakeCore> {
+    let core: FakeCore;
+    ({ app, core } = await openProject());
+    await click(app, '[role="treeitem"]', "Lister");
+    await click(app, ".editor__tab", "Auth");
+    await app.get(".auth select").setValue("bearer");
+    await app.get('.auth input[type="text"]').setValue("eyJhbGciOi.xyz");
+    await wait(750);
+    setActivePinia(app.vm.$.appContext.config.globalProperties.$pinia);
+    return core;
+  }
+
+  it("un brouillon en attente ailleurs n'empêche pas de dupliquer", async () => {
+    const core = await heldSecret();
+    const selection = useSelectionStore();
+    selection.toggle(BOUTIQUE_TESTS, "sante.yml");
+
+    await selection.apply({ kind: "duplicate" });
+
+    expect(core.commands()).toContain("tree_batch");
+  });
+
+  it("un brouillon en attente de la requête choisie arrête l'action", async () => {
+    const core = await heldSecret();
+    const selection = useSelectionStore();
+    selection.toggle(BOUTIQUE_TESTS, "Clients/lister.yml");
+
+    await expect(selection.apply({ kind: "duplicate" })).rejects.toThrow(
+      "« Lister » n'est pas enregistrée : choisissez où va le secret saisi en clair.",
+    );
+    expect(core.commands()).not.toContain("tree_batch");
   });
 });
 

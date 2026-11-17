@@ -77,9 +77,18 @@ export const useTransferStore = defineStore("transfer", () => {
     mode: TransferMode,
   ): Promise<TransferDone> {
     const workbench = useWorkbenchStore();
-    // Les requêtes ouvertes sont enregistrées : rien ne réécrit un rang d'étape renuméroté.
-    // Un brouillon non enregistré arrête l'action : rien n'est réécrit dessous (R6).
-    const refused = await useDrafts().saveAll();
+    // Les requêtes ouvertes sont enregistrées : rien ne réécrit un rang d'étape renuméroté. Un
+    // brouillon non enregistré de la requête ou de sa destination arrête l'action (R6).
+    const into =
+      destination.kind === "folder"
+        ? destination.folder
+        : destination.kind === "step"
+          ? destination.test
+          : null;
+    const refused = await useDrafts().saveTouching([
+      { projectId: source.projectId, paths: [source.path] },
+      ...(into === null || into === "" ? [] : [{ projectId: target, paths: [into] }]),
+    ]);
     if (refused !== null) throw new Error(refused);
     const done = await ipc.transferApply(source.projectId, source.path, target, destination, mode);
     if (mode === "move")
@@ -130,8 +139,10 @@ export const useTransferStore = defineStore("transfer", () => {
     const done = last.value;
     if (!done) return false;
     const workbench = useWorkbenchStore();
-    // Un brouillon non enregistré arrête l'action : rien n'est réécrit dessous (R6).
-    const refused = await useDrafts().saveAll();
+    // Un brouillon non enregistré d'un projet touché arrête l'action (R6).
+    const refused = await useDrafts().saveTouching(
+      done.projects.map((projectId) => ({ projectId, paths: [""] })),
+    );
     if (refused !== null) throw new Error(refused);
     last.value = null;
     await ipc.transferUndo(done.token);

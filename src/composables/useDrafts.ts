@@ -70,6 +70,30 @@ export function useDrafts() {
     return refusal(requests, contractKeys);
   }
 
+  /**
+   * Avant une action sur l'arborescence (déplacer, dupliquer, transférer, annuler) : enregistre
+   * toutes les requêtes modifiées, mais ne refuse que pour celles que l'action touche, dans
+   * `places` (projet, puis chemins : la requête ou un dossier qui la contient ; `""` : tout le
+   * projet). Un brouillon en attente ailleurs n'empêche rien. `null` si l'action peut partir.
+   */
+  async function saveTouching(
+    places: { projectId: string; paths: string[] }[],
+  ): Promise<string | null> {
+    const unsaved = await workbench.saveAll();
+    const touched = unsaved.filter((key) => {
+      const editor = workbench.editors[key];
+      if (!editor) return false;
+      return places.some(
+        (place) =>
+          place.projectId === editor.projectId &&
+          place.paths.some(
+            (path) => path === "" || editor.path === path || editor.path.startsWith(`${path}/`),
+          ),
+      );
+    });
+    return refusal(touched, []);
+  }
+
   /** Comme `saveAll`, la raison d'un refus montrée en notification ; `true` si tout est écrit. */
   async function saveAllOrSay(): Promise<boolean> {
     const message = await saveAll();
@@ -87,5 +111,5 @@ export function useDrafts() {
     return true;
   }
 
-  return { saveRequest, saveContract, saveAll, saveAllOrSay, reattach };
+  return { saveRequest, saveContract, saveAll, saveTouching, saveAllOrSay, reattach };
 }
