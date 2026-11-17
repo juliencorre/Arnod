@@ -1,6 +1,6 @@
 # Plan - Qualité du MVP
 
-**Version** 0.1 · **Date** 2026-11-17 · **Statut** Brouillon (Q5, Q10, Q11 tranchées) · **Base** version 0.0.3
+**Version** 0.1 · **Date** 2026-11-17 · **Statut** Brouillon (Q1, Q2, Q5, Q8, Q10, Q11 tranchées) · **Base** version 0.0.3
 (Develop @512f194)
 
 Plan de correction des constats de l'[audit du MVP](audit-2026-11-mvp.md) : performance, qualité,
@@ -208,13 +208,13 @@ C, D, E, F, I. Vague 3, en parallèle : G, H, J, K.
 
 **Lot C - Brouillons et fenêtres** (`claude/qualite-c-brouillons`)
 
-- [ ] **T9** IN3 : issue de `save` ; fermeture, rattachement, déplacement et installation refusent
+- [x] **T9** IN3 : issue de `save` ; fermeture, rattachement, déplacement et installation refusent
       un brouillon non enregistré ; la fenêtre principale enregistre avant de quitter.
-- [ ] **T10** IN2, IN4, IN9 : « Rattacher » enregistre ; choix du secret gardé ; frappe pendant
+- [x] **T10** IN2, IN4, IN9 : « Rattacher » enregistre ; choix du secret gardé ; frappe pendant
       une relecture conservée.
-- [ ] **T11** IN5, IN6 : renommages et suppressions suivis dans toutes les fenêtres ; éditeurs
+- [x] **T11** IN5, IN6 : renommages et suppressions suivis dans toutes les fenêtres ; éditeurs
       sans onglet libérés.
-- [ ] **T12** ES8 : instance unique (selon Q1).
+- [x] **T12** ES8 : instance unique (selon Q1).
 
 **Lot D - Secrets et réseau** (`claude/qualite-d-secrets-reseau`)
 
@@ -308,16 +308,16 @@ C, D, E, F, I. Vague 3, en parallèle : G, H, J, K.
 
 Questions ouvertes, à trancher avant le lot cité.
 
-| ID  | Question                                                                                                                                                  | Lot | Décision                                                                                               |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------ |
-| Q1  | Instance unique : `tauri-plugin-single-instance` (un plugin de plus, ramène la fenêtre) ou fichier verrou écrit par Arnod (sans plugin, message seul) ?   | C   | À trancher                                                                                             |
-| Q2  | Miroir IPC : `ts-rs` en dépendance de test (types générés, rien dans le binaire) ou échantillons JSON vérifiés par `vue-tsc` (sans dépendance, partiel) ? | B   | À trancher                                                                                             |
-| Q3  | Commentaires YAML perdus à l'enregistrement : les conserver (réécriture de la couche YAML, effort L) ou l'écrire comme limite connue ?                    | E   | À trancher                                                                                             |
-| Q4  | Variable qui cite une autre variable : la résoudre comme Bruno (profondeur bornée, cycles refusés) ou la signaler inconnue ?                              | E   | À trancher                                                                                             |
-| Q5  | Environnements et réglages du projet : enregistrement automatique comme le reste (résout l'écart 3.3-a) ou garde à la fermeture ?                         | J   | 2026-11-17 : enregistrement automatique                                                                |
-| Q6  | Taille de projet visée par les budgets R7 : 2 000 requêtes et un poste ralenti 4×, ou une autre cible ?                                                   | F   | À trancher                                                                                             |
-| Q7  | Liste virtualisée : composant maison à hauteur fixe ou dépendance (`@tanstack/vue-virtual`) ?                                                             | G   | À trancher                                                                                             |
-| Q8  | SonarCloud : versionner sa configuration dans le dépôt, ou retirer ses badges du README ?                                                                 | B   | À trancher                                                                                             |
-| Q9  | `reqwest` 0.13 pour n'avoir qu'un client HTTP : maintenant (lot K) ou à la prochaine montée de Tauri ?                                                    | K   | À trancher                                                                                             |
-| Q10 | Bords de contrôle à 3:1 : foncer les bords de tous les champs, ou seulement cases, interrupteurs et focus ?                                               | I   | 2026-11-17 : cases, interrupteurs, radios et focus ; jeton `--color-border-control` (#8f8a83, #7d7871) |
-| Q11 | Barre des étapes trop haute (DE8) : une rangée qui défile, ou « Étape n / total » avec un menu ?                                                          | I   | 2026-11-17 : une rangée qui défile                                                                     |
+| ID  | Question                                                                                                                                                  | Lot | Décision                                                                                                           |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------------------ |
+| Q1  | Instance unique : `tauri-plugin-single-instance` (un plugin de plus, ramène la fenêtre) ou fichier verrou écrit par Arnod (sans plugin, message seul) ?   | C   | 2026-11-17 : fichier verrou `arnod.lock` (verrou du système, sans plugin) ; la seconde instance le dit et s'arrête |
+| Q2  | Miroir IPC : `ts-rs` en dépendance de test (types générés, rien dans le binaire) ou échantillons JSON vérifiés par `vue-tsc` (sans dépendance, partiel) ? | B   | 2026-11-17 : `ts-rs` en dépendance de test, plus des échantillons du vrai cœur pour le faux cœur                   |
+| Q3  | Commentaires YAML perdus à l'enregistrement : les conserver (réécriture de la couche YAML, effort L) ou l'écrire comme limite connue ?                    | E   | À trancher                                                                                                         |
+| Q4  | Variable qui cite une autre variable : la résoudre comme Bruno (profondeur bornée, cycles refusés) ou la signaler inconnue ?                              | E   | À trancher                                                                                                         |
+| Q5  | Environnements et réglages du projet : enregistrement automatique comme le reste (résout l'écart 3.3-a) ou garde à la fermeture ?                         | J   | 2026-11-17 : enregistrement automatique                                                                            |
+| Q6  | Taille de projet visée par les budgets R7 : 2 000 requêtes et un poste ralenti 4×, ou une autre cible ?                                                   | F   | À trancher                                                                                                         |
+| Q7  | Liste virtualisée : composant maison à hauteur fixe ou dépendance (`@tanstack/vue-virtual`) ?                                                             | G   | À trancher                                                                                                         |
+| Q8  | SonarCloud : versionner sa configuration dans le dépôt, ou retirer ses badges du README ?                                                                 | B   | 2026-11-17 : configuration versionnée (`.sonarcloud.properties`)                                                   |
+| Q9  | `reqwest` 0.13 pour n'avoir qu'un client HTTP : maintenant (lot K) ou à la prochaine montée de Tauri ?                                                    | K   | À trancher                                                                                                         |
+| Q10 | Bords de contrôle à 3:1 : foncer les bords de tous les champs, ou seulement cases, interrupteurs et focus ?                                               | I   | 2026-11-17 : cases, interrupteurs, radios et focus ; jeton `--color-border-control` (#8f8a83, #7d7871)             |
+| Q11 | Barre des étapes trop haute (DE8) : une rangée qui défile, ou « Étape n / total » avec un menu ?                                                          | I   | 2026-11-17 : une rangée qui défile                                                                                 |

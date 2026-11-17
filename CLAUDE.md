@@ -98,7 +98,8 @@ src/                    Frontend Vue
                         réponse),
                         contracts (contrats par projet, contrats ouverts), steps (catalogue des
                         étapes, reconnaissance, essai)
-  composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions)
+  composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions),
+                        brouillons avant fermeture ou sortie (useDrafts)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification,
                         en-tête et icônes des sections (SectionHeading, SectionIcon)
   components/layout/    Coquille : sélecteur de workspace (WorkspaceSwitcher), barre latérale (un
@@ -147,6 +148,8 @@ src-tauri/              Cœur Rust
                         validation, reconnaissance, valeurs du formulaire, requête HTTP d'un essai
   src/trial.rs          Essai sans projet : contrat déduit et « Essai N » dans « Non classés »
   src/windows.rs        windows.json, fenêtres natives, focus, fermetures, événements arnod://
+  src/quit.rs           Sortie d'Arnod : réponses des fenêtres à arnod://quitter (pur)
+  src/instance.rs       Instance unique : verrou arnod.lock du dossier de données
   src/opencollection/   Format OpenCollection 1.0.0 : schéma embarqué, YAML, requêtes, racine
                         (opencollection.yml, extensions.arnod), conversion de l'ancien format
   src/manifest.rs       Dossier d'un projet et sa racine opencollection.yml
@@ -834,3 +837,27 @@ Référence : écran 4.1-a quater.
 - Interface : store `selection` (propre à la fenêtre, un seul projet), `TreeRow` (Ctrl+clic,
   Maj+clic dans l'ordre affiché, Ctrl+Espace ou Maj+Espace au clavier), `SelectionBar.vue` (monté
   par `SharedDialogs`, Échap vide la sélection).
+
+## Brouillons, sortie et instance unique
+
+Référence : `docs/plan-qualite-mvp.md`, lot C (T9 à T12 : IN2 à IN6, IN9, ES8 ; règles R6, R11 ;
+décision Q1).
+
+- `workbench.save` rend son issue (`SaveOutcome` : `saved`, `held` pour un conflit, un fichier
+  supprimé ou un secret en attente, `failed`) ; `saveAll` rend les requêtes non enregistrées.
+  Fermer, détacher, rattacher, déplacer, quitter ou installer passe par `useDrafts`
+  (`saveRequest`, `saveContract`, `saveAll`, `reattach`) : un brouillon non enregistré arrête
+  l'action et la notification dit pourquoi (`workbench.unsavedReason`). Ne lâchez jamais un
+  brouillon sans passer par là.
+- Sortie d'Arnod (fenêtre principale fermée, Fichier › Quitter) : `windows::request_quit` émet
+  `arnod://quitter` à toutes les fenêtres, chacune enregistre et répond par `window_quit_ready`
+  (`quit::QuitGate`, pur) ; un refus garde Arnod ouvert, une fenêtre muette ne le retient pas
+  plus de 10 s. N'appelez pas `app.exit` pour quitter : passez par `request_quit`.
+- `arnod://projet` porte `renamed` et `removed` (`windows::paths_changed`) : une commande qui
+  renomme, déplace ou retire une requête les remplit, et les éditeurs des autres fenêtres suivent
+  ou sont oubliés. Les éditeurs qu'aucun onglet ne montre plus sont libérés (`pruneEditors`).
+  Une relecture garde une frappe faite pendant l'appel ; le choix « Laisser dans le test » vaut
+  pour la session.
+- Instance unique (`instance.rs`) : verrou du système sur `arnod.lock` dans le dossier de
+  données, tenu jusqu'à la sortie. Une seconde instance attend 5 s (relance après une mise à
+  jour), puis ne charge rien, ferme sa fenêtre cachée, le dit par un message natif et s'arrête.
