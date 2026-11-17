@@ -327,6 +327,30 @@ pub(crate) fn free_file_name(dir: &Path, base: &str) -> String {
     candidate
 }
 
+/// Un dossier nommé `name` dans `parent_dir` reste visible dans l'arborescence (PU4) : ni caché
+/// (`.…`), ni `folder.yml`, ni, à la racine du projet, un dossier réservé (`environments`,
+/// `contracts`) ou le fichier racine. Vaut pour créer, renommer et déplacer.
+fn check_folder_name(root: &Path, parent_dir: &Path, name: &str) -> Result<(), CommandError> {
+    if name.starts_with('.') || name.eq_ignore_ascii_case(FOLDER_FILE) {
+        return Err(CommandError::new(
+            CommandErrorKind::InvalidName,
+            format!("« {name} » serait caché dans l'arborescence : choisissez un autre nom."),
+        ));
+    }
+    let top = parent_dir == root;
+    if top
+        && [ENVIRONMENTS_DIR, CONTRACTS_DIR, ROOT_FILE]
+            .iter()
+            .any(|reserved| name.eq_ignore_ascii_case(reserved))
+    {
+        return Err(CommandError::new(
+            CommandErrorKind::NameTaken,
+            format!("« {name} » est réservé à la racine du projet : choisissez un autre nom."),
+        ));
+    }
+    Ok(())
+}
+
 /// Crée un dossier réel (A3). Renvoie son chemin relatif.
 pub fn create_folder(root: &Path, parent: &str, name: &str) -> Result<String, CommandError> {
     let name = item_name(name)?;
@@ -337,11 +361,8 @@ pub fn create_folder(root: &Path, parent: &str, name: &str) -> Result<String, Co
             "Le dossier parent n'existe plus.",
         ));
     }
-    if exists_ignoring_case(&parent_dir, &name)
-        || (parent.is_empty()
-            && (name.eq_ignore_ascii_case(ENVIRONMENTS_DIR)
-                || name.eq_ignore_ascii_case(CONTRACTS_DIR)))
-    {
+    check_folder_name(root, &parent_dir, &name)?;
+    if exists_ignoring_case(&parent_dir, &name) {
         return Err(name_taken(&name));
     }
     let path = parent_dir.join(&name);
@@ -398,6 +419,7 @@ pub fn rename(root: &Path, path: &str, name: &str) -> Result<String, CommandErro
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
+        check_folder_name(root, &parent, &name)?;
         if !names::same_name(&current, &name) && exists_ignoring_case(&parent, &name) {
             return Err(name_taken(&name));
         }
@@ -407,8 +429,11 @@ pub fn rename(root: &Path, path: &str, name: &str) -> Result<String, CommandErro
             let tmp = parent.join(format!(".arnod-rename-{}", uuid::Uuid::new_v4()));
             fs::rename(&source, &tmp)
                 .map_err(|e| CommandError::io("Renommage impossible", &source, &e))?;
-            fs::rename(&tmp, &target)
-                .map_err(|e| CommandError::io("Renommage impossible", &target, &e))?;
+            if let Err(error) = fs::rename(&tmp, &target) {
+                // Le dossier ne reste jamais caché sous son nom temporaire (PU5).
+                let _ = fs::rename(&tmp, &source);
+                return Err(CommandError::io("Renommage impossible", &target, &error));
+            }
             crate::watch::settle(&source);
             crate::watch::settle(&target);
         }
@@ -467,6 +492,9 @@ pub fn move_to(root: &Path, path: &str, target_folder: &str) -> Result<String, C
     let target = target_dir.join(&file_name);
     if target == source {
         return Ok(relative_path(root, &source));
+    }
+    if source.is_dir() {
+        check_folder_name(root, &target_dir, &file_name.to_string_lossy())?;
     }
     if exists_ignoring_case(&target_dir, &file_name.to_string_lossy()) {
         return Err(name_taken(&file_name.to_string_lossy()));
