@@ -9,6 +9,7 @@ export default defineConfigWithVueTs(
     // .maquette/ et .apercu/ : copies locales de la maquette et captures, ignorées par Git.
     ignores: [
       "dist/**",
+      "dist-perf/**",
       "src-tauri/target/**",
       "src-tauri/gen/**",
       "coverage/**",
