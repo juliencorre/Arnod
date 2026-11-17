@@ -21,7 +21,7 @@
  * suivante peinte, temps du faux cœur retiré. Les fonctions passées à la page viennent de ce
  * fichier (outil local : rien d'extérieur n'y est évalué).
  */
-import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { dirname, extname, join, resolve } from "node:path";
@@ -50,13 +50,32 @@ const TYPES = {
   ".map": "application/json",
 };
 
+/** Fichiers de `dossier` par adresse (`/assets/x.js`) ; `/` sert `index.html`. */
+function fichiersServis(dossier) {
+  const servis = new Map();
+  const parcourir = (relatif) => {
+    for (const entree of readdirSync(join(dossier, relatif), { withFileTypes: true })) {
+      const enfant = relatif === "" ? entree.name : `${relatif}/${entree.name}`;
+      if (entree.isDirectory()) parcourir(enfant);
+      else if (entree.isFile()) servis.set(`/${enfant}`, join(dossier, enfant));
+    }
+  };
+  parcourir("");
+  const index = servis.get("/index.html");
+  if (index) servis.set("/", index);
+  return servis;
+}
+
+/**
+ * Sert la page construite sur 127.0.0.1. Seuls les fichiers listés au démarrage sont servis :
+ * l'adresse demandée ne sert qu'à choisir dans cette liste, jamais à construire un chemin.
+ */
 function servir(dossier) {
+  const servis = fichiersServis(dossier);
   return new Promise((ok) => {
     const server = createServer((req, res) => {
-      const chemin = join(dossier, decodeURIComponent(new URL(req.url, "http://x").pathname));
-      const fichier =
-        existsSync(chemin) && statSync(chemin).isDirectory() ? join(chemin, "index.html") : chemin;
-      if (!existsSync(fichier)) {
+      const fichier = servis.get(new URL(req.url ?? "/", "http://x").pathname);
+      if (fichier === undefined) {
         res.writeHead(404).end();
         return;
       }
