@@ -1,0 +1,15 @@
+diff --git a/src-tauri/src/lib.rs b/src-tauri/src/lib.rs
+index 6d27233..2e06e40 100644
+--- a/src-tauri/src/lib.rs
++++ b/src-tauri/src/lib.rs
+@@ -6,6 +6,10 @@
+ //! vivent dans [`catalog`], leur persistance dans [`storage`] et [`manifest`],
+ //! l'état partagé dans [`state`].
+ 
++#[cfg(test)]
++mod audit_constats;
++#[cfg(test)]
++mod audit_purs;
+ pub mod bruno;
+ pub mod catalog;
+ pub mod commands;

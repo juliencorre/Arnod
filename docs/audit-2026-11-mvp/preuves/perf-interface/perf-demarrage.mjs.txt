@@ -1,0 +1,214 @@
+#!/usr/bin/env node
+/**
+ * Démarrage et poids du JS (audit de performance de l'interface).
+ *
+ *   npx vite build --outDir /tmp/arnod-audit/perf-interface/dist-app --emptyOutDir --sourcemap
+ *   npx vite build --config vite.apercu.config.ts --outDir /tmp/arnod-audit/perf-interface/dist-apercu --emptyOutDir --base ./
+ *   node scripts/perf-demarrage.mjs [dist-app] [dist-apercu]
+ *
+ * 1. Poids des fichiers du build de l'application (brut, gzip, brotli) et part de chaque dossier
+ *    de `src/` dans le JS, d'après la carte des sources.
+ * 2. Compilation et évaluation du JS de l'application dans Chromium (trace), à vitesse normale
+ *    et processeur ralenti 4×.
+ * 3. Aperçu (scénario `projet`, build de production) : du chargement de la page à la première
+ *    image qui montre la barre latérale.
+ */
+import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { createServer } from "node:http";
+import { createRequire } from "node:module";
+import { extname, join } from "node:path";
+import { brotliCompressSync, gzipSync } from "node:zlib";
+
+const require = createRequire(import.meta.url);
+const BASE = "/tmp/arnod-audit/perf-interface";
+const APP = process.argv[2] ?? `${BASE}/dist-app`;
+const APERCU = process.argv[3] ?? `${BASE}/dist-apercu`;
+
+function playwright() {
+  for (const piste of [
+    "playwright",
+    process.env.PLAYWRIGHT_DIR,
+    "/home/julien/.npm/_npx/e41f203b7505f1fb/node_modules/playwright",
+  ].filter(Boolean)) {
+    try {
+      return require(piste);
+    } catch {
+      // Piste suivante.
+    }
+  }
+  throw new Error("Playwright introuvable.");
+}
+
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css" };
+
+function servir(dossier) {
+  return new Promise((ok) => {
+    const server = createServer((req, res) => {
+      const chemin = join(dossier, decodeURIComponent(new URL(req.url, "http://x").pathname));
+      const fichier =
+        existsSync(chemin) && statSync(chemin).isDirectory() ? join(chemin, "index.html") : chemin;
+      if (!existsSync(fichier)) return void res.writeHead(404).end();
+      res.writeHead(200, { "content-type": TYPES[extname(fichier)] ?? "application/octet-stream" });
+      createReadStream(fichier).pipe(res);
+    });
+    server.listen(0, "127.0.0.1", () =>
+      ok({ server, base: `http://127.0.0.1:${server.address().port}` }),
+    );
+  });
+}
+
+const ko = (n) => `${(n / 1024).toFixed(1)} ko`;
+const mediane = (v) => {
+  const t = [...v].sort((a, b) => a - b);
+  return t[Math.floor(t.length / 2)];
+};
+
+// --- 1. Poids ---------------------------------------------------------------------------
+
+function poids() {
+  console.log("## Poids du build de l'application");
+  const assets = join(APP, "assets");
+  let js = null;
+  for (const nom of readdirSync(assets)) {
+    if (nom.endsWith(".map")) continue;
+    const contenu = readFileSync(join(assets, nom));
+    console.log(
+      `${nom.padEnd(28)} brut ${ko(contenu.length).padStart(9)} · gzip ${ko(gzipSync(contenu).length).padStart(9)} · brotli ${ko(brotliCompressSync(contenu).length).padStart(9)}`,
+    );
+    if (nom.endsWith(".js")) js = join(assets, nom);
+  }
+  if (!js || !existsSync(`${js}.map`)) return;
+  // Part de chaque source : caractères du JS produit, d'un segment de la carte au suivant.
+  const { TraceMap, decodedMappings } = require("@jridgewell/trace-mapping");
+  const carte = new TraceMap(JSON.parse(readFileSync(`${js}.map`, "utf8")));
+  const lignes = readFileSync(js, "utf8").split("\n");
+  const parSource = new Map();
+  decodedMappings(carte).forEach((segments, numero) => {
+    const longueur = lignes[numero]?.length ?? 0;
+    segments.forEach((segment, i) => {
+      if (segment.length < 2) return;
+      const fin = segments[i + 1]?.[0] ?? longueur;
+      const source = carte.sources[segment[1]] ?? "?";
+      parSource.set(source, (parSource.get(source) ?? 0) + fin - segment[0]);
+    });
+  });
+  const groupe = (source) => {
+    const s = source.replaceAll("\\", "/");
+    if (s.includes("node_modules/")) {
+      const paquet = s.split("node_modules/").at(-1).split("/");
+      return `node_modules/${paquet[0].startsWith("@") ? `${paquet[0]}/${paquet[1]}` : paquet[0]}`;
+    }
+    const src = s.split("/src/").at(-1);
+    const parts = src.split("/");
+    return parts[0] === "components" ? `src/components/${parts[1]}` : `src/${parts[0]}`;
+  };
+  const parGroupe = new Map();
+  const parFichier = [];
+  let total = 0;
+  for (const [source, octets] of parSource) {
+    total += octets;
+    parGroupe.set(groupe(source), (parGroupe.get(groupe(source)) ?? 0) + octets);
+    parFichier.push([source.replaceAll("\\", "/").split("/src/").at(-1), octets]);
+  }
+  console.log(`\n## Part de chaque dossier dans le JS (${ko(total)} attribués)`);
+  for (const [nom, octets] of [...parGroupe].sort((a, b) => b[1] - a[1])) {
+    console.log(`${nom.padEnd(38)} ${ko(octets).padStart(9)}  ${((octets / total) * 100).toFixed(1)} %`);
+  }
+  console.log("\n## 25 plus gros fichiers");
+  for (const [nom, octets] of parFichier.sort((a, b) => b[1] - a[1]).slice(0, 25)) {
+    console.log(`${String(nom).slice(-60).padEnd(60)} ${ko(octets).padStart(9)}`);
+  }
+}
+
+// --- 2 et 3. Chargement dans Chromium ----------------------------------------------------
+
+const CATEGORIES = ["devtools.timeline", "v8", "disabled-by-default-v8.compile", "loading"];
+const NOMS = {
+  "v8.compile": "compilation",
+  "v8.compileModule": "compilation",
+  "V8.CompileCode": "compilation",
+  "v8.produceCache": "compilation",
+  "v8.evaluateModule": "évaluation",
+  EvaluateScript: "évaluation",
+  ParseAuthorStyleSheet: "analyse du CSS",
+  ParseHTML: "analyse du HTML",
+};
+
+async function charger(browser, url, ralenti, attendre) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const cdp = await context.newCDPSession(page);
+  if (ralenti > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: ralenti });
+  await page.addInitScript(() => {
+    window.__vu = {};
+    const observer = new MutationObserver(() => {
+      if (window.__vu.barre === undefined && document.querySelector("aside.sidebar")) {
+        window.__vu.barre = performance.now();
+        requestAnimationFrame(() => {
+          const canal = new MessageChannel();
+          canal.port1.onmessage = () => {
+            window.__vu.image = performance.now();
+          };
+          canal.port2.postMessage(0);
+        });
+      }
+    });
+    document.addEventListener("DOMContentLoaded", () => {
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    });
+  });
+  await browser.startTracing(page, { categories: CATEGORIES });
+  await page.goto(url);
+  if (attendre) await page.waitForFunction(() => window.__vu.image !== undefined, null, { timeout: 60000 });
+  else await page.waitForTimeout(1500);
+  const trace = JSON.parse((await browser.stopTracing()).toString());
+  const mesures = await page.evaluate(() => {
+    const peint = performance.getEntriesByName("first-contentful-paint")[0];
+    const script = performance.getEntriesByType("resource").find((r) => r.name.endsWith(".js"));
+    return {
+      "premier contenu peint (FCP)": peint?.startTime ?? null,
+      "JS reçu": script?.responseEnd ?? null,
+      "barre latérale dans le DOM": window.__vu.barre ?? null,
+      "première image avec la barre latérale": window.__vu.image ?? null,
+    };
+  });
+  const phases = {};
+  for (const event of trace.traceEvents ?? []) {
+    const phase = NOMS[event.name];
+    if (!phase || event.ph !== "X" || !event.dur) continue;
+    phases[phase] = (phases[phase] ?? 0) + event.dur / 1000;
+  }
+  await context.close();
+  return { ...mesures, ...phases };
+}
+
+async function serie(browser, nom, url, attendre) {
+  console.log(`\n## ${nom}`);
+  const passes = { 1: [], 4: [] };
+  for (const ralenti of [1, 4]) {
+    for (let i = 0; i < (ralenti === 1 ? 5 : 3); i++) {
+      passes[ralenti].push(await charger(browser, url, ralenti, attendre));
+    }
+  }
+  for (const cle of Object.keys(passes[1][0])) {
+    const normal = mediane(passes[1].map((p) => p[cle] ?? 0));
+    const lent = mediane(passes[4].map((p) => p[cle] ?? 0));
+    console.log(`${cle.padEnd(40)} ${normal.toFixed(1).padStart(8)} ms   ×4 : ${lent.toFixed(1).padStart(8)} ms`);
+  }
+}
+
+poids();
+const { chromium } = playwright();
+const browser = await chromium.launch();
+try {
+  const app = await servir(APP);
+  await serie(browser, "Application (sans cœur : seul le chargement du JS compte)", `${app.base}/index.html`, false);
+  app.server.close();
+  if (existsSync(join(APERCU, "index.html"))) {
+    const apercu = await servir(APERCU);
+    await serie(browser, "Aperçu, scénario « projet » (build de production)", `${apercu.base}/index.html?scenario=projet`, true);
+    apercu.server.close();
+  }
+} finally {
+  await browser.close();
+}

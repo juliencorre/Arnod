@@ -1,0 +1,729 @@
+//! Audit de robustesse (novembre 2026, version 0.0.3) : preuves exécutées des constats ES.
+//! Chaque test décrit le comportement ATTENDU : il échoue sur le code audité (13 tests), sauf
+//! `es_statuts_diffuses_dans_l_ordre`, qui passe (course non reproduite).
+//! `es_numero_de_run_apres_un_last_run_tronque` simule la coupure d'une écriture non atomique :
+//! il prouve la conséquence d'un fichier tronqué, pas la coupure elle-même.
+//! Lancer : `cargo test --manifest-path src-tauri/Cargo.toml --locked --test audit_es`.
+
+use std::collections::BTreeMap;
+use std::fs;
+use std::sync::Arc;
+use std::time::Duration;
+
+use arnod_lib::environment::{self, Environment, Variable};
+use arnod_lib::error::{CommandError, CommandErrorKind};
+use arnod_lib::http::Cancel;
+use arnod_lib::network::failure::FailureCause;
+use arnod_lib::network::proxy::{FixedProxySource, SystemProxy};
+use arnod_lib::network::{Network, Session};
+use arnod_lib::request::model::{
+    Auth, AuthKind, Body, Method, Pair, ParamKind, Request, Settings,
+};
+use arnod_lib::request::resolve::Prepared;
+use arnod_lib::secrets::{MemorySecretStore, SecretStore};
+use arnod_lib::workbench::{ProjectCtx, Workbench};
+use base64::Engine;
+use uuid::Uuid;
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, MockServer, ResponseTemplate};
+
+struct Fixture {
+    _dir: tempfile::TempDir,
+    ctx: ProjectCtx,
+    bench: Arc<Workbench>,
+}
+
+fn fixture_with(store: Arc<dyn SecretStore>) -> Fixture {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("projet");
+    fs::create_dir_all(&root).unwrap();
+    environment::init(&root).unwrap();
+    Fixture {
+        ctx: ProjectCtx {
+            id: Uuid::new_v4(),
+            root,
+            data_dir: dir.path().join("data"),
+        },
+        bench: Arc::new(Workbench::new(store)),
+        _dir: dir,
+    }
+}
+
+fn fixture() -> Fixture {
+    fixture_with(Arc::new(MemorySecretStore::default()))
+}
+
+/// « Local » avec `baseUrl` et une variable locale secrète `name` = `value`.
+fn local_with_secret(f: &Fixture, base_url: &str, name: &str, value: &str) {
+    let mut env = environment::list(&f.ctx.root).remove(0);
+    env.variables = vec![Variable {
+        name: "baseUrl".into(),
+        value: base_url.into(),
+    }];
+    env.locals = vec![name.to_owned()];
+    f.bench
+        .save_environment(&f.ctx, &env, Some("Local"))
+        .unwrap();
+    f.bench
+        .set_local(&f.ctx, "Local", name, value, true)
+        .unwrap();
+}
+
+fn pair(name: &str, value: &str) -> Pair {
+    Pair {
+        name: name.into(),
+        value: value.into(),
+        enabled: true,
+        kind: ParamKind::Query,
+        description: String::new(),
+    }
+}
+
+fn prepared(url: String) -> Prepared {
+    Prepared {
+        method: Method::Get,
+        url,
+        headers: Vec::new(),
+        body: None,
+        timeout_ms: Some(2_000),
+        max_redirects: 5,
+        drawn: Vec::new(),
+        used: Vec::new(),
+        oauth2: None,
+        hidden: Vec::new(),
+    }
+}
+
+fn direct_network() -> Network {
+    Network::new(
+        Arc::new(MemorySecretStore::default()),
+        Box::new(FixedProxySource(SystemProxy::default())),
+    )
+}
+
+// ---------------------------------------------------------------- ES : environnements
+
+/// Un `environments/local.yml` illisible (marqueurs de fusion Git) ne doit jamais être réécrit.
+#[test]
+fn es_environnement_illisible_jamais_reecrit() {
+    let f = fixture();
+    let file = f.ctx.root.join("environments").join("local.yml");
+    let edited = "<<<<<<< HEAD\nname: Local\nvariables:\n  - name: baseUrl\n    value: https://api.interne.example\n=======\nname: Local\nvariables:\n  - name: baseUrl\n    value: https://recette.example\n>>>>>>> main\n";
+    fs::write(&file, edited).unwrap();
+
+    // Ce que fait `environments_load` à l'ouverture du projet ou sur `arnod://projet`.
+    let _ = f.bench.environments(&f.ctx);
+
+    assert_eq!(
+        fs::read_to_string(&file).unwrap(),
+        edited,
+        "le fichier illisible a été remplacé par un « Local » vide"
+    );
+}
+
+/// Deux environnements de noms différents mais de même nom de fichier : le second ne doit pas
+/// écraser le premier.
+#[test]
+fn es_environnement_de_meme_fichier_n_ecrase_pas_l_autre() {
+    let f = fixture();
+    let env = |name: &str, url: &str| Environment {
+        name: name.into(),
+        color: "gray".into(),
+        protected: false,
+        variables: vec![Variable {
+            name: "baseUrl".into(),
+            value: url.into(),
+        }],
+        locals: Vec::new(),
+    };
+    environment::save(&f.ctx.root, &env("Recette 1", "https://recette-1.example"), None).unwrap();
+    let second = environment::save(
+        &f.ctx.root,
+        &env("Recette-1", "https://autre.example"),
+        None,
+    );
+
+    let names: Vec<String> = environment::list(&f.ctx.root)
+        .into_iter()
+        .map(|e| e.name)
+        .collect();
+    assert!(
+        second.is_err() || names.contains(&"Recette 1".to_owned()),
+        "« Recette 1 » a disparu ; restent : {names:?}"
+    );
+}
+
+// ---------------------------------------------------------------- ES : secrets
+
+/// Un secret encodé (Basic, paramètre d'adresse, formulaire) reste masqué dans « Envoyé ».
+#[tokio::test]
+async fn es_secret_encode_masque_dans_envoye() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{}"))
+        .mount(&server)
+        .await;
+    let f = fixture();
+    let secret = "S3cret!pass word";
+    local_with_secret(&f, &server.uri(), "motDePasse", secret);
+    let mut request = Request::new("connexion");
+    request.method = Method::Post;
+    request.url = "{{baseUrl}}/login".into();
+    request.auth = Auth {
+        kind: AuthKind::Basic,
+        username: "alice".into(),
+        password: "{{motDePasse}}".into(),
+        ..Auth::default()
+    };
+    request.params = vec![pair("cle", "{{motDePasse}}")];
+    request.body = Body::form(vec![pair("password", "{{motDePasse}}")]);
+    request.settings = Settings::default();
+
+    let outcome = f
+        .bench
+        .send(&f.ctx, Uuid::new_v4(), "Local", request, false)
+        .await
+        .unwrap();
+    let sent = outcome.sent.unwrap();
+
+    let authorization = sent
+        .headers
+        .iter()
+        .find(|(n, _)| n.eq_ignore_ascii_case("authorization"))
+        .map(|(_, v)| v.clone())
+        .unwrap();
+    let decoded = authorization
+        .strip_prefix("Basic ")
+        .and_then(|b| base64::engine::general_purpose::STANDARD.decode(b).ok())
+        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+        .unwrap_or_default();
+    let mut leaks = Vec::new();
+    if decoded.contains(secret) {
+        leaks.push(format!("en-tête Authorization: {authorization} (= {decoded})"));
+    }
+    if sent.url.contains("S3cret") {
+        leaks.push(format!("adresse: {}", sent.url));
+    }
+    if sent.body.as_deref().is_some_and(|b| b.contains("S3cret")) {
+        leaks.push(format!("corps: {}", sent.body.unwrap()));
+    }
+    assert!(leaks.is_empty(), "secret lisible dans « Envoyé » :\n{}", leaks.join("\n"));
+}
+
+/// Le mot de passe d'un proxy du système (`HTTPS_PROXY=http://user:pass@hôte`) ne doit
+/// apparaître ni dans le message d'échec, ni dans l'échec classé, ni dans les préférences.
+#[tokio::test]
+async fn es_mot_de_passe_du_proxy_systeme_jamais_montre() {
+    let proxy = "http://alice:Pr0xyPass@127.0.0.1:9";
+    let network = Network::new(
+        Arc::new(MemorySecretStore::default()),
+        Box::new(FixedProxySource(SystemProxy {
+            http: Some(proxy.into()),
+            https: Some(proxy.into()),
+            ..SystemProxy::default()
+        })),
+    );
+    let mut request = prepared("http://api.exemple.invalid/commandes".into());
+    let error = network
+        .send(&mut request, None, &Cancel::new())
+        .await
+        .unwrap_err();
+    let failure = error.failure.clone().unwrap();
+    let view = network.view();
+
+    let shown = format!(
+        "message: {}\nfailure.proxy: {:?}\nfailure.title: {}\npréférences: {:?}",
+        error.message, failure.proxy, failure.title, view.system.https
+    );
+    assert!(!shown.contains("Pr0xyPass"), "mot de passe du proxy lisible :\n{shown}");
+}
+
+/// Deux commandes cURL collées, pour deux services : le jeton du second ne doit pas partir vers
+/// le premier quand on renvoie « Essai 1 ».
+#[tokio::test]
+async fn es_jeton_d_un_essai_jamais_envoye_a_un_autre_service() {
+    let service_a = MockServer::start().await;
+    Mock::given(path("/a"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&service_a)
+        .await;
+    let f = fixture();
+    local_with_secret(&f, "", "inutile", "x");
+
+    // Les deux commandes donnent la même variable `{{token}}` (`curl::take_secrets`).
+    let first = arnod_lib::steps::detect(&format!(
+        "curl -H 'Authorization: Bearer JETON-DU-SERVICE-A' {}/a",
+        service_a.uri()
+    ))
+    .unwrap();
+    let second = arnod_lib::steps::detect(
+        "curl -H 'Authorization: Bearer JETON-DU-SERVICE-B' https://service-b.example/b",
+    )
+    .unwrap();
+    let names = |d: &arnod_lib::steps::Detection| -> Vec<(String, String)> {
+        d.curl
+            .as_ref()
+            .unwrap()
+            .secrets
+            .iter()
+            .map(|s| (s.name.clone(), s.value.clone()))
+            .collect()
+    };
+    let (first, second) = (names(&first), names(&second));
+    assert_eq!(first[0].0, "token");
+    assert_eq!(second[0].0, "token");
+
+    // `trial_send` → `keep_secrets` : variable locale secrète de « Local », même nom.
+    let mut env = environment::list(&f.ctx.root).remove(0);
+    env.locals = vec!["token".into()];
+    f.bench
+        .save_environment(&f.ctx, &env, Some("Local"))
+        .unwrap();
+    for (name, value) in first.iter().chain(second.iter()) {
+        f.bench
+            .set_local(&f.ctx, "Local", name, value, true)
+            .unwrap();
+    }
+
+    // « Essai 1 », tel qu'enregistré, renvoyé plus tard.
+    let mut essai_1 = Request::new("Essai 1");
+    essai_1.url = format!("{}/a", service_a.uri());
+    essai_1.headers = vec![pair("Authorization", "Bearer {{token}}")];
+    f.bench
+        .send(&f.ctx, Uuid::new_v4(), "Local", essai_1, false)
+        .await
+        .unwrap();
+
+    let received = service_a.received_requests().await.unwrap();
+    let authorization = received[0]
+        .headers
+        .get("authorization")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        authorization, "Bearer JETON-DU-SERVICE-A",
+        "le service A a reçu le jeton du service B"
+    );
+}
+
+// ---------------------------------------------------------------- ES : réseau
+
+/// Un délai dépassé sur une adresse qui contient « 407 » reste un délai dépassé : la requête
+/// est partie, elle a pu être traitée.
+#[tokio::test]
+async fn es_delai_depasse_sur_une_adresse_contenant_407() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(201).set_delay(Duration::from_secs(2)))
+        .mount(&server)
+        .await;
+    let network = direct_network();
+    let mut request = prepared(format!("{}/commandes/407/paiement", server.uri()));
+    request.method = Method::Post;
+    request.timeout_ms = Some(300);
+
+    let error: CommandError = network
+        .send(&mut request, None, &Cancel::new())
+        .await
+        .unwrap_err();
+    let failure = error.failure.clone().unwrap();
+
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+    assert_eq!(
+        (error.kind, failure.cause, failure.not_sent),
+        (CommandErrorKind::Timeout, FailureCause::Timeout, false),
+        "message montré : {}",
+        error.message
+    );
+}
+
+/// Un cookie posé par la réponse 302 d'une connexion est gardé (flux de connexion courant).
+#[tokio::test]
+async fn es_cookie_pose_pendant_une_redirection_garde() {
+    let server = MockServer::start().await;
+    Mock::given(path("/login"))
+        .respond_with(
+            ResponseTemplate::new(302)
+                .insert_header("Location", "/accueil")
+                .insert_header("Set-Cookie", "session=abc123; Path=/"),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(path("/accueil"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&server)
+        .await;
+    let network = direct_network();
+    let session = Session {
+        project: Uuid::new_v4(),
+        environment: "Local".into(),
+    };
+    let mut request = prepared(format!("{}/login", server.uri()));
+    let response = network
+        .send(&mut request, Some(&session), &Cancel::new())
+        .await
+        .unwrap();
+    assert_eq!(response.status, 200);
+
+    let jar = network.cookies(&session, None);
+    let names: Vec<String> = jar
+        .domains
+        .iter()
+        .flat_map(|d| d.cookies.iter().map(|c| c.name.clone()))
+        .collect();
+    assert_eq!(names, ["session"], "cookie de la réponse 302 perdu");
+}
+
+/// Un cookie posé par l'hôte B au bout d'une redirection n'est pas renvoyé à l'hôte A.
+#[tokio::test]
+async fn es_cookie_d_un_hote_jamais_renvoye_a_un_autre() {
+    let host_b = MockServer::start().await;
+    Mock::given(path("/session"))
+        .respond_with(
+            ResponseTemplate::new(200).insert_header("Set-Cookie", "sid=SECRET-DE-B; Path=/"),
+        )
+        .mount(&host_b)
+        .await;
+    let host_a = MockServer::start().await;
+    Mock::given(path("/sso"))
+        .respond_with(
+            ResponseTemplate::new(302)
+                .insert_header("Location", format!("{}/session", host_b.uri()).as_str()),
+        )
+        .mount(&host_a)
+        .await;
+    Mock::given(path("/autre"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&host_a)
+        .await;
+    // A est appelé par « localhost », B par « 127.0.0.1 » : deux hôtes différents.
+    let a = host_a.uri().replace("127.0.0.1", "localhost");
+    let network = direct_network();
+    let session = Session {
+        project: Uuid::new_v4(),
+        environment: "Local".into(),
+    };
+    network
+        .send(&mut prepared(format!("{a}/sso")), Some(&session), &Cancel::new())
+        .await
+        .unwrap();
+    network
+        .send(&mut prepared(format!("{a}/autre")), Some(&session), &Cancel::new())
+        .await
+        .unwrap();
+
+    let received = host_a.received_requests().await.unwrap();
+    let cookie = received
+        .iter()
+        .find(|r| r.url.path() == "/autre")
+        .and_then(|r| r.headers.get("cookie"))
+        .map(|v| v.to_str().unwrap().to_owned());
+    assert_eq!(cookie, None, "l'hôte A a reçu le cookie posé par l'hôte B");
+}
+
+// ---------------------------------------------------------------- ES : annulation
+
+/// Coffre lent (Secret Service sous Linux) : chaque lecture prend 300 ms.
+#[derive(Default)]
+struct SlowStore(MemorySecretStore);
+
+impl SecretStore for SlowStore {
+    fn get(&self, key: &str) -> Result<Option<String>, CommandError> {
+        std::thread::sleep(Duration::from_millis(300));
+        self.0.get(key)
+    }
+    fn set(&self, key: &str, value: &str) -> Result<(), CommandError> {
+        self.0.set(key, value)
+    }
+    fn delete(&self, key: &str) -> Result<(), CommandError> {
+        self.0.delete(key)
+    }
+}
+
+/// « Annuler » cliqué pendant que l'envoi lit encore le coffre : la requête ne doit pas partir.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn es_annuler_pendant_la_lecture_du_coffre_n_envoie_rien() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(201))
+        .mount(&server)
+        .await;
+    let f = fixture_with(Arc::new(SlowStore::default()));
+    local_with_secret(&f, &server.uri(), "jeton", "abc");
+    let mut request = Request::new("payer");
+    request.method = Method::Post;
+    request.url = "{{baseUrl}}/paiements".into();
+
+    let exec = Uuid::new_v4();
+    let (bench, ctx) = (f.bench.clone(), f.ctx.clone());
+    let sending =
+        tokio::spawn(async move { bench.send(&ctx, exec, "Local", request, false).await });
+    // L'envoi lit le coffre (300 ms) : l'utilisateur annule (`request_cancel`).
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    f.bench.cancel(exec);
+    let result = sending.await.unwrap();
+
+    let received = server.received_requests().await.unwrap().len();
+    assert!(
+        received == 0 && result.is_err_and(|e| e.kind == CommandErrorKind::Cancelled),
+        "requêtes reçues par le serveur après l'annulation : {received}"
+    );
+}
+
+// ---------------------------------------------------------------- ES : dernier run
+
+/// `last-run.json` écrit à moitié (coupure pendant `fs::write`) : le run suivant ne doit pas
+/// reprendre le numéro 1.
+#[tokio::test]
+async fn es_numero_de_run_apres_un_last_run_tronque() {
+    let f = fixture();
+    let run_file = f
+        .ctx
+        .data_dir
+        .join("projects")
+        .join(f.ctx.id.to_string())
+        .join("last-run.json");
+    let first = f.bench.start_run(&f.ctx, "", "Local", None, false).unwrap();
+    assert_eq!(first.number, 1);
+    let text = fs::read_to_string(&run_file).unwrap();
+    // Écriture non atomique interrompue : le fichier garde la moitié du texte.
+    fs::write(&run_file, &text[..text.len() / 2]).unwrap();
+
+    // Après un redémarrage d'Arnod (aucun run en mémoire).
+    let restarted = Arc::new(Workbench::new(Arc::new(MemorySecretStore::default())));
+    let next = restarted
+        .start_run(&f.ctx, "", "Local", None, false)
+        .unwrap();
+    assert_eq!(next.number, 2, "le dernier run est perdu, la numérotation repart");
+}
+
+// ---------------------------------------------------------------- ES : deux instances
+
+/// Deux Arnod lancés sur le même poste : ce que l'un enregistre ne doit pas être effacé par
+/// l'autre.
+#[test]
+fn es_deux_instances_ne_s_effacent_pas() {
+    use arnod_lib::state::AppState;
+    let dir = tempfile::tempdir().unwrap();
+    let data = dir.path().join("data");
+    let home = dir.path().join("arnod");
+    let first = AppState::load(data.clone(), home.clone());
+    // Second lancement (double-clic, raccourci) pendant que le premier tourne.
+    let second = AppState::load(data.clone(), home.clone());
+
+    first.mutate(|catalog| catalog.create_workspace("Boutique")).unwrap();
+    second.mutate(|catalog| catalog.create_workspace("Paiement")).unwrap();
+
+    let names: Vec<String> = AppState::load(data, home)
+        .snapshot()
+        .unwrap()
+        .workspaces
+        .into_iter()
+        .map(|w| w.name)
+        .collect();
+    assert_eq!(names, ["Boutique", "Paiement"], "un workspace enregistré a disparu");
+}
+
+// ---------------------------------------------------------------- ES : renommage d'un environnement
+
+/// Coffre qui refuse d'écrire (trousseau verrouillé, invite refusée).
+#[derive(Default)]
+struct LockedStore {
+    inner: MemorySecretStore,
+    locked: std::sync::atomic::AtomicBool,
+}
+
+impl SecretStore for LockedStore {
+    fn get(&self, key: &str) -> Result<Option<String>, CommandError> {
+        self.inner.get(key)
+    }
+    fn set(&self, key: &str, value: &str) -> Result<(), CommandError> {
+        if self.locked.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(CommandError::new(
+                CommandErrorKind::SecretStore,
+                "Le coffre du système est indisponible.",
+            ));
+        }
+        self.inner.set(key, value)
+    }
+    fn delete(&self, key: &str) -> Result<(), CommandError> {
+        self.inner.delete(key)
+    }
+}
+
+/// Renommer un environnement alors que le coffre refuse : soit tout est fait, soit rien.
+#[test]
+fn es_renommage_d_environnement_tout_ou_rien() {
+    let store = Arc::new(LockedStore::default());
+    let f = fixture_with(store.clone());
+    let mut env = environment::list(&f.ctx.root).remove(0);
+    env.locals = vec!["region".into(), "jeton".into()];
+    f.bench.save_environment(&f.ctx, &env, Some("Local")).unwrap();
+    f.bench.set_local(&f.ctx, "Local", "region", "eu-west", false).unwrap();
+    f.bench.set_local(&f.ctx, "Local", "jeton", "abc", true).unwrap();
+
+    store.locked.store(true, std::sync::atomic::Ordering::SeqCst);
+    env.name = "Recette".into();
+    let renamed = f.bench.save_environment(&f.ctx, &env, Some("Local"));
+    assert!(renamed.is_err());
+
+    // L'échec est signalé : l'environnement devrait s'appeler encore « Local », avec ses valeurs.
+    let view = f.bench.environments(&f.ctx);
+    let shown: Vec<(String, Vec<(String, bool)>)> = view
+        .environments
+        .iter()
+        .map(|e| {
+            (
+                e.environment.name.clone(),
+                e.local_vars.iter().map(|v| (v.name.clone(), v.has_value)).collect(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        shown,
+        [(
+            "Local".to_owned(),
+            vec![("region".to_owned(), true), ("jeton".to_owned(), true)]
+        )],
+        "renommage refusé mais à moitié appliqué"
+    );
+}
+
+// ---------------------------------------------------------------- ES : jeton OAuth 2 d'un run
+
+/// Un run de 8 requêtes sous la même authentification OAuth 2 demande un seul jeton.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn es_un_run_demande_un_seul_jeton_oauth2() {
+    use arnod_lib::request::file;
+    use arnod_lib::request::model::OAuth2;
+    use arnod_lib::tree;
+
+    let server = MockServer::start().await;
+    Mock::given(path("/oauth/token"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(Duration::from_millis(150))
+                .set_body_string(r#"{"access_token":"jeton-1","expires_in":3600}"#),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(path("/api"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{}"))
+        .mount(&server)
+        .await;
+    let f = fixture();
+    local_with_secret(&f, &server.uri(), "oauth2ClientSecret", "s3cr3t");
+    for index in 0..8 {
+        let name = format!("Requête {index}");
+        let created = tree::create_request(&f.ctx.root, "", Some(&name)).unwrap();
+        let full = tree::resolve(&f.ctx.root, &created).unwrap();
+        let mut request = file::read(&full).unwrap();
+        request.url = "{{baseUrl}}/api".into();
+        request.auth = Auth {
+            kind: AuthKind::OAuth2,
+            oauth2: OAuth2 {
+                access_token_url: "{{baseUrl}}/oauth/token".into(),
+                client_id: "boutique".into(),
+                client_secret: "{{oauth2ClientSecret}}".into(),
+                ..serde_json::from_str("{}").unwrap()
+            },
+            ..Auth::default()
+        };
+        file::write(&full, &request).unwrap();
+    }
+
+    let run = f.bench.start_run(&f.ctx, "", "Local", None, false).unwrap();
+    for _ in 0..300 {
+        if f.bench.run_status(run.id).unwrap().finished {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let received = server.received_requests().await.unwrap();
+    let tokens = received
+        .iter()
+        .filter(|r| r.url.path() == "/oauth/token")
+        .count();
+    let calls = received.iter().filter(|r| r.url.path() == "/api").count();
+    assert_eq!((tokens, calls), (1, 8), "(demandes de jeton, appels)");
+}
+
+// ---------------------------------------------------------------- ES : ordre des statuts
+
+/// Enregistre les diffusions comme `windows::EventNotifier` : sérialise, puis « émet ».
+#[derive(Default)]
+struct Recorder {
+    /// Nombre de statuts de chaque diffusion, dans l'ordre d'arrivée.
+    sizes: std::sync::Mutex<Vec<usize>>,
+}
+
+impl arnod_lib::workbench::Notifier for Recorder {
+    fn run_changed(&self, _: Uuid, _: &arnod_lib::workbench::RunView) {}
+    fn statuses_changed(&self, _: Uuid, statuses: &arnod_lib::statuses::Statuses) {
+        let _json = serde_json::to_string(statuses).unwrap();
+        self.sizes.lock().unwrap().push(statuses.len());
+    }
+}
+
+/// `arnod://statuts` porte tous les statuts, sans révision : la dernière diffusion reçue doit
+/// être la plus récente, sinon la barre latérale garde un état périmé.
+///
+/// NON REPRODUIT : ce test passe (5 exécutions de 400 requêtes, aucune inversion). Le constat
+/// correspondant reste « lu dans le code » (`Workbench::with_statuses` diffuse hors du verrou).
+/// `AUDIT_TOTAL=<n>` change le nombre de requêtes ; la durée affichée sert de mesure.
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn es_statuts_diffuses_dans_l_ordre() {
+    use arnod_lib::request::file;
+    use arnod_lib::tree;
+
+    let server = MockServer::start().await;
+    Mock::given(path("/ok"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{}"))
+        .mount(&server)
+        .await;
+    let f = fixture();
+    local_with_secret(&f, &server.uri(), "inutile", "x");
+    let total: usize = std::env::var("AUDIT_TOTAL")
+        .ok()
+        .and_then(|t| t.parse().ok())
+        .unwrap_or(400);
+    let setup = std::time::Instant::now();
+    for index in 0..total {
+        let name = format!("Requête {index}");
+        let created = tree::create_request(&f.ctx.root, "", Some(&name)).unwrap();
+        let full = tree::resolve(&f.ctx.root, &created).unwrap();
+        let mut request = file::read(&full).unwrap();
+        request.url = "{{baseUrl}}/ok".into();
+        file::write(&full, &request).unwrap();
+    }
+    let setup = setup.elapsed();
+    let recorder = Arc::new(Recorder::default());
+    f.bench.set_notifier(recorder.clone());
+
+    let started = std::time::Instant::now();
+    let run = f.bench.start_run(&f.ctx, "", "Local", None, false).unwrap();
+    let launched = started.elapsed();
+    for _ in 0..12000 {
+        if f.bench.run_status(run.id).unwrap().finished {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    println!(
+        "{total} requêtes : création {setup:?}, lancement {launched:?}, run {:?}",
+        started.elapsed()
+    );
+    let sizes = recorder.sizes.lock().unwrap().clone();
+    let inversions = sizes.windows(2).filter(|pair| pair[1] < pair[0]).count();
+    assert_eq!(sizes.len(), total);
+    assert_eq!(
+        (inversions, sizes.last().copied()),
+        (0, Some(total)),
+        "(diffusions arrivées après une plus récente, taille de la dernière reçue)"
+    );
+}
+
+#[allow(dead_code)]
+fn unused(_: BTreeMap<String, String>) {}

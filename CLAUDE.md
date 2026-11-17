@@ -35,6 +35,10 @@ trois vagues, règles communes R1 à R10) ; lot L (installation des mises à jou
 il respecte les règles communes, notamment les ajouts en fin de liste dans les fichiers partagés (R5)
 et la comparaison avec la maquette par l'aperçu (R6).
 
+**À venir** : qualité du MVP selon `docs/plan-qualite-mvp.md` (brouillon : lots A à K, questions Q1
+à Q10 à trancher), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
+`docs/audit-2026-11-mvp/preuves/`).
+
 ## Architecture
 
 - **Le frontend ne contient aucune logique métier.** Il affiche l'état et appelle des
