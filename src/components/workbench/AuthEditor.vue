@@ -141,8 +141,8 @@ const note = computed(() => {
       <template #secret><slot name="secret" /></template>
     </OAuth2Fields>
     <p v-if="['basic', 'bearer', 'apiKey'].includes(auth.type)" class="hint">
-      Utilisez des variables, par exemple <code>{{ TOKEN_EXAMPLE }}</code
-      >, plutôt que des valeurs en clair : les secrets restent sur votre poste.
+      Utilisez des variables, par exemple <code>{{ TOKEN_EXAMPLE }}</code>, plutôt que des valeurs
+      en clair : les secrets restent sur votre poste.
     </p>
   </div>
 </template>
