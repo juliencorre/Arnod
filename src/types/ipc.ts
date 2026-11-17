@@ -334,7 +334,8 @@ export type TreeNode =
       kind: "request";
       name: string;
       path: string;
-      method: HttpMethod;
+      /** `null` : fichier illisible (`invalid`). */
+      method: HttpMethod | null;
       assertionCount: number;
       invalid: boolean;
       /** Contrat lié (`contracts/petstore.yaml`), d'après l'étiquette `contract:`. */
@@ -623,7 +624,7 @@ export type EnvironmentColor = "gray" | "blue" | "green" | "orange" | "red" | "p
 export interface EnvironmentDoc {
   name: string;
   color: string;
-  protected?: boolean;
+  protected: boolean;
   variables: EnvVariable[];
   locals: string[];
 }

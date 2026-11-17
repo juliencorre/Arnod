@@ -117,6 +117,7 @@ pub struct OAuth2Grant {
 
 /// Valeur dynamique tirée à un envoi (R9, R10).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct DrawnValue {
     /// Nom, avec son `$` (`$randomUUID`).

@@ -30,6 +30,7 @@ jobs:
   lint:
     name: Lint et format
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -48,12 +49,24 @@ jobs:
         run: node scripts/check-version.mjs
       - name: Maquette et code
         run: node scripts/check-maquette.mjs
+      # Mêmes contrôles que `npm run check` (MA5, plan-qualite-mvp) ; Vitest, clippy et
+      # `cargo test` tournent dans les jobs de build.
+      - name: Design system à jour
+        run: node scripts/design-system.mjs --check
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - name: cargo fmt
         working-directory: src-tauri
         run: cargo fmt --check
+      # Audits des dépendances : vulnérabilités connues des paquets livrés (npm) et des crates.
+      - name: npm audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: cargo audit
+        working-directory: src-tauri
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit
 
   build:
     name: Build ${{ matrix.name }}
@@ -77,6 +90,7 @@ jobs:
             dir: src-tauri/target/release/bundle/appimage
             path: src-tauri/target/release/bundle/appimage/*.AppImage
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
 
@@ -173,6 +187,7 @@ jobs:
     # Parcours complets sur le binaire debug via tauri-driver et WebKitWebDriver,
     # sous Xvfb, en thème clair puis sombre. Voir e2e/README.md.
     runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -224,6 +239,7 @@ jobs:
     needs: [lint, build, e2e]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-22.04
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:

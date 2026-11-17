@@ -50,7 +50,7 @@ export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): R
     docs: "",
     assertions: [
       {
-        id: "duree",
+        id: "a0",
         target: "responseTime",
         operator: "lessThan",
         value: 500,
@@ -93,7 +93,7 @@ export function okOutcome(overrides: Partial<SendOutcome> = {}): SendOutcome {
     },
     assertions: [
       {
-        id: "duree",
+        id: "a0",
         target: "responseTime",
         passed: true,
         message: null,
@@ -112,6 +112,8 @@ export interface FakeWorkbench {
   /** Requêtes par chemin ; les dossiers se déduisent des chemins et de `folders`. */
   requests: Map<string, RequestDoc>;
   folders: Set<string>;
+  /** Fichiers de requête illisibles : listés sans méthode, comme `tree::read` (A10). */
+  unreadable: Set<string>;
   envs: EnvironmentDoc[];
   active: string;
   collapsed: string[];
@@ -138,10 +140,12 @@ export function createFakeWorkbench(): FakeWorkbench {
   return {
     requests: new Map(),
     folders: new Set(),
+    unreadable: new Set(),
     envs: [
       {
         name: "Local",
         color: "gray",
+        protected: false,
         variables: [{ name: "baseUrl", value: "" }],
         locals: [],
       },
@@ -189,13 +193,16 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
           !children.some((c) => c.kind === "folder"),
       };
     });
-    // Rang (`seq`) d'abord, puis le chemin (lot E, R1).
-    const rank = (request: RequestDoc): number => request.seq ?? Number.POSITIVE_INFINITY;
-    for (const [path, request] of [...wb.requests.entries()].sort(
-      ([a, x], [b, y]) => rank(x) - rank(y) || a.localeCompare(b),
-    )) {
-      if (path.startsWith(prefix) && !path.slice(prefix.length).includes("/")) {
-        nodes.push({
+    // Rang (`seq`) d'abord, puis le nom sans casse, comme `tree::read` (lot E, R1) ; un fichier
+    // illisible n'a pas de rang.
+    const here = (path: string): boolean =>
+      path.startsWith(prefix) && !path.slice(prefix.length).includes("/");
+    const requests: { seq: number; node: TreeNode }[] = [];
+    for (const [path, request] of wb.requests) {
+      if (!here(path)) continue;
+      requests.push({
+        seq: request.seq ?? Number.POSITIVE_INFINITY,
+        node: {
           kind: "request",
           name: request.name,
           path,
@@ -205,9 +212,34 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
           contract: request.contract?.file ?? null,
           url: request.url,
           tags: request.tags,
-        });
-      }
+        },
+      });
     }
+    for (const path of wb.unreadable) {
+      if (!here(path)) continue;
+      requests.push({
+        seq: Number.POSITIVE_INFINITY,
+        node: {
+          kind: "request",
+          name: (path.split("/").at(-1) ?? path).replace(/\.yml$/, ""),
+          path,
+          method: null,
+          assertionCount: 0,
+          invalid: true,
+          contract: null,
+          url: "",
+          tags: [],
+        },
+      });
+    }
+    const key = (node: TreeNode): string => node.name.toLowerCase();
+    requests.sort((x, y) => {
+      if (x.seq !== y.seq) return x.seq < y.seq ? -1 : 1;
+      const a = key(x.node);
+      const b = key(y.node);
+      return a < b ? -1 : a > b ? 1 : 0;
+    });
+    nodes.push(...requests.map((r) => r.node));
     return nodes;
   };
   return build("");

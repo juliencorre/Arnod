@@ -199,11 +199,11 @@ C, D, E, F, I. Vague 3, en parallèle : G, H, J, K.
 
 **Lot B - Garde-fous** (`claude/qualite-b-garde-fous`)
 
-- [ ] **T6** MA1 : concordance des structures IPC vérifiée en CI (selon Q2) ; le faux cœur lit des
+- [x] **T6** MA1 : concordance des structures IPC vérifiée en CI (selon Q2) ; le faux cœur lit des
       échantillons JSON produits par le cœur.
-- [ ] **T7** Bancs dans le dépôt : `src-tauri/tests/perf_coeur.rs` (`#[ignore]`) et
+- [x] **T7** Bancs dans le dépôt : `src-tauri/tests/perf_coeur.rs` (`#[ignore]`) et
       `scripts/perf-interface.mjs`, avec les seuils de R7 ; lancés à la demande et chaque semaine.
-- [ ] **T8** MA5 : design system, `cargo audit`, `npm audit`, `timeout-minutes`, couverture de
+- [x] **T8** MA5 : design system, `cargo audit`, `npm audit`, `timeout-minutes`, couverture de
       `commands/` publiée ; SonarCloud selon Q8.
 
 **Lot C - Brouillons et fenêtres** (`claude/qualite-c-brouillons`)

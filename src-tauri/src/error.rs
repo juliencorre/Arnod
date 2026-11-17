@@ -17,6 +17,7 @@ use serde::Serialize;
 
 /// Nature d'une erreur de commande.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum CommandErrorKind {
     /// Nom vide, trop long ou inutilisable comme nom de dossier.
@@ -59,6 +60,7 @@ pub enum CommandErrorKind {
 
 /// Erreur renvoyée par une commande : une nature et un message prêt à afficher.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CommandError {
     /// Nature de l'erreur.
@@ -68,6 +70,7 @@ pub struct CommandError {
     /// Lot H : échec réseau classé (cause, certificat, proxy), absent du JSON s'il est vide
     /// (`docs/plan-mvp-h-reseau-auth.md`, 5.1-i).
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub failure: Option<Box<crate::network::failure::NetworkFailure>>,
 }
 

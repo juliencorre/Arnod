@@ -35,6 +35,7 @@ pub fn is_test(children: &[TreeNode]) -> bool {
 
 /// Test créé : son dossier et son étape 1 (R11).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CreatedTest {
     pub folder: String,
@@ -43,6 +44,7 @@ pub struct CreatedTest {
 
 /// Étape d'un test, pour son onglet (4.2-a).
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct StepView {
     pub path: String,
@@ -58,6 +60,7 @@ pub struct StepView {
 
 /// Test ouvert dans un onglet (4.2-a).
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TestView {
     pub path: String,
@@ -69,6 +72,7 @@ pub struct TestView {
 
 /// Requête qui lit une variable (onglet « Variables », EX5).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct VariableUser {
     pub path: String,

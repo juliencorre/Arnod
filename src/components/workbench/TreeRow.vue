@@ -325,7 +325,10 @@ function activate(preview = true): void {
           <StatusCount class="row__count" :count="folderCount" :fallback="node.requestCount" />
         </template>
         <template v-else>
-          <span class="row__lead row__method" :class="`row__method--${node.method.toLowerCase()}`">
+          <span
+            class="row__lead row__method"
+            :class="node.method && `row__method--${node.method.toLowerCase()}`"
+          >
             {{ node.method }}
           </span>
           <span v-if="step" class="row__step" :aria-label="`Étape ${step}`">{{ step }}</span>

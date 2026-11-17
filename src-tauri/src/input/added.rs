@@ -13,6 +13,7 @@ use crate::request::resolve::{MASK, variable_names};
 
 /// D'où vient un en-tête ajouté.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum AddedOrigin {
     /// Onglet Auth, ou authentification héritée.
@@ -25,6 +26,7 @@ pub enum AddedOrigin {
 
 /// En-tête ajouté à l'envoi, tel que l'onglet En-têtes le montre, grisé.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct AddedHeader {
     pub name: String,

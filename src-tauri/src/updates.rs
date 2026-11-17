@@ -47,6 +47,8 @@ const PROGRESS_STEP_BYTES: u64 = 1024 * 1024;
 
 /// Canal suivi.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "UpdateChannel"))]
 #[serde(rename_all = "camelCase")]
 pub enum Channel {
     #[default]
@@ -56,6 +58,7 @@ pub enum Channel {
 
 /// Préférences du poste.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePrefs {
     /// Chercher au démarrage, puis chaque jour.
@@ -84,6 +87,7 @@ impl Default for UpdatePrefs {
 
 /// Release telle que l'API GitHub la décrit (champs lus seulement).
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct GhRelease {
     pub tag_name: String,
     #[serde(default)]
@@ -104,6 +108,7 @@ pub struct GhRelease {
 
 /// Fichier joint à une release (champs lus seulement).
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct GhAsset {
     pub name: String,
     pub browser_download_url: String,
@@ -111,6 +116,7 @@ pub struct GhAsset {
 
 /// Version plus récente que celle installée.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Release {
     /// `0.10.0`, sans le `v`.
@@ -130,6 +136,7 @@ pub struct Release {
 
 /// Installation de la version trouvée (R8).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", tag = "state")]
 pub enum InstallState {
     /// Rien n'est téléchargé.
@@ -146,6 +153,7 @@ pub enum InstallState {
 
 /// Ce que montre la section « Mises à jour ».
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatesView {
     /// Version installée.

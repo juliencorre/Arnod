@@ -13,6 +13,7 @@ pub const HELLO_MESSAGE: &str = "Hello World";
 /// Miroir TypeScript : `HelloResponse` dans `src/types/ipc.ts`.
 /// Toute modification ici doit être reportée de l'autre côté.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct HelloResponse {
     /// Texte de salutation produit par le cœur natif.

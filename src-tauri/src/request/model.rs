@@ -14,6 +14,8 @@ pub const DEFAULT_MAX_DURATION_MS: i64 = 500;
 
 /// Méthode HTTP.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "HttpMethod"))]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Method {
     Get,
@@ -51,6 +53,7 @@ fn yes() -> bool {
 
 /// Emplacement d'un paramètre : adresse (`?nom=valeur`) ou chemin (`:nom`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ParamKind {
     #[default]
@@ -60,6 +63,7 @@ pub enum ParamKind {
 
 /// Ligne nom / valeur : paramètre, en-tête, champ de formulaire.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Pair {
     pub name: String,
     #[serde(default)]
@@ -98,6 +102,7 @@ impl Pair {
 
 /// Type d'authentification (B5).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum AuthKind {
     #[default]
@@ -116,6 +121,7 @@ pub enum AuthKind {
 
 /// Où le client présente ses identifiants au serveur de jetons (OAuth 2).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum CredentialsPlacement {
     /// En-tête `Authorization: Basic`.
@@ -127,6 +133,7 @@ pub enum CredentialsPlacement {
 
 /// Où le jeton OAuth 2 part avec la requête (R11).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum TokenPlacement {
     #[default]
@@ -137,6 +144,7 @@ pub enum TokenPlacement {
 /// OAuth 2 par identifiants client (flux `client_credentials` du schéma OpenCollection, R8) ;
 /// les valeurs acceptent `{{variable}}`, le secret n'est jamais écrit en clair (R10).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct OAuth2 {
     #[serde(default)]
@@ -176,6 +184,7 @@ impl Default for OAuth2 {
 
 /// Emplacement d'une clé d'API.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ApiKeyLocation {
     #[default]
@@ -185,6 +194,7 @@ pub enum ApiKeyLocation {
 
 /// Authentification : les valeurs acceptent `{{variable}}`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Auth {
     #[serde(rename = "type", default)]
@@ -212,6 +222,7 @@ pub struct Auth {
 
 /// Type de corps (B4) ; commun à toutes les variantes (Q3).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum BodyKind {
     #[default]
@@ -226,6 +237,7 @@ pub enum BodyKind {
 
 /// Variante d'un corps (EP3) : un titre vide pour un corps simple.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct BodyVariant {
     #[serde(default)]
@@ -240,6 +252,7 @@ pub struct BodyVariant {
 
 /// Corps de la requête : une ou plusieurs variantes, la sélectionnée part (R2).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Body {
     /// `kind` dans le JSON échangé avec l'interface (`Body.kind` de `src/types/ipc.ts`) ; le
@@ -301,6 +314,7 @@ impl Body {
 
 /// Valeur attendue d'une vérification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(untagged)]
 pub enum Scalar {
     Bool(bool),
@@ -312,6 +326,8 @@ pub enum Scalar {
 /// Opérateur d'une vérification (V2) : ceux d'OpenCollection et de Bruno (R4).
 /// Le nom OpenCollection de chacun est donné par `crate::opencollection::request`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "AssertionOperator"))]
 #[serde(rename_all = "camelCase")]
 pub enum Operator {
     Equals,
@@ -346,6 +362,8 @@ pub enum Operator {
 
 /// Origine d'une vérification, connue pendant la session seulement (non écrite).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "AssertionOrigin"))]
 #[serde(rename_all = "camelCase")]
 pub enum Origin {
     /// Calculée d'après une réponse reçue (R10).
@@ -359,6 +377,7 @@ pub enum Origin {
 
 /// Condition sur la réponse, sans code (§ 3).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Assertion {
     /// Identifiant de session, recalculé à la lecture (non écrit).
@@ -368,6 +387,7 @@ pub struct Assertion {
     pub target: String,
     pub operator: Operator,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional = nullable))]
     pub value: Option<Scalar>,
     #[serde(default)]
     pub origin: Origin,
@@ -380,6 +400,7 @@ pub struct Assertion {
 /// réponse, ou de la requête envoyée, rangée dans une variable d'exécution.
 /// Écrite en action OpenCollection `set-variable` (R2 du plan d'ensemble).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Extraction {
     /// Nom de la variable (`client.id`).
@@ -394,6 +415,7 @@ pub struct Extraction {
 
 /// Opération d'un contrat dont la requête est issue (C7).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ContractLink {
     /// Fichier du contrat, relatif au projet (`contracts/petstore.yaml`).
@@ -412,6 +434,8 @@ pub const DEFAULT_MAX_REDIRECTS: u32 = 5;
 
 /// Réglages d'envoi propres à la requête (EP7) ; `None` : hérité (R3).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "RequestSettings"))]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     /// Délai en millisecondes ; 0 : aucun délai (R5).
@@ -427,6 +451,7 @@ pub struct Settings {
 
 /// Réglages effectifs, après héritage (R3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ResolvedSettings {
     pub timeout_ms: u64,
@@ -460,6 +485,7 @@ impl Settings {
 
 /// Type du corps d'une réponse attendue.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ExampleBodyKind {
     /// Pas de corps.
@@ -474,6 +500,7 @@ pub enum ExampleBodyKind {
 
 /// En-tête d'une réponse attendue.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseHeader {
     pub name: String,
@@ -483,6 +510,7 @@ pub struct ResponseHeader {
 
 /// Réponse attendue (EP8) : un exemple OpenCollection complet (R6).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Example {
     pub name: String,
@@ -502,6 +530,7 @@ pub struct Example {
 
 /// Authentification reprise d'un dossier ou de la collection (R4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct InheritedAuth {
     pub auth: Auth,
@@ -511,6 +540,7 @@ pub struct InheritedAuth {
 
 /// En-tête ajouté par un dossier ou la collection (R4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct InheritedHeader {
     pub name: String,
@@ -521,6 +551,7 @@ pub struct InheritedHeader {
 /// Ce qu'une requête hérite de ses dossiers et de la collection : calculé à
 /// la lecture pour l'éditeur, jamais écrit (R3, R4).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Inherited {
     #[serde(default)]
@@ -533,6 +564,8 @@ pub struct Inherited {
 
 /// Requête éditée : un endpoint (docs/plan-configuration-endpoint.md).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "RequestDoc"))]
 #[serde(rename_all = "camelCase")]
 pub struct Request {
     pub name: String,
@@ -564,12 +597,14 @@ pub struct Request {
     pub extractions: Vec<Extraction>,
     /// Rang de l'étape dans son dossier (`info.seq`), s'il est écrit.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub seq: Option<f64>,
     /// Réponses attendues (EP8).
     #[serde(default)]
     pub examples: Vec<Example>,
     /// Opération du contrat liée (étiquette `contract:` du fichier, S7).
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub contract: Option<ContractLink>,
     /// Parties du fichier conservées sans être gérées par Arnod (scripts,
     /// variables…), pour le signaler dans l'éditeur. Ignoré à l'enregistrement.

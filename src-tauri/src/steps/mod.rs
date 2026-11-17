@@ -26,6 +26,8 @@ const BUILTIN: [(&str, &str); 1] = [("rest.json", include_str!("../../steps/rest
 
 /// Origine d'une nature.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "StepOrigin"))]
 #[serde(rename_all = "camelCase")]
 pub enum Origin {
     /// Livrée avec Arnod.
@@ -34,6 +36,7 @@ pub enum Origin {
 
 /// Nature telle que l'interface l'affiche et en rend le formulaire.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct StepNature {
     #[serde(flatten)]
@@ -43,6 +46,8 @@ pub struct StepNature {
 
 /// Source des définitions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "StepCatalogSource"))]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogSource {
     /// Nom du catalogue (`arnod-steps`).
@@ -55,6 +60,7 @@ pub struct CatalogSource {
 
 /// Catalogue des natures disponibles sur ce poste.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct StepCatalog {
     pub source: CatalogSource,

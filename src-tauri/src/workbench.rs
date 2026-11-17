@@ -47,6 +47,7 @@ pub struct ProjectCtx {
 
 /// Variable locale vue par l'interface : un secret n'expose jamais sa valeur (R9).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct LocalVarView {
     pub name: String,
@@ -58,6 +59,7 @@ pub struct LocalVarView {
 
 /// Environnement vu par l'interface.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentView {
     #[serde(flatten)]
@@ -67,6 +69,7 @@ pub struct EnvironmentView {
 
 /// Environnements du projet et choix courant.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentsView {
     pub environments: Vec<EnvironmentView>,
@@ -75,6 +78,7 @@ pub struct EnvironmentsView {
 
 /// Résultat d'un envoi.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct SendOutcome {
     pub response: HttpResponse,
@@ -87,6 +91,7 @@ pub struct SendOutcome {
 
 /// Variable lue par un envoi (VD2) : un secret est masqué.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct UsedVariable {
     pub name: String,
@@ -98,6 +103,7 @@ pub struct UsedVariable {
 /// Requête envoyée, secrets masqués, avec ses valeurs tirées, ses variables
 /// et ses valeurs extraites (VD2, EX3).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Sent {
     pub method: String,
@@ -164,6 +170,8 @@ fn sent_data(prepared: &Prepared) -> ResponseData {
 
 /// État d'une requête dans un run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "RunItemStatus"))]
 #[serde(rename_all = "camelCase")]
 pub enum ItemStatus {
     Pending,
@@ -179,6 +187,7 @@ pub enum ItemStatus {
 
 /// Ligne d'un run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RunItem {
     pub path: String,
@@ -203,6 +212,7 @@ pub struct RunItem {
 
 /// Verdict d'un test dans un run (R4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RunTest {
     pub path: String,
@@ -273,6 +283,7 @@ pub fn run_tests(items: &[RunItem]) -> Vec<RunTest> {
 
 /// Résultat d'un groupe de requêtes d'un run (`docs/plan-fin-premier-usage.md`, R2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RunGroup {
     /// Nom affiché : le dossier, ou « Projet » pour la racine.
@@ -287,6 +298,7 @@ pub struct RunGroup {
 
 /// Run vu par l'interface.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RunView {
     pub id: Uuid,
@@ -399,6 +411,7 @@ pub trait Notifier: Send + Sync {
 
 /// Résumé du dernier run d'un projet, pour « Tous les projets » (O12).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectLastRun {
     pub project_id: Uuid,

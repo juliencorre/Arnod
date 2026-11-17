@@ -22,6 +22,16 @@ describe("arborescence du projet", () => {
     expect(items).toEqual(["▾Clients2", "POST1Créer", "GET2Lister", "GETSanté"]);
   });
 
+  it("liste un fichier de requête illisible sans méthode (MA1)", async () => {
+    // Le cœur envoie `method: null` pour un fichier illisible ; la ligne ne doit pas casser le rendu.
+    ({ app } = await openProject((core) => {
+      core.workbench.unreadable.add("casse.yml");
+    }));
+    const row = app.findAll('[role="treeitem"]').find((i) => i.text().includes("casse"));
+    expect(row?.find(".row__method").text()).toBe("");
+    expect(row?.find(".row__invalid").exists()).toBe(true);
+  });
+
   it("replie un dossier et mémorise l'état", async () => {
     let core;
     ({ app, core } = await openProject());

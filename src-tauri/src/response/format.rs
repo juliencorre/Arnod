@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Format d'affichage d'un corps : détecté d'après `content-type`, modifiable dans l'interface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ResponseFormat {
     Json,

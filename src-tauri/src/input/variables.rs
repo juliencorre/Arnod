@@ -11,6 +11,7 @@ use crate::request::resolve::variable_names;
 
 /// Environnement où une variable inconnue de l'environnement actif est définie.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct VariableSource {
     pub environment: String,
@@ -20,6 +21,7 @@ pub struct VariableSource {
 
 /// Variable utilisée par la requête et absente de l'environnement actif (R2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct UnknownVariable {
     pub name: String,

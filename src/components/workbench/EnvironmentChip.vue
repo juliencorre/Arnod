@@ -51,7 +51,7 @@ const items = computed<MenuItem[]>(() => [
     checked: env.name === view.value?.active,
     radio: true,
     swatch: swatch(env),
-    tag: env.protected === true ? "protégé" : undefined,
+    tag: env.protected ? "protégé" : undefined,
     detail: host(env),
   })),
   { id: MANAGE, label: "Gérer les environnements…", shortcut: "Ctrl+Maj+E", separatorBefore: true },

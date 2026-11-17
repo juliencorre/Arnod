@@ -23,6 +23,7 @@ pub const KEPT_MARK: &str = "x-arnod-path-kept";
 
 /// Paramètre de chemin proposé : son nom et la valeur vue dans l'adresse.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct PathParam {
     pub name: String,
@@ -31,6 +32,7 @@ pub struct PathParam {
 
 /// Chemin généralisé d'un chemin concret.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Template {
     /// `/orders/{id}/tracking`.
@@ -40,6 +42,8 @@ pub struct Template {
 
 /// Proposition montrée au-dessus d'un essai (`trial_generalization`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "PathGeneralization"))]
 #[serde(rename_all = "camelCase")]
 pub struct Suggestion {
     /// Chemin actuel de l'opération : `/orders/42/tracking`.

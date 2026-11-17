@@ -15,6 +15,7 @@ use crate::error::{CommandError, CommandErrorKind};
 
 /// Variable locale : sa valeur est ici, sauf si elle est secrète (coffre).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LocalVar {
     pub name: String,
     #[serde(default)]
@@ -25,6 +26,7 @@ pub struct LocalVar {
 
 /// Contenu de `local.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct LocalData {
     #[serde(default)]

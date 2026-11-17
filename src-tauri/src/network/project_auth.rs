@@ -17,6 +17,7 @@ use crate::tree::{self, TreeNode};
 /// Ce qui remplace l'authentification du projet : un dossier, une requête, ou les requêtes sans
 /// authentification.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct AuthOverride {
     /// « dossier « v1-legacy » », « requête « Santé » », ou vide pour « sans authentification ».
@@ -33,6 +34,7 @@ pub struct AuthOverride {
 
 /// Qui utilise l'authentification du projet (OA4).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct AuthUsage {
     /// Requêtes qui l'héritent.

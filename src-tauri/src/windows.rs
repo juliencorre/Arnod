@@ -61,6 +61,7 @@ pub mod events {
 
 /// Statuts des requêtes d'un projet, diffusés à chaque changement (R4, R5).
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct StatusesChange {
     pub project_id: Uuid,
@@ -104,6 +105,7 @@ impl<R: Runtime> Notifier for EventNotifier<R> {
 
 /// Run démarré dans une fenêtre, diffusé aux autres (R7).
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RunChange {
     pub project_id: Uuid,
@@ -114,6 +116,7 @@ pub struct RunChange {
 
 /// Partie d'un projet modifiée.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectScope {
     Tree,
@@ -125,6 +128,7 @@ pub enum ProjectScope {
 
 /// Modification d'un projet, diffusée aux autres fenêtres (F11).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectChange {
     pub project_id: Uuid,

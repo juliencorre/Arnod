@@ -9,6 +9,7 @@ use crate::request::model::{AuthKind, Request};
 
 /// Champ de l'authentification qui porte un secret en clair.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ClearSecret {
     /// Champ de `Auth` : `token`, `password`, `value` ou `oauth2.clientSecret`.

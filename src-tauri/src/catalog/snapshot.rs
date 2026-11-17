@@ -13,6 +13,7 @@ use crate::error::CommandError;
 /// Réponse de `catalog_load` : l'instantané et, une seule fois, l'avertissement
 /// d'un fichier d'état illisible mis de côté (nature `corruptState`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogLoad {
     pub snapshot: CatalogSnapshot,
@@ -21,6 +22,7 @@ pub struct CatalogLoad {
 
 /// Réponse d'une action annulable : l'instantané et le jeton à passer à `undo`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Undoable {
     pub snapshot: CatalogSnapshot,
@@ -29,6 +31,7 @@ pub struct Undoable {
 
 /// Réponse de `project_create`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectCreated {
     pub snapshot: CatalogSnapshot,
@@ -37,6 +40,7 @@ pub struct ProjectCreated {
 
 /// Réponse de `workspace_create`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceCreated {
     pub snapshot: CatalogSnapshot,
@@ -45,6 +49,7 @@ pub struct WorkspaceCreated {
 
 /// État complet du catalogue, prêt à afficher.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogSnapshot {
     /// « Tous les projets », dans l'ordre de création.
@@ -59,6 +64,7 @@ pub struct CatalogSnapshot {
 
 /// Projet de « Tous les projets » vu par l'interface.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectView {
     pub id: Uuid,
@@ -72,6 +78,7 @@ pub struct ProjectView {
 
 /// Présence du dossier d'un projet sur disque (P10).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectStatus {
     /// Le dossier existe.
@@ -82,6 +89,7 @@ pub enum ProjectStatus {
 
 /// Workspace vu par l'interface.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceView {
     pub id: Uuid,

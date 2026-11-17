@@ -68,6 +68,7 @@ const MAX_OPEN: usize = 2 * MAX_NODES;
 
 /// Nœud de l'aperçu.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum HtmlNode {
     Text {

@@ -50,7 +50,13 @@ request ; chaque constat se corrige avec son test de preuve, qui échoue avant e
 - Les commandes Rust vivent dans `src-tauri/src/commands/`, un fichier par domaine
   (`hello.rs`, plus tard `http.rs`, `mocks.rs`...).
 - Les types échangés sont écrits à la main dans `src/types/ipc.ts` et doivent refléter
-  exactement la sérialisation serde (`#[serde(rename_all = "camelCase")]`).
+  exactement la sérialisation serde (`#[serde(rename_all = "camelCase")]`). Vérifié (MA1) : chaque
+  type sérialisé porte `#[cfg_attr(test, derive(ts_rs::TS))]` (ts-rs, dépendance de test
+  seulement) et, s'il s'appelle autrement côté interface, `#[cfg_attr(test, ts(rename = "…"))]` ;
+  un champ `skip_serializing_if = "Option::is_none"` prend `ts(optional)`. `src-tauri/src/ts_mirror.rs`
+  génère `tests/ipc/coeur.ts` (comparé par vue-tsc à `ipc.ts`) et `tests/ipc/echantillons.json`
+  (sorties du vrai cœur que le faux cœur doit rendre à l'identique) ; après un changement :
+  `ARNOD_IPC_ECRIRE=1 cargo test --lib ts_mirror`.
 - Une commande qui peut échouer renvoie `Result<T, CommandError>` (`src-tauri/src/error.rs`) :
   `kind` donne la nature de l'erreur, `message` un texte en français prêt à afficher. Côté
   interface, `IpcError` reprend `kind` (ou `null` si la cause n'est pas une `CommandError`) et
@@ -65,7 +71,8 @@ request ; chaque constat se corrige avec son test de preuve, qui échoue avant e
    `Result<T, CommandError>`.
 2. L'enregistrer dans `tauri::generate_handler![...]` (`src-tauri/src/lib.rs`).
 3. Ajouter son nom à `CommandName` et ses types dans `src/types/ipc.ts` (un test Rust vérifie
-   que `CommandName` concorde avec `generate_handler!`, et les unions miroirs avec le Rust).
+   que `CommandName` concorde avec `generate_handler!`, et les unions miroirs avec le Rust) ; un
+   nouveau type sérialisé reçoit la dérivation ts-rs et `tests/ipc/coeur.ts` est régénéré.
 4. L'exposer dans l'objet `ipc` de `src/lib/ipc.ts`.
 5. Tester : `#[cfg(test)]` côté Rust (dont la forme JSON sérialisée, erreurs comprises),
    Vitest avec `mockIPC` côté frontend (`tests/`).
@@ -108,7 +115,9 @@ src/                    Frontend Vue
                         StatusCount)
   types/ipc.ts          Types IPC documentés à la main
 tests/                  Tests Vitest (happy-dom, mockIPC, faux cœur fakeCore.ts), dont contrastes
-                        ; apercu/ : l'application sur le faux cœur dans un navigateur
+                        ; apercu/ : l'application sur le faux cœur dans un navigateur ; ipc/ :
+                        miroir des types généré par le cœur (ts_mirror.rs) ; perf/ : banc de
+                        l'interface (scripts/perf-interface.mjs)
 e2e/                    Tests e2e sur l'application réelle (tauri-driver, WebdriverIO)
 src-tauri/              Cœur Rust
   tauri.conf.json       Fenêtre, CSP, bundles (NSIS currentUser, AppImage)

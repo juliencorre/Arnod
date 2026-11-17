@@ -18,6 +18,7 @@ const VALUE_PREVIEW: usize = 200;
 
 /// Correspondance du filtre.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct FilterMatch {
     /// Chemin canonique, celui des jetons de la mise en forme (`$.items[0].sku`).
@@ -31,6 +32,7 @@ pub struct FilterMatch {
 
 /// Résultat du filtre : correspondances, ou erreur en français (R7).
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct FilterResult {
     pub matches: Vec<FilterMatch>,

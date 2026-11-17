@@ -26,6 +26,8 @@ use crate::request::model::{AuthKind, BodyKind, ContractLink, Request};
 
 /// Copier (l'original reste) ou déplacer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "TransferMode"))]
 #[serde(rename_all = "camelCase")]
 pub enum Mode {
     Copy,
@@ -34,6 +36,8 @@ pub enum Mode {
 
 /// Destination d'une requête copiée ou déplacée.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "TransferTarget"))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Target {
     /// Dossier du référentiel (`""` : racine du projet).
@@ -46,6 +50,7 @@ pub enum Target {
 
 /// Opération d'un contrat qui peut recevoir la requête (même méthode).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct OperationTarget {
     pub contract: String,
@@ -58,6 +63,7 @@ pub struct OperationTarget {
 
 /// Dossier du référentiel (« » : racine).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct FolderTarget {
     pub path: String,
@@ -67,6 +73,7 @@ pub struct FolderTarget {
 
 /// Test du référentiel et ses étapes, pour choisir la place.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TestTarget {
     pub path: String,
@@ -79,6 +86,8 @@ pub struct TestTarget {
 
 /// Destinations d'une requête dans un projet.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "TransferTargets"))]
 #[serde(rename_all = "camelCase")]
 pub struct Targets {
     /// Méthode de la requête, pour le titre du dialogue.
@@ -90,6 +99,8 @@ pub struct Targets {
 
 /// Ce qui change pour la requête à cette destination (« Ce qui change », 4.1-g).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "TransferChange"))]
 #[serde(rename_all = "camelCase")]
 pub struct Change {
     pub title: String,
@@ -100,6 +111,8 @@ pub struct Change {
 
 /// Requête copiée ou déplacée : son chemin dans le projet de destination.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "TransferredRequest"))]
 #[serde(rename_all = "camelCase")]
 pub struct Transferred {
     pub path: String,

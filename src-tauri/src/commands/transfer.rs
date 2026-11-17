@@ -18,6 +18,7 @@ use crate::windows::{self, ProjectScope};
 
 /// Requête copiée ou déplacée, et le jeton de « Annuler ».
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TransferDone {
     /// Projet qui la reçoit.

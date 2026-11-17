@@ -66,6 +66,7 @@ pub struct Session {
 
 /// Autorité interne, telle que montrée dans les préférences.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct AuthorityView {
     #[serde(flatten)]
@@ -75,6 +76,7 @@ pub struct AuthorityView {
 
 /// Préférences réseau vues par l'interface (1.6-e).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkView {
     pub proxy: ProxyPrefs,
@@ -91,6 +93,7 @@ pub struct NetworkView {
 
 /// Préférences modifiées par l'interface.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkPrefsInput {
     pub proxy: ProxyPrefs,

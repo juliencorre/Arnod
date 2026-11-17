@@ -36,6 +36,8 @@ pub mod tree;
 pub mod trial;
 #[cfg(test)]
 mod ts_contract;
+#[cfg(test)]
+mod ts_mirror;
 pub mod updates;
 pub mod watch;
 pub mod windows;

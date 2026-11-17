@@ -18,6 +18,7 @@ use crate::request::resolve::MASK;
 
 /// Cookie gardé.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct StoredCookie {
     pub name: String,
@@ -38,6 +39,7 @@ pub struct StoredCookie {
 
 /// Cookies d'un environnement.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Jar {
     #[serde(default)]
@@ -49,6 +51,7 @@ pub struct Jar {
 
 /// Cookie montré à l'interface : valeur masquée (`HttpOnly`) ou abrégée (R14).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CookieView {
     pub name: String,
@@ -62,6 +65,7 @@ pub struct CookieView {
 
 /// Cookies d'un domaine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CookieDomain {
     pub domain: String,
@@ -72,6 +76,7 @@ pub struct CookieDomain {
 
 /// Cookies gardés d'un environnement, pour l'interface (3.4-g).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CookieJarView {
     pub environment: String,

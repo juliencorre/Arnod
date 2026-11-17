@@ -18,6 +18,7 @@ use crate::workbench::{RunView, Workbench};
 
 /// Résultat d'une action sur la sélection, et le jeton de « Annuler ».
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct BatchResult {
     /// Chemins d'avant et d'après (absent après une mise à la corbeille).

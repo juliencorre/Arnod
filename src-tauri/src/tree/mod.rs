@@ -22,6 +22,7 @@ pub const ENVIRONMENTS_DIR: &str = "environments";
 
 /// Nœud de l'arborescence affichée dans la barre latérale (A1).
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",

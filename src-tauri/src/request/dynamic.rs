@@ -46,6 +46,7 @@ pub const NAMES: [(&str, &str); 30] = [
 /// Valeur dynamique proposée à la saisie (`dynamic_values`, 5.1-h) : nom, description et
 /// un exemple tiré maintenant (une autre valeur est tirée à chaque envoi).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct DynamicValue {
     pub name: String,

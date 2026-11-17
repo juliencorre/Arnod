@@ -19,6 +19,7 @@ pub const MAX_RESULTS: usize = 50;
 
 /// Dernier envoi d'une requête, diffusé par `arnod://resultat`.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RequestResult {
     pub project_id: Uuid,
@@ -31,6 +32,7 @@ pub struct RequestResult {
     pub error: Option<String>,
     /// Lot H : échec réseau classé du dernier envoi (5.1-i), absent du JSON sinon.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub failure: Option<Box<crate::network::failure::NetworkFailure>>,
     /// Réception de la réponse, en millisecondes depuis l'époque Unix.
     pub received_at: Option<u64>,
@@ -41,6 +43,7 @@ pub struct RequestResult {
 
 /// Résultat diffusé aux fenêtres, avec la fenêtre d'origine qui l'a déjà appliqué.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ResultChange {
     pub result: RequestResult,

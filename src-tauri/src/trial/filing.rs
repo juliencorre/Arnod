@@ -17,6 +17,7 @@ use crate::tree;
 
 /// Essais rangés : où ils sont allés, ce qui est resté, et de quoi annuler.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Filed {
     /// Chemins des essais déplacés : (dans « Non classés », dans le projet).

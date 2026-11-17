@@ -24,6 +24,8 @@ pub const MAX_RATIO: f64 = 0.9;
 
 /// Ce qu'affiche un onglet. Un même contenu n'est ouvert qu'une fois par fenêtre (Z3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ContentRef"))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Content {
     /// Une requête du projet, par son chemin relatif.
@@ -63,6 +65,8 @@ impl Content {
 
 /// Onglet de contenu.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ContentTab"))]
 #[serde(rename_all = "camelCase")]
 pub struct Tab {
     pub id: Uuid,
@@ -85,6 +89,7 @@ impl Tab {
 
 /// Place du résultat d'une requête dans sa zone (F6).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum Placement {
     /// Dessous quand la zone est étroite, à droite sinon.
@@ -96,6 +101,8 @@ pub enum Placement {
 
 /// Zone : des onglets, l'un d'eux actif.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ZoneView"))]
 #[serde(rename_all = "camelCase")]
 pub struct Zone {
     pub id: Uuid,
@@ -170,6 +177,7 @@ impl Zone {
 
 /// Orientation d'une séparation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum Axis {
     /// Côte à côte : `first` à gauche, `second` à droite.
@@ -180,6 +188,7 @@ pub enum Axis {
 
 /// Côté où ouvrir une nouvelle zone (F2, F3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum Side {
     Right,
@@ -188,6 +197,8 @@ pub enum Side {
 
 /// Nœud de la disposition : une zone, ou une séparation entre deux nœuds.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "LayoutNode"))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Node {
     Zone(Zone),
@@ -321,6 +332,8 @@ fn placeholder() -> Node {
 
 /// Découpages vides du menu Fenêtre › Dispositions (F7).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "LayoutPreset"))]
 #[serde(rename_all = "camelCase")]
 pub enum Preset {
     One,
@@ -345,6 +358,8 @@ impl Preset {
 
 /// Disposition d'une fenêtre : l'arbre des zones et la zone active.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "WindowLayout"))]
 #[serde(rename_all = "camelCase")]
 pub struct Layout {
     pub root: Node,

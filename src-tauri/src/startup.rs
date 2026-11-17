@@ -126,6 +126,7 @@ impl Failure {
 
 /// Nature d'une erreur bloquante (miroir `ProblemNature` de `src/types/ipc.ts`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ProblemNature {
     NewerVersion,
@@ -136,6 +137,7 @@ pub enum ProblemNature {
 
 /// Issue proposée (miroir `StartupAction`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum StartupAction {
     /// Ouvre la page des versions dans le navigateur.
@@ -150,6 +152,7 @@ pub enum StartupAction {
 
 /// Cible ouverte dans le système (miroir `StartupTarget`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum StartupTarget {
     /// Dossier de données.
@@ -162,6 +165,7 @@ pub enum StartupTarget {
 
 /// Une issue : ce qu'elle fait et ses conséquences.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct StartupOption {
     pub action: StartupAction,
@@ -178,6 +182,7 @@ pub struct StartupOption {
 
 /// Prochain essai automatique (R4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RetryPlan {
     /// Numéro de l'essai à venir, à partir de 1.
@@ -188,6 +193,7 @@ pub struct RetryPlan {
 
 /// Ligne des détails pour le support.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct DetailRow {
     pub label: String,
@@ -196,6 +202,7 @@ pub struct DetailRow {
 
 /// Erreur bloquante décrite pour l'écran de démarrage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct StartupProblem {
     pub nature: ProblemNature,
