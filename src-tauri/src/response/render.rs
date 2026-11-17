@@ -261,11 +261,16 @@ fn json_lines(value: &Value) -> Vec<Vec<Token>> {
 /// Texte entre deux balises gardé sur la ligne de sa balise.
 const INLINE_TEXT: usize = 80;
 
+/// Indentation maximale d'une ligne XML ou HTML (PU3) : des balises jamais fermées (`<li>`,
+/// `<p>`, `<td>` du HTML courant) feraient croître chaque ligne avec leur nombre, et le tout avec
+/// son carré. Au-delà, les lignes restent à cette profondeur.
+const MAX_INDENT: usize = 32;
+
 fn indent(depth: usize) -> Vec<Token> {
     if depth == 0 {
         Vec::new()
     } else {
-        vec![token("  ".repeat(depth), TokenKind::Text)]
+        vec![token("  ".repeat(depth.min(MAX_INDENT)), TokenKind::Text)]
     }
 }
 
