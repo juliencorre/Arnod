@@ -15,7 +15,9 @@ function fileName(path: string): string {
 
 /** Raison suivie d'un seul point final. */
 function ending(reason: string): string {
-  return `${reason.replace(/[.\s]+$/, "")}.`;
+  let end = reason.trimEnd();
+  while (end.endsWith(".")) end = end.slice(0, -1).trimEnd();
+  return `${end}.`;
 }
 
 export function useDrafts() {
