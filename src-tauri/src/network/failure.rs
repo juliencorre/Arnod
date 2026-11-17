@@ -163,7 +163,23 @@ const NOT_SENT: &str = "La requête n'est pas partie : rien n'a été écrit sur
 /// Échec réseau classé et message prêt à afficher (R5, R6).
 pub fn classify(error: &reqwest::Error, attempt: &Attempt<'_>) -> CommandError {
     let (host, port) = host_port(attempt.url);
-    let texts = chain_texts(error);
+    // L'adresse ne décide jamais du classement (ES7) : « 407 » dans un chemin ou dans le port
+    // d'un serveur ferait dire « le proxy demande une identification » à un délai dépassé.
+    let urls: Vec<String> = [
+        error.url().map(|url| url.as_str().to_lowercase()),
+        Some(attempt.url.to_lowercase()),
+    ]
+    .into_iter()
+    .flatten()
+    .filter(|url| !url.is_empty())
+    .collect();
+    let texts: Vec<String> = chain_texts(error)
+        .into_iter()
+        .map(|text| {
+            urls.iter()
+                .fold(text, |text, url| text.replace(url.as_str(), ""))
+        })
+        .collect();
     let has = |needle: &str| texts.iter().any(|t| t.contains(needle));
     let via = attempt
         .proxy
