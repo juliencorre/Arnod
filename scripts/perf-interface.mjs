@@ -74,7 +74,7 @@ function servir(dossier) {
   const servis = fichiersServis(dossier);
   return new Promise((ok) => {
     const server = createServer((req, res) => {
-      const fichier = servis.get(new URL(req.url ?? "/", "http://x").pathname);
+      const fichier = servis.get((req.url ?? "/").split("?")[0]);
       if (fichier === undefined) {
         res.writeHead(404).end();
         return;
@@ -143,17 +143,20 @@ async function relever(page) {
 
 const temps = (entree) => entree.image - entree.faux;
 
-/** Clic réel, mesuré jusqu'à l'image qui montre `fini` (fonction évaluée dans la page). */
+/**
+ * Clic réel, mesuré jusqu'à l'image qui montre la condition. `fini` est une fabrique : Playwright
+ * la sérialise comme toute fonction passée à `evaluate` et la fonction qu'elle rend (la condition,
+ * appelée avec `argument`) reste dans la page. Aucun texte n'est évalué.
+ */
 async function clic(page, selecteur, fini, argument) {
   const faux = await armer(page, ["click"]);
   await page.click(selecteur);
+  const test = await page.evaluateHandle(fini);
   const fin = await page.evaluate(
-    ([source, arg]) => {
-      const test = new Function("arg", `return (${source})(arg)`);
-      return window.__perf.attendre(() => test(arg), 600000);
-    },
-    [fini.toString(), argument],
+    ([condition, arg]) => window.__perf.attendre(() => condition(arg), 600000),
+    [test, argument],
   );
+  await test.dispose();
   const releve = await relever(page);
   const entree = releve.entrees.find((e) => e.type === "click");
   const etat = await page.evaluate(() => ({
@@ -186,22 +189,27 @@ async function frapper(page, texte, delai = 80) {
   };
 }
 
-/** Action faite dans la page (événement du cœur, store), mesurée par `__perf.chrono`. */
+/**
+ * Action faite dans la page (événement du cœur, store), mesurée par `__perf.chrono`. `action` et
+ * `fini` sont des fabriques, comme pour `clic`.
+ */
 async function chrono(page, action, fini, argument) {
+  const agir = await page.evaluateHandle(action);
+  const test = fini ? await page.evaluateHandle(fini) : null;
   const r = await page.evaluate(
-    ([a, f, arg]) => {
-      const agir = new Function("arg", `return (${a})(arg)`);
-      const test = f === null ? undefined : new Function("arg", `return (${f})(arg)`);
-      return window.__perf.chrono(() => agir(arg), test ? () => test(arg) : undefined);
-    },
-    [action.toString(), fini ? fini.toString() : null, argument],
+    ([a, f, arg]) => window.__perf.chrono(() => a(arg), f ? () => f(arg) : undefined),
+    [agir, test, argument],
   );
+  await agir.dispose();
+  await test?.dispose();
   return { ms: r.image - r.faux, calcul: r.calcul - r.faux, parse: r.parse };
 }
 
 const LIGNES = () => document.querySelectorAll('[role="tree"] [role="treeitem"]').length;
-const AU_MOINS = (n) => document.querySelectorAll('[role="tree"] [role="treeitem"]').length >= n;
-const AU_PLUS = (n) => document.querySelectorAll('[role="tree"] [role="treeitem"]').length <= n;
+const AU_MOINS = () => (n) =>
+  document.querySelectorAll('[role="tree"] [role="treeitem"]').length >= n;
+const AU_PLUS = () => (n) =>
+  document.querySelectorAll('[role="tree"] [role="treeitem"]').length <= n;
 
 /** Ouvre le projet depuis l'accueil du workspace : premier rendu de la barre latérale. */
 async function ouvrirProjet(page) {
@@ -213,11 +221,11 @@ async function ouvrirProjet(page) {
 function ouvrirRequete(page, laquelle) {
   return chrono(
     page,
-    (nom) => {
+    () => (nom) => {
       const p = window.__perf;
       return p.workbench.openRequest(p.PROJET, p[nom]);
     },
-    () => document.querySelector(".editor__url") !== null,
+    () => () => document.querySelector(".editor__url") !== null,
     laquelle,
   );
 }
@@ -289,7 +297,7 @@ async function barre({ page, cdp }) {
   r["tout déplier"] = (
     await chrono(
       page,
-      () => {
+      () => () => {
         const p = window.__perf;
         p.workbench.trees[p.PROJET].collapsed = [];
       },
@@ -318,7 +326,7 @@ async function barre({ page, cdp }) {
       window.__statuts = window.__perf.statutsChanges(500, t);
     }, tour);
     statuts.push(
-      await chrono(page, () => {
+      await chrono(page, () => () => {
         const p = window.__perf;
         return p.emettre("arnod://statuts", { projectId: p.PROJET, statuses: window.__statuts });
       }),
@@ -336,7 +344,7 @@ async function barre({ page, cdp }) {
     relus.push(
       await chrono(
         page,
-        () => {
+        () => () => {
           const p = window.__perf;
           return p.emettre("arnod://projet", {
             projectId: p.PROJET,
@@ -345,7 +353,7 @@ async function barre({ page, cdp }) {
             origin: "autre",
           });
         },
-        () => {
+        () => () => {
           const p = window.__perf;
           return (
             p.workbench.trees[p.PROJET] !== window.__arbre &&
@@ -360,7 +368,11 @@ async function barre({ page, cdp }) {
 
   // Gros contrat déplié : ses ressources et ses opérations.
   r["déplier le gros contrat"] = (
-    await clic(page, ".contract-row__chevron", () => document.querySelectorAll(".crow").length > 0)
+    await clic(
+      page,
+      ".contract-row__chevron",
+      () => () => document.querySelectorAll(".crow").length > 0,
+    )
   ).ms;
   return r;
 }
@@ -384,7 +396,7 @@ async function editeur({ page }) {
   r["enregistrement auto · tâche la plus longue"] = apresUrl?.longue ?? null;
 
   r["onglet Corps · ouvrir"] = (
-    await clic(page, "#tab-body", () => document.querySelector(".body__content") !== null)
+    await clic(page, "#tab-body", () => () => document.querySelector(".body__content") !== null)
   ).ms;
   await page.click(".body__content");
   await page.keyboard.press("Control+Home");
@@ -410,7 +422,11 @@ async function editeur({ page }) {
   });
 
   r["onglet En-têtes · ouvrir (100 lignes)"] = (
-    await clic(page, "#tab-headers", () => document.querySelectorAll(".pairs__row").length >= 100)
+    await clic(
+      page,
+      "#tab-headers",
+      () => () => document.querySelectorAll(".pairs__row").length >= 100,
+    )
   ).ms;
   await page.click('input[aria-label="Valeur, ligne 50"]');
   const entete = await frapper(page, "abcdefghijkl");
@@ -486,7 +502,7 @@ async function envoyer(page, cdp, r) {
   const envoi = await clic(
     page,
     '.editor__line button[type="submit"]',
-    () => document.querySelector(".code__line") !== null,
+    () => () => document.querySelector(".code__line") !== null,
   );
   r["afficher le corps"] = envoi.ms;
   r["dont lecture JSON de la mise en forme"] =
@@ -526,7 +542,7 @@ async function filtre({ page, cdp }) {
   const suivants = [];
   for (let i = 0; i < 4; i++) {
     suivants.push(
-      (await clic(page, 'button[aria-label="Résultat suivant"]', () => true)).premiereImage,
+      (await clic(page, 'button[aria-label="Résultat suivant"]', () => () => true)).premiereImage,
     );
   }
   r["filtre · correspondance suivante"] = mediane(suivants);
@@ -538,7 +554,7 @@ async function html({ page, cdp }) {
   await envoyer(page, cdp, r);
   const noeuds = await page.evaluate(() => window.__perf.noeuds());
   r["aperçu HTML"] = (
-    await clic(page, '.body__bar [role="switch"]', () => {
+    await clic(page, '.body__bar [role="switch"]', () => () => {
       const apercu = document.querySelector(".preview");
       return apercu !== null && apercu.childElementCount > 0;
     })
@@ -560,12 +576,12 @@ async function run({ page }, taille) {
   r["ouvrir le run terminé (Échecs)"] = (
     await chrono(
       page,
-      () => window.__perf.ouvrirRun(),
-      () => document.querySelector(".run__item") !== null,
+      () => () => window.__perf.ouvrirRun(),
+      () => () => document.querySelector(".run__item") !== null,
     )
   ).ms;
-  const ITEMS_AU_MOINS = (n) => document.querySelectorAll(".run__item").length >= n;
-  const ITEMS_AU_PLUS = (n) => document.querySelectorAll(".run__item").length <= n;
+  const ITEMS_AU_MOINS = () => (n) => document.querySelectorAll(".run__item").length >= n;
+  const ITEMS_AU_PLUS = () => (n) => document.querySelectorAll(".run__item").length <= n;
   r["filtre Tous"] = (await clic(page, '.run__tab:has-text("Tous")', ITEMS_AU_MOINS, lignes)).ms;
   r["nœuds DOM (Tous)"] = await page.evaluate(() => window.__perf.noeuds());
   r["filtre Lents"] = (
@@ -621,12 +637,12 @@ async function onglets({ page }) {
   const ouverture = await clic(
     page,
     'main article button:has-text("Ouvrir")',
-    () => document.querySelectorAll(".editor__url").length >= 4,
+    () => () => document.querySelectorAll(".editor__url").length >= 4,
   );
   r["ouvrir le projet · 4 éditeurs et l'arbre"] = ouverture.ms;
   await page.waitForTimeout(1500);
   r["nœuds DOM"] = await page.evaluate(() => window.__perf.noeuds());
-  const actif = (i) => {
+  const actif = () => (i) => {
     const zone = document.querySelectorAll("section.zone")[0];
     const onglet = zone.querySelectorAll('[role="tab"]')[i];
     return (
@@ -644,7 +660,7 @@ async function onglets({ page }) {
   const fenetres = [];
   for (let i = 0; i < 3; i++) {
     fenetres.push(
-      await chrono(page, () => {
+      await chrono(page, () => () => {
         const p = window.__perf;
         return p.emettre("arnod://fenetres", p.fenetres());
       }),
