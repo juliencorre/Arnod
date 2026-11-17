@@ -29,16 +29,13 @@ leur contrat selon `docs/plan-requetes-dans-contrats.md` (sections « Contrats d
 `docs/plan-qualite-interface.md` (échelles du design system appliquées au code et à la maquette).
 Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
-**Travail en cours** : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots A à L en
-trois vagues, règles communes R1 à R10) ; lot L (installation des mises à jour) selon
-`docs/plan-mvp-l-mises-a-jour.md`. Un lot = une branche `claude/mvp-<lot>` et une pull request ;
-il respecte les règles communes, notamment les ajouts en fin de liste dans les fichiers partagés (R5)
-et la comparaison avec la maquette par l'aperçu (R6).
+Livré ensuite : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots A à L).
 
-**À venir** : qualité du MVP selon `docs/plan-qualite-mvp.md` (brouillon : lots A à K, questions Q1
-à Q10, dont Q5 et Q10 tranchées ; lot 0 : maquette redessinée d'abord, elle est la référence, selon
-`docs/maquette-consignes-qualite.md`), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
-`docs/audit-2026-11-mvp/preuves/`).
+**Travail en cours** : qualité du MVP selon `docs/plan-qualite-mvp.md` (lots 0 et A à K en trois
+vagues, règles R1 à R14), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
+`docs/audit-2026-11-mvp/preuves/`). Lot 0 livré : la maquette redessinée est la référence
+(`docs/maquette-consignes-qualite.md`). Un lot = une branche `claude/qualite-<lot>` et une pull
+request ; chaque constat se corrige avec son test de preuve, qui échoue avant et passe après (R1).
 
 ## Architecture
 

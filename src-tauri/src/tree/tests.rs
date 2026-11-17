@@ -518,3 +518,70 @@ fn lot_e_variables_extraites_par_les_etapes_precedentes() {
     assert!(extracted_before(dir.path(), &created.step).is_empty());
     assert!(extracted_before(dir.path(), "libre.yml").is_empty());
 }
+
+/// Chemins des dossiers montrés à la racine.
+fn top_folders(root: &Path) -> Vec<String> {
+    read(root)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|node| match node {
+            TreeNode::Folder { path, .. } => Some(path),
+            TreeNode::Request { .. } => None,
+        })
+        .collect()
+}
+
+/// PU4 : un dossier renommé ou déplacé sous un nom réservé ou caché serait accepté puis absent de
+/// l'arborescence : le nom est refusé, le dossier reste en place.
+#[test]
+fn pu4_nom_reserve_ou_cache_refuse_pour_renommer_et_deplacer() {
+    let dir = project();
+    let root = dir.path();
+    let folder = create_folder(root, "", "Dossier").unwrap();
+    create_request(root, &folder, Some("Requête")).unwrap();
+    for name in [
+        "contracts",
+        "Environments",
+        ".archive",
+        "folder.yml",
+        "opencollection.yml",
+    ] {
+        assert!(rename(root, &folder, name).is_err(), "« {name} » accepté");
+        assert_eq!(top_folders(root), ["Dossier"], "après « {name} »");
+    }
+    // Plus bas dans l'arborescence, `contracts` est un nom comme un autre…
+    let inner = create_folder(root, &folder, "contracts").unwrap();
+    create_request(root, &inner, Some("Signer")).unwrap();
+    // … mais il ne remonte pas à la racine.
+    assert_eq!(
+        move_to(root, &inner, "").unwrap_err().kind,
+        CommandErrorKind::NameTaken
+    );
+    assert_eq!(requests_in(root, "").unwrap().len(), 2);
+    assert_eq!(
+        create_folder(root, "", ".cache").unwrap_err().kind,
+        CommandErrorKind::InvalidName
+    );
+}
+
+/// PU5 : si la seconde étape d'un renommage de dossier échoue, le dossier reprend son nom au lieu
+/// de rester caché sous `.arnod-rename-<uuid>`. Ici le nom (64 émojis, 256 octets) dépasse la
+/// limite du système de fichiers.
+#[cfg(unix)]
+#[test]
+fn pu5_renommage_de_dossier_defait_si_la_seconde_etape_echoue() {
+    let dir = project();
+    let root = dir.path();
+    let folder = create_folder(root, "", "Commandes").unwrap();
+    create_request(root, &folder, Some("Requête")).unwrap();
+    assert!(rename(root, &folder, &"😀".repeat(64)).is_err());
+    assert!(root.join("Commandes").is_dir());
+    assert_eq!(top_folders(root), ["Commandes"]);
+    let hidden: Vec<String> = fs::read_dir(root)
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with(".arnod-rename"))
+        .collect();
+    assert!(hidden.is_empty(), "{hidden:?}");
+}
