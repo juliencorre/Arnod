@@ -35,6 +35,8 @@ pub const SIDEBAR_ID: &str = "barre-masquer";
 
 /// Raccourci choisi dans le menu, transmis à la fenêtre qui l'exécute (`arnod://raccourci`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "MenuShortcut"))]
 #[serde(rename_all = "camelCase")]
 pub enum Shortcut {
     /// Résultat sous la requête ou à côté (Ctrl+J).

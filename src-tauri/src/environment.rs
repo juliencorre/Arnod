@@ -22,6 +22,8 @@ use crate::tree::{ENVIRONMENTS_DIR, item_name, slug};
 
 /// Variable partagée.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "EnvVariable"))]
 pub struct Variable {
     pub name: String,
     #[serde(default)]
@@ -34,6 +36,8 @@ fn default_color() -> String {
 
 /// Environnement, tel que l'interface l'édite.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "EnvironmentDoc"))]
 pub struct Environment {
     pub name: String,
     #[serde(default = "default_color")]

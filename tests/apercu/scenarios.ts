@@ -179,12 +179,14 @@ function commandeSaisie(): FakeCore {
     {
       name: "Recette fonctionnelle",
       color: "orange",
+      protected: false,
       variables: [{ name: "baseUrl", value: "https://recette.boutique.dev" }],
       locals: ["token"],
     },
     {
       name: "Local",
       color: "gray",
+      protected: false,
       variables: [
         { name: "baseUrl", value: "http://localhost:8080" },
         { name: "apiVersion", value: "v2" },
@@ -860,6 +862,7 @@ function commandeLotH(): FakeCore {
     {
       name: "Recette fonctionnelle",
       color: "orange",
+      protected: false,
       variables: [
         { name: "baseUrl", value: "https://recette.boutique.dev" },
         { name: "authUrl", value: "https://auth.boutique.dev" },

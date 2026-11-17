@@ -16,6 +16,7 @@ const INLINE_WIDTH: usize = 72;
 
 /// Nature d'un jeton, pour sa couleur.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum TokenKind {
     /// Nom de membre JSON.
@@ -39,6 +40,8 @@ pub enum TokenKind {
 
 /// Morceau de ligne.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "BodyToken"))]
 #[serde(rename_all = "camelCase")]
 pub struct Token {
     pub text: String,
@@ -46,11 +49,13 @@ pub struct Token {
     /// Chemin canonique de la valeur JSON (valeur simple, ou accolade et crochet d'un objet ou
     /// d'un tableau).
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub path: Option<String>,
 }
 
 /// Corps mis en forme.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RenderedBody {
     /// Format appliqué : celui choisi, sinon celui détecté.

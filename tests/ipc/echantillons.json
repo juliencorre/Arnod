@@ -1,0 +1,179 @@
+{
+  "treeLoad": {
+    "nodes": [
+      {
+        "kind": "folder",
+        "name": "Clients",
+        "path": "Clients",
+        "children": [
+          {
+            "kind": "request",
+            "name": "Créer",
+            "path": "Clients/creer.yml",
+            "method": "POST",
+            "assertionCount": 1,
+            "invalid": false,
+            "contract": null,
+            "url": "{{baseUrl}}/",
+            "tags": []
+          },
+          {
+            "kind": "request",
+            "name": "Lister",
+            "path": "Clients/lister.yml",
+            "method": "GET",
+            "assertionCount": 1,
+            "invalid": false,
+            "contract": null,
+            "url": "{{baseUrl}}/clients",
+            "tags": []
+          }
+        ],
+        "requestCount": 2,
+        "test": true
+      },
+      {
+        "kind": "request",
+        "name": "casse",
+        "path": "casse.yml",
+        "method": null,
+        "assertionCount": 0,
+        "invalid": true,
+        "contract": null,
+        "url": "",
+        "tags": []
+      },
+      {
+        "kind": "request",
+        "name": "Santé",
+        "path": "sante.yml",
+        "method": "GET",
+        "assertionCount": 1,
+        "invalid": false,
+        "contract": null,
+        "url": "{{baseUrl}}/",
+        "tags": []
+      }
+    ],
+    "tests": [
+      {
+        "kind": "folder",
+        "name": "Clients",
+        "path": "Clients",
+        "children": [
+          {
+            "kind": "request",
+            "name": "Créer",
+            "path": "Clients/creer.yml",
+            "method": "POST",
+            "assertionCount": 1,
+            "invalid": false,
+            "contract": null,
+            "url": "{{baseUrl}}/",
+            "tags": []
+          },
+          {
+            "kind": "request",
+            "name": "Lister",
+            "path": "Clients/lister.yml",
+            "method": "GET",
+            "assertionCount": 1,
+            "invalid": false,
+            "contract": null,
+            "url": "{{baseUrl}}/clients",
+            "tags": []
+          }
+        ],
+        "requestCount": 2,
+        "test": true
+      },
+      {
+        "kind": "request",
+        "name": "casse",
+        "path": "casse.yml",
+        "method": null,
+        "assertionCount": 0,
+        "invalid": true,
+        "contract": null,
+        "url": "",
+        "tags": []
+      },
+      {
+        "kind": "request",
+        "name": "Santé",
+        "path": "sante.yml",
+        "method": "GET",
+        "assertionCount": 1,
+        "invalid": false,
+        "contract": null,
+        "url": "{{baseUrl}}/",
+        "tags": []
+      }
+    ],
+    "collapsed": []
+  },
+  "requestRead": {
+    "name": "Lister",
+    "description": "",
+    "tags": [],
+    "method": "GET",
+    "url": "{{baseUrl}}/clients",
+    "params": [],
+    "headers": [],
+    "auth": {
+      "type": "none",
+      "username": "",
+      "password": "",
+      "token": "",
+      "name": "",
+      "value": "",
+      "location": "header",
+      "other": "",
+      "oauth2": {
+        "accessTokenUrl": "",
+        "clientId": "",
+        "clientSecret": "",
+        "scope": "",
+        "credentials": "basicAuthHeader",
+        "tokenPlacement": "header",
+        "tokenName": "Authorization"
+      }
+    },
+    "body": {
+      "kind": "none",
+      "variants": [],
+      "selected": 0,
+      "other": ""
+    },
+    "settings": {
+      "timeoutMs": null,
+      "followRedirects": null,
+      "maxRedirects": null,
+      "encodeUrl": null
+    },
+    "docs": "",
+    "assertions": [
+      {
+        "id": "a0",
+        "target": "responseTime",
+        "operator": "lessThan",
+        "value": 500,
+        "origin": "default",
+        "enabled": true
+      }
+    ],
+    "extractions": [],
+    "examples": [],
+    "preserved": [],
+    "inherited": {
+      "auth": null,
+      "headers": [],
+      "settings": {
+        "timeoutMs": 30000,
+        "followRedirects": true,
+        "maxRedirects": 5,
+        "encodeUrl": true
+      }
+    }
+  }
+}

@@ -7,6 +7,7 @@ export default defineConfigWithVueTs(
     name: "arnod/ignores",
     // docs/design-system/ : types de documentation du design system, hors projet TypeScript.
     // .maquette/ et .apercu/ : copies locales de la maquette et captures, ignorées par Git.
+    // tests/ipc/coeur.ts : généré par le cœur (src-tauri/src/ts_mirror.rs), vérifié par vue-tsc.
     ignores: [
       "dist/**",
       "dist-perf/**",
@@ -16,6 +17,7 @@ export default defineConfigWithVueTs(
       "docs/**",
       ".maquette/**",
       ".apercu/**",
+      "tests/ipc/coeur.ts",
     ],
   },
   pluginVue.configs["flat/recommended"],

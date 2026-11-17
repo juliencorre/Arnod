@@ -17,6 +17,7 @@ pub struct ResponseData {
 
 /// Résultat d'une vérification (V3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct AssertionResult {
     pub id: String,

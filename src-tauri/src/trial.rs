@@ -177,6 +177,8 @@ pub fn record(
 
 /// Essai transféré au référentiel de tests (écran 2.2-b) : le dossier du test et son étape 1.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "TransferredTrial"))]
 #[serde(rename_all = "camelCase")]
 pub struct Transferred {
     pub test: String,

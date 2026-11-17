@@ -95,6 +95,7 @@ pub fn network_remove_authority(
 
 /// Authentification du projet vue par les réglages (3.4-a).
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectAuthView {
     pub auth: Auth,

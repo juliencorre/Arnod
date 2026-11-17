@@ -16,6 +16,7 @@ pub const REQUEST_PREFIX: &str = "request.";
 
 /// Valeur extraite à un envoi.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ExtractedValue {
     pub name: String,

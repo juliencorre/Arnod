@@ -17,6 +17,7 @@ use crate::error::CommandError;
 
 /// Action sur la sélection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum BatchAction {
     /// Vers le dossier `target` (`""` : racine du projet).
@@ -33,6 +34,7 @@ pub enum BatchAction {
 
 /// Ce que l'action a fait : chemins d'avant et d'après (absent après une suppression).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct BatchDone {
     pub items: Vec<(String, Option<String>)>,

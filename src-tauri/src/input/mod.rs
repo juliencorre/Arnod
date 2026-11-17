@@ -22,6 +22,7 @@ pub use variables::{
 
 /// Ce que l'éditeur montre pendant la saisie (`request_input`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RequestInput {
     /// Environnement actif, nommé dans les messages.

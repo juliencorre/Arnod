@@ -55,7 +55,7 @@ function load(env: EnvironmentView | undefined): void {
   draft.value = {
     name: env.name,
     color: env.color,
-    protected: env.protected ?? false,
+    protected: env.protected,
     variables: env.variables.map((v) => ({ ...v })),
     locals: [...env.locals],
   };

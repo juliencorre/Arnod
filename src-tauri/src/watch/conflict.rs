@@ -15,6 +15,7 @@ use crate::request::model::Request;
 
 /// Version gardée pour un élément.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ConflictSide {
     Disk,
@@ -23,6 +24,7 @@ pub enum ConflictSide {
 
 /// Élément de la requête qui diffère, ou que les deux versions ont changé de la même façon.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ConflictItem {
     /// Clé stable de l'élément (`url`, `headers:x-request-id#0`).
@@ -41,6 +43,7 @@ pub struct ConflictItem {
 
 /// Conflit d'une requête ouverte (`request_conflict`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RequestConflict {
     pub items: Vec<ConflictItem>,

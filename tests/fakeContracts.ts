@@ -250,7 +250,7 @@ function generate(
         contract: { file: path, operation: operation.key },
         assertions: [
           {
-            id: "duree",
+            id: "a0",
             target: "responseTime",
             operator: "lessThan",
             value: 500,

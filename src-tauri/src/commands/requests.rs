@@ -201,6 +201,7 @@ pub fn request_cancel(bench: State<'_, Arc<Workbench>>, exec_id: Uuid) {
 
 /// Réponse sur laquelle proposer des vérifications (R10).
 #[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ProposeInput {
     pub status: u16,
@@ -221,6 +222,7 @@ pub fn request_propose_assertions(response: ProposeInput) -> Vec<Assertion> {
 
 /// Réponse reçue à reprendre comme réponse attendue (R7).
 #[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ExampleInput {
     pub status: u16,

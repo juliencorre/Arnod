@@ -26,6 +26,7 @@ const BASE_URL: &str = "baseUrl";
 
 /// Contrat de la barre latérale.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ContractSummary {
     /// Contrat déduit des échanges réels (`x-arnod-deduced`) : version non affichée.
@@ -46,6 +47,7 @@ pub struct ContractSummary {
 
 /// Ressource d'un contrat : premier segment du chemin de ses opérations (R2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceView {
     /// `/pets`, ou `/` pour la racine.
@@ -55,6 +57,7 @@ pub struct ResourceView {
 
 /// Opération d'une ressource et ses requêtes liées ; la première est l'endpoint (R3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct OperationNode {
     pub key: String,
@@ -68,6 +71,7 @@ pub struct OperationNode {
 
 /// Requête liée, telle que la barre latérale la montre.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct LinkedView {
     pub path: String,
@@ -80,6 +84,7 @@ pub struct LinkedView {
 
 /// Réponse attendue d'une requête liée, telle que la barre latérale la liste (3.2-a3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ExampleRef {
     /// Position dans `examples` de la requête.
@@ -90,6 +95,7 @@ pub struct ExampleRef {
 
 /// Opération affichée dans l'onglet du contrat.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct OperationView {
     pub key: String,
@@ -108,6 +114,7 @@ pub struct OperationView {
 
 /// Requête liée dont l'opération n'est plus dans le contrat (R11).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct OrphanView {
     pub path: String,
@@ -117,6 +124,7 @@ pub struct OrphanView {
 
 /// Contrat affiché dans son onglet (C5).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ContractView {
     /// Contrat déduit des échanges réels (`x-arnod-deduced`).
@@ -137,6 +145,7 @@ pub struct ContractView {
 
 /// Origine d'un contrat ajouté (C2 à C4).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ContractSource {
     /// Texte collé.
@@ -149,6 +158,7 @@ pub enum ContractSource {
 
 /// Opération pour laquelle aucune requête n'a été créée.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct SkippedOperation {
     pub operation: String,
@@ -157,6 +167,7 @@ pub struct SkippedOperation {
 
 /// `baseUrl` renseignée à la création des requêtes (R8).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct BaseUrlSet {
     pub environment: String,
@@ -165,6 +176,7 @@ pub struct BaseUrlSet {
 
 /// Bilan de « Créer les requêtes » (C6).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct GenerateReport {
     /// Dossier des requêtes créées.

@@ -20,6 +20,7 @@ pub const VERSION: u32 = 1;
 
 /// Dernière exécution d'une requête.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RequestStatus {
     pub passed: bool,

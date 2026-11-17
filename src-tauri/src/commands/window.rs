@@ -44,6 +44,7 @@ pub fn window_set_title(
 
 /// Fenêtre qui appelle et état de toutes les fenêtres.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct WindowContext {
     pub label: String,

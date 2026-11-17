@@ -94,6 +94,7 @@ export function projet(core: FakeCore, total: number): Projet {
     {
       name: "Recette",
       color: "orange",
+      protected: false,
       variables: [
         { name: "baseUrl", value: "https://recette.boutique.dev" },
         { name: "page", value: "1" },
@@ -101,7 +102,13 @@ export function projet(core: FakeCore, total: number): Projet {
       ],
       locals: [],
     },
-    { name: "Local", color: "gray", variables: [{ name: "baseUrl", value: "" }], locals: [] },
+    {
+      name: "Local",
+      color: "gray",
+      protected: false,
+      variables: [{ name: "baseUrl", value: "" }],
+      locals: [],
+    },
   ];
   wb.active = "Recette";
   wb.now = Date.now();

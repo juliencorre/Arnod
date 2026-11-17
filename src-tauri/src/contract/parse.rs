@@ -13,6 +13,7 @@ const MAX_HOPS: usize = 32;
 
 /// Famille de spécification d'un contrat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum SpecKind {
     OpenApi3,

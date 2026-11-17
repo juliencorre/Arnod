@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 
 /// Nature d'un élément du rapport : ce qui l'a produit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ImportItemKind"))]
 #[serde(rename_all = "camelCase")]
 pub enum ItemKind {
     /// Bloc `tests`.
@@ -42,6 +44,8 @@ pub enum ItemKind {
 
 /// Suite à donner à un élément du rapport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ImportItemStatus"))]
 #[serde(rename_all = "camelCase")]
 pub enum ItemStatus {
     /// Gardé dans le fichier, pas exécuté (scripts).
@@ -58,6 +62,8 @@ pub enum ItemStatus {
 
 /// Élément signalé par l'import, avec le fichier d'origine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ImportReportItem"))]
 #[serde(rename_all = "camelCase")]
 pub struct ReportItem {
     pub kind: ItemKind,
@@ -80,6 +86,7 @@ pub struct ReportItem {
 
 /// Exemple de conversion sans code : avant (Bruno), après (Arnod).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ConversionExample {
     pub before: String,
@@ -88,6 +95,7 @@ pub struct ConversionExample {
 
 /// Comptes du rapport.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ImportCounts {
     pub folders: usize,

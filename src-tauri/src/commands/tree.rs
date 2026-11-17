@@ -22,6 +22,7 @@ use crate::workbench::Workbench;
 
 /// Arborescence d'un projet et dossiers repliés.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TreeView {
     pub nodes: Vec<TreeNode>,

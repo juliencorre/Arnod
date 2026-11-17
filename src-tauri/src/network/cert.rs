@@ -12,6 +12,7 @@ use crate::error::{CommandError, CommandErrorKind};
 
 /// Certificat montré à l'utilisateur, avec son PEM pour l'ajouter aux autorités.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CertificateInfo {
     /// Nom commun du sujet, sinon son organisation, sinon le nom complet.

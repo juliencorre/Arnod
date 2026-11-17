@@ -11,6 +11,7 @@ use crate::network::tls::{CertificateProblem, Rejection};
 
 /// Cause d'un échec réseau (R5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum FailureCause {
     /// Certificat du serveur refusé.
@@ -34,6 +35,7 @@ pub enum FailureCause {
 /// Certificat refusé : le problème, le certificat du serveur et l'autorité à laquelle faire
 /// confiance si le serveur l'a présentée (R7).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CertificateFailure {
     pub problem: CertificateProblem,
@@ -44,6 +46,7 @@ pub struct CertificateFailure {
 
 /// Échec d'un envoi, classé.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkFailure {
     pub cause: FailureCause,

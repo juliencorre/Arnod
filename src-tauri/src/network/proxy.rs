@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 /// Mode de proxy choisi dans les préférences.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ProxyMode {
     /// Celui du système (variables d'environnement, registre Windows).
@@ -20,6 +21,7 @@ pub enum ProxyMode {
 
 /// D'où vient le proxy du système.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum ProxySource {
     /// Variables `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`.
@@ -30,6 +32,7 @@ pub enum ProxySource {
 
 /// Proxy du système détecté.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct SystemProxy {
     /// Proxy des adresses http.
