@@ -52,8 +52,8 @@ async function toLocal(): Promise<void> {
       </BaseButton>
     </div>
     <p class="secret__note">
-      Le champ deviendra <code>{{ reference }}</code
-      >, valeur rangée dans le coffre du système, jamais envoyée à l'équipe.
+      Le champ deviendra <code>{{ reference }}</code>, valeur rangée dans le coffre du système,
+      jamais envoyée à l'équipe.
     </p>
   </section>
 </template>
