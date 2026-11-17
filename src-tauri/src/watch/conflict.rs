@@ -220,7 +220,7 @@ fn shown(key: &str, value: &Value) -> String {
             .map(|tags| tags.iter().map(scalar).collect::<Vec<_>>().join(", "))
             .unwrap_or_default(),
         "body" => {
-            let kind = text("type");
+            let kind = text("kind");
             let selected = value
                 .get("selected")
                 .and_then(Value::as_u64)
