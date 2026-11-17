@@ -160,7 +160,8 @@ export type CommandName =
   | "run_selection"
   | "updates_download"
   | "updates_cancel"
-  | "updates_install";
+  | "updates_install"
+  | "window_quit_ready";
 
 /**
  * Nature d'une erreur de commande.
@@ -896,6 +897,10 @@ export interface ProjectChange {
   path: string | null;
   /** Fenêtre à l'origine du changement, qui l'a déjà appliqué. */
   origin: string;
+  /** Requêtes ou dossiers renommés ou déplacés : les éditeurs suivent (plan qualité, IN5). */
+  renamed: RenamedFile[];
+  /** Requêtes ou dossiers retirés (corbeille, autre projet) : leurs éditeurs sont oubliés. */
+  removed: string[];
 }
 
 // --- Contrats de services (docs/plan-contrats-services.md) ---

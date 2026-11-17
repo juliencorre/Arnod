@@ -52,10 +52,13 @@ export const useInputStore = defineStore("input", () => {
     }
   }
 
+  /**
+   * Oublie l'analyse de la requête `key` (éditeur démonté). Le choix « Laisser dans le test »
+   * reste pour la session : il vaut pour cette valeur, quel que soit l'onglet qui la montre (IN4).
+   */
   function forget(key: string): void {
     asked.delete(key);
     inputs.delete(key);
-    kept.delete(key);
   }
 
   /** La requête ouverte `key` en commande cURL, dans son environnement actif (R8). */
@@ -117,7 +120,10 @@ export const useInputStore = defineStore("input", () => {
 
   // --- Lot K : secret saisi en clair dans l'authentification (4.2-c) ---------------
 
-  /** Valeurs que l'utilisateur a choisi de laisser dans la requête, par clé et champ. */
+  /**
+   * Valeurs que l'utilisateur a choisi de laisser dans la requête, par clé et champ ; gardées
+   * pour la session, même quand l'onglet se ferme ou change (IN4).
+   */
   const kept = reactive(new Map<string, Set<string>>());
 
   function authOf(key: string): Auth | null {

@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 
+import { useDrafts } from "@/composables/useDrafts";
 import { ipc } from "@/lib/ipc";
 import { useContractsStore } from "@/stores/contracts";
 import { useToastStore } from "@/stores/toasts";
@@ -77,7 +78,9 @@ export const useTransferStore = defineStore("transfer", () => {
   ): Promise<TransferDone> {
     const workbench = useWorkbenchStore();
     // Les requêtes ouvertes sont enregistrées : rien ne réécrit un rang d'étape renuméroté.
-    await workbench.saveAll();
+    // Un brouillon non enregistré arrête l'action : rien n'est réécrit dessous (R6).
+    const refused = await useDrafts().saveAll();
+    if (refused !== null) throw new Error(refused);
     const done = await ipc.transferApply(source.projectId, source.path, target, destination, mode);
     if (mode === "move")
       workbench.followTransfer(
@@ -126,9 +129,11 @@ export const useTransferStore = defineStore("transfer", () => {
   async function undo(): Promise<boolean> {
     const done = last.value;
     if (!done) return false;
-    last.value = null;
     const workbench = useWorkbenchStore();
-    await workbench.saveAll();
+    // Un brouillon non enregistré arrête l'action : rien n'est réécrit dessous (R6).
+    const refused = await useDrafts().saveAll();
+    if (refused !== null) throw new Error(refused);
+    last.value = null;
     await ipc.transferUndo(done.token);
     await refresh(done.projects);
     for (const projectId of done.projects) {

@@ -22,8 +22,10 @@ use crate::error::{CommandError, CommandErrorKind};
 use crate::layout::windows::{
     ActiveRequest, Bounds, MAIN, WINDOWS_VERSION, WindowKind, WindowState, Windows, WindowsFile,
 };
+use crate::quit::{self, QuitGate};
 use crate::startup::{Cause, Failure, StateFile};
 use crate::statuses::Statuses;
+use crate::watch::Renamed;
 use crate::workbench::{Notifier, RunView};
 
 /// Étiquette de la fenêtre principale.
@@ -42,6 +44,9 @@ pub mod events {
     pub const PROJECT: &str = "arnod://projet";
     /// Demande de fermeture d'une fenêtre détachée : elle enregistre puis se rattache (Z6).
     pub const CLOSE: &str = "arnod://fermer";
+    /// Demande de sortie d'Arnod : chaque fenêtre enregistre ses brouillons puis répond par
+    /// `window_quit_ready` (plan qualité, R6, IN3).
+    pub const QUIT: &str = "arnod://quitter";
     /// Requête active, que montre la fenêtre de résultat (`ActiveRequest` ou `null`).
     pub const ACTIVE_REQUEST: &str = "arnod://requete-active";
     /// Début ou fin d'un envoi (`ResultChange`).
@@ -137,6 +142,12 @@ pub struct ProjectChange {
     pub path: Option<String>,
     /// Fenêtre à l'origine du changement, qui l'a déjà appliqué.
     pub origin: String,
+    /// Requêtes ou dossiers renommés ou déplacés : les éditeurs des autres fenêtres suivent
+    /// (plan qualité, IN5).
+    pub renamed: Vec<Renamed>,
+    /// Requêtes ou dossiers mis à la corbeille ou partis vers un autre projet : leurs éditeurs
+    /// sont oubliés, un brouillon est gardé et signalé (IN5).
+    pub removed: Vec<String>,
 }
 
 /// Fenêtres de l'application et leur fichier.
@@ -413,10 +424,60 @@ fn bounds_of<R: Runtime>(window: &Window<R>) -> Option<Bounds> {
     })
 }
 
+/// Demande la sortie d'Arnod (fenêtre principale fermée, « Fichier › Quitter ») : chaque fenêtre
+/// enregistre ses brouillons et répond ; Arnod quitte quand toutes ont dit oui, ou après
+/// [`quit::ANSWER_DELAY`] si une fenêtre ne répond pas (R6, IN3).
+pub fn request_quit<R: Runtime>(app: &AppHandle<R>) {
+    let labels: Vec<String> = app.webview_windows().into_keys().collect();
+    let gate = app.state::<Mutex<QuitGate>>();
+    // Verrou empoisonné : plus rien de fiable à attendre, Arnod quitte.
+    let Ok(mut guard) = gate.lock() else {
+        app.exit(0);
+        return;
+    };
+    let started = guard.start(labels.clone());
+    drop(guard);
+    let Some(round) = started else {
+        return;
+    };
+    if labels.is_empty() {
+        app.exit(0);
+        return;
+    }
+    for label in &labels {
+        let _ = app.emit_to(label.as_str(), events::QUIT, ());
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(quit::ANSWER_DELAY);
+        let gate = app.state::<Mutex<QuitGate>>();
+        let step = gate
+            .lock()
+            .map_or(quit::Step::Exit, |mut gate| gate.expire(round));
+        if step == quit::Step::Exit {
+            app.exit(0);
+        }
+    });
+}
+
+/// Réponse d'une fenêtre à `arnod://quitter` : `saved` faux abandonne la sortie.
+pub fn quit_answer<R: Runtime>(app: &AppHandle<R>, label: &str, saved: bool) {
+    let gate = app.state::<Mutex<QuitGate>>();
+    let step = gate
+        .lock()
+        .map_or(quit::Step::Exit, |mut gate| gate.answer(label, saved));
+    if step == quit::Step::Exit {
+        app.exit(0);
+    }
+}
+
 /// Événements des fenêtres : focus (Z5), position (F13), fermetures (Z6, Z7).
 pub fn on_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
     let app = window.app_handle();
-    let state = app.state::<WindowsState>();
+    // Seconde instance qui s'arrête (ES8) : rien n'est chargé, rien à suivre.
+    let Some(state) = app.try_state::<WindowsState>() else {
+        return;
+    };
     let label = window.label().to_owned();
     match event {
         WindowEvent::Focused(true) => {
@@ -430,7 +491,13 @@ pub fn on_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
                 state.quietly(|windows| windows.set_bounds(&label, bounds));
             }
         }
-        WindowEvent::CloseRequested { api, .. } if label != MAIN => {
+        WindowEvent::CloseRequested { api, .. } if label == MAIN => {
+            // Fermer la fenêtre principale quitte Arnod (Z7), une fois les brouillons de toutes
+            // les fenêtres enregistrés (R6).
+            api.prevent_close();
+            request_quit(app);
+        }
+        WindowEvent::CloseRequested { api, .. } => {
             // La fenêtre enregistre ses requêtes modifiées puis se rattache (Z6).
             if state
                 .read(|windows| windows.get(&label).is_ok())
@@ -508,6 +575,30 @@ pub fn project_changed<R: Runtime>(
             scope,
             path: path.map(str::to_owned),
             origin: origin.to_owned(),
+            renamed: Vec::new(),
+            removed: Vec::new(),
+        },
+    );
+}
+
+/// Diffuse une modification de l'arborescence qui renomme, déplace ou retire des éléments : les
+/// éditeurs ouverts dans les autres fenêtres suivent ou sont oubliés (IN5).
+pub fn paths_changed<R: Runtime>(
+    app: &AppHandle<R>,
+    origin: &str,
+    project_id: Uuid,
+    renamed: Vec<Renamed>,
+    removed: Vec<String>,
+) {
+    let _ = app.emit(
+        events::PROJECT,
+        ProjectChange {
+            project_id,
+            scope: ProjectScope::Tree,
+            path: None,
+            origin: origin.to_owned(),
+            renamed,
+            removed,
         },
     );
 }
@@ -598,6 +689,11 @@ mod tests {
             scope: ProjectScope::Request,
             path: Some("a.yml".into()),
             origin: MAIN.into(),
+            renamed: vec![Renamed {
+                from: "b.yml".into(),
+                to: "c.yml".into(),
+            }],
+            removed: vec!["d.yml".into()],
         };
         assert_eq!(
             serde_json::to_value(change).unwrap(),
@@ -605,7 +701,9 @@ mod tests {
                 "projectId": Uuid::from_u128(1).to_string(),
                 "scope": "request",
                 "path": "a.yml",
-                "origin": "main"
+                "origin": "main",
+                "renamed": [{ "from": "b.yml", "to": "c.yml" }],
+                "removed": ["d.yml"]
             })
         );
     }

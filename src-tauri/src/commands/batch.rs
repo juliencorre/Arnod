@@ -13,6 +13,7 @@ use crate::error::{CommandError, CommandErrorKind};
 use crate::layout::windows::Windows;
 use crate::state::AppState;
 use crate::tree::{self, batch, undo::Undo};
+use crate::watch::Renamed;
 use crate::windows::{self, ProjectScope};
 use crate::workbench::{RunView, Workbench};
 
@@ -58,10 +59,15 @@ pub fn tree_batch(
 ) -> Result<BatchResult, CommandError> {
     let ctx = state.project_ctx(project)?;
     let (done, undo) = batch::apply(&ctx.root, &paths, &action)?;
+    let (mut renamed, mut removed) = (Vec::new(), Vec::new());
     for (from, to) in &done.items {
         match to {
             Some(to) if matches!(action, batch::BatchAction::Move { .. }) => {
                 follow_path(&window, project, from, to);
+                renamed.push(Renamed {
+                    from: from.clone(),
+                    to: to.clone(),
+                });
             }
             None => {
                 bench.remove_status(&ctx, from);
@@ -69,11 +75,18 @@ pub fn tree_batch(
                     w.close_path(project, from);
                     Ok(())
                 });
+                removed.push(from.clone());
             }
             Some(_) => {}
         }
     }
-    changed(&window, project);
+    windows::paths_changed(
+        window.app_handle(),
+        window.label(),
+        project,
+        renamed,
+        removed,
+    );
     let undo_token = Uuid::new_v4();
     if let Ok(mut list) = pending().lock() {
         list.push_back((undo_token, project, undo));

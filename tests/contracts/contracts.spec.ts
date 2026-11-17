@@ -275,7 +275,7 @@ describe("source et suppression (C9, C11)", () => {
 
     await app?.get('[aria-label="Fermer Petstore"]').trigger("click");
     await flushPromises();
-    expect(app?.get(".toast").text()).toContain("Source du contrat non enregistrée");
+    expect(app?.get(".toast").text()).toContain("Source du contrat « petstore » non enregistrée");
     expect(app?.find(".contract").exists()).toBe(true);
   });
 

@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
+import { useDrafts } from "@/composables/useDrafts";
 import { ipc } from "@/lib/ipc";
 import { useContractsStore } from "@/stores/contracts";
 import { useToastStore } from "@/stores/toasts";
@@ -83,7 +84,9 @@ export const useSelectionStore = defineStore("selection", () => {
     const toasts = useToastStore();
     busy.value = true;
     try {
-      await workbench.saveAll();
+      // Un brouillon non enregistré arrête l'action : rien n'est réécrit dessous (R6).
+      const refused = await useDrafts().saveAll();
+      if (refused !== null) throw new Error(refused);
       const result = await ipc.treeBatch(project, paths.value, action);
       for (const [from, to] of result.items) {
         if (action.kind === "move" && to !== null) workbench.followTransfer(project, from, to);

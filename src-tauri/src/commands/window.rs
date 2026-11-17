@@ -254,6 +254,13 @@ pub fn window_reattach(app: AppHandle, window: WebviewWindow) -> Result<WindowsF
     windows::apply(&app, |w| w.reattach(&label)).map(|(_, file)| file)
 }
 
+/// Réponse de la fenêtre appelante à `arnod://quitter` : ses brouillons sont enregistrés
+/// (`saved`), ou l'un d'eux ne l'est pas et la sortie est abandonnée (plan qualité, R6, IN3).
+#[tauri::command]
+pub fn window_quit_ready(app: AppHandle, window: WebviewWindow, saved: bool) {
+    windows::quit_answer(&app, window.label(), saved);
+}
+
 /// Rattache toutes les fenêtres détachées (F12).
 #[tauri::command]
 pub fn window_reattach_all(app: AppHandle) -> Result<WindowsFile, CommandError> {

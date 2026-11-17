@@ -16,7 +16,8 @@ import StartupSkeleton from "@/components/startup/StartupSkeleton.vue";
 import ToastHost from "@/components/ui/ToastHost.vue";
 import ContentWindow from "@/components/windows/ContentWindow.vue";
 import SidebarWindow from "@/components/windows/SidebarWindow.vue";
-import { events } from "@/lib/ipc";
+import { useDrafts } from "@/composables/useDrafts";
+import { events, ipc } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
 import { useNavigationStore } from "@/stores/navigation";
@@ -33,6 +34,7 @@ const toasts = useToastStore();
 const windows = useWindowsStore();
 const workbench = useWorkbenchStore();
 const contracts = useContractsStore();
+const drafts = useDrafts();
 const ready = ref(false);
 let booting = false;
 
@@ -61,10 +63,9 @@ async function boot(): Promise<void> {
     ]);
     if (windows.kind !== "main") {
       // Fermeture d'une fenêtre détachée : enregistrer, puis se rattacher (Z6).
+      // Un brouillon non enregistré garde la fenêtre ouverte et le dit (R6, IN3).
       await events.onClose(() => {
-        void Promise.all(Object.keys(contracts.open).map((key) => contracts.save(key)))
-          .then(() => workbench.saveAll())
-          .finally(() => windows.reattach());
+        void drafts.reattach();
       });
     }
     navigation.start();
@@ -91,7 +92,25 @@ watch(
   },
 );
 
+/**
+ * Sortie d'Arnod (fenêtre principale fermée, « Fichier › Quitter ») : chaque fenêtre enregistre
+ * ses brouillons puis répond au cœur ; un brouillon non enregistré garde Arnod ouvert et le dit
+ * (plan qualité, R6, IN3). Abonné avant le démarrage : un écran d'erreur répond aussi.
+ */
+async function answerQuit(): Promise<void> {
+  let saved = false;
+  try {
+    saved = await drafts.saveAllOrSay();
+  } catch (error) {
+    toasts.showError(error);
+  }
+  await ipc.windowQuitReady(saved);
+}
+
 onMounted(async () => {
+  await events.onQuit(() => {
+    void answerQuit();
+  });
   if (await startup.check()) await boot();
   await reveal();
   // Lot L (1.6-g) : une version plus récente s'annonce, si la vérification est due.
