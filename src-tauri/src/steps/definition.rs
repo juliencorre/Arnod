@@ -13,6 +13,8 @@ const BUILTIN_ENGINES: [(&str, u32); 1] = [("http", 1)];
 
 /// Famille d'une nature : fermée, elle donne la couleur de ses pastilles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "StepFamily"))]
 #[serde(rename_all = "camelCase")]
 pub enum Family {
     Calls,
@@ -38,6 +40,8 @@ impl Family {
 
 /// Moteur qui exécute la nature.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "StepEngine"))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Engine {
     /// Moteur du cœur Rust, mis à jour avec Arnod.
@@ -52,6 +56,8 @@ pub enum Engine {
 
 /// Champ principal, saisi dans l'entrée de l'accueil.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "StepSubject"))]
 #[serde(rename_all = "camelCase")]
 pub struct Subject {
     pub key: String,
@@ -62,6 +68,8 @@ pub struct Subject {
 
 /// Règle de reconnaissance de ce que l'on colle.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "StepRule"))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Rule {
     /// Adresse d'un des schémas, éventuellement précédée d'une option du
@@ -94,6 +102,8 @@ pub const CURL_FIELDS: [(&str, FieldKind); 4] = [
 
 /// Nature d'un champ du formulaire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "StepFieldKind"))]
 #[serde(rename_all = "camelCase")]
 pub enum FieldKind {
     /// Une option parmi `options`.
@@ -106,6 +116,8 @@ pub enum FieldKind {
 
 /// Condition d'affichage : le champ `key` vaut l'une des valeurs `values`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "StepVisibleWhen"))]
 #[serde(rename_all = "camelCase")]
 pub struct VisibleWhen {
     pub key: String,
@@ -115,6 +127,8 @@ pub struct VisibleWhen {
 
 /// Champ déclaratif du formulaire d'une nature.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "StepField"))]
 #[serde(rename_all = "camelCase")]
 pub struct Field {
     pub key: String,
@@ -134,6 +148,7 @@ pub struct Field {
 
 /// Définition d'une nature d'étape : des données, sans code.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Definition {
     pub format: u32,

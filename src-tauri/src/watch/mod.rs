@@ -43,6 +43,8 @@ pub enum Entry {
 
 /// Requête renommée ou déplacée hors d'Arnod (R5).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "RenamedFile"))]
 #[serde(rename_all = "camelCase")]
 pub struct Renamed {
     pub from: String,
@@ -52,6 +54,7 @@ pub struct Renamed {
 /// Changements d'un projet faits hors d'Arnod, diffusés par `arnod://fichiers` (R3 à R6).
 /// Les chemins sont ceux des requêtes, relatifs au projet et séparés par `/`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct FilesChange {
     pub project_id: Uuid,

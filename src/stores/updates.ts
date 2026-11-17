@@ -1,11 +1,10 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
+import { useDrafts } from "@/composables/useDrafts";
 import { events, ipc } from "@/lib/ipc";
-import { useContractsStore } from "@/stores/contracts";
 import { useNetworkStore } from "@/stores/network";
 import { useToastStore } from "@/stores/toasts";
-import { useWorkbenchStore } from "@/stores/workbench";
 import type { UpdateChannel, UpdatesView } from "@/types/ipc";
 
 /**
@@ -120,22 +119,8 @@ export const useUpdatesStore = defineStore("updates", () => {
    * (échec, conflit, secret en attente) arrête l'installation.
    */
   async function installNow(): Promise<void> {
-    const contracts = useContractsStore();
-    const workbench = useWorkbenchStore();
-    const saved = await Promise.all(Object.keys(contracts.open).map((key) => contracts.save(key)));
-    let failed = saved.includes(false);
-    try {
-      await workbench.saveAll();
-    } catch {
-      // L'éditeur garde et montre l'échec (« Non enregistré · Réessayer »).
-      failed = true;
-    }
-    const unsaved = failed || Object.keys(workbench.editors).some((key) => workbench.isDirty(key));
-    if (unsaved) {
-      throw new Error(
-        "Des modifications ne sont pas enregistrées : enregistrez-les ou annulez-les, puis redémarrez.",
-      );
-    }
+    const refused = await useDrafts().saveAll();
+    if (refused !== null) throw new Error(refused);
     apply(await ipc.updatesInstall(true));
   }
 

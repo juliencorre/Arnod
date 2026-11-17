@@ -20,6 +20,7 @@ use crate::workbench::Workbench;
 
 /// Commande cURL d'une requête (`request_curl`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CurlCopy {
     pub command: String,

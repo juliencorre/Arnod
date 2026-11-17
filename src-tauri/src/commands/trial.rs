@@ -22,6 +22,7 @@ use crate::workbench::{ProjectCtx, SendOutcome, Workbench};
 
 /// Essai enregistré dans « Non classés » et sa réponse.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TrialResult {
     /// Instantané du catalogue, « Non classés » compris.
@@ -239,6 +240,7 @@ pub fn trial_transfer(
 
 /// Essais rangés dans un projet (`trial_file`) et le jeton de « Annuler ».
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct FiledTrials {
     #[serde(flatten)]

@@ -13,6 +13,7 @@ use crate::request::model::Pair;
 /// Ce qu'une commande cURL collée a donné en plus des valeurs du formulaire
 /// (`docs/plan-mvp-b-saisie-curl.md`, R5, R6).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CurlImport {
     /// Secrets retirés des en-têtes, remplacés par `{{nom}}` : gardés au coffre
@@ -24,6 +25,7 @@ pub struct CurlImport {
 
 /// Nature reconnue, avec le champ principal et les valeurs lues au passage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Detection {
     pub nature: String,
@@ -31,6 +33,7 @@ pub struct Detection {
     pub values: BTreeMap<String, String>,
     /// Commande cURL reconnue (règle « curl »).
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub curl: Option<CurlImport>,
 }
 

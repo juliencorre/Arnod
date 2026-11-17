@@ -16,12 +16,14 @@ use crate::local;
 use crate::results::ResultBook;
 use crate::state::AppState;
 use crate::tree::{self, TreeNode};
+use crate::watch::Renamed;
 use crate::watch::service::Watchers;
 use crate::windows::{self, ProjectScope};
 use crate::workbench::Workbench;
 
 /// Arborescence d'un projet et dossiers repliés.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TreeView {
     pub nodes: Vec<TreeNode>,
@@ -140,8 +142,18 @@ pub fn tree_rename(
         .and_then(|ctx| tree::rename(&ctx.root, &path, &name));
     if let Ok(renamed) = &result {
         follow_path(&window, project, &path, renamed);
+        windows::paths_changed(
+            window.app_handle(),
+            window.label(),
+            project,
+            vec![Renamed {
+                from: path,
+                to: renamed.clone(),
+            }],
+            Vec::new(),
+        );
     }
-    tree_changed(&window, project, result)
+    result
 }
 
 #[tauri::command]
@@ -157,8 +169,18 @@ pub fn tree_move(
         .and_then(|ctx| tree::move_to(&ctx.root, &path, &target_folder));
     if let Ok(moved) = &result {
         follow_path(&window, project, &path, moved);
+        windows::paths_changed(
+            window.app_handle(),
+            window.label(),
+            project,
+            vec![Renamed {
+                from: path,
+                to: moved.clone(),
+            }],
+            Vec::new(),
+        );
     }
-    tree_changed(&window, project, result)
+    result
 }
 
 #[tauri::command]
@@ -193,6 +215,13 @@ pub fn tree_delete(
             w.close_path(project, &path);
             Ok(())
         });
+        windows::paths_changed(
+            window.app_handle(),
+            window.label(),
+            project,
+            Vec::new(),
+            vec![path],
+        );
     }
-    tree_changed(&window, project, result)
+    result
 }

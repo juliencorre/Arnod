@@ -251,7 +251,9 @@ describe("lot L - installation depuis Arnod (1.6-g)", () => {
     if (!draft) throw new Error("brouillon attendu");
     draft.url = "{{baseUrl}}/modifiee";
     core.failNext("request_save", { kind: "io", message: "Disque plein." });
-    await expect(useUpdatesStore().installNow()).rejects.toThrow("ne sont pas enregistrées");
+    await expect(useUpdatesStore().installNow()).rejects.toThrow(
+      "« Santé » n'est pas enregistrée : Disque plein.",
+    );
     expect(core.updates.installs).toEqual([]);
   });
 });

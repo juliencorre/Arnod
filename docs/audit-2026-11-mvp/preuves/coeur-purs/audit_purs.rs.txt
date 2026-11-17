@@ -1,0 +1,1402 @@
+//! Audit (novembre 2026) : tests de robustesse des parseurs et des modules purs.
+//!
+//! Chaque test passe quelques milliers d'entrées engendrées (mutations d'exemples valides,
+//! caractères sur plusieurs octets, textes tronqués, répétitions) à un parseur, attrape les
+//! paniques avec `catch_unwind` et relève les écarts à une propriété (aller-retour, schéma).
+//! Aucune crate ajoutée : le hasard vient d'un générateur congruentiel.
+//!
+//! À déclarer dans `lib.rs` : `#[cfg(test)] mod audit_purs;`
+//! Lancer : `cargo test --manifest-path src-tauri/Cargo.toml --locked audit_purs -- --nocapture`
+
+use std::collections::BTreeMap;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::path::Path;
+
+use serde_json::{Value, json};
+
+/// Générateur congruentiel (constantes de Knuth).
+pub(crate) struct Lcg(pub u64);
+
+impl Lcg {
+    pub(crate) fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        self.0 >> 33
+    }
+
+    pub(crate) fn below(&mut self, n: usize) -> usize {
+        if n == 0 {
+            0
+        } else {
+            usize::try_from(self.next()).unwrap_or(0) % n
+        }
+    }
+
+    pub(crate) fn pick<'a>(&mut self, items: &[&'a str]) -> &'a str {
+        items[self.below(items.len())]
+    }
+}
+
+/// Morceaux insérés : plusieurs octets, délimiteurs des formats lus, valeurs limites.
+const SNIPPETS: &[&str] = &[
+    "é",
+    "€",
+    "𝄞",
+    "\u{feff}",
+    "\0",
+    "\u{1}",
+    "{{",
+    "}}",
+    "{",
+    "}",
+    "[",
+    "]",
+    "'",
+    "\"",
+    "\\",
+    "$'",
+    "$",
+    "<",
+    ">",
+    "</",
+    "&",
+    ";",
+    ":",
+    "/",
+    "\n",
+    "\r\n",
+    "\t",
+    " ",
+    "~",
+    "'''",
+    "@",
+    "%",
+    "#",
+    "-",
+    "--",
+    "=",
+    "?",
+    "*",
+    ".",
+    ",",
+    "|",
+    "!",
+    "`",
+    "(",
+    ")",
+    "\u{2028}",
+    "\u{a0}",
+    "e\u{301}",
+    "🇫🇷",
+    "0",
+    "9999999999999999999999",
+    "-1",
+    "null",
+    "true",
+];
+
+fn floor_boundary(text: &str, index: usize) -> usize {
+    let mut index = index.min(text.len());
+    while !text.is_char_boundary(index) {
+        index -= 1;
+    }
+    index
+}
+
+/// Une à quatre mutations de `seed` : coupe, retrait, insertion, répétition, remplacement.
+pub(crate) fn mutate(rng: &mut Lcg, seed: &str, extra: &[&str]) -> String {
+    let mut text = seed.to_owned();
+    for _ in 0..=rng.below(4) {
+        let a = floor_boundary(&text, rng.below(text.len() + 1));
+        let b = floor_boundary(&text, rng.below(text.len() + 1));
+        let (a, b) = (a.min(b), a.max(b));
+        match rng.below(9) {
+            0 => text.truncate(a),
+            1 => text.replace_range(a..b, ""),
+            2 => text.insert_str(a, rng.pick(SNIPPETS)),
+            3 => {
+                let snippet = if extra.is_empty() {
+                    rng.pick(SNIPPETS)
+                } else {
+                    rng.pick(extra)
+                };
+                text.insert_str(a, snippet);
+            }
+            4 => {
+                let part = text[a..b].to_owned();
+                text.insert_str(b, &part);
+            }
+            5 => text.replace_range(a..b, rng.pick(SNIPPETS)),
+            6 => {
+                let repeated = rng.pick(SNIPPETS).repeat(1 + rng.below(40));
+                text.insert_str(a, &repeated);
+            }
+            7 => {
+                let snippet = if extra.is_empty() {
+                    rng.pick(SNIPPETS)
+                } else {
+                    rng.pick(extra)
+                };
+                text.replace_range(a..b, snippet);
+            }
+            _ => text = text[a..].to_owned(),
+        }
+        if text.len() > 20_000 {
+            let cut = floor_boundary(&text, 20_000);
+            text.truncate(cut);
+        }
+    }
+    text
+}
+
+/// Bilan d'un passage : entrées, paniques et écarts distincts (les premiers).
+pub(crate) struct Bilan {
+    pub entrees: usize,
+    pub paniques: Vec<(String, String)>,
+    pub ecarts: Vec<(String, String)>,
+}
+
+/// Passe `rounds` entrées à `run` ; `run` renvoie un écart à une propriété, s'il y en a un.
+pub(crate) fn fuzz(
+    name: &str,
+    seeds: &[&str],
+    extra: &[&str],
+    rounds: usize,
+    run: impl Fn(&str) -> Option<String>,
+) -> Bilan {
+    // Les paniques attrapées n'écrivent pas leur trace.
+    std::panic::set_hook(Box::new(|_| {}));
+    let mut rng = Lcg(0x5EED_0000 + name.len() as u64 * 7919);
+    let mut bilan = Bilan {
+        entrees: 0,
+        paniques: Vec::new(),
+        ecarts: Vec::new(),
+    };
+    let mut panic_count = 0usize;
+    let mut gap_count = 0usize;
+    for round in 0..rounds {
+        let seed = seeds[round % seeds.len()];
+        let input = if round < seeds.len() {
+            seed.to_owned()
+        } else {
+            mutate(&mut rng, seed, extra)
+        };
+        bilan.entrees += 1;
+        match catch_unwind(AssertUnwindSafe(|| run(&input))) {
+            Ok(None) => {}
+            Ok(Some(gap)) => {
+                gap_count += 1;
+                let key: String = gap.chars().take(60).collect();
+                if bilan.ecarts.len() < 6 && !bilan.ecarts.iter().any(|(_, g)| g.starts_with(&key))
+                {
+                    bilan.ecarts.push((input, gap));
+                }
+            }
+            Err(panic) => {
+                panic_count += 1;
+                let message = panic
+                    .downcast_ref::<String>()
+                    .cloned()
+                    .or_else(|| panic.downcast_ref::<&str>().map(|s| (*s).to_owned()))
+                    .unwrap_or_default();
+                let key: String = message.chars().take(40).collect();
+                if bilan.paniques.len() < 6
+                    && !bilan.paniques.iter().any(|(_, m)| m.starts_with(&key))
+                {
+                    bilan.paniques.push((input, message));
+                }
+            }
+        }
+    }
+    eprintln!(
+        "[audit] {name} : {} entrées, {panic_count} paniques, {gap_count} écarts",
+        bilan.entrees
+    );
+    for (input, message) in &bilan.paniques {
+        eprintln!("  PANIQUE {message}\n    entrée : {:?}", shorten(input));
+    }
+    for (input, gap) in &bilan.ecarts {
+        eprintln!("  ÉCART {gap}\n    entrée : {:?}", shorten(input));
+    }
+    bilan
+}
+
+fn shorten(text: &str) -> String {
+    if text.chars().count() <= 300 {
+        text.to_owned()
+    } else {
+        let head: String = text.chars().take(300).collect();
+        format!("{head}… ({} octets)", text.len())
+    }
+}
+
+// --- cURL --------------------------------------------------------------------------------------
+
+const CURL_SEEDS: &[&str] = &[
+    "curl -X POST https://api.boutique.dev/orders -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJhbGci.x' -d '{\"customerId\":\"cus_31\"}' --compressed",
+    "curl 'https://api.test/x?a=1&b=2' \\\n  -H $'accept: */*\\u00e9' \\\n  --data-raw $'{\\n  \"a\": \"b\\'c\"\\n}' -u user:pass -b 'sid=1' -sSL -XPUT",
+    "curl.exe --url=https://h/ --data-urlencode \"q=é è\" -G -A agent -e ref --json '{\"a\":1}' -- -weird",
+    "curl -u \"$USER:${PASS}\" -H \"X-Api-Key: $API_KEY\" -H 'Cookie: a=b' https://h -F f=@x -o out -k -m 3",
+];
+
+const CURL_EXTRA: &[&str] = &[
+    " -H ", " -d ", " --data-raw ", " -X", " -u ", "$'", "\\x", "\\u", "\\\n", "\\\r\n", " -- ",
+    "--data-urlencode ", " -G ", "=@", "Authorization: Bearer ", "Basic ", "--json ", " -b ",
+];
+
+#[test]
+fn robustesse_curl() {
+    let bilan = fuzz("curl::parse", CURL_SEEDS, CURL_EXTRA, 6000, |input| {
+        let _ = crate::curl::parse::words(input);
+        let _ = crate::curl::parse::is_curl(input);
+        if let Ok(mut request) = crate::curl::parse::parse(input) {
+            let _ = crate::curl::parse::take_secrets(&mut request.headers);
+        }
+        let _ = crate::steps::detect(input);
+        let _ = crate::curl::render::quote(input);
+        let _ = crate::curl::render::shell_name(input);
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+}
+
+/// Aller-retour : une requête écrite en cURL puis relue donne la même requête.
+#[test]
+fn robustesse_curl_aller_retour() {
+    use crate::curl::render::{placeholder, render};
+    use crate::request::model::Method;
+    use crate::request::resolve::Prepared;
+    let seeds = &[
+        "{\"a\": \"b'c\", \"d\": \"$x `y` \\\\ \\\"z\\\"\"}",
+        "ligne 1\nligne 2\r\nfin",
+        "@fichier",
+        "a=1&b=é",
+    ];
+    let bilan = fuzz("curl aller-retour", seeds, &[], 4000, |input| {
+        // Un caractère nul ne passe pas dans un argument : hors du format.
+        if input.contains('\0') || input.contains('\u{1}') {
+            return None;
+        }
+        let with_secret = format!("{input}{}", placeholder("TOKEN"));
+        for body in [input.to_owned(), with_secret] {
+            let prepared = Prepared {
+                method: Method::Post,
+                url: "https://api.test/x".to_owned(),
+                headers: vec![("X-Test".to_owned(), "v".to_owned())],
+                body: Some(body.clone()),
+                timeout_ms: None,
+                max_redirects: 0,
+                drawn: Vec::new(),
+                used: Vec::new(),
+                oauth2: None,
+                hidden: Vec::new(),
+            };
+            let text = render(&prepared, None);
+            let expected = body.replace(&placeholder("TOKEN"), "$TOKEN");
+            // Un corps vide n'est pas un corps pour la lecture.
+            match crate::curl::parse::parse(&text) {
+                Ok(read) => {
+                    let got = read.body.unwrap_or_default();
+                    // `${TOKEN}` est écrit quand la suite prolongerait le nom.
+                    let got = got.replace("${TOKEN}", "$TOKEN");
+                    if got != expected {
+                        return Some(format!(
+                            "corps relu différent : écrit {text:?}, relu {got:?}, attendu {expected:?}"
+                        ));
+                    }
+                }
+                Err(reason) => return Some(format!("commande écrite illisible ({reason}) : {text:?}")),
+            }
+        }
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+// --- Bruno -------------------------------------------------------------------------------------
+
+fn bruno_seeds() -> Vec<String> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/bruno/fixtures/boutique");
+    let mut seeds = Vec::new();
+    let mut stack = vec![root];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|e| e == "bru")
+                && let Ok(text) = std::fs::read_to_string(&path)
+            {
+                seeds.push(text);
+            }
+        }
+    }
+    seeds.sort();
+    seeds
+}
+
+const BRU_EXTRA: &[&str] = &[
+    "\n}\n", "\n]\n", "meta {\n", "get {\n", "body:json {\n", "assert {\n", "vars:secret [\n",
+    "  ~", "'''", "\"a:b\": ", "auth:oauth2 {\n", "body:multipart-form {\n", "@file(", "@contentType(",
+    "  seq: nan\n", "  seq: 1e999\n", "  type: graphql\n", "{{process.env.X}}", "{{$randomUUID}}",
+    "settings {\n  timeout: 99999999999999999999\n}\n", "tags: [\n", "res.body.items.length: gt 0\n",
+];
+
+/// Lecture d'un `.bru` muté, puis conversion : pas de panique, et tout fichier produit est
+/// conforme au schéma (la conversion le garantit elle-même, R3).
+#[test]
+fn robustesse_bruno() {
+    use crate::bruno::read::{Collection, Folder, Source};
+    use crate::opencollection::schema;
+    let seeds = bruno_seeds();
+    let seeds: Vec<&str> = seeds.iter().map(String::as_str).collect();
+    assert!(!seeds.is_empty());
+    let bilan = fuzz("bruno::parse + convert", &seeds, BRU_EXTRA, 6000, |input| {
+        let Ok(file) = crate::bruno::parse::parse(input) else {
+            return None;
+        };
+        let source = |path: &str| Source {
+            path: path.to_owned(),
+            file: file.clone(),
+        };
+        let collection = Collection {
+            name: "Fuzz".to_owned(),
+            settings: Some(source("collection.bru")),
+            environments: vec![("Local".to_owned(), source("environments/Local.bru"))],
+            tree: Folder {
+                folders: vec![Folder {
+                    dir: "Dossier".to_owned(),
+                    path: "Dossier".to_owned(),
+                    settings: Some(source("Dossier/folder.bru")),
+                    folders: Vec::new(),
+                    requests: vec![source("Dossier/Requête é.bru")],
+                }],
+                requests: vec![source("Requête.bru")],
+                ..Folder::default()
+            },
+            dotenv: BTreeMap::from([("X".to_owned(), "valeur".to_owned())]),
+            bru_files: 5,
+            unreadable: Vec::new(),
+        };
+        let converted = crate::bruno::convert::convert(&collection);
+        for out in &converted.files {
+            if let Err(reason) = schema::check(out.part, &out.value) {
+                return Some(format!("fichier converti non conforme : {reason}"));
+            }
+            // Ce qui sera écrit se relit à l'identique.
+            let text = match crate::opencollection::yaml::render(&out.value) {
+                Ok(text) => text,
+                Err(error) => return Some(format!("YAML impossible : {}", error.message)),
+            };
+            match crate::opencollection::yaml::parse(&text) {
+                Ok(back) if back == out.value => {}
+                Ok(_) => return Some("fichier converti relu différent de ce qui est écrit".to_owned()),
+                Err(reason) => return Some(format!("fichier converti illisible : {reason}")),
+            }
+        }
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+// --- Réponse -----------------------------------------------------------------------------------
+
+const BODY_SEEDS: &[&str] = &[
+    r#"{"items":[{"sku":"A-1","qty":2,"prix":12.5,"tags":["a","b"],"é è":null}],"total":59.8,"ok":true}"#,
+    "<?xml version=\"1.0\"?><!DOCTYPE a><a x=\"1\" y='2'><b>texte &amp; &#233; &#xE9;</b><c/><![CDATA[ <z> ]]><!-- note --></a>",
+    "<!doctype html><html><head><title>T</title><script>if (a<b) {}</script><style>p{}</style></head><body><p class=x>Bonjour <b>vous</b><br><img alt=\"l&eacute;\" src=x><ul><li>un<li>deux</ul><table><tr><td>1</table><textarea></textarea></body></html>",
+    "texte simple\nsur deux lignes",
+    "[1,2,[3,[4,[5]]],{\"a\":{\"b\":{\"c\":[]}}}]",
+];
+
+const BODY_EXTRA: &[&str] = &[
+    "<script>", "</script>", "<style>", "<!--", "-->", "<![CDATA[", "]]>", "<?", "?>", "<!", "&#",
+    "&#x", "&amp;", "&;", "<a ", "</a>", "<p>", "<li>", "<div>", "<img alt=", "='", "=\"", "/>",
+    "<title>", "<textarea>", "<svg>", "\\u00e9", "\\ud83d", "1e999", "-0", "[[[[[[[[", "{\"a\":",
+];
+
+const CONTENT_TYPES: &[&str] = &[
+    "application/json",
+    "application/xml; charset=utf-8",
+    "text/html",
+    "text/plain",
+    "application/problem+json",
+    "image/svg+xml",
+    "",
+];
+
+#[test]
+fn robustesse_reponse() {
+    use crate::response::ResponseFormat;
+    let bilan = fuzz("response::render/preview", BODY_SEEDS, BODY_EXTRA, 6000, |input| {
+        for content_type in CONTENT_TYPES {
+            let headers = vec![("Content-Type".to_owned(), (*content_type).to_owned())];
+            let _ = crate::response::detect(&headers, input);
+            let _ = crate::response::render(input, &headers, None);
+        }
+        for format in [
+            ResponseFormat::Json,
+            ResponseFormat::Xml,
+            ResponseFormat::Html,
+            ResponseFormat::Text,
+        ] {
+            let rendered = crate::response::render(input, &[], Some(format));
+            // Ce qui part vers l'interface se sérialise.
+            if serde_json::to_string(&rendered).is_err() {
+                return Some("mise en forme non sérialisable".to_owned());
+            }
+        }
+        let nodes = crate::response::preview(input);
+        if serde_json::to_string(&nodes).is_err() {
+            return Some("aperçu non sérialisable".to_owned());
+        }
+        let _ = crate::response::markup::decode_entities(input);
+        let _ = crate::response::file_name(input, ResponseFormat::Json);
+        let _ = crate::request::example::from_response("x", 200, "OK", &[], input);
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+const PATH_SEEDS: &[&str] = &[
+    "$.items[*].sku",
+    "$..qty",
+    "$.items[?(@.qty > 1 && @.sku == 'A-1')].prix",
+    "$['é è']",
+    "$.items[0:2:1]",
+    "$[?length(@.tags) > 1]",
+    "$.items[?match(@.sku, 'A-.*')]",
+];
+
+const PATH_EXTRA: &[&str] = &[
+    "[?", "@.", "..", "[*]", "(", ")", "&&", "||", "==", "!=", "<=", "'", "\"", "[-1]", "[0:",
+    "length(", "count(", "match(", "search(", "value(", "$", "[", "]", "\\u", "\\", "9999999999999999999999",
+];
+
+#[test]
+fn robustesse_filtre_jsonpath() {
+    let body = BODY_SEEDS[0];
+    let bilan = fuzz("response::filter", PATH_SEEDS, PATH_EXTRA, 6000, |input| {
+        let result = crate::response::filter(body, input);
+        // Chaque correspondance porte un chemin que la mise en forme connaît (R5).
+        let rendered = crate::response::render(body, &[], Some(crate::response::ResponseFormat::Json));
+        let known: Vec<&str> = rendered
+            .lines
+            .iter()
+            .flatten()
+            .filter_map(|token| token.path.as_deref())
+            .collect();
+        for found in &result.matches {
+            if !known.contains(&found.path.as_str()) {
+                return Some(format!("chemin {} inconnu de la mise en forme", found.path));
+            }
+            // La vérification proposée lit bien la valeur trouvée (R6).
+            if let Some(assertion) = &found.assertion {
+                let response = crate::request::assertions::ResponseData {
+                    status: 200,
+                    duration_ms: 1,
+                    headers: Vec::new(),
+                    body: body.to_owned(),
+                };
+                let results = crate::request::assertions::evaluate_all(
+                    std::slice::from_ref(assertion),
+                    &response,
+                );
+                if results.iter().any(|r| !r.passed) {
+                    return Some(format!(
+                        "la vérification tirée de {} échoue sur la réponse dont elle vient : {:?}",
+                        found.path,
+                        results[0].message
+                    ));
+                }
+            }
+        }
+        // Le filtre s'applique aussi à un corps muté.
+        let _ = crate::response::filter(input, "$..*");
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+// --- Saisie, variables, valeurs dynamiques -------------------------------------------------------
+
+const TEMPLATE_SEEDS: &[&str] = &[
+    "{{baseUrl}}/orders/:id/lines/{lineId}?x={{ x }}#f",
+    "https://api.test/{{$randomInt}}/{{$date:+3d}}/{{inconnue}}",
+    "{\"ref\": \"{{$randomUUID}}\", \"n\": {{$randomInt}}, \"t\": [{{$timestamp}}, \"{{a}}\"]}",
+    "Bearer {{token}}",
+    "{{$date:-12d}} {{$date:+9h}} {{$date:+30m}} {{$isoTimestamp}}",
+];
+
+const TEMPLATE_EXTRA: &[&str] = &[
+    "{{", "}}", "{{$", "{{$date:", "+", "d}}", "h}}", "{{ ", " }}", ":id", "{id}", "/:", "?",
+    "{{$date:+9223372036854775807d}}", "{{$date:-99999999999999d}}", "{{$date:+é}}", "{{$randomé}}",
+    "{{$date:+1é}}", "{{$date:++1d}}", "{{$date:+ d}}",
+];
+
+#[test]
+fn robustesse_variables_et_valeurs_dynamiques() {
+    use crate::request::dynamic::{Dice, draw};
+    use crate::request::model::{Auth, AuthKind, Body, BodyKind, Method, Pair, Request};
+    use crate::request::resolve::{Variables, prepare_with, variable_names};
+    let variables = Variables {
+        values: BTreeMap::from([
+            ("baseUrl".to_owned(), "https://api.test".to_owned()),
+            ("x".to_owned(), "é&=?#".to_owned()),
+            ("a".to_owned(), "{{b}}".to_owned()),
+            ("token".to_owned(), "s3cret".to_owned()),
+        ]),
+        secrets: ["token".to_owned()].into_iter().collect(),
+        environment: "Recette".to_owned(),
+    };
+    let bilan = fuzz("request::resolve + dynamic", TEMPLATE_SEEDS, TEMPLATE_EXTRA, 6000, |input| {
+        for name in variable_names(input) {
+            let _ = draw(&name, &mut Dice::seeded(7, 1_794_495_731_000));
+        }
+        let _ = crate::request::model::path_param_names(input);
+        let _ = variables.mask(input);
+        let _ = crate::input::fill(input, &variables.values);
+        for kind in [BodyKind::Json, BodyKind::Text, BodyKind::Form] {
+            let mut request = Request::new("t");
+            request.method = Method::Post;
+            request.url = input.to_owned();
+            request.params = vec![Pair::new(input, input), Pair::path("id", input)];
+            request.headers = vec![Pair::new("X-Ref", input)];
+            request.auth = Auth {
+                kind: AuthKind::Bearer,
+                token: input.to_owned(),
+                ..Auth::default()
+            };
+            request.body = if kind == BodyKind::Form {
+                Body::form(vec![Pair::new(input, input)])
+            } else {
+                Body::raw(kind, input)
+            };
+            let _ = prepare_with(&request, &variables, &mut Dice::seeded(7, 1_794_495_731_000));
+            let _ = crate::input::used_names(&request);
+            let _ = crate::input::secret::clear_secrets(&request, &[]);
+            let _ = crate::curl::command(&request, &variables);
+        }
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+}
+
+const PAIRS_SEEDS: &[&str] = &[
+    "Content-Type: application/json\n# X-Off: 1\n:authority: h\nAccept: */*",
+    "a=1\nb: 2\n#c=3\ndebug\nurl=http://x/y?z=1",
+];
+
+#[test]
+fn robustesse_listes_en_texte() {
+    use crate::input::{PairsFormat, from_text, to_text};
+    let bilan = fuzz("input::text", PAIRS_SEEDS, &[], 6000, |input| {
+        for format in [PairsFormat::Header, PairsFormat::Query] {
+            let read = from_text(input, format, &[]);
+            // Aller-retour : ce qui est lu, réécrit puis relu, ne change pas (R11, R12).
+            let text = to_text(&read.pairs, format);
+            let back = from_text(&text, format, &[]);
+            if back.pairs != read.pairs || !back.errors.is_empty() {
+                return Some(format!(
+                    "aller-retour {format:?} : {:?} réécrit {text:?} relu {:?} (erreurs {:?})",
+                    read.pairs, back.pairs, back.errors
+                ));
+            }
+        }
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+// --- Essais ------------------------------------------------------------------------------------
+
+const PATH_URL_SEEDS: &[&str] = &[
+    "/orders/42/tracking",
+    "/users/7/orders/ord_8F2kQ",
+    "/a/7c1e2b04-5d3a-4f6e-9b21-0c8d4e7a91f3/b",
+    "/",
+    "/é/123/€",
+];
+
+#[test]
+fn robustesse_chemins_generalises() {
+    use crate::contract::deduce::{Exchange, add_exchange, new_document, path_matches};
+    use crate::trial::generalize::{is_identifier, template};
+    let bilan = fuzz("trial::generalize + deduce", PATH_URL_SEEDS, &["/", "{", "}", "//", "42", "{id}"], 6000, |input| {
+        let _ = is_identifier(input);
+        if let Some(found) = template(input) {
+            // Le chemin généralisé sert le chemin d'origine.
+            if !path_matches(&found.path, input) {
+                return Some(format!("{} ne sert pas {input}", found.path));
+            }
+        }
+        if let Ok(url) = reqwest::Url::parse(&format!("https://api.test{input}")) {
+            let mut doc = new_document(&url);
+            for body in ["", "[]", "{\"a\":[{\"b\":1}]}", input] {
+                let key = add_exchange(
+                    &mut doc,
+                    &Exchange {
+                        method: "GET",
+                        url: &url,
+                        status: 200,
+                        status_text: "OK",
+                        headers: &[],
+                        body,
+                    },
+                );
+                let text = match crate::opencollection::yaml::render(&doc) {
+                    Ok(text) => text,
+                    Err(error) => return Some(format!("contrat déduit non écrit : {}", error.message)),
+                };
+                match crate::contract::parse::load(&text) {
+                    Ok(contract) if contract.operation(&key).is_some() => {}
+                    Ok(_) => return Some(format!("opération {key} absente du contrat déduit relu")),
+                    Err(reason) => return Some(format!("contrat déduit illisible : {reason}")),
+                }
+            }
+        }
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+// --- Contrats ----------------------------------------------------------------------------------
+
+const CONTRACT_SEEDS: &[&str] = &[
+    r##"openapi: 3.0.3
+info: { title: Petstore, version: 1.2.0 }
+servers:
+  - url: "{scheme}://api.exemple.fr/v1"
+    variables: { scheme: { default: https } }
+tags: [{ name: animaux }]
+paths:
+  /pets/{petId}:
+    parameters:
+      - { name: petId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      tags: [animaux]
+      summary: Lire un animal
+      security: [{ cle: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, maximum: 100 } }
+        - { $ref: "#/components/parameters/Trace" }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+        default: { $ref: "#/components/responses/Erreur" }
+    post:
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema: { type: object, properties: { nom: { type: string, minLength: 3 } } }
+      responses: { "201": { description: créé } }
+components:
+  parameters:
+    Trace: { name: X-Trace, in: header, schema: { type: string } }
+  responses:
+    Erreur: { description: erreur, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  securitySchemes:
+    cle: { type: apiKey, in: header, name: X-Key }
+  schemas:
+    Pet:
+      type: object
+      required: [id, nom]
+      properties:
+        id: { type: integer }
+        nom: { type: string }
+        parent: { $ref: "#/components/schemas/Pet" }
+        tags: { type: array, items: { type: string, enum: [a, b] } }
+        forme: { oneOf: [{ type: string }, { type: integer }] }
+        extra: { allOf: [{ $ref: "#/components/schemas/Error" }, { type: object, properties: { x: { type: number } } }] }
+    Error: { type: object, properties: { message: { type: string } }, additionalProperties: false }
+"##,
+    r##"{"swagger":"2.0","info":{"title":"S","version":"1"},"host":"h.test","basePath":"/v2","schemes":["https"],"consumes":["application/json"],"produces":["application/json"],"paths":{"/a/{id}":{"put":{"parameters":[{"name":"id","in":"path","type":"string"},{"name":"corps","in":"body","schema":{"$ref":"#/definitions/A"}},{"name":"f","in":"formData","type":"integer"}],"responses":{"200":{"description":"ok","schema":{"$ref":"#/definitions/A"}}}}}},"definitions":{"A":{"type":"object","properties":{"n":{"type":"integer"},"suite":{"$ref":"#/definitions/A"}}}},"securityDefinitions":{"b":{"type":"basic"}},"security":[{"b":[]}]}"##,
+];
+
+const CONTRACT_EXTRA: &[&str] = &[
+    "$ref: \"#/components/schemas/Pet\"", "$ref: \"#\"", "$ref: \"#/paths\"", "{ $ref: \"#/components/schemas/Error\" }",
+    "allOf:", "oneOf:", "anyOf:", "items:", "type: [string, \"null\"]", "nullable: true", "enum: []",
+    "minLength: 3", "minimum: -1", "example:", "examples:", "default:", "additionalProperties:",
+    "\"$ref\":\"#/definitions/A\"", "\"$ref\":\"#/definitions\"", "required: [", "properties:", "{}", "[]", "&a ", "*a",
+    "<<: ", "? ", "!!str ", "|\n", ">\n",
+];
+
+const RESPONSE_BODIES: &[&str] = &[
+    "",
+    "{}",
+    "[]",
+    "null",
+    r#"{"id":1,"nom":"Rex","parent":{"id":2,"nom":"Max","parent":null},"tags":["a","c"],"forme":1.5,"extra":{"message":"m","x":"y"}}"#,
+    r#"{"n":"x","suite":{"suite":{"suite":{"n":1}}}}"#,
+    "pas du json",
+];
+
+#[test]
+fn robustesse_contrats() {
+    use crate::contract::{conformance, generate, parse};
+    use crate::request::assertions::ResponseData;
+    let bilan = fuzz("contract::parse + generate + conformance", CONTRACT_SEEDS, CONTRACT_EXTRA, 4000, |input| {
+        let Ok(contract) = parse::load(input) else {
+            return None;
+        };
+        for operation in &contract.operations {
+            let _ = contract.parameters(operation);
+            let _ = contract.success_status(operation);
+            if let Ok(request) = generate::request_for(&contract, operation, "contracts/x.yaml") {
+                // Une requête créée depuis une opération doit pouvoir s'écrire (schéma strict).
+                let value = crate::opencollection::request::into_value(&request, None);
+                if let Err(reason) = crate::opencollection::schema::check(
+                    crate::opencollection::schema::Part::HttpRequest,
+                    &value,
+                ) {
+                    return Some(format!("requête créée non conforme : {reason}"));
+                }
+            }
+            for status in [200, 201, 404, 500] {
+                for body in RESPONSE_BODIES {
+                    let _ = conformance::check(
+                        &contract,
+                        &operation.key,
+                        &ResponseData {
+                            status,
+                            duration_ms: 1,
+                            headers: Vec::new(),
+                            body: (*body).to_owned(),
+                        },
+                    );
+                }
+            }
+        }
+        let links: Vec<&crate::contract::file::Linked> = Vec::new();
+        let _ = crate::contract::file::resources(&contract, &links);
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+// --- OpenCollection ----------------------------------------------------------------------------
+
+const REQUEST_SEEDS: &[&str] = &[
+    r#"info:
+  name: Créer une commande
+  type: http
+  seq: 2
+  description: { content: "Crée", type: text/markdown }
+  tags: [smoke, "contract:contracts/a.yaml#POST /orders"]
+http:
+  method: POST
+  url: "{{baseUrl}}/orders/:id?x=1"
+  params:
+    - { name: id, value: "42", type: path }
+    - { name: page, value: "1", type: query, disabled: true, description: page }
+  headers:
+    - { name: Content-Type, value: application/json }
+  body:
+    type: json
+    data: |-
+      {
+        "qty": 2
+      }
+  auth: { type: bearer, token: "{{token}}" }
+runtime:
+  variables:
+    - { name: a, value: "1" }
+  scripts:
+    - { type: before-request, code: "console.log(1)" }
+  assertions:
+    - { expression: res.status, operator: eq, value: "201" }
+    - { expression: 'res.headers["content-type"]', operator: contains, value: json, description: type }
+    - { expression: "res.body.items[0].sku", operator: isDefined, disabled: true }
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector: { expression: res.body.id, method: jsonq }
+      variable: { name: orderId, scope: runtime }
+    - type: set-variable
+      phase: before-request
+      selector: { expression: req.body.x, method: jsonq }
+      variable: { name: avant, scope: request }
+settings: { timeout: 5000, followRedirects: false, maxRedirects: 3, encodeUrl: inherit }
+docs: |-
+  # Titre
+  Texte
+examples:
+  - name: 201 Created
+    request: { url: "{{baseUrl}}/orders", method: POST }
+    response:
+      status: 201
+      statusText: Created
+      headers: [{ name: Content-Type, value: application/json }]
+      body: { type: json, data: "{\"id\": 1}" }
+"#,
+    r#"info: { name: Formulaire, type: http }
+http:
+  method: PUT
+  url: https://api.test/f
+  body:
+    - title: A
+      selected: true
+      body: { type: form-urlencoded, data: [{ name: a, value: "1" }, { name: b, value: "2", disabled: true }] }
+    - title: B
+      body: { type: form-urlencoded, data: [] }
+  auth: { type: apikey, key: X-Key, value: "{{k}}", placement: query }
+"#,
+    r#"info: { name: Autres, type: http }
+http:
+  method: GET
+  url: https://api.test/o
+  body: { type: multipart-form, data: [{ name: f, type: file, value: [a.png] }] }
+  auth: { type: digest, username: u, password: p }
+"#,
+];
+
+const REQUEST_EXTRA: &[&str] = &[
+    "disabled: true", "description: x", "{ content: c, type: text/plain }", "type: path", "type: query",
+    "operator: neq", "operator: between", "value: \"1,2\"", "value: \"1.0\"", "value: \"007\"", "value: \"'x'\"",
+    "expression: res.body", "expression: res(\"a.b\")", "expression: req.body.a", "phase: before-request",
+    "scope: collection", "selected: true", "title: A", "type: xml", "type: text", "type: sparql", "auth: inherit",
+    "seq: 1.5", "seq: 1e30", "status: 99999", "status: -1", "timeout: 1e30", "timeout: -5", "maxRedirects: 99999999999",
+    "  - ", "\n", "data: |+\n      x\n\n", "data: \"\"", "name: \"\"", "tags: []", "docs: \"\"",
+];
+
+/// Ce qui change entre deux requêtes, pour le message d'un écart.
+fn request_gap(a: &crate::request::model::Request, b: &crate::request::model::Request) -> String {
+    let a = serde_json::to_value(a).unwrap_or(Value::Null);
+    let b = serde_json::to_value(b).unwrap_or(Value::Null);
+    let mut gaps = Vec::new();
+    if let (Some(a), Some(b)) = (a.as_object(), b.as_object()) {
+        for (key, value) in a {
+            if b.get(key) != Some(value) {
+                gaps.push(format!("{key} : {value} → {}", b.get(key).unwrap_or(&Value::Null)));
+            }
+        }
+    }
+    gaps.join(" ; ")
+}
+
+/// Lire puis enregistrer sans rien modifier : le fichier reste conforme (R1), se relit en la
+/// même requête, et ce qu'Arnod ne gère pas reste (R3).
+#[test]
+fn robustesse_opencollection_aller_retour() {
+    use crate::opencollection::request::{from_value, into_value};
+    use crate::opencollection::schema::{self, Part};
+    use crate::opencollection::yaml;
+    let bilan = fuzz("opencollection aller-retour", REQUEST_SEEDS, REQUEST_EXTRA, 6000, |input| {
+        let Ok(original) = yaml::parse(input) else {
+            return None;
+        };
+        let Ok(request) = from_value(&original, "x") else {
+            return None;
+        };
+        let written = into_value(&request, Some(&original));
+        if let Err(reason) = schema::check(Part::HttpRequest, &written) {
+            return Some(format!("une requête lue ne s'enregistre plus : {reason}"));
+        }
+        let text = match yaml::render(&written) {
+            Ok(text) => text,
+            Err(error) => return Some(format!("YAML impossible : {}", error.message)),
+        };
+        let reread = match yaml::parse(&text) {
+            Ok(value) => value,
+            Err(reason) => return Some(format!("fichier écrit illisible : {reason}")),
+        };
+        if reread != written {
+            return Some("le YAML écrit ne se relit pas à l'identique".to_owned());
+        }
+        let back = match from_value(&reread, "x") {
+            Ok(back) => back,
+            Err(reason) => return Some(format!("fichier écrit refusé à la relecture : {reason}")),
+        };
+        if back != request {
+            return Some(format!("requête relue différente : {}", request_gap(&request, &back)));
+        }
+        // Ce qu'Arnod ne gère pas est conservé tel quel.
+        for pointer in ["/runtime/scripts", "/runtime/variables"] {
+            if original.pointer(pointer) != written.pointer(pointer) {
+                return Some(format!("{pointer} modifié par l'enregistrement"));
+            }
+        }
+        // Un second enregistrement ne change plus rien.
+        let again = into_value(&back, Some(&reread));
+        if again != written {
+            return Some("le second enregistrement change encore le fichier".to_owned());
+        }
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+const TEXT_SEEDS: &[&str] = &[
+    "ligne 1\nligne 2",
+    "{\n  \"a\": 1\n}\n",
+    "  indenté\n\ttabulé\n",
+    "fin avec espaces   \nsuite",
+    "# pas un commentaire\n- pas une liste\nclé: valeur",
+    "\n\ncommence par des lignes vides",
+    "finit par des lignes vides\n\n\n",
+    "retour chariot\r\nici",
+    "yes",
+    "0123",
+    "1e3",
+    "~",
+    "",
+];
+
+/// Un texte (corps, docs, script) écrit en YAML se relit à l'identique.
+#[test]
+fn robustesse_yaml_textes() {
+    use crate::opencollection::yaml;
+    let bilan = fuzz("opencollection::yaml textes", TEXT_SEEDS, &[], 8000, |input| {
+        let value = json!({ "docs": input, "liste": [input], "clé": { input: input } });
+        let text = match yaml::render(&value) {
+            Ok(text) => text,
+            Err(error) => return Some(format!("YAML impossible : {}", error.message)),
+        };
+        match yaml::parse(&text) {
+            Ok(back) if back == value => None,
+            Ok(back) => Some(format!(
+                "texte altéré par l'aller-retour YAML : relu {:?}",
+                shorten(&back["docs"].to_string())
+            )),
+            Err(reason) => Some(format!("YAML écrit illisible : {reason}")),
+        }
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+// --- Vérifications, extractions, noms ------------------------------------------------------------
+
+const TARGET_SEEDS: &[&str] = &[
+    "body.items[0].sku",
+    "headers.Content-Type",
+    "status",
+    "responseTime",
+    "body",
+    "body[0][1].a",
+    "res.body.items.length",
+    "res.headers['x-id']",
+    "res(\"a.b\")",
+    "req.body.ref",
+];
+
+#[test]
+fn robustesse_verifications_et_extractions() {
+    use crate::opencollection::request::{
+        OPERATORS, extraction_source, scalar_from, target_from, value_text,
+    };
+    use crate::request::assertions::{ResponseData, evaluate_all, propose};
+    use crate::request::extract;
+    use crate::request::model::{Assertion, Extraction, Origin};
+    let response = ResponseData {
+        status: 200,
+        duration_ms: 12,
+        headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+        body: BODY_SEEDS[0].to_owned(),
+    };
+    let bilan = fuzz("assertions + extract", TARGET_SEEDS, &["[", "]", ".", "[0]", "[-1]", "[99999999999999999999]", "body", "headers.", "res.", "''"], 6000, |input| {
+        let target = target_from(input);
+        let scalar = scalar_from(input);
+        // Une valeur attendue écrite puis relue ne change pas (R4 du format).
+        let back = scalar_from(&value_text(&scalar));
+        if back != scalar && !matches!(scalar, crate::request::model::Scalar::Float(f) if f.is_nan()) {
+            return Some(format!("valeur attendue {scalar:?} relue {back:?}"));
+        }
+        for (operator, _) in OPERATORS {
+            let assertion = Assertion {
+                id: "a".to_owned(),
+                target: target.clone(),
+                operator,
+                value: Some(scalar.clone()),
+                origin: Origin::Manual,
+                enabled: true,
+            };
+            let _ = evaluate_all(std::slice::from_ref(&assertion), &response);
+            let mutated = ResponseData {
+                body: input.to_owned(),
+                ..response.clone()
+            };
+            let _ = evaluate_all(std::slice::from_ref(&assertion), &mutated);
+            let _ = propose(&mutated);
+        }
+        let extraction = Extraction {
+            name: "v".to_owned(),
+            source: extraction_source(input),
+            enabled: true,
+        };
+        let _ = extract::apply(std::slice::from_ref(&extraction), &response, &response);
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+#[test]
+fn robustesse_noms() {
+    let seeds = &["Créer une commande", "CON", "a/b:c*d?", "  .. ", "œuf à la coque", ".caché", "nul.txt"];
+    let bilan = fuzz("noms", seeds, &[], 6000, |input| {
+        let slug = crate::tree::slug(input);
+        if slug.is_empty() || slug.contains(['/', '\\', ':', '*', '?', '"', '<', '>', '|']) || slug.starts_with('.') {
+            return Some(format!("nom de fichier inutilisable : {slug:?}"));
+        }
+        let safe = crate::contract::generate::safe_name(input, "Repli");
+        if safe.is_empty()
+            || safe.contains(['/', '\\', ':', '*', '?', '"', '<', '>', '|'])
+            || safe.ends_with('.')
+            || safe != safe.trim()
+            || safe == ".."
+            || safe == "."
+        {
+            return Some(format!("nom de dossier inutilisable : {safe:?}"));
+        }
+        let _ = crate::catalog::names::project_name(input);
+        let _ = crate::catalog::names::workspace_name(input);
+        let _ = crate::tree::item_name(input);
+        let _ = crate::tree::batch::normalize(&[input.to_owned(), format!("{input}/x")]);
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+#[test]
+fn robustesse_definitions_d_etapes() {
+    let seed = include_str!("../steps/rest.json");
+    let bilan = fuzz("steps::definition", &[seed], &["\"visibleWhen\":", "\"options\":[]", "\"key\":\"\"", "null"], 3000, |input| {
+        if let Ok(definition) = crate::steps::definition::parse(input) {
+            let _ = crate::steps::detect::detect(std::slice::from_ref(&definition), "GET https://api.test/x");
+            let _ = crate::steps::values::normalize(&definition, &BTreeMap::new());
+        }
+        None
+    });
+    assert!(bilan.paniques.is_empty());
+}
+
+// --- Mutations de structure ----------------------------------------------------------------------
+//
+// Un texte YAML muté au hasard est le plus souvent illisible : ces tests mutent la valeur lue
+// (feuilles remplacées, clés retirées, éléments répétés) pour garder des documents que le cœur
+// accepte, et aller plus loin que le parseur.
+
+/// Textes mis dans les feuilles.
+const LEAVES: &[&str] = &[
+    "",
+    " ",
+    "é",
+    "a\nb",
+    "a\nb\n",
+    "\n",
+    "  x  ",
+    "{{v}}",
+    "{{$randomInt}}",
+    "1",
+    "1.0",
+    "007",
+    "1e3",
+    "-0",
+    "true",
+    "null",
+    "~",
+    "'x'",
+    "\"x\"",
+    "a,b",
+    "[1, 2]",
+    "res.body.items.length",
+    "res.body['a b']",
+    "res.headers.X-Id",
+    "res(\"a.b\")",
+    "req.body.x",
+    "body.a",
+    "contract:contracts/a.yaml#GET /x",
+    "contract:sans-diese",
+    "#",
+    ": ",
+    "- ",
+    "𝄞",
+    "\u{feff}",
+    "99999999999999999999",
+    "a\u{0}b",
+    "a\tb",
+    "x\r\ny",
+];
+
+fn mutate_value(rng: &mut Lcg, value: &mut Value, depth: usize) {
+    match value {
+        Value::Object(map) => {
+            if map.is_empty() || depth > 12 {
+                return;
+            }
+            let keys: Vec<String> = map.keys().cloned().collect();
+            let key = keys[rng.below(keys.len())].clone();
+            match rng.below(12) {
+                0 => {
+                    map.remove(&key);
+                }
+                1 => {
+                    let other = keys[rng.below(keys.len())].clone();
+                    if let Some(copy) = map.get(&other).cloned() {
+                        map.insert(key, copy);
+                    }
+                }
+                _ => {
+                    if let Some(child) = map.get_mut(&key) {
+                        mutate_value(rng, child, depth + 1);
+                    }
+                }
+            }
+        }
+        Value::Array(items) => {
+            if items.is_empty() {
+                return;
+            }
+            let index = rng.below(items.len());
+            match rng.below(10) {
+                0 => {
+                    items.remove(index);
+                }
+                1 => {
+                    let copy = items[index].clone();
+                    items.push(copy);
+                }
+                2 => items.reverse(),
+                _ => mutate_value(rng, &mut items[index], depth + 1),
+            }
+        }
+        Value::String(text) => {
+            *text = match rng.below(4) {
+                0 => mutate(rng, text, LEAVES),
+                _ => rng.pick(LEAVES).to_owned(),
+            };
+        }
+        Value::Bool(flag) => *flag = !*flag,
+        Value::Number(_) => {
+            *value = match rng.below(5) {
+                0 => json!(0),
+                1 => json!(-1),
+                2 => json!(1.5),
+                3 => json!(65_536),
+                // Pas plus grand : `minLength: 4294967296` fige `contract::sample` (constat
+                // prouvé à part, `audit_constats::contrat_qui_fige_arnod`), et ce test avec.
+                _ => json!(300),
+            };
+        }
+        Value::Null => {}
+    }
+}
+
+/// Comme `fuzz`, sur des valeurs : `run` reçoit une valeur mutée et dit si elle a été acceptée
+/// (`Ok(true)`), refusée (`Ok(false)`), ou donne un écart.
+fn fuzz_values(
+    name: &str,
+    seeds: &[Value],
+    rounds: usize,
+    run: impl Fn(&Value) -> Result<bool, String>,
+) -> Bilan {
+    std::panic::set_hook(Box::new(|_| {}));
+    let mut rng = Lcg(0xA0D1_7000 + name.len() as u64 * 104_729);
+    let mut bilan = Bilan {
+        entrees: 0,
+        paniques: Vec::new(),
+        ecarts: Vec::new(),
+    };
+    let (mut accepted, mut panic_count, mut gap_count) = (0usize, 0usize, 0usize);
+    for round in 0..rounds {
+        let mut value = seeds[round % seeds.len()].clone();
+        if round >= seeds.len() {
+            for _ in 0..=rng.below(5) {
+                mutate_value(&mut rng, &mut value, 0);
+            }
+        }
+        bilan.entrees += 1;
+        match catch_unwind(AssertUnwindSafe(|| run(&value))) {
+            Ok(Ok(true)) => accepted += 1,
+            Ok(Ok(false)) => {}
+            Ok(Err(gap)) => {
+                accepted += 1;
+                gap_count += 1;
+                let key: String = gap.chars().take(48).collect();
+                if bilan.ecarts.len() < 12 && !bilan.ecarts.iter().any(|(_, g)| g.starts_with(&key))
+                {
+                    bilan.ecarts.push((value.to_string(), gap));
+                }
+            }
+            Err(panic) => {
+                panic_count += 1;
+                let message = panic
+                    .downcast_ref::<String>()
+                    .cloned()
+                    .or_else(|| panic.downcast_ref::<&str>().map(|s| (*s).to_owned()))
+                    .unwrap_or_default();
+                if bilan.paniques.len() < 6 && !bilan.paniques.iter().any(|(_, m)| *m == message) {
+                    bilan.paniques.push((value.to_string(), message));
+                }
+            }
+        }
+    }
+    eprintln!(
+        "[audit] {name} : {} valeurs, {accepted} acceptées, {panic_count} paniques, {gap_count} écarts",
+        bilan.entrees
+    );
+    for (input, message) in &bilan.paniques {
+        eprintln!("  PANIQUE {message}\n    valeur : {}", shorten(input));
+    }
+    for (input, gap) in &bilan.ecarts {
+        eprintln!("  ÉCART {gap}\n    valeur : {}", shorten(input));
+    }
+    bilan
+}
+
+/// Lire puis enregistrer une requête sans la modifier, sur des fichiers conformes mutés.
+#[test]
+fn robustesse_opencollection_valeurs() {
+    use crate::opencollection::request::{from_value, into_value};
+    use crate::opencollection::schema::{self, Part};
+    use crate::opencollection::yaml;
+    let seeds: Vec<Value> = REQUEST_SEEDS
+        .iter()
+        .filter_map(|text| yaml::parse(text).ok())
+        .collect();
+    assert_eq!(seeds.len(), REQUEST_SEEDS.len());
+    let bilan = fuzz_values("opencollection valeurs", &seeds, 20_000, |original| {
+        let Ok(request) = from_value(original, "x") else {
+            return Ok(false);
+        };
+        let written = into_value(&request, Some(original));
+        schema::check(Part::HttpRequest, &written)
+            .map_err(|reason| format!("une requête lue ne s'enregistre plus : {reason}"))?;
+        let text = yaml::render(&written).map_err(|e| format!("YAML impossible : {}", e.message))?;
+        let reread = yaml::parse(&text).map_err(|r| format!("fichier écrit illisible : {r}"))?;
+        if reread != written {
+            return Err("le YAML écrit ne se relit pas à l'identique".to_owned());
+        }
+        let back = from_value(&reread, "x")
+            .map_err(|reason| format!("fichier écrit refusé à la relecture : {reason}"))?;
+        if back != request {
+            return Err(format!("requête relue différente : {}", request_gap(&request, &back)));
+        }
+        for pointer in ["/runtime/scripts", "/runtime/variables", "/info/seq"] {
+            if original.pointer(pointer) != written.pointer(pointer) {
+                return Err(format!("{pointer} modifié par l'enregistrement"));
+            }
+        }
+        // Un corps ou une authentification qu'Arnod ne gère pas reste tel quel.
+        if request.body.kind == crate::request::model::BodyKind::Other
+            && original.pointer("/http/body") != written.pointer("/http/body")
+        {
+            return Err("corps non géré modifié par l'enregistrement".to_owned());
+        }
+        if request.auth.kind == crate::request::model::AuthKind::Other
+            && original.pointer("/http/auth") != written.pointer("/http/auth")
+        {
+            return Err("authentification non gérée modifiée par l'enregistrement".to_owned());
+        }
+        // La partie `request` d'un exemple n'est pas gérée : elle reste.
+        let requests = |value: &Value| -> Vec<Value> {
+            value
+                .get("examples")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|e| e.get("request").cloned())
+                .collect()
+        };
+        if requests(original) != requests(&written) {
+            return Err("partie « request » d'un exemple perdue ou déplacée".to_owned());
+        }
+        // Actions qu'Arnod ne gère pas : conservées.
+        let others = |value: &Value| -> Vec<Value> {
+            value
+                .pointer("/runtime/actions")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|a| a.get("phase").and_then(Value::as_str) == Some("before-request"))
+                .cloned()
+                .collect()
+        };
+        if others(original) != others(&written) {
+            return Err("action « before-request » modifiée par l'enregistrement".to_owned());
+        }
+        let again = into_value(&back, Some(&reread));
+        if again != written {
+            return Err("le second enregistrement change encore le fichier".to_owned());
+        }
+        Ok(true)
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}
+
+/// Contrats mutés : lecture, requêtes créées, exemples et conformité, sans panique ni boucle.
+#[test]
+fn robustesse_contrats_valeurs() {
+    use crate::contract::{conformance, generate, parse};
+    use crate::request::assertions::ResponseData;
+    let seeds: Vec<Value> = CONTRACT_SEEDS
+        .iter()
+        .filter_map(|text| parse::load(text).ok().map(|c| c.doc))
+        .collect();
+    assert_eq!(seeds.len(), CONTRACT_SEEDS.len());
+    let bilan = fuzz_values("contrats valeurs", &seeds, 12_000, |doc| {
+        let text = doc.to_string();
+        let Ok(contract) = parse::load(&text) else {
+            return Ok(false);
+        };
+        for operation in &contract.operations {
+            let _ = contract.parameters(operation);
+            if let Ok(request) = generate::request_for(&contract, operation, "contracts/x.yaml") {
+                let value = crate::opencollection::request::into_value(&request, None);
+                crate::opencollection::schema::check(
+                    crate::opencollection::schema::Part::HttpRequest,
+                    &value,
+                )
+                .map_err(|reason| format!("requête créée non conforme : {reason}"))?;
+                // Chaque réponse attendue créée depuis le contrat lui est conforme.
+                for example in &request.examples {
+                    let Some(status) = example.status else { continue };
+                    if example.body.is_empty() {
+                        continue;
+                    }
+                    let _ = conformance::check(
+                        &contract,
+                        &operation.key,
+                        &ResponseData {
+                            status,
+                            duration_ms: 1,
+                            headers: Vec::new(),
+                            body: example.body.clone(),
+                        },
+                    );
+                }
+            }
+            for body in RESPONSE_BODIES {
+                let _ = conformance::check(
+                    &contract,
+                    &operation.key,
+                    &ResponseData {
+                        status: 200,
+                        duration_ms: 1,
+                        headers: Vec::new(),
+                        body: (*body).to_owned(),
+                    },
+                );
+            }
+        }
+        Ok(true)
+    });
+    assert!(bilan.paniques.is_empty());
+    assert!(bilan.ecarts.is_empty());
+}

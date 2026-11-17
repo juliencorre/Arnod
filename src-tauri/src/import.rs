@@ -33,6 +33,8 @@ const REPORT_FILE: &str = "import.json";
 
 /// Format reconnu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ImportFormat"))]
 #[serde(rename_all = "camelCase")]
 pub enum SourceFormat {
     /// Collection Bruno en fichiers `.bru`.
@@ -45,6 +47,7 @@ pub enum SourceFormat {
 
 /// Ce que l'import a reconnu, avant toute écriture (R2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ImportSource {
     /// Dossier (ou fichier, pour un contrat) à importer.
@@ -61,6 +64,7 @@ pub struct ImportSource {
 
 /// Où va l'import.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
@@ -78,6 +82,7 @@ pub enum ImportTarget {
 
 /// Rapport d'import (2.3-f).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ImportReport {
     pub collection: String,
@@ -99,6 +104,7 @@ pub struct ImportReport {
 
 /// Réponse de `import_run`.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ImportDone {
     pub project_id: Uuid,

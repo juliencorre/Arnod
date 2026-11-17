@@ -512,3 +512,110 @@ fn unions_miroirs_cote_typescript() {
     .collect();
     assert_eq!(kinds, union_members("TokenKind"));
 }
+
+// --- Plan qualité, lot A : entrées qui ne doivent jamais arrêter Arnod (R2) --------------------
+
+/// PU1 : une expression JSONPath en cours de frappe, coupée dans un échappement `\u`, est une
+/// erreur expliquée, pas une panique (qui ferme Arnod en release).
+#[test]
+fn pu1_filtre_jsonpath_echappement_incomplet() {
+    let body = r#"{"a": 1, "é": 2, "😀": 3}"#;
+    for expression in [
+        "$['\\u",
+        "$[\"\\u",
+        "$[?@.a=='\\u",
+        "$['\\u00",
+        "$['\\uD83D\\u",
+    ] {
+        let result = filter(body, expression);
+        assert!(result.error.is_some(), "{expression:?} : {result:?}");
+        assert!(result.matches.is_empty());
+    }
+    // Chaque préfixe d'expressions faites d'échappements : aucune panique.
+    for complete in [
+        "$['\\u00e9']",
+        "$[\"\\uD83D\\uDE00\"]",
+        "$[?@['\\u00e9']==2]",
+    ] {
+        let mut end = 0;
+        while end <= complete.len() {
+            if complete.is_char_boundary(end) {
+                let _ = filter(body, &complete[..end]);
+            }
+            end += 1;
+        }
+    }
+    // L'échappement complet trouve son membre ; un backslash échappé n'est pas un échappement.
+    assert_eq!(filter(body, "$['\\u00e9']").total, 1);
+    assert_eq!(filter(body, "$['\\uD83D\\uDE00']").total, 1);
+    assert!(filter(body, "$['\\\\u']").error.is_none());
+}
+
+/// PU2 : un corps HTML de 1 Mo fait de balises jamais fermées donne un aperçu borné en profondeur
+/// et en nœuds, qui se sérialise et se libère sur une pile de 1 Mo (fil principal sous Windows).
+#[test]
+fn pu2_apercu_html_imbrication_profonde() {
+    fn deepest(nodes: &[HtmlNode]) -> usize {
+        nodes
+            .iter()
+            .map(|node| match node {
+                HtmlNode::Text { .. } => 0,
+                HtmlNode::Element { children, .. } => 1 + deepest(children),
+            })
+            .max()
+            .unwrap_or(0)
+    }
+    let handle = std::thread::Builder::new()
+        .stack_size(1024 * 1024)
+        .spawn(|| {
+            let body = "<div>".repeat(200_000);
+            let nodes = preview(&body);
+            let depth = deepest(&nodes);
+            let size = serde_json::to_string(&nodes).map(|text| text.len());
+            drop(nodes);
+            (depth, size.is_ok())
+        })
+        .expect("fil de test");
+    let (depth, serialized) = handle.join().expect("aperçu sans débordement de pile");
+    assert!(depth <= preview::MAX_DEPTH, "profondeur {depth}");
+    assert!(serialized);
+    // Une balise ouverte compte comme un nœud : la limite tient sans fermeture.
+    let nodes = preview(&"<p>x".repeat(10 * preview::MAX_NODES));
+    let text = serde_json::to_string(&nodes).expect("aperçu sérialisé");
+    assert!(text.contains("aperçu limité au début du document"));
+    // Balises jamais fermées puis fermetures sans correspondance : linéaire, en un instant.
+    let started = std::time::Instant::now();
+    let body = format!("{}{}", "<span>".repeat(100_000), "</b>".repeat(100_000));
+    let nodes = preview(&body);
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(5),
+        "{:?}",
+        started.elapsed()
+    );
+    assert!(serde_json::to_string(&nodes).is_ok_and(|t| t.contains("aperçu limité")));
+}
+
+/// PU3 : des balises jamais fermées (`<li>` du HTML courant) ne coûtent plus le carré de leur
+/// nombre : l'indentation est bornée.
+#[test]
+fn pu3_mise_en_forme_html_indentation_bornee() {
+    let size = |items: usize| -> (usize, usize) {
+        let body = "<li>x".repeat(items);
+        let rendered = render(&body, &[], Some(ResponseFormat::Html));
+        let bytes: usize = rendered
+            .lines
+            .iter()
+            .flatten()
+            .map(|token| token.text.len())
+            .sum();
+        (body.len(), bytes)
+    };
+    let (body, bytes) = size(4000);
+    assert!(
+        bytes < body * 50,
+        "{body} octets de corps, {bytes} octets de jetons"
+    );
+    // Linéaire : quatre fois plus de balises, au plus quatre fois et demie plus de jetons.
+    let (_, small) = size(1000);
+    assert!(bytes <= small * 9 / 2, "1000 : {small} ; 4000 : {bytes}");
+}

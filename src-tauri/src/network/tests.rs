@@ -322,6 +322,27 @@ async fn r6_delai_depasse_la_requete_a_pu_arriver() {
     assert!(!failure.not_sent);
 }
 
+/// ES7 : un délai dépassé sur une adresse qui contient « 407 » reste un délai dépassé ; la
+/// requête est partie et a pu être traitée.
+#[tokio::test]
+async fn es7_delai_depasse_sur_une_adresse_contenant_407() {
+    let server = MockServer::start().await;
+    Mock::given(path("/commandes/407/paiement"))
+        .respond_with(ResponseTemplate::new(201).set_delay(Duration::from_secs(5)))
+        .mount(&server)
+        .await;
+    let mut p = prepared(format!("{}/commandes/407/paiement", server.uri()));
+    p.timeout_ms = Some(1_000);
+    let error = network()
+        .send(&mut p, None, &Cancel::new())
+        .await
+        .unwrap_err();
+    assert_eq!(error.kind, CommandErrorKind::Timeout, "{error:?}");
+    let failure = error.failure.unwrap();
+    assert_eq!(failure.cause, FailureCause::Timeout);
+    assert!(!failure.not_sent);
+}
+
 #[test]
 fn r1_preferences_ecrites_et_relues() {
     let dir = tempfile::tempdir().unwrap();

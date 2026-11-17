@@ -1,0 +1,375 @@
+/**
+ * Point d'entrée des mesures de performance de l'interface : monte l'application réelle sur le
+ * faux cœur gonflé par `donnees.ts` (`?scenario=…&taille=…`) et expose `window.__perf`, que pilote
+ * `scripts/perf-interface.mjs` (Playwright). Rien n'est mesuré ici tout seul : la page fournit les
+ * relevés (événements d'entrée jusqu'à l'image suivante, tâches longues, images longues, rendus
+ * de composants) et de quoi émettre les événements du cœur.
+ */
+import { createPinia } from "pinia";
+import { createApp, nextTick } from "vue";
+
+import App from "@/App.vue";
+import "@/styles.css";
+import { useContractsStore } from "@/stores/contracts";
+import { useResponseStore } from "@/stores/response";
+import { useSidebarStore } from "@/stores/sidebar";
+import { useWindowsStore } from "@/stores/windows";
+import { useWorkbenchStore } from "@/stores/workbench";
+import type { RunView } from "@/types/ipc";
+
+import { groupsOf, testsOf } from "../fakeWorkbench";
+import { snapshotOf } from "../fakeWindows";
+import {
+  DOSSIER_200,
+  GROSSE,
+  PROJET,
+  REPONSE,
+  preparer,
+  run as runInitial,
+  statutsChanges,
+  terminer,
+} from "./donnees";
+
+const options = new URLSearchParams(location.search);
+const scenario = options.get("scenario") ?? "barre";
+const taille = Number(options.get("taille") ?? "500");
+
+const t0Page = performance.now();
+const { core, compteur, projet } = preparer(scenario, taille, options);
+const tPrepare = performance.now() - t0Page;
+
+// --- Observateurs ---------------------------------------------------------------------
+
+interface Longue {
+  debut: number;
+  duree: number;
+  bloquant?: number;
+}
+const longues: Longue[] = [];
+const images: Longue[] = [];
+try {
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries()) longues.push({ debut: e.startTime, duree: e.duration });
+  }).observe({ type: "longtask", buffered: true });
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries()) {
+      const loaf = e as PerformanceEntry & { blockingDuration?: number };
+      images.push({ debut: e.startTime, duree: e.duration, bloquant: loaf.blockingDuration ?? 0 });
+    }
+  }).observe({ type: "long-animation-frame", buffered: true });
+} catch {
+  // Navigateur sans ces entrées (WebKit) : les relevés restent vides.
+}
+
+/** Prochaine image peinte : `requestAnimationFrame`, puis une tâche (après style, mise en page, peinture). */
+function image(): Promise<number> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      const canal = new MessageChannel();
+      canal.port1.onmessage = () => {
+        resolve(performance.now());
+      };
+      canal.port2.postMessage(0);
+    });
+  });
+}
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Attend que `fini` soit vrai, image après image ; renvoie l'heure de l'image qui le montre. */
+async function attendre(fini: () => boolean, delai = 120000): Promise<number> {
+  const limite = performance.now() + delai;
+  for (;;) {
+    await nextTick();
+    if (fini()) return image();
+    if (performance.now() > limite) throw new Error("attente dépassée");
+    await image();
+  }
+}
+
+// --- Entrées réelles (Playwright) : de l'événement à l'image suivante -------------------
+
+interface Entree {
+  type: string;
+  /** Début du traitement de l'événement. */
+  debut: number;
+  /** Attente dans la file avant le traitement (événement matériel → gestionnaire). */
+  file: number;
+  /** Fin du calcul (gestionnaires et rendu de Vue). */
+  calcul: number;
+  /** Image suivante peinte. */
+  image: number;
+  faux: number;
+}
+let entrees: Entree[] = [];
+const suivis = new Set<string>();
+
+function suivre(type: string): void {
+  if (suivis.has(type)) return;
+  suivis.add(type);
+  window.addEventListener(
+    type,
+    (event) => {
+      const debut = performance.now();
+      const entree: Entree = {
+        type,
+        debut,
+        file: debut - event.timeStamp,
+        calcul: 0,
+        image: 0,
+        faux: compteur.faux,
+      };
+      entrees.push(entree);
+      // Après les gestionnaires de l'application et le rendu de Vue.
+      setTimeout(() => {
+        void nextTick(() => {
+          if (entree.calcul === 0) entree.calcul = performance.now() - debut;
+        });
+      }, 0);
+      void image().then((fin) => {
+        entree.image = fin - debut;
+        entree.faux = compteur.faux - entree.faux;
+        if (entree.calcul === 0 || entree.calcul > entree.image) entree.calcul = entree.image;
+      });
+    },
+    true,
+  );
+}
+
+// --- Rendus de composants (seulement avec ?compte) ---------------------------------------
+
+const rendus: Record<string, number> = {};
+const montes: Record<string, number> = {};
+
+const pinia = createPinia();
+const app = createApp(App).use(pinia);
+if (options.has("compte")) {
+  app.mixin({
+    mounted() {
+      const nom = (this.$options as { __name?: string }).__name ?? "?";
+      montes[nom] = (montes[nom] ?? 0) + 1;
+    },
+    updated() {
+      const nom = (this.$options as { __name?: string }).__name ?? "?";
+      rendus[nom] = (rendus[nom] ?? 0) + 1;
+    },
+  });
+}
+performance.mark("perf:montage");
+app.mount("#app");
+
+const workbench = useWorkbenchStore(pinia);
+const windows = useWindowsStore(pinia);
+const contracts = useContractsStore(pinia);
+const response = useResponseStore(pinia);
+const sidebar = useSidebarStore(pinia);
+
+/** Mesure une action faite dans la page (événement du cœur, appel de store). */
+async function chrono(
+  action: () => unknown,
+  fini?: () => boolean,
+): Promise<{ calcul: number; image: number; faux: number; parse: number }> {
+  await image();
+  const faux = compteur.faux;
+  const parse = compteur.parse;
+  const debut = performance.now();
+  await action();
+  await nextTick();
+  if (fini) {
+    while (!fini()) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await nextTick();
+    }
+  }
+  // Mise en page forcée : le calcul compte le style et la mise en page, pas l'attente de l'image.
+  void document.documentElement.offsetHeight;
+  const calcul = performance.now() - debut;
+  const fin = await image();
+  return {
+    calcul,
+    image: fin - debut,
+    faux: compteur.faux - faux,
+    parse: compteur.parse - parse,
+  };
+}
+
+// --- Run : flot d'événements ---------------------------------------------------------------
+
+let runCourant: RunView | null = null;
+
+function copie<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+let numeroRun = 0;
+
+/** Prépare un run dont toutes les lignes sont en attente (ou finies) ; non mesuré. */
+function preparerRun(fini: boolean): number {
+  runCourant = runInitial(core, fini);
+  runCourant.id = `run-perf-${String(++numeroRun)}`;
+  core.workbench.lastRun = runCourant;
+  return runCourant.items.length;
+}
+
+/** Diffuse le run préparé et ouvre son onglet. */
+async function ouvrirRun(): Promise<void> {
+  if (!runCourant) throw new Error("aucun run");
+  await core.emit("arnod://run", { projectId: PROJET, run: copie(runCourant), origin: "" });
+  await windows.openSelection({ kind: "run", projectId: PROJET });
+}
+
+interface Flot {
+  evenements: number;
+  /** Temps de traitement par événement (gestionnaire et rendu de Vue), en ms. */
+  traitement: number[];
+  /** Copie JSON de l'état du run, ce que coûte sa désérialisation. */
+  copies: number;
+  total: number;
+  statuts: number;
+}
+
+/**
+ * Flot `arnod://run` : une révision par ligne terminée, chacune portant tout l'état du run.
+ * `rythme` (ms) : attente entre deux événements ; 0 : l'un après l'autre, sans rendre la main à
+ * l'affichage. `statuts` : le cœur diffuse aussi `arnod://statuts` à chaque ligne terminée.
+ */
+async function flot(
+  rythme: number,
+  statuts: boolean,
+  pas = 1,
+  limite = Infinity,
+): Promise<Flot> {
+  const view = runCourant;
+  if (!view) throw new Error("aucun run");
+  const traitement: number[] = [];
+  let copies = 0;
+  let tempsStatuts = 0;
+  const etats = statuts ? copie(core.workbench.statuses) : null;
+  const debut = performance.now();
+  const nombre = Math.min(view.items.length, limite);
+  for (let i = 0; i < nombre; i++) {
+    const item = view.items[i];
+    if (!item) continue;
+    terminer(item, i);
+    view.revision += 1;
+    if (i === view.items.length - 1) {
+      view.finished = true;
+      view.finishedAt = view.startedAt + 41000;
+    }
+    if (i % pas !== 0 && i !== nombre - 1) continue;
+    view.groups = groupsOf("", view.items);
+    view.tests = testsOf(view.items);
+    const t0 = performance.now();
+    const charge = { projectId: PROJET, run: copie(view), origin: "" };
+    const t1 = performance.now();
+    copies += t1 - t0;
+    await core.emit("arnod://run", charge);
+    await nextTick();
+    void document.documentElement.offsetHeight;
+    traitement.push(performance.now() - t1);
+    if (etats) {
+      etats[item.path] = { passed: item.status === "passed", at: Date.now() };
+      const chargeStatuts = { projectId: PROJET, statuses: copie(etats) };
+      const t2 = performance.now();
+      await core.emit("arnod://statuts", chargeStatuts);
+      await nextTick();
+      void document.documentElement.offsetHeight;
+      tempsStatuts += performance.now() - t2;
+    }
+    if (rythme > 0) await pause(rythme);
+    else if (rythme < 0) await image();
+  }
+  return {
+    evenements: traitement.length,
+    traitement,
+    copies,
+    total: performance.now() - debut,
+    statuts: tempsStatuts,
+  };
+}
+
+// --- Images par seconde pendant un geste -------------------------------------------------
+
+let cadence: { marche: boolean; instants: number[] } | null = null;
+
+function debutCadence(): void {
+  const etat = { marche: true, instants: [] as number[] };
+  cadence = etat;
+  const tic = (t: number): void => {
+    if (!etat.marche) return;
+    etat.instants.push(t);
+    requestAnimationFrame(tic);
+  };
+  requestAnimationFrame(tic);
+}
+
+function finCadence(): { images: number; duree: number; ips: number; pire: number; plus33: number } {
+  const etat = cadence;
+  cadence = null;
+  if (!etat || etat.instants.length < 2) return { images: 0, duree: 0, ips: 0, pire: 0, plus33: 0 };
+  etat.marche = false;
+  const ecarts = etat.instants.slice(1).map((t, i) => t - (etat.instants[i] ?? t));
+  const duree = (etat.instants.at(-1) ?? 0) - (etat.instants[0] ?? 0);
+  return {
+    images: ecarts.length,
+    duree,
+    ips: (ecarts.length / duree) * 1000,
+    pire: Math.max(...ecarts),
+    plus33: ecarts.filter((e) => e > 33.4).length,
+  };
+}
+
+const perf = {
+  scenario,
+  taille,
+  projet,
+  PROJET,
+  DOSSIER_200,
+  GROSSE,
+  REPONSE,
+  core,
+  compteur,
+  tPrepare,
+  workbench,
+  windows,
+  contracts,
+  response,
+  sidebar,
+  nextTick,
+  image,
+  pause,
+  attendre,
+  chrono,
+  suivre,
+  /** Rend et vide le relevé des entrées, des tâches longues et des images longues. */
+  releve(): { entrees: Entree[]; longues: Longue[]; images: Longue[] } {
+    const rendu = { entrees, longues: [...longues], images: [...images] };
+    entrees = [];
+    longues.length = 0;
+    images.length = 0;
+    return rendu;
+  },
+  rendus,
+  montes,
+  razRendus(): void {
+    for (const nom of Object.keys(rendus)) rendus[nom] = 0;
+  },
+  noeuds: (): number => document.querySelectorAll("*").length,
+  /** Événement du cœur, comme reçu d'une autre fenêtre. */
+  emettre: (event: string, payload: unknown) => core.emit(event, payload),
+  statutsChanges: (nombre: number, tour: number) => statutsChanges(core, nombre, tour),
+  fenetres: () => snapshotOf(core.windows),
+  preparerRun,
+  ouvrirRun,
+  flot,
+  debutCadence,
+  finCadence,
+  copie,
+};
+
+(window as unknown as { __perf: typeof perf }).__perf = perf;
+export type Perf = typeof perf;
+
+void nextTick(() => {
+  document.documentElement.setAttribute("data-perf", "pret");
+});

@@ -34,7 +34,7 @@ const heading = computed(() => {
       ?.replace(/\.yml$/, "") ?? current.path;
   const project = catalog.projectById(current.projectId)?.name ?? "projet";
   return {
-    method: draft?.method ?? (node?.kind === "request" ? node.method : "GET"),
+    method: draft?.method ?? (node?.kind === "request" ? node.method : null) ?? "GET",
     name: draft?.name ?? node?.name ?? fallback,
     where: [project, ...current.path.split("/").slice(0, -1)].join(" › "),
   };

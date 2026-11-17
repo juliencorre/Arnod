@@ -522,6 +522,8 @@ export function handleWindows(
     case "window_reattach_all":
       for (const w of fw.windows.filter((x) => x.kind !== "main")) reattach(fw, w.label);
       return done();
+    case "window_quit_ready":
+      return null;
     default:
       return undefined;
   }

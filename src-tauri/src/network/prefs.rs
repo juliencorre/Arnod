@@ -21,6 +21,7 @@ pub const PROXY_SECRET_KEY: &str = "arnod/preferences/proxy";
 
 /// Proxy saisi à la main.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ManualProxy {
     /// Adresse, `hôte:port` ou `http://hôte:port`.
@@ -36,6 +37,7 @@ pub struct ManualProxy {
 
 /// Réglage du proxy.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ProxyPrefs {
     #[serde(default)]
@@ -46,6 +48,7 @@ pub struct ProxyPrefs {
 
 /// Autorité interne ajoutée (R4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct StoredAuthority {
     pub pem: String,
@@ -56,6 +59,7 @@ pub struct StoredAuthority {
 
 /// Contenu de `network.json`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkPrefs {
     #[serde(default = "format")]

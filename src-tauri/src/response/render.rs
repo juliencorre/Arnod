@@ -16,6 +16,7 @@ const INLINE_WIDTH: usize = 72;
 
 /// Nature d'un jeton, pour sa couleur.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum TokenKind {
     /// Nom de membre JSON.
@@ -39,6 +40,8 @@ pub enum TokenKind {
 
 /// Morceau de ligne.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "BodyToken"))]
 #[serde(rename_all = "camelCase")]
 pub struct Token {
     pub text: String,
@@ -46,11 +49,13 @@ pub struct Token {
     /// Chemin canonique de la valeur JSON (valeur simple, ou accolade et crochet d'un objet ou
     /// d'un tableau).
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub path: Option<String>,
 }
 
 /// Corps mis en forme.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RenderedBody {
     /// Format appliqué : celui choisi, sinon celui détecté.
@@ -261,11 +266,16 @@ fn json_lines(value: &Value) -> Vec<Vec<Token>> {
 /// Texte entre deux balises gardé sur la ligne de sa balise.
 const INLINE_TEXT: usize = 80;
 
+/// Indentation maximale d'une ligne XML ou HTML (PU3) : des balises jamais fermées (`<li>`,
+/// `<p>`, `<td>` du HTML courant) feraient croître chaque ligne avec leur nombre, et le tout avec
+/// son carré. Au-delà, les lignes restent à cette profondeur.
+const MAX_INDENT: usize = 32;
+
 fn indent(depth: usize) -> Vec<Token> {
     if depth == 0 {
         Vec::new()
     } else {
-        vec![token("  ".repeat(depth), TokenKind::Text)]
+        vec![token("  ".repeat(depth.min(MAX_INDENT)), TokenKind::Text)]
     }
 }
 

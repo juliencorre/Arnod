@@ -97,6 +97,14 @@ def gpill(aligner: str) -> str:
     return f'<span data-arnod="ecart" style="{PILL};{GAP}">Écart · {esc(ALIGN[aligner])}</span>'
 
 
+def gaps_of(e: dict) -> list:
+    """Écarts d'un écran : un seul (`ecart: {…}`) ou une liste (`ecart: [{…}, …]`)."""
+    g = e.get("ecart")
+    if not g:
+        return []
+    return list(g) if isinstance(g, list) else [g]
+
+
 def fr_date(d: str) -> str:
     parts = str(d).split("-")
     if len(parts) == 3:
@@ -164,7 +172,7 @@ def fiche(code: str, page) -> str:
         cell("PAGES LIÉES", esc(liees)),
         cell("QUESTIONS OUVERTES", q_html, last=True),
     ]
-    gaps = [(k, e["ecart"]) for k, e in (page.get("ecrans") or {}).items() if e.get("ecart")]
+    gaps = [(k, g) for k, e in (page.get("ecrans") or {}).items() for g in gaps_of(e)]
     gap_html = ""
     if gaps:
         items = "".join(
@@ -210,12 +218,11 @@ def screen(block: str, code: str, letter: str, e: dict) -> str:
     pm = PILL_RUN.match(rest)
     if pm:
         rest = rest[pm.end():]
-    pills = pill(e["etat"]) + (vpill(e["version"]) if e.get("version") else "") + (gpill(e["ecart"]["aligner"]) if e.get("ecart") else "")
+    pills = pill(e["etat"]) + (vpill(e["version"]) if e.get("version") else "") + "".join(gpill(g["aligner"]) for g in gaps_of(e))
     block = block[:m.start()] + m.group(1) + f"{code}-{letter}" + m.group(3) + pills + rest
     # Texte de l'écart sous le libellé, captures réelles sous la carte.
     olabel_end = block.index("</div>", block.index('<div class="dv-olabel"')) + len("</div>")
-    if e.get("ecart"):
-        g = e["ecart"]
+    for g in reversed(gaps_of(e)):
         note = (f'<div data-arnod="ecart-texte" style="max-width:1280px;font-size:12.5px;line-height:1.45;color:#4a3a5c;'
                 f'background:#f7f2fb;border:1px solid #e4d6f0;border-radius:6px;padding:6px 10px">'
                 f'<b style="font-weight:600;color:#6b3d8f">Écart · {esc(ALIGN[g["aligner"]])} :</b> {esc(g["texte"])}</div>')
@@ -267,7 +274,7 @@ def index_option() -> str:
                         f'font-weight:600;color:#1d1b18;border-bottom:1px solid #e2ddd4">{g} · {GROUPS[g]}</th></tr>')
         state = page_state(page)
         total[state] = total.get(state, 0) + 1
-        gaps = [e["ecart"]["aligner"] for e in (page.get("ecrans") or {}).values() if e.get("ecart")]
+        gaps = [g["aligner"] for e in (page.get("ecrans") or {}).values() for g in gaps_of(e)]
         gaps_total += len(gaps)
         gap_cell = "".join(gpill(a) for a in gaps) if gaps else "—"
         rows.append(

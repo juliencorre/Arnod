@@ -14,6 +14,8 @@ const UNRESERVED: &AsciiSet = &NON_ALPHANUMERIC
 
 /// Option de la commande sans équivalent dans Arnod, signalée (R6).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "CurlIgnored"))]
 #[serde(rename_all = "camelCase")]
 pub struct Ignored {
     /// Option telle qu'écrite (`--compressed`, `-k`).
@@ -38,6 +40,8 @@ pub struct CurlRequest {
 
 /// Valeur d'un en-tête collé qui ne doit pas rester dans le texte (R5).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "CurlSecret"))]
 #[serde(rename_all = "camelCase")]
 pub struct Secret {
     /// Nom de la variable locale qui la remplace (`token`).

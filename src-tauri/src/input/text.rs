@@ -8,6 +8,7 @@ use crate::request::model::{Pair, ParamKind};
 
 /// Écriture des lignes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum PairsFormat {
     /// `Nom: valeur`.
@@ -18,6 +19,7 @@ pub enum PairsFormat {
 
 /// Ligne qui ne se lit pas.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TextError {
     /// Numéro de la ligne, à partir de 1.
@@ -27,6 +29,7 @@ pub struct TextError {
 
 /// Paires lues d'un texte, et les lignes illisibles.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct PairsText {
     pub pairs: Vec<Pair>,

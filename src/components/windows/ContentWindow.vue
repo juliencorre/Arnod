@@ -8,6 +8,7 @@ import { computed, watch } from "vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import ConfirmProtectedDialog from "@/components/workbench/ConfirmProtectedDialog.vue";
 import ZoneArea from "@/components/zones/ZoneArea.vue";
+import { useDrafts } from "@/composables/useDrafts";
 import { ipc } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
 import { contractKey, useContractsStore } from "@/stores/contracts";
@@ -16,6 +17,7 @@ import { findRequest, requestKey, useWorkbenchStore } from "@/stores/workbench";
 
 const catalog = useCatalogStore();
 const windows = useWindowsStore();
+const drafts = useDrafts();
 const workbench = useWorkbenchStore();
 const contracts = useContractsStore();
 
@@ -84,7 +86,7 @@ watch(
       >
         {{ follow ? "⇆ Suit la sélection" : "Épinglée" }}
       </button>
-      <BaseButton @click="windows.reattach()">Rattacher</BaseButton>
+      <BaseButton @click="drafts.reattach()">Rattacher</BaseButton>
     </header>
     <main class="content-window__main">
       <ZoneArea />

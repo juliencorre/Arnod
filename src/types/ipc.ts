@@ -160,7 +160,8 @@ export type CommandName =
   | "run_selection"
   | "updates_download"
   | "updates_cancel"
-  | "updates_install";
+  | "updates_install"
+  | "window_quit_ready";
 
 /**
  * Nature d'une erreur de commande.
@@ -334,7 +335,8 @@ export type TreeNode =
       kind: "request";
       name: string;
       path: string;
-      method: HttpMethod;
+      /** `null` : fichier illisible (`invalid`). */
+      method: HttpMethod | null;
       assertionCount: number;
       invalid: boolean;
       /** Contrat lié (`contracts/petstore.yaml`), d'après l'étiquette `contract:`. */
@@ -623,7 +625,7 @@ export type EnvironmentColor = "gray" | "blue" | "green" | "orange" | "red" | "p
 export interface EnvironmentDoc {
   name: string;
   color: string;
-  protected?: boolean;
+  protected: boolean;
   variables: EnvVariable[];
   locals: string[];
 }
@@ -895,6 +897,10 @@ export interface ProjectChange {
   path: string | null;
   /** Fenêtre à l'origine du changement, qui l'a déjà appliqué. */
   origin: string;
+  /** Requêtes ou dossiers renommés ou déplacés : les éditeurs suivent (plan qualité, IN5). */
+  renamed: RenamedFile[];
+  /** Requêtes ou dossiers retirés (corbeille, autre projet) : leurs éditeurs sont oubliés. */
+  removed: string[];
 }
 
 // --- Contrats de services (docs/plan-contrats-services.md) ---

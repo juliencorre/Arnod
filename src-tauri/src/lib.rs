@@ -16,6 +16,7 @@ pub mod error;
 pub mod http;
 pub mod import;
 pub mod input;
+pub mod instance;
 pub mod layout;
 pub mod local;
 pub mod manifest;
@@ -23,6 +24,7 @@ pub mod manifest;
 mod menu;
 pub mod network;
 pub mod opencollection;
+pub mod quit;
 pub mod request;
 pub mod response;
 pub mod results;
@@ -36,6 +38,8 @@ pub mod tree;
 pub mod trial;
 #[cfg(test)]
 mod ts_contract;
+#[cfg(test)]
+mod ts_mirror;
 pub mod updates;
 pub mod watch;
 pub mod windows;
@@ -44,6 +48,7 @@ pub mod workbench;
 use std::sync::{Arc, Mutex};
 
 use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use crate::results::ResultBook;
 use crate::secrets::SystemSecretStore;
@@ -66,6 +71,32 @@ pub fn run() {
         .on_menu_event(menu::handle_event)
         .setup(|app| {
             let data_dir = app.path().app_local_data_dir()?;
+            // Plan qualité, ES8 : une seule instance par poste. La seconde ne charge rien, le
+            // dit et s'arrête.
+            match instance::acquire(&data_dir, instance::WAIT) {
+                instance::Acquired::Alone(lock) => {
+                    app.manage(lock);
+                }
+                instance::Acquired::AlreadyRunning => {
+                    // La fenêtre de la configuration existe déjà, cachée : elle part avant que
+                    // l'interface ne démarre (elle appellerait des commandes sans état).
+                    for window in app.webview_windows().into_values() {
+                        let _ = window.destroy();
+                    }
+                    let handle = app.handle().clone();
+                    std::thread::spawn(move || {
+                        handle
+                            .dialog()
+                            .message(instance::ALREADY_RUNNING)
+                            .title("Arnod")
+                            .kind(MessageDialogKind::Info)
+                            .blocking_show();
+                        handle.exit(0);
+                    });
+                    return Ok(());
+                }
+                instance::Acquired::Unavailable => {}
+            }
             let default_location = app.path().home_dir()?.join(DEFAULT_LOCATION_DIR);
             app.manage(AppState::load(data_dir.clone(), default_location));
             let bench = Arc::new(Workbench::new(Arc::new(SystemSecretStore)));
@@ -76,6 +107,7 @@ pub fn run() {
             app.manage(bench);
             app.manage(WindowsState::load(data_dir));
             app.manage(Mutex::new(ResultBook::default()));
+            app.manage(Mutex::new(quit::QuitGate::default()));
             // Dossiers des projets ouverts surveillés : changements faits hors d'Arnod diffusés
             // aux fenêtres (lot I).
             app.manage(Watchers::new(Arc::new(watch::app::AppSink::new(
@@ -258,13 +290,25 @@ pub fn run() {
             commands::batch::tree_batch,
             commands::batch::tree_batch_undo,
             commands::batch::run_selection,
+            commands::window::window_quit_ready,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")
         .run(|app, event| {
+            // Seconde instance (ES8) : sans fenêtre, elle attend que son message soit lu.
+            if let tauri::RunEvent::ExitRequested {
+                api, code: None, ..
+            } = &event
+                && app.try_state::<WindowsState>().is_none()
+            {
+                api.prevent_exit();
+            }
             if let tauri::RunEvent::Exit = event {
-                // Positions et tailles des fenêtres détachées, pour la restauration (F13).
-                app.state::<WindowsState>().flush();
+                // Positions et tailles des fenêtres détachées, pour la restauration (F13). Une
+                // seconde instance (ES8) n'a rien chargé : elle n'écrit rien.
+                if let Some(state) = app.try_state::<WindowsState>() {
+                    state.flush();
+                }
                 // Lot L : version mise de côté pour « Au prochain lancement » (R9), que la
                 // sortie vienne de la fenêtre principale fermée ou de Fichier > Quitter.
                 commands::updates::install_on_exit(app);

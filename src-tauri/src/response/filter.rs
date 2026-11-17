@@ -18,6 +18,7 @@ const VALUE_PREVIEW: usize = 200;
 
 /// Correspondance du filtre.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct FilterMatch {
     /// Chemin canonique, celui des jetons de la mise en forme (`$.items[0].sku`).
@@ -31,6 +32,7 @@ pub struct FilterMatch {
 
 /// Résultat du filtre : correspondances, ou erreur en français (R7).
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct FilterResult {
     pub matches: Vec<FilterMatch>,
@@ -57,6 +59,13 @@ pub fn filter(body: &str, expression: &str) -> FilterResult {
             total: 0,
             error: None,
         };
+    }
+    // `serde_json_path` 0.7 panique sur un échappement `\u` coupé par la fin de l'expression
+    // (PU1) : le cas courant d'une expression en cours de frappe. Il ne lui est jamais passé.
+    if ends_inside_unicode_escape(expression) {
+        return FilterResult::error(
+            "Échappement \\u incomplet : il attend quatre chiffres hexadécimaux (par exemple \\u00e9).",
+        );
     }
     let query = match JsonPath::parse(expression) {
         Ok(query) => query,
@@ -145,6 +154,31 @@ pub fn assertion_for(target: String, value: &Value) -> Assertion {
         origin: Origin::Proposed,
         enabled: true,
     }
+}
+
+/// `true` si `expression` s'arrête au milieu d'un échappement `\uXXXX` (y compris la moitié
+/// basse d'une paire de substitution, `\uD83D\u`) : le parseur y atteint la fin du texte avec un
+/// analyseur « streaming » et panique au lieu de répondre « incomplet ». Plus loin dans
+/// l'expression, un échappement mal formé est une erreur ordinaire.
+fn ends_inside_unicode_escape(expression: &str) -> bool {
+    let bytes = expression.as_bytes();
+    // Dernière séquence `\u` dont le backslash n'est pas lui-même échappé.
+    let mut i = 0;
+    let mut last = None;
+    while i < bytes.len() {
+        if bytes[i] == b'\\' {
+            if bytes.get(i + 1) == Some(&b'u') {
+                last = Some(i + 2);
+            }
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+    last.is_some_and(|start| {
+        let rest = &bytes[start..];
+        rest.len() < 4 && rest.iter().all(u8::is_ascii_hexdigit)
+    })
 }
 
 /// Explication en français d'une expression refusée (R7).

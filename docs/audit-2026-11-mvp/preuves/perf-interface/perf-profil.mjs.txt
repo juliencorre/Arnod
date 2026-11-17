@@ -1,0 +1,200 @@
+#!/usr/bin/env node
+/**
+ * Profils du processeur des cas les plus lents (audit de performance de l'interface) : où passe
+ * le temps, fonction par fonction, ramené aux sources par la carte du build de mesure.
+ *
+ *   npx vite build --config vite.perf.config.ts
+ *   node scripts/perf-profil.mjs [run] [arbre] [reponse] [frappe]
+ */
+import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { createServer } from "node:http";
+import { createRequire } from "node:module";
+import { extname, join } from "node:path";
+
+const require = createRequire(import.meta.url);
+const DIST = process.env.PERF_DIST ?? "/tmp/arnod-audit/perf-interface/dist-perf";
+const { TraceMap, originalPositionFor } = require("@jridgewell/trace-mapping");
+
+function playwright() {
+  for (const piste of [
+    "playwright",
+    process.env.PLAYWRIGHT_DIR,
+    "/home/julien/.npm/_npx/e41f203b7505f1fb/node_modules/playwright",
+  ].filter(Boolean)) {
+    try {
+      return require(piste);
+    } catch {
+      // Piste suivante.
+    }
+  }
+  throw new Error("Playwright introuvable.");
+}
+
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css" };
+const server = createServer((req, res) => {
+  const chemin = join(DIST, decodeURIComponent(new URL(req.url, "http://x").pathname));
+  const fichier = existsSync(chemin) && statSync(chemin).isDirectory() ? join(chemin, "index.html") : chemin;
+  if (!existsSync(fichier)) return void res.writeHead(404).end();
+  res.writeHead(200, { "content-type": TYPES[extname(fichier)] ?? "application/octet-stream" });
+  createReadStream(fichier).pipe(res);
+});
+await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
+const base = `http://127.0.0.1:${server.address().port}`;
+
+const carteFichier = readdirSync(join(DIST, "assets")).find((f) => f.endsWith(".js.map"));
+const carte = new TraceMap(JSON.parse(readFileSync(join(DIST, "assets", carteFichier), "utf8")));
+
+/** Fonction d'un cadre du profil, ramenée à sa source. */
+function origine(frame) {
+  if (!frame.url) return frame.functionName || "(natif)";
+  const pos = originalPositionFor(carte, { line: frame.lineNumber + 1, column: frame.columnNumber });
+  if (!pos.source) return `${frame.functionName || "(anonyme)"} @ bundle:${frame.columnNumber}`;
+  const source = pos.source.replaceAll("\\", "/");
+  const court = source.includes("node_modules/")
+    ? source.split("node_modules/").at(-1)
+    : (source.split(/\/(?=src\/|tests\/)/).at(-1) ?? source);
+  return `${court}:${pos.line} ${pos.name ?? frame.functionName ?? ""}`.trim();
+}
+
+function resume(nom, profile) {
+  const propre = new Map();
+  const parId = new Map(profile.nodes.map((n) => [n.id, n]));
+  let total = 0;
+  profile.samples.forEach((id, i) => {
+    const delta = (profile.timeDeltas[i] ?? 0) / 1000;
+    const frame = parId.get(id)?.callFrame;
+    if (!frame || frame.functionName === "(idle)") return;
+    total += delta;
+    const cle = origine(frame);
+    propre.set(cle, (propre.get(cle) ?? 0) + delta);
+  });
+  console.log(`\n## ${nom} : ${total.toFixed(0)} ms de processeur`);
+  for (const [cle, ms] of [...propre].sort((a, b) => b[1] - a[1]).slice(0, 16)) {
+    console.log(`${ms.toFixed(1).padStart(8)} ms ${((ms / total) * 100).toFixed(1).padStart(5)} %  ${cle}`);
+  }
+}
+
+const { chromium } = playwright();
+const browser = await chromium.launch();
+
+async function ouvrir(params) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  page.setDefaultTimeout(600000);
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("Profiler.enable");
+  await cdp.send("Profiler.setSamplingInterval", { interval: 250 });
+  await page.goto(`${base}/index.html?${new URLSearchParams(params)}`);
+  await page.waitForFunction(() => document.documentElement.dataset.perf === "pret");
+  await page.click('main article button:has-text("Ouvrir")');
+  await page.evaluate(() =>
+    window.__perf.attendre(() => document.querySelector('[role="tree"] [role="treeitem"]') !== null),
+  );
+  await page.waitForTimeout(500);
+  const profiler = async (nom, action) => {
+    await cdp.send("Profiler.start");
+    await action();
+    const { profile } = await cdp.send("Profiler.stop");
+    resume(nom, profile);
+  };
+  return { page, context, profiler };
+}
+
+const CAS = {
+  async run() {
+    const { page, context, profiler } = await ouvrir({ scenario: "run", taille: 2000 });
+    await page.evaluate(async () => {
+      const p = window.__perf;
+      p.preparerRun(false);
+      await p.ouvrirRun();
+      await p.attendre(() => document.querySelector(".run__item") !== null);
+    });
+    await profiler("Run de 2 000 lignes : 14 événements arnod://run", () =>
+      page.evaluate(() => window.__perf.flot(0, false, 150)),
+    );
+    await context.close();
+  },
+  async arbre() {
+    const { page, context, profiler } = await ouvrir({ scenario: "barre", taille: 2000 });
+    await profiler("Barre latérale, 2 000 requêtes : replier puis déplier le projet", async () => {
+      await page.click(".project__chevron");
+      await page.evaluate(() => window.__perf.image());
+      await page.click(".project__chevron");
+      await page.evaluate(() =>
+        window.__perf.attendre(() => document.querySelectorAll('[role="tree"] [role="treeitem"]').length > 1700),
+      );
+    });
+    await profiler("Barre latérale, 2 000 requêtes : arnod://projet (arbre relu) × 3", async () => {
+      for (let i = 0; i < 3; i++) {
+        await page.evaluate(async () => {
+          const p = window.__perf;
+          const arbre = p.workbench.trees[p.PROJET];
+          await p.emettre("arnod://projet", { projectId: p.PROJET, scope: "tree", path: null, origin: "autre" });
+          await p.attendre(() => p.workbench.trees[p.PROJET] !== arbre);
+          await p.pause(50);
+        });
+      }
+    });
+    await page.click('input[aria-label^="Filtrer le référentiel"]');
+    await profiler("Barre latérale, 2 000 requêtes : 1re frappe du filtre, puis Échap", async () => {
+      await page.keyboard.type("c");
+      await page.evaluate(() => window.__perf.image());
+      await page.keyboard.press("Escape");
+      await page.evaluate(() => window.__perf.image());
+    });
+    await context.close();
+  },
+  async reponse() {
+    const { page, context, profiler } = await ouvrir({ scenario: "reponse", taille: 1, articles: 5000 });
+    await page.evaluate(async () => {
+      const p = window.__perf;
+      await p.workbench.openRequest(p.PROJET, p.REPONSE);
+      await p.attendre(() => document.querySelector(".editor__url") !== null);
+    });
+    await page.waitForTimeout(600);
+    await profiler("Réponse JSON de 1,1 Mo : affichage du corps", async () => {
+      await page.click('.editor__line button[type="submit"]');
+      await page.evaluate(() => window.__perf.attendre(() => document.querySelector(".code__line") !== null));
+    });
+    await page.fill('input[aria-label="Filtre JSONPath"]', "$.items[*].sku");
+    await page.evaluate(() =>
+      window.__perf.attendre(() => document.querySelectorAll(".tok--match").length >= 5000),
+    );
+    await profiler("Réponse : correspondance suivante × 3 (5 000 surlignées)", async () => {
+      for (let i = 0; i < 3; i++) {
+        await page.click('button[aria-label="Résultat suivant"]');
+        await page.evaluate(() => window.__perf.image());
+      }
+    });
+    await context.close();
+  },
+  async frappe() {
+    const { page, context, profiler } = await ouvrir({ scenario: "editeur", taille: 2000 });
+    await page.evaluate(async () => {
+      const p = window.__perf;
+      await p.workbench.openRequest(p.PROJET, p.GROSSE);
+      await p.attendre(() => document.querySelector(".editor__url") !== null);
+    });
+    await page.waitForTimeout(1200);
+    await page.click(".editor__url");
+    await page.keyboard.press("End");
+    await profiler("Éditeur, arbre de 2 000 requêtes : 12 frappes dans l'adresse", async () => {
+      for (const caractere of "/abc?x=12&y=") {
+        await page.keyboard.type(caractere);
+        await page.waitForTimeout(40);
+      }
+    });
+    await profiler("Éditeur : enregistrement automatique, arbre et contrats relus", async () => {
+      await page.waitForTimeout(1500);
+    });
+    await context.close();
+  },
+};
+
+try {
+  const noms = process.argv.slice(2);
+  for (const nom of noms.length > 0 ? noms : Object.keys(CAS)) await CAS[nom]();
+} finally {
+  await browser.close();
+  server.close();
+}

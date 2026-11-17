@@ -22,6 +22,7 @@ pub const USER_AGENT: &str = concat!("Arnod/", env!("CARGO_PKG_VERSION"));
 
 /// Réponse reçue, prête à être affichée.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct HttpResponse {
     pub status: u16,
@@ -42,6 +43,7 @@ pub struct HttpResponse {
 /// Chronologie d'un envoi (lot K, écran 5.1-c), en ms : DNS, connexion (TCP et TLS), attente du
 /// serveur, réception. DNS et connexion sont absents quand une connexion du pool a servi.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Timeline {
     pub dns_ms: Option<u64>,

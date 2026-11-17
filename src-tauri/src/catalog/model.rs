@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 /// Projet du référentiel : un dossier sur disque contenant `arnod.yml`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     /// Identifiant, également écrit dans le manifeste du projet.
@@ -19,6 +20,7 @@ pub struct Project {
 
 /// Workspace : regroupement nommé et coloré de projets du référentiel.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Workspace {
     pub id: Uuid,
@@ -32,6 +34,7 @@ pub struct Workspace {
 ///
 /// Miroir TypeScript : `WorkspaceColor` dans `src/types/ipc.ts` (lot C).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum WorkspaceColor {
     Gray,
@@ -61,6 +64,7 @@ impl WorkspaceColor {
 
 /// Format du fichier `arnod.json` (§ 6.1 du plan).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogFile {
     /// Version du format, pour les migrations.
@@ -74,11 +78,13 @@ pub struct CatalogFile {
     /// Projet « Non classés » (`docs/plan-accueil-non-classes.md`, R4). Champ
     /// facultatif du format 2 : absent, aucun ; une version précédente l'ignore.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub inbox_project_id: Option<Uuid>,
 }
 
 /// Format version 1, avec un workspace par défaut, lu seulement pour être migré (R12).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogFileV1 {
     pub projects: Vec<Project>,

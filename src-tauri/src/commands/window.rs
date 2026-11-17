@@ -44,6 +44,7 @@ pub fn window_set_title(
 
 /// Fenêtre qui appelle et état de toutes les fenêtres.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct WindowContext {
     pub label: String,
@@ -251,6 +252,13 @@ pub fn window_detach_result(
 pub fn window_reattach(app: AppHandle, window: WebviewWindow) -> Result<WindowsFile, CommandError> {
     let label = window.label().to_owned();
     windows::apply(&app, |w| w.reattach(&label)).map(|(_, file)| file)
+}
+
+/// Réponse de la fenêtre appelante à `arnod://quitter` : ses brouillons sont enregistrés
+/// (`saved`), ou l'un d'eux ne l'est pas et la sortie est abandonnée (plan qualité, R6, IN3).
+#[tauri::command]
+pub fn window_quit_ready(app: AppHandle, window: WebviewWindow, saved: bool) {
+    windows::quit_answer(&app, window.label(), saved);
 }
 
 /// Rattache toutes les fenêtres détachées (F12).

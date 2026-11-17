@@ -112,7 +112,7 @@ function info(tab: ContentTab): { name: string; badge: string; dirty: boolean } 
       ?.replace(/\.yml$/, "") ?? content.path;
   return {
     name: draft?.name ?? node?.name ?? fallback,
-    badge: draft?.method ?? (node?.kind === "request" ? node.method : "GET"),
+    badge: draft?.method ?? (node?.kind === "request" ? node.method : null) ?? "GET",
     dirty: workbench.isDirty(key),
   };
 }

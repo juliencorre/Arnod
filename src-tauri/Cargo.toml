@@ -1,6 +1,6 @@
 [package]
 name = "arnod"
-version = "0.0.3"
+version = "0.0.4"
 description = "Arnod - application de test d'API"
 authors = ["Julien Corre"]
 license = "MIT"
@@ -88,6 +88,9 @@ tempfile = "3"
 tauri = { version = "2", features = ["test"] }
 # Serveur HTTP simulé pour les tests des envois et des runs.
 wiremock = "0.6"
+# Miroir IPC (MA1, Q2 du plan-qualite-mvp) : types TypeScript engendrés depuis les types Rust, en
+# test seulement ; rien n'entre dans l'application.
+ts-rs = { version = "12", features = ["serde-json-impl", "uuid-impl"] }
 
 # Optimisations de taille, voir https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

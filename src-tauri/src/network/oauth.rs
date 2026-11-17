@@ -34,6 +34,7 @@ impl Token {
 
 /// État du jeton d'un environnement, pour l'interface (3.4-a) : jamais sa valeur.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TokenStatus {
     pub obtained_at: u64,

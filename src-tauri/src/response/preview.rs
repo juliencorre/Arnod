@@ -54,11 +54,21 @@ const DROPPED: [&str; 14] = [
     "math", "canvas", "select", "textarea",
 ];
 
-/// Nombre maximal de nœuds de l'aperçu.
+/// Nombre maximal de nœuds de l'aperçu, compté à l'ouverture d'une balise (PU2).
 pub const MAX_NODES: usize = 5000;
+
+/// Profondeur maximale de l'aperçu (PU2) : au-delà, le contenu d'une balise rejoint son parent.
+/// L'arbre est sérialisé, affiché et libéré récursivement : sans borne, 200 000 `<div>` jamais
+/// fermées débordent la pile.
+pub const MAX_DEPTH: usize = 64;
+
+/// Balises ouvertes à la fois, gardées ou non (PU2) : chaque fermeture cherche la sienne dans la
+/// pile ; sans borne, un corps de balises jamais fermées rendrait ces recherches quadratiques.
+const MAX_OPEN: usize = 2 * MAX_NODES;
 
 /// Nœud de l'aperçu.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum HtmlNode {
     Text {
@@ -76,6 +86,8 @@ struct Frame {
     /// Balise gardée, ou `None` : le contenu rejoint le parent.
     tag: Option<&'static str>,
     children: Vec<HtmlNode>,
+    /// Balises gardées ouvertes, celle-ci comprise : profondeur de ses enfants.
+    depth: usize,
 }
 
 fn allowed(name: &str) -> Option<&'static str> {
@@ -89,11 +101,14 @@ pub fn preview(body: &str) -> Vec<HtmlNode> {
         name: String::new(),
         tag: None,
         children: Vec::new(),
+        depth: 0,
     }];
     let mut count = 0usize;
+    let mut truncated = false;
     let mut skip: Option<(String, usize)> = None;
     for item in &items {
-        if count >= MAX_NODES {
+        if count >= MAX_NODES || stack.len() > MAX_OPEN {
+            truncated = true;
             break;
         }
         // Contenu d'une balise retirée : ignoré jusqu'à sa fermeture.
@@ -155,10 +170,18 @@ pub fn preview(body: &str) -> Vec<HtmlNode> {
                     }
                     continue;
                 }
+                // Une balise gardée compte dès son ouverture : une balise jamais fermée est un
+                // nœud comme une autre. Trop profonde, elle laisse son contenu à son parent.
+                let depth = stack.last().map_or(0, |frame| frame.depth);
+                let tag = tag.filter(|_| depth < MAX_DEPTH);
+                if tag.is_some() {
+                    count += 1;
+                }
                 stack.push(Frame {
                     name: lower,
                     tag,
                     children: Vec::new(),
+                    depth: depth + usize::from(tag.is_some()),
                 });
             }
             Item::Close { name } => {
@@ -170,7 +193,7 @@ pub fn preview(body: &str) -> Vec<HtmlNode> {
                     continue;
                 }
                 while stack.len() > position {
-                    close(&mut stack, &mut count);
+                    close(&mut stack);
                 }
             }
             Item::Text(text) => {
@@ -184,10 +207,10 @@ pub fn preview(body: &str) -> Vec<HtmlNode> {
         }
     }
     while stack.len() > 1 {
-        close(&mut stack, &mut count);
+        close(&mut stack);
     }
     let mut root = stack.pop().map(|f| f.children).unwrap_or_default();
-    if count >= MAX_NODES {
+    if truncated || count >= MAX_NODES {
         root.push(HtmlNode::Text {
             text: "… aperçu limité au début du document.".to_owned(),
         });
@@ -202,19 +225,17 @@ fn push(stack: &mut [Frame], node: HtmlNode) {
 }
 
 /// Ferme la balise du sommet : gardée, elle devient un nœud ; sinon son contenu rejoint le parent.
-fn close(stack: &mut Vec<Frame>, count: &mut usize) {
+fn close(stack: &mut Vec<Frame>) {
     let Some(frame) = stack.pop() else { return };
     let Some(parent) = stack.last_mut() else {
         return;
     };
     match frame.tag {
-        Some(tag) => {
-            parent.children.push(HtmlNode::Element {
-                tag: tag.to_owned(),
-                children: frame.children,
-            });
-            *count += 1;
-        }
+        // Déjà comptée à l'ouverture.
+        Some(tag) => parent.children.push(HtmlNode::Element {
+            tag: tag.to_owned(),
+            children: frame.children,
+        }),
         None => parent.children.extend(frame.children),
     }
 }

@@ -22,6 +22,7 @@ use crate::error::{CommandError, CommandErrorKind};
 
 /// Ce que le serveur a présenté de travers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum CertificateProblem {
     /// Signé par une autorité inconnue du poste.

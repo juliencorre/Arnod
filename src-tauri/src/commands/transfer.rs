@@ -14,10 +14,12 @@ use crate::layout::windows::Windows;
 use crate::state::AppState;
 use crate::tree::transfer::{self, Change, Mode, Target, Targets};
 use crate::tree::undo::Undo;
+use crate::watch::Renamed;
 use crate::windows::{self, ProjectScope};
 
 /// Requête copiée ou déplacée, et le jeton de « Annuler ».
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct TransferDone {
     /// Projet qui la reçoit.
@@ -99,16 +101,32 @@ pub fn transfer_apply(
     let from = state.project_ctx(project)?;
     let to = state.project_ctx(target)?;
     let (done, undo) = transfer::transfer(&from.root, &path, &to.root, &destination, mode)?;
+    let (mut renamed, mut removed) = (Vec::new(), Vec::new());
     if mode == Mode::Move && done.path != path {
         if project == target {
             follow_path(&window, project, &path, &done.path);
+            renamed.push(Renamed {
+                from: path.clone(),
+                to: done.path.clone(),
+            });
         } else {
             let _ = windows::apply(window.app_handle(), |w: &mut Windows| {
                 w.close_path(project, &path);
                 Ok(())
             });
+            removed.push(path.clone());
         }
+    } else if mode == Mode::Move && project != target {
+        removed.push(path.clone());
     }
+    // Les éditeurs des autres fenêtres suivent la requête déplacée (IN5).
+    windows::paths_changed(
+        window.app_handle(),
+        window.label(),
+        project,
+        renamed,
+        removed,
+    );
     changed(&window, project);
     if target != project {
         changed(&window, target);

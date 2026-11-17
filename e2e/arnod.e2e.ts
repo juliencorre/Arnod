@@ -216,6 +216,37 @@ async function clickText(selector: string, text: string): Promise<void> {
   );
 }
 
+/** Attend qu'une requête écrite sur disque apparaisse dans l'arborescence, puis l'ouvre. */
+async function openTreeRequest(name: string): Promise<void> {
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        (n) =>
+          Array.from(document.querySelectorAll('aside [role="treeitem"]')).some((i) =>
+            i.textContent.includes(n),
+          ),
+        name,
+      ),
+    { timeout: 10_000, timeoutMsg: `« ${name} » attendue dans l'arborescence` },
+  );
+  await browser.execute((n) => {
+    Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'))
+      .find((i) => i.textContent.includes(n))
+      ?.click();
+  }, name);
+  await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+}
+
+/** Ferme un serveur de test, connexions gardées ouvertes par le client de l'application comprises. */
+async function closeServer(server: Server): Promise<void> {
+  server.closeAllConnections();
+  await new Promise<void>((resolve) => {
+    server.close(() => {
+      resolve();
+    });
+  });
+}
+
 /** Attend `count` fenêtres et renvoie leurs identifiants WebDriver. */
 async function waitForWindows(count: number): Promise<string[]> {
   await browser.waitUntil(async () => (await browser.getWindowHandles()).length === count, {
@@ -677,8 +708,26 @@ describe("Fenêtres et zones", () => {
     expect(await browser.$(".content-window__follow").getAttribute("aria-pressed")).toBe("true");
     await screenshot(browser, "07-fenetre-contenu");
 
+    // Plan qualité, IN2 : une frappe faite juste avant « Rattacher » (moins de 600 ms) est
+    // enregistrée avant que l'onglet ne quitte la fenêtre.
+    const detachedLayout = readWindows(sandbox).windows[1]?.layout;
+    const listerPath = detachedLayout
+      ? zonesOf(detachedLayout.root)
+          .flatMap((z) => z.tabs)
+          .find((t) => t.content.kind === "request")?.content.path
+      : undefined;
+    if (!listerPath) throw new Error("requête de la fenêtre détachée introuvable");
+    const listerFile = path.join(sandbox.home, "arnod", "boutique-tests", listerPath);
+    await browser.$(".editor__url").waitForExist({ timeout: 10_000 });
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(".editor__url");
+      if (!input) throw new Error("adresse introuvable");
+      input.value = `${input.value}?rattache=1`;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     await browser.$(".content-window__bar").$("button=Rattacher").click();
     await waitForWindows(1);
+    expect(readFileSync(listerFile, "utf8")).toContain("rattache=1");
     await browser.switchToWindow(mainWindow);
     await waitForZoneTabs([["Nouvelle requête", "lister"]]);
     expect(readWindows(sandbox).windows.map((w) => w.kind)).toEqual(["main"]);
@@ -2948,32 +2997,10 @@ describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
     );
   });
 
-  afterAll(async () => {
-    // Les connexions gardées ouvertes par le client de l'application retiendraient `close`.
-    server.closeAllConnections();
-    await new Promise<void>((resolve) => {
-      server.close(() => {
-        resolve();
-      });
-    });
-  });
+  afterAll(() => closeServer(server));
 
   it("l'onglet Chronologie dit où le temps est passé (5.1-c)", async () => {
-    await browser.waitUntil(
-      () =>
-        browser.execute(() =>
-          Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]')).some((i) =>
-            i.textContent.includes("Chrono K"),
-          ),
-        ),
-      { timeout: 10_000, timeoutMsg: "requête écrite sur disque attendue dans l'arborescence" },
-    );
-    await browser.execute(() => {
-      Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'))
-        .find((i) => i.textContent.includes("Chrono K"))
-        ?.click();
-    });
-    await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+    await openTreeRequest("Chrono K");
     await clickText(".request-tab button", "Envoyer");
     await browser.waitUntil(
       () =>
@@ -3109,6 +3136,60 @@ describe("Sélection multiple (4.1-a quater)", () => {
       timeoutMsg: "copies retirées attendues",
     });
     expect(files.every((f) => existsSync(path.join(project(), f)))).toBe(true);
+  });
+});
+
+describe("Plan qualité, lot A - Corps choisi dans l'éditeur (IN1)", () => {
+  const file = () => path.join(sandbox.home, "arnod", "boutique-tests", "corps-in1.yml");
+  let server: Server;
+  const received: { type: string; body: string }[] = [];
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk: Buffer) => (body += chunk.toString()));
+      request.on("end", () => {
+        received.push({ type: request.headers["content-type"] ?? "", body });
+        response.writeHead(201, { "Content-Type": "application/json" });
+        response.end("{}");
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = String((server.address() as AddressInfo).port);
+    const http = `http:\n  method: POST\n  url: http://127.0.0.1:${port}/orders\n`;
+    writeFileSync(file(), `info:\n  name: Corps IN1\n  type: http\n${http}`);
+  });
+
+  afterAll(() => closeServer(server));
+
+  it("le corps JSON choisi dans l'éditeur est enregistré et part au serveur", async () => {
+    await openTreeRequest("Corps IN1");
+    await clickText(".request-tab .editor__tab", "Corps");
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".request-tab .body__type");
+      if (!select) throw new Error("type de corps introuvable");
+      select.value = "json";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await browser.$(".request-tab .body__content").waitForExist({ timeout: 10_000 });
+    await browser.execute(() => {
+      const area = document.querySelector<HTMLTextAreaElement>(".request-tab .body__content");
+      if (!area) throw new Error("contenu du corps introuvable");
+      area.value = '{"sku": "TSH-BLU-M"}';
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    // Enregistré seul (600 ms) : le fichier porte le type choisi.
+    await browser.waitUntil(() => readFileSync(file(), "utf8").includes("type: json"), {
+      timeout: 10_000,
+      timeoutMsg: "type du corps écrit dans le fichier attendu",
+    });
+    await clickText(".request-tab button", "Envoyer");
+    await browser.waitUntil(() => received.length > 0, {
+      timeout: 15_000,
+      timeoutMsg: "requête reçue par le serveur attendue",
+    });
+    expect(received[0]?.type).toContain("application/json");
+    expect(received[0]?.body).toBe('{"sku": "TSH-BLU-M"}');
   });
 });
 

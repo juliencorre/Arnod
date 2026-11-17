@@ -56,6 +56,7 @@ async function openOrder(): Promise<{ app: AppWrapper; core: ReturnType<typeof i
     core.workbench.envs.push({
       name: "Recette",
       color: "orange",
+      protected: false,
       variables: [{ name: "apiVersion", value: "v2" }],
       locals: [],
     });

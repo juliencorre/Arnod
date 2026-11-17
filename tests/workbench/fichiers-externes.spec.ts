@@ -27,7 +27,14 @@ afterEach(() => {
 
 /** Changement diffusé par le surveillant du cœur (origine vide). */
 function fromDisk(path: string): ProjectChange {
-  return { projectId: BOUTIQUE_TESTS, scope: "request", path, origin: "" };
+  return {
+    projectId: BOUTIQUE_TESTS,
+    scope: "request",
+    path,
+    origin: "",
+    renamed: [],
+    removed: [],
+  };
 }
 
 describe("Fichiers modifiés hors d'Arnod (lot I)", () => {

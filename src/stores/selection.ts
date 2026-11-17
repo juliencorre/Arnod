@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
+import { useDrafts } from "@/composables/useDrafts";
 import { ipc } from "@/lib/ipc";
 import { useContractsStore } from "@/stores/contracts";
 import { useToastStore } from "@/stores/toasts";
@@ -75,6 +76,11 @@ export const useSelectionStore = defineStore("selection", () => {
     delete: ["mis à la corbeille", "mis à la corbeille"],
   };
 
+  /** Dossier qui reçoit un déplacement (hors racine) : ses étapes peuvent être renumérotées. */
+  function movedInto(action: BatchAction): string[] {
+    return action.kind === "move" && action.target !== "" ? [action.target] : [];
+  }
+
   /** Applique `action` à la sélection, avec « Annuler » dans la notification. */
   async function apply(action: BatchAction): Promise<void> {
     const project = projectId.value;
@@ -83,7 +89,11 @@ export const useSelectionStore = defineStore("selection", () => {
     const toasts = useToastStore();
     busy.value = true;
     try {
-      await workbench.saveAll();
+      // Un brouillon non enregistré arrête l'action : rien n'est réécrit dessous (R6).
+      const refused = await useDrafts().saveTouching([
+        { projectId: project, paths: [...paths.value, ...movedInto(action)] },
+      ]);
+      if (refused !== null) throw new Error(refused);
       const result = await ipc.treeBatch(project, paths.value, action);
       for (const [from, to] of result.items) {
         if (action.kind === "move" && to !== null) workbench.followTransfer(project, from, to);

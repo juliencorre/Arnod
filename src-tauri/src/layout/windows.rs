@@ -25,6 +25,7 @@ pub const WINDOWS_VERSION: u32 = 1;
 
 /// Rôle d'une fenêtre.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub enum WindowKind {
     /// Onglets des workspaces, barre latérale (sauf détachée) et zones.
@@ -37,6 +38,8 @@ pub enum WindowKind {
 
 /// Position et taille d'une fenêtre à l'écran, en pixels physiques.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "WindowBounds"))]
 #[serde(rename_all = "camelCase")]
 pub struct Bounds {
     pub x: i32,
@@ -47,6 +50,8 @@ pub struct Bounds {
 
 /// État d'une fenêtre.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "WindowView"))]
 #[serde(rename_all = "camelCase")]
 pub struct WindowState {
     pub label: String,
@@ -115,6 +120,7 @@ impl WindowState {
 /// Requête active : celle dont la fenêtre de résultat montre le résultat
 /// (`docs/plan-resultat-detachable.md`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ActiveRequest {
     pub project_id: Uuid,
@@ -123,6 +129,8 @@ pub struct ActiveRequest {
 
 /// Fichier `windows.json` et instantané envoyé aux fenêtres.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "WindowsSnapshot"))]
 #[serde(rename_all = "camelCase")]
 pub struct WindowsFile {
     pub version: u32,

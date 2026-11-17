@@ -808,6 +808,18 @@ fn join(parent: &str, name: &str) -> String {
 /// Convertit un dossier et son contenu ; `out` est son chemin d'arrivée.
 fn folder(source: &Folder, out: &str, converted: &mut Converted, ctx: &mut Ctx) {
     let mut taken: HashSet<String> = HashSet::new();
+    // À la racine d'un nouveau projet, un dossier `contracts` ou `environments` serait pris pour
+    // un dossier réservé et ses requêtes cachées, une requête `opencollection` remplacerait le
+    // fichier racine (PU4) : ces noms sont déjà pris.
+    if out.is_empty() {
+        for reserved in [
+            crate::contract::CONTRACTS_DIR,
+            crate::tree::ENVIRONMENTS_DIR,
+            crate::opencollection::ROOT_FILE,
+        ] {
+            taken.insert(reserved.to_owned());
+        }
+    }
     let place = source.path.as_str();
     for child in &source.folders {
         let dir = item_name(&child.dir).unwrap_or_else(|_| slug(&child.dir));

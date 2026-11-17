@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 
+import { useDrafts } from "@/composables/useDrafts";
 import { ipc } from "@/lib/ipc";
 import { useContractsStore } from "@/stores/contracts";
 import { useToastStore } from "@/stores/toasts";
@@ -76,8 +77,19 @@ export const useTransferStore = defineStore("transfer", () => {
     mode: TransferMode,
   ): Promise<TransferDone> {
     const workbench = useWorkbenchStore();
-    // Les requêtes ouvertes sont enregistrées : rien ne réécrit un rang d'étape renuméroté.
-    await workbench.saveAll();
+    // Les requêtes ouvertes sont enregistrées : rien ne réécrit un rang d'étape renuméroté. Un
+    // brouillon non enregistré de la requête ou de sa destination arrête l'action (R6).
+    const into =
+      destination.kind === "folder"
+        ? destination.folder
+        : destination.kind === "step"
+          ? destination.test
+          : null;
+    const refused = await useDrafts().saveTouching([
+      { projectId: source.projectId, paths: [source.path] },
+      ...(into === null || into === "" ? [] : [{ projectId: target, paths: [into] }]),
+    ]);
+    if (refused !== null) throw new Error(refused);
     const done = await ipc.transferApply(source.projectId, source.path, target, destination, mode);
     if (mode === "move")
       workbench.followTransfer(
@@ -126,9 +138,13 @@ export const useTransferStore = defineStore("transfer", () => {
   async function undo(): Promise<boolean> {
     const done = last.value;
     if (!done) return false;
-    last.value = null;
     const workbench = useWorkbenchStore();
-    await workbench.saveAll();
+    // Un brouillon non enregistré d'un projet touché arrête l'action (R6).
+    const refused = await useDrafts().saveTouching(
+      done.projects.map((projectId) => ({ projectId, paths: [""] })),
+    );
+    if (refused !== null) throw new Error(refused);
+    last.value = null;
     await ipc.transferUndo(done.token);
     await refresh(done.projects);
     for (const projectId of done.projects) {

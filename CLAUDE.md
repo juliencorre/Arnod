@@ -29,11 +29,13 @@ leur contrat selon `docs/plan-requetes-dans-contrats.md` (sections « Contrats d
 `docs/plan-qualite-interface.md` (échelles du design system appliquées au code et à la maquette).
 Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
-**Travail en cours** : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots A à L en
-trois vagues, règles communes R1 à R10) ; lot L (installation des mises à jour) selon
-`docs/plan-mvp-l-mises-a-jour.md`. Un lot = une branche `claude/mvp-<lot>` et une pull request ;
-il respecte les règles communes, notamment les ajouts en fin de liste dans les fichiers partagés (R5)
-et la comparaison avec la maquette par l'aperçu (R6).
+Livré ensuite : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots A à L).
+
+**Travail en cours** : qualité du MVP selon `docs/plan-qualite-mvp.md` (lots 0 et A à K en trois
+vagues, règles R1 à R14), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
+`docs/audit-2026-11-mvp/preuves/`). Lot 0 livré : la maquette redessinée est la référence
+(`docs/maquette-consignes-qualite.md`). Un lot = une branche `claude/qualite-<lot>` et une pull
+request ; chaque constat se corrige avec son test de preuve, qui échoue avant et passe après (R1).
 
 ## Architecture
 
@@ -48,7 +50,13 @@ et la comparaison avec la maquette par l'aperçu (R6).
 - Les commandes Rust vivent dans `src-tauri/src/commands/`, un fichier par domaine
   (`hello.rs`, plus tard `http.rs`, `mocks.rs`...).
 - Les types échangés sont écrits à la main dans `src/types/ipc.ts` et doivent refléter
-  exactement la sérialisation serde (`#[serde(rename_all = "camelCase")]`).
+  exactement la sérialisation serde (`#[serde(rename_all = "camelCase")]`). Vérifié (MA1) : chaque
+  type sérialisé porte `#[cfg_attr(test, derive(ts_rs::TS))]` (ts-rs, dépendance de test
+  seulement) et, s'il s'appelle autrement côté interface, `#[cfg_attr(test, ts(rename = "…"))]` ;
+  un champ `skip_serializing_if = "Option::is_none"` prend `ts(optional)`. `src-tauri/src/ts_mirror.rs`
+  génère `tests/ipc/coeur.ts` (comparé par vue-tsc à `ipc.ts`) et `tests/ipc/echantillons.json`
+  (sorties du vrai cœur que le faux cœur doit rendre à l'identique) ; après un changement :
+  `ARNOD_IPC_ECRIRE=1 cargo test --lib ts_mirror`.
 - Une commande qui peut échouer renvoie `Result<T, CommandError>` (`src-tauri/src/error.rs`) :
   `kind` donne la nature de l'erreur, `message` un texte en français prêt à afficher. Côté
   interface, `IpcError` reprend `kind` (ou `null` si la cause n'est pas une `CommandError`) et
@@ -63,7 +71,8 @@ et la comparaison avec la maquette par l'aperçu (R6).
    `Result<T, CommandError>`.
 2. L'enregistrer dans `tauri::generate_handler![...]` (`src-tauri/src/lib.rs`).
 3. Ajouter son nom à `CommandName` et ses types dans `src/types/ipc.ts` (un test Rust vérifie
-   que `CommandName` concorde avec `generate_handler!`, et les unions miroirs avec le Rust).
+   que `CommandName` concorde avec `generate_handler!`, et les unions miroirs avec le Rust) ; un
+   nouveau type sérialisé reçoit la dérivation ts-rs et `tests/ipc/coeur.ts` est régénéré.
 4. L'exposer dans l'objet `ipc` de `src/lib/ipc.ts`.
 5. Tester : `#[cfg(test)]` côté Rust (dont la forme JSON sérialisée, erreurs comprises),
    Vitest avec `mockIPC` côté frontend (`tests/`).
@@ -89,7 +98,8 @@ src/                    Frontend Vue
                         réponse),
                         contracts (contrats par projet, contrats ouverts), steps (catalogue des
                         étapes, reconnaissance, essai)
-  composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions)
+  composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions),
+                        brouillons avant fermeture ou sortie (useDrafts)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification,
                         en-tête et icônes des sections (SectionHeading, SectionIcon)
   components/layout/    Coquille : sélecteur de workspace (WorkspaceSwitcher), barre latérale (un
@@ -106,7 +116,9 @@ src/                    Frontend Vue
                         StatusCount)
   types/ipc.ts          Types IPC documentés à la main
 tests/                  Tests Vitest (happy-dom, mockIPC, faux cœur fakeCore.ts), dont contrastes
-                        ; apercu/ : l'application sur le faux cœur dans un navigateur
+                        ; apercu/ : l'application sur le faux cœur dans un navigateur ; ipc/ :
+                        miroir des types généré par le cœur (ts_mirror.rs) ; perf/ : banc de
+                        l'interface (scripts/perf-interface.mjs)
 e2e/                    Tests e2e sur l'application réelle (tauri-driver, WebdriverIO)
 src-tauri/              Cœur Rust
   tauri.conf.json       Fenêtre, CSP, bundles (NSIS currentUser, AppImage)
@@ -136,6 +148,8 @@ src-tauri/              Cœur Rust
                         validation, reconnaissance, valeurs du formulaire, requête HTTP d'un essai
   src/trial.rs          Essai sans projet : contrat déduit et « Essai N » dans « Non classés »
   src/windows.rs        windows.json, fenêtres natives, focus, fermetures, événements arnod://
+  src/quit.rs           Sortie d'Arnod : réponses des fenêtres à arnod://quitter (pur)
+  src/instance.rs       Instance unique : verrou arnod.lock du dossier de données
   src/opencollection/   Format OpenCollection 1.0.0 : schéma embarqué, YAML, requêtes, racine
                         (opencollection.yml, extensions.arnod), conversion de l'ancien format
   src/manifest.rs       Dossier d'un projet et sa racine opencollection.yml
@@ -279,7 +293,7 @@ Référence : `docs/plan-suivi-maquette.md` (règles R1 à R9).
   lettre). Plans, commits et pull requests citent les écrans par repère.
 - `docs/maquette-etat.yml` tient l'état de chaque écran (livré, en partie, à faire…), sa pull
   request ou son plan, ses captures e2e et ses écarts avec le code (`aligner` : maquette, code ou
-  à décider). Une pull request qui livre, modifie ou écarte un écran le met à jour ;
+  à décider ; une liste quand un écran diffère sur plusieurs points). Une pull request qui livre, modifie ou écarte un écran le met à jour ;
   `scripts/check-maquette.mjs` le vérifie (`npm run check`, CI).
 - Une capture citée existe dans `e2e/arnod.e2e.ts` (`screenshot(browser, "…")`) : un écran livré
   visible gagne une capture e2e. La maquette est régénérée depuis le fichier après fusion
@@ -823,3 +837,27 @@ Référence : écran 4.1-a quater.
 - Interface : store `selection` (propre à la fenêtre, un seul projet), `TreeRow` (Ctrl+clic,
   Maj+clic dans l'ordre affiché, Ctrl+Espace ou Maj+Espace au clavier), `SelectionBar.vue` (monté
   par `SharedDialogs`, Échap vide la sélection).
+
+## Brouillons, sortie et instance unique
+
+Référence : `docs/plan-qualite-mvp.md`, lot C (T9 à T12 : IN2 à IN6, IN9, ES8 ; règles R6, R11 ;
+décision Q1).
+
+- `workbench.save` rend son issue (`SaveOutcome` : `saved`, `held` pour un conflit, un fichier
+  supprimé ou un secret en attente, `failed`) ; `saveAll` rend les requêtes non enregistrées.
+  Fermer, détacher, rattacher, déplacer, quitter ou installer passe par `useDrafts`
+  (`saveRequest`, `saveContract`, `saveAll`, `reattach`) : un brouillon non enregistré arrête
+  l'action et la notification dit pourquoi (`workbench.unsavedReason`). Ne lâchez jamais un
+  brouillon sans passer par là.
+- Sortie d'Arnod (fenêtre principale fermée, Fichier › Quitter) : `windows::request_quit` émet
+  `arnod://quitter` à toutes les fenêtres, chacune enregistre et répond par `window_quit_ready`
+  (`quit::QuitGate`, pur) ; un refus garde Arnod ouvert, une fenêtre muette ne le retient pas
+  plus de 10 s. N'appelez pas `app.exit` pour quitter : passez par `request_quit`.
+- `arnod://projet` porte `renamed` et `removed` (`windows::paths_changed`) : une commande qui
+  renomme, déplace ou retire une requête les remplit, et les éditeurs des autres fenêtres suivent
+  ou sont oubliés. Les éditeurs qu'aucun onglet ne montre plus sont libérés (`pruneEditors`).
+  Une relecture garde une frappe faite pendant l'appel ; le choix « Laisser dans le test » vaut
+  pour la session.
+- Instance unique (`instance.rs`) : verrou du système sur `arnod.lock` dans le dossier de
+  données, tenu jusqu'à la sortie. Une seconde instance attend 5 s (relance après une mise à
+  jour), puis ne charge rien, ferme sa fenêtre cachée, le dit par un message natif et s'arrête.
