@@ -36,7 +36,8 @@ il respecte les règles communes, notamment les ajouts en fin de liste dans les 
 et la comparaison avec la maquette par l'aperçu (R6).
 
 **À venir** : qualité du MVP selon `docs/plan-qualite-mvp.md` (brouillon : lots A à K, questions Q1
-à Q10 à trancher), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
+à Q10, dont Q5 et Q10 tranchées ; lot 0 : maquette redessinée d'abord, elle est la référence, selon
+`docs/maquette-consignes-qualite.md`), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
 `docs/audit-2026-11-mvp/preuves/`).
 
 ## Architecture
@@ -283,7 +284,7 @@ Référence : `docs/plan-suivi-maquette.md` (règles R1 à R9).
   lettre). Plans, commits et pull requests citent les écrans par repère.
 - `docs/maquette-etat.yml` tient l'état de chaque écran (livré, en partie, à faire…), sa pull
   request ou son plan, ses captures e2e et ses écarts avec le code (`aligner` : maquette, code ou
-  à décider). Une pull request qui livre, modifie ou écarte un écran le met à jour ;
+  à décider ; une liste quand un écran diffère sur plusieurs points). Une pull request qui livre, modifie ou écarte un écran le met à jour ;
   `scripts/check-maquette.mjs` le vérifie (`npm run check`, CI).
 - Une capture citée existe dans `e2e/arnod.e2e.ts` (`screenshot(browser, "…")`) : un écran livré
   visible gagne une capture e2e. La maquette est régénérée depuis le fichier après fusion

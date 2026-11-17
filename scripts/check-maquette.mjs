@@ -81,12 +81,18 @@ for (const [code, page] of Object.entries(doc.pages)) {
     for (const capture of list(screen.captures)) {
       if (!captures.has(capture)) fail(id, `capture inconnue des tests e2e : « ${capture} »`);
     }
-    if (screen.ecart !== undefined) {
+    // Un écart, ou une liste d'écarts quand l'écran diffère du code sur plusieurs points qui ne
+    // s'alignent pas du même côté.
+    const screenGaps = Array.isArray(screen.ecart) ? screen.ecart : list(screen.ecart);
+    if (Array.isArray(screen.ecart) && screen.ecart.length === 0) {
+      fail(id, "une liste d'écarts n'est pas vide");
+    }
+    for (const gap of screenGaps) {
       gaps += 1;
-      if (typeof screen.ecart?.texte !== "string" || screen.ecart.texte === "") {
+      if (typeof gap?.texte !== "string" || gap.texte === "") {
         fail(id, "un écart dit ce qui diffère (texte)");
       }
-      if (!ALIGN.includes(screen.ecart?.aligner)) {
+      if (!ALIGN.includes(gap?.aligner)) {
         fail(id, `un écart dit quoi aligner : ${ALIGN.join(", ")}`);
       }
     }

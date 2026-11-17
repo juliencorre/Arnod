@@ -1,6 +1,6 @@
 # Plan - Qualité du MVP
 
-**Version** 0.1 · **Date** 2026-11-17 · **Statut** Brouillon · **Base** version 0.0.3
+**Version** 0.1 · **Date** 2026-11-17 · **Statut** Brouillon (Q5, Q10, Q11 tranchées) · **Base** version 0.0.3
 (Develop @512f194)
 
 Plan de correction des constats de l'[audit du MVP](audit-2026-11-mvp.md) : performance, qualité,
@@ -28,18 +28,27 @@ trancher avant le lot qu'elles bloquent ; le lot A n'en dépend d'aucune.
 
 ## 2. Maquettes
 
-Aucun écran n'est ajouté. Les lots H, I et J modifient des écrans livrés ; chacun met à jour
-`docs/maquette-etat.yml` quand un écart naît ou disparaît (dont les deux entrées périmées : 1.2-d
-et le vocabulaire).
+La maquette est la référence (décision du 2026-11-17) : un écran que ce plan change est redessiné
+d'abord (lot 0, consignes dans [`maquette-consignes-qualite.md`](maquette-consignes-qualite.md)),
+et chaque divergence avec le code est notée dans `docs/maquette-etat.yml` en `aligner: code`,
+avec son constat. Un lot qui livre la correction retire l'écart. Aucun écran n'est ajouté.
 
-| Repère              | Dans ce plan                                                      |
-| ------------------- | ----------------------------------------------------------------- |
-| 5.1-b, 5.1-b ter    | DE1, DE3, DE10, ER3, ER6 (panneau de réponse, vue partagée)       |
-| 1.6-g, 4.1-g, 4.2-c | DE2 (textes illisibles en thème sombre)                           |
-| 1.2-a, 1.2-e, 4.2-a | DE5, AC1, PI4 (barre latérale)                                    |
-| 1.2-d, 2.1-a        | DE6, DE9, ER5 (points de départ, accueil)                         |
-| 3.3-a               | ER2 (environnements : écart « à décider », question Q5)           |
-| 0.5                 | DE4, AC6 (jetons de bord et de texte : design system à régénérer) |
+| Repère            | Redessiné                                                              | Constat       | Lot |
+| ----------------- | ---------------------------------------------------------------------- | ------------- | --- |
+| 0.5 (transverses) | bord de contrôle à 3:1, couleurs de texte, formes uniques              | DE4, AC6, DE7 | I   |
+| 1.2-a             | infobulle d'un nom coupé, ⋯ au survol et au focus                      | DE5           | H   |
+| 1.2-d             | quatre points de départ sur quatre colonnes                            | DE6           | I   |
+| 1.6-e, 1.6-g      | bouton de fermeture ; « Vérifier maintenant » lisible en sombre        | ER4, DE2      | I   |
+| 2.1-a             | un seul bouton plein, hauteurs de contrôle                             | DE9           | I   |
+| 3.3-a, 3.4-a      | enregistrement sur place, « ✓ Enregistré »                             | ER2           | J   |
+| 4.1-g, 4.2-c      | notes lisibles en sombre                                               | DE2           | I   |
+| 4.2-a, 5.1-h      | barre des étapes sur une rangée qui défile                             | DE8           | I   |
+| 4.2-b             | échec d'assertion affiché une fois, « Ignorer pour ce résultat »       | DE10, ER3     | I   |
+| 5.1-b             | réponse vide en neutre, vue partagée sur une ligne, erreur avec action | DE1, DE3, ER6 | I   |
+
+Écarts transverses ajoutés, sans écran redessiné : « Suppressions » (ER1, ER7, lot J) et « Clavier
+et cibles » (AC1 à AC4, lots H et J). L'écart transverse du vocabulaire, résolu par le lot K du
+MVP, est retiré ; l'écart de 1.2-d, résolu aussi, est remplacé.
 
 ## 3. Règles
 
@@ -60,6 +69,7 @@ Ces règles valent pour tous les lots.
 | R11 | Toute suppression se rattrape par « Annuler » dans la notification ; une saisie n'est jamais jetée sans le dire.                                                                                                                            |
 | R12 | Un composant qui suit un motif WAI-ARIA (arbre, onglets, menu) en a le clavier complet ; le focus revient au déclencheur après une fermeture.                                                                                               |
 | R13 | Un type échangé avec le cœur est vérifié par la CI des deux côtés ; un style partagé par plus de trois composants vit dans `styles.css` ou `components/ui/`.                                                                                |
+| R14 | La maquette est la référence : un écran change d'abord dans la maquette ; le lot qui l'aligne dans le code retire son écart de `maquette-etat.yml` et compare son aperçu à l'écran redessiné (`scripts/apercu.mjs --maquette`).             |
 
 ## 4. Constats par lot
 
@@ -166,8 +176,15 @@ données, si Q1 le retient.
 ## 8. Plan de tâches pour Claude Code
 
 Un lot = une pull request, titrée en Conventional Commits. `npm run check` passe avant chaque
-commit ; chaque tâche est relue avant commit. Vague 1 : A puis B, seuls. Vague 2, en parallèle :
+commit ; chaque tâche est relue avant commit. Vague 0 : lot 0, la maquette, sur claude.ai ; il
+ne bloque que H, I et J. Vague 1 : A puis B, seuls. Vague 2, en parallèle :
 C, D, E, F, I. Vague 3, en parallèle : G, H, J, K.
+
+**Lot 0 - Maquette de référence** (session claude.ai, `docs/maquette-consignes-qualite.md`)
+
+- [x] **T0a** Divergences notées dans `maquette-etat.yml` (`aligner: code`) ; un écran peut porter
+      une liste d'écarts (`check-maquette.mjs`, `maquette-sync.py`).
+- [ ] **T0b** Écrans du § 2 redessinés dans la maquette, puis régénérée et republiée.
 
 **Lot A - Urgences** (`claude/qualite-a-urgences`)
 
@@ -291,15 +308,16 @@ C, D, E, F, I. Vague 3, en parallèle : G, H, J, K.
 
 Questions ouvertes, à trancher avant le lot cité.
 
-| ID  | Question                                                                                                                                                  | Lot | Décision   |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---------- |
-| Q1  | Instance unique : `tauri-plugin-single-instance` (un plugin de plus, ramène la fenêtre) ou fichier verrou écrit par Arnod (sans plugin, message seul) ?   | C   | À trancher |
-| Q2  | Miroir IPC : `ts-rs` en dépendance de test (types générés, rien dans le binaire) ou échantillons JSON vérifiés par `vue-tsc` (sans dépendance, partiel) ? | B   | À trancher |
-| Q3  | Commentaires YAML perdus à l'enregistrement : les conserver (réécriture de la couche YAML, effort L) ou l'écrire comme limite connue ?                    | E   | À trancher |
-| Q4  | Variable qui cite une autre variable : la résoudre comme Bruno (profondeur bornée, cycles refusés) ou la signaler inconnue ?                              | E   | À trancher |
-| Q5  | Environnements et réglages du projet : enregistrement automatique comme le reste (résout l'écart 3.3-a) ou garde à la fermeture ?                         | J   | À trancher |
-| Q6  | Taille de projet visée par les budgets R7 : 2 000 requêtes et un poste ralenti 4×, ou une autre cible ?                                                   | F   | À trancher |
-| Q7  | Liste virtualisée : composant maison à hauteur fixe ou dépendance (`@tanstack/vue-virtual`) ?                                                             | G   | À trancher |
-| Q8  | SonarCloud : versionner sa configuration dans le dépôt, ou retirer ses badges du README ?                                                                 | B   | À trancher |
-| Q9  | `reqwest` 0.13 pour n'avoir qu'un client HTTP : maintenant (lot K) ou à la prochaine montée de Tauri ?                                                    | K   | À trancher |
-| Q10 | Bords de contrôle à 3:1 : foncer les bords de tous les champs, ou seulement cases, interrupteurs et focus ?                                               | I   | À trancher |
+| ID  | Question                                                                                                                                                  | Lot | Décision                                                                                               |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------ |
+| Q1  | Instance unique : `tauri-plugin-single-instance` (un plugin de plus, ramène la fenêtre) ou fichier verrou écrit par Arnod (sans plugin, message seul) ?   | C   | À trancher                                                                                             |
+| Q2  | Miroir IPC : `ts-rs` en dépendance de test (types générés, rien dans le binaire) ou échantillons JSON vérifiés par `vue-tsc` (sans dépendance, partiel) ? | B   | À trancher                                                                                             |
+| Q3  | Commentaires YAML perdus à l'enregistrement : les conserver (réécriture de la couche YAML, effort L) ou l'écrire comme limite connue ?                    | E   | À trancher                                                                                             |
+| Q4  | Variable qui cite une autre variable : la résoudre comme Bruno (profondeur bornée, cycles refusés) ou la signaler inconnue ?                              | E   | À trancher                                                                                             |
+| Q5  | Environnements et réglages du projet : enregistrement automatique comme le reste (résout l'écart 3.3-a) ou garde à la fermeture ?                         | J   | 2026-11-17 : enregistrement automatique                                                                |
+| Q6  | Taille de projet visée par les budgets R7 : 2 000 requêtes et un poste ralenti 4×, ou une autre cible ?                                                   | F   | À trancher                                                                                             |
+| Q7  | Liste virtualisée : composant maison à hauteur fixe ou dépendance (`@tanstack/vue-virtual`) ?                                                             | G   | À trancher                                                                                             |
+| Q8  | SonarCloud : versionner sa configuration dans le dépôt, ou retirer ses badges du README ?                                                                 | B   | À trancher                                                                                             |
+| Q9  | `reqwest` 0.13 pour n'avoir qu'un client HTTP : maintenant (lot K) ou à la prochaine montée de Tauri ?                                                    | K   | À trancher                                                                                             |
+| Q10 | Bords de contrôle à 3:1 : foncer les bords de tous les champs, ou seulement cases, interrupteurs et focus ?                                               | I   | 2026-11-17 : cases, interrupteurs, radios et focus ; jeton `--color-border-control` (#8f8a83, #7d7871) |
+| Q11 | Barre des étapes trop haute (DE8) : une rangée qui défile, ou « Étape n / total » avec un menu ?                                                          | I   | 2026-11-17 : une rangée qui défile                                                                     |
