@@ -1,0 +1,148 @@
+name: qualite
+
+# Plan qualité (docs/plan-qualite-mvp.md, T7 et T8) : bancs de performance et couverture,
+# chaque lundi et à la demande. Trop longs pour chaque pull request ; leurs relevés sont dans le
+# résumé de l'exécution et en artefacts. Les budgets de R7 sont signalés ; ils ne font échouer
+# les bancs qu'avec ARNOD_BANC_STRICT=1 (variable du dépôt), à poser quand les lots F et G les
+# tiennent.
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: 22
+  ARNOD_BANC_STRICT: ${{ vars.ARNOD_BANC_STRICT }}
+
+jobs:
+  perf-coeur:
+    name: Banc du cœur
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dépendances système
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libxdo-dev libssl-dev librsvg2-dev file
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: "./src-tauri -> target"
+          key: perf
+
+      # `generate_context!` lit dist/ ; le profil release fixe `panic = "abort"`, que les tests
+      # ne permettent pas (en-tête de src-tauri/tests/perf_coeur.rs).
+      - name: Banc du cœur (2 000 requêtes)
+        working-directory: src-tauri
+        env:
+          CARGO_PROFILE_RELEASE_PANIC: unwind
+        run: |
+          mkdir -p ../dist && touch ../dist/index.html
+          set -o pipefail
+          cargo test --release --locked --test perf_coeur -- --ignored --nocapture --test-threads=1 \
+            | tee ../perf-coeur.md
+          grep "> Budget" ../perf-coeur.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: perf-coeur
+          path: perf-coeur.md
+          if-no-files-found: ignore
+
+  perf-interface:
+    name: Banc de l'interface
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      # Playwright n'est pas une dépendance du projet : installé pour ce job seulement.
+      - name: Playwright et Chromium
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      - name: Banc de l'interface (processeur ralenti 4×)
+        run: |
+          npx vite build --config vite.perf.config.ts
+          set -o pipefail
+          node scripts/perf-interface.mjs --sortie perf-interface.json | tee perf-interface.txt
+          sed -n '/## Budgets R7/,$p' perf-interface.txt >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: perf-interface
+          path: |
+            perf-interface.json
+            perf-interface.txt
+          if-no-files-found: ignore
+
+  couverture:
+    name: Couverture du cœur
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dépendances système
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libxdo-dev libssl-dev librsvg2-dev file
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: "./src-tauri -> target"
+          key: couverture
+
+      # Couverture des lignes ; celle de src/commands/ (les façades, MA3) est publiée à part.
+      - name: Couverture (cargo llvm-cov)
+        working-directory: src-tauri
+        run: |
+          mkdir -p ../dist && touch ../dist/index.html
+          cargo install cargo-llvm-cov --locked
+          cargo llvm-cov --locked --lib --lcov --output-path ../couverture.lcov
+          cargo llvm-cov report --summary-only | tee ../couverture.txt
+          {
+            echo "## Couverture du cœur"
+            echo '```'
+            tail -n 1 ../couverture.txt
+            echo '```'
+            echo "### src/commands/"
+            echo '```'
+            grep "commands/" ../couverture.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: couverture
+          path: |
+            couverture.lcov
+            couverture.txt
