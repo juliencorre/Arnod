@@ -184,18 +184,18 @@ C, D, E, F, I. Vague 3, en parallèle : G, H, J, K.
 
 - [x] **T0a** Divergences notées dans `maquette-etat.yml` (`aligner: code`) ; un écran peut porter
       une liste d'écarts (`check-maquette.mjs`, `maquette-sync.py`).
-- [ ] **T0b** Écrans du § 2 redessinés dans la maquette, puis régénérée et republiée.
+- [x] **T0b** Écrans du § 2 redessinés dans la maquette, puis régénérée et republiée.
 
 **Lot A - Urgences** (`claude/qualite-a-urgences`)
 
-- [ ] **T1** IN1 : `Body` aligné des deux côtés, test Rust de sa forme JSON, e2e qui envoie un
+- [x] **T1** IN1 : `Body` aligné des deux côtés, test Rust de sa forme JSON, e2e qui envoie un
       corps JSON choisi dans l'éditeur.
-- [ ] **T2** PU1, PU2, PU3 : filtre JSONPath sans panique, aperçu et mise en forme bornés en
+- [x] **T2** PU1, PU2, PU3 : filtre JSONPath sans panique, aperçu et mise en forme bornés en
       profondeur.
-- [ ] **T3** ES1, ES2, PU4, PU5 : environnement illisible jamais réécrit, nom de fichier libre,
+- [x] **T3** ES1, ES2, PU4, PU5 : environnement illisible jamais réécrit, nom de fichier libre,
       contrôle de nom unique, renommage défait en cas d'échec.
-- [ ] **T4** ES7 : classement sans le texte de l'adresse ; test sur un port contenant 407.
-- [ ] **T5** MA4 : clé de signature passée aux seuls tags.
+- [x] **T4** ES7 : classement sans le texte de l'adresse ; test sur un port contenant 407.
+- [x] **T5** MA4 : clé de signature passée aux seuls tags.
 
 **Lot B - Garde-fous** (`claude/qualite-b-garde-fous`)
 

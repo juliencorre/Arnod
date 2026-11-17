@@ -131,13 +131,14 @@ jobs:
 
       # Lot L (docs/plan-mvp-l-mises-a-jour.md) : avec la clé privée, chaque paquet reçoit sa
       # signature (.sig) pour la mise à jour par Arnod. Obligatoire pour un tag : une release non
-      # signée ne s'installerait pas depuis Arnod. Sans la clé (pull request de Dependabot) : build
-      # sans signature.
+      # signée ne s'installerait pas depuis Arnod. La clé n'est passée qu'aux tags (MA4,
+      # plan-qualite-mvp) : ailleurs, les scripts de build des dépendances ne la voient pas, et le
+      # paquet part sans signature.
       - name: tauri build
         shell: bash
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
         run: |
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
             npm run tauri build -- --config src-tauri/tauri.updater.conf.json

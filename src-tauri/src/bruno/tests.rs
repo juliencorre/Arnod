@@ -463,3 +463,42 @@ fn forme_json_du_rapport() {
     let counts = serde_json::to_value(converted().counts).unwrap();
     assert!(counts.get("dynamicValues").is_some());
 }
+
+/// PU4 : une collection Bruno dont un dossier s'appelle `contracts` ne range pas ses requêtes dans
+/// le dossier réservé aux contrats du nouveau projet.
+#[test]
+fn pu4_dossier_contracts_d_une_collection_renomme() {
+    use super::read::{Collection, Folder, Source};
+    let file = super::parse::parse(
+        "meta {\n  name: Signer\n  type: http\n}\n\nget {\n  url: https://api.test/contracts\n}\n",
+    )
+    .unwrap();
+    let collection = Collection {
+        name: "Juridique".to_owned(),
+        tree: Folder {
+            folders: vec![Folder {
+                dir: "contracts".to_owned(),
+                path: "contracts".to_owned(),
+                requests: vec![Source {
+                    path: "contracts/Signer.bru".to_owned(),
+                    file,
+                }],
+                ..Folder::default()
+            }],
+            ..Folder::default()
+        },
+        bru_files: 1,
+        ..Collection::default()
+    };
+    let converted = convert(&collection);
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    std::fs::write(
+        root.join(crate::opencollection::ROOT_FILE),
+        "opencollection: 1.0.0\ninfo:\n  name: Juridique\n",
+    )
+    .unwrap();
+    crate::import::write_new_project(root, &converted).unwrap();
+    assert_eq!(crate::tree::requests_in(root, "").unwrap().len(), 1);
+    assert!(crate::contract::file::list(root).is_empty());
+}

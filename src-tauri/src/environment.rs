@@ -121,14 +121,38 @@ fn from_value(value: &Value, protected: bool) -> Option<Environment> {
     })
 }
 
-fn files(root: &Path) -> Vec<EnvFile> {
-    let protected = collection::read_meta(root).protected;
+/// Fichiers d'environnement présents, lisibles ou non.
+fn env_paths(root: &Path) -> Vec<PathBuf> {
     fs::read_dir(dir(root))
         .into_iter()
         .flatten()
         .flatten()
         .map(|entry| entry.path())
         .filter(|path| path.extension().is_some_and(|ext| ext == "yml"))
+        .collect()
+}
+
+/// Fichier où écrire l'environnement `name` (ES2) : `<slug>.yml`, ou `<slug>-2.yml`… quand ce
+/// fichier appartient à un autre environnement, ou est illisible (R3). `own` est le fichier
+/// actuel de l'environnement, qu'il réécrit.
+fn free_file(root: &Path, name: &str, own: Option<&Path>) -> PathBuf {
+    let base = slug(name);
+    (1..)
+        .map(|n| {
+            if n == 1 {
+                dir(root).join(format!("{base}.yml"))
+            } else {
+                dir(root).join(format!("{base}-{n}.yml"))
+            }
+        })
+        .find(|path| own == Some(path.as_path()) || !path.exists())
+        .unwrap_or_else(|| file_for(root, name))
+}
+
+fn files(root: &Path) -> Vec<EnvFile> {
+    let protected = collection::read_meta(root).protected;
+    env_paths(root)
+        .into_iter()
         .filter_map(|path| {
             let value = yaml::read(&path).ok()?;
             let name = value.get("name").and_then(Value::as_str).unwrap_or("");
@@ -225,11 +249,12 @@ fn write_file(path: &Path, value: &Value) -> Result<(), CommandError> {
 /// Environnement créé avec chaque projet (N1).
 pub const LOCAL: &str = "Local";
 
-/// Crée `environments/` avec « Local » et la variable `baseUrl` vide (N1).
+/// Crée `environments/` avec « Local » et la variable `baseUrl` vide (N1), seulement s'il n'y a
+/// aucun fichier d'environnement : un fichier illisible (conflit Git…) n'est jamais remplacé (ES1).
 pub fn init(root: &Path) -> Result<(), CommandError> {
     fs::create_dir_all(dir(root))
         .map_err(|error| CommandError::io("Création du dossier impossible", &dir(root), &error))?;
-    if list(root).is_empty() {
+    if env_paths(root).is_empty() {
         let local = Environment {
             name: LOCAL.to_owned(),
             color: default_color(),
@@ -268,7 +293,7 @@ pub fn save(
     let old = previous.and_then(|p| existing.iter().find(|f| same_name(&f.environment.name, p)));
     fs::create_dir_all(dir(root))
         .map_err(|error| CommandError::io("Création du dossier impossible", &dir(root), &error))?;
-    let target = file_for(root, &name);
+    let target = free_file(root, &name, old.map(|f| f.path.as_path()));
     write_file(&target, &into_value(&environment, old.map(|f| &f.value)))?;
     if let Some(old) = old
         && old.path != target
@@ -340,6 +365,42 @@ mod tests {
             }],
             locals: vec!["token".into()],
         }
+    }
+
+    /// ES1 : un environnement illisible (marqueurs de fusion Git) n'est jamais remplacé par un
+    /// « Local » vide.
+    #[test]
+    fn es1_environnement_illisible_jamais_reecrit() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(ENVIRONMENTS_DIR)).unwrap();
+        let file = dir.path().join(ENVIRONMENTS_DIR).join("local.yml");
+        let edited = "<<<<<<< HEAD\nname: Local\n=======\nname: Local\n>>>>>>> main\n";
+        fs::write(&file, edited).unwrap();
+        init(dir.path()).unwrap();
+        assert_eq!(fs::read_to_string(&file).unwrap(), edited);
+        // Un nouvel environnement « Local » ne l'écrase pas non plus.
+        save(dir.path(), &env("Local"), None).unwrap();
+        assert_eq!(fs::read_to_string(&file).unwrap(), edited);
+        assert_eq!(list(dir.path()).len(), 1);
+    }
+
+    /// ES2 : deux environnements de noms différents mais de même nom de fichier coexistent.
+    #[test]
+    fn es2_environnement_de_meme_fichier_n_ecrase_pas_l_autre() {
+        let dir = tempfile::tempdir().unwrap();
+        init(dir.path()).unwrap();
+        save(dir.path(), &env("Recette 1"), None).unwrap();
+        save(dir.path(), &env("Recette-1"), None).unwrap();
+        let names: Vec<String> = list(dir.path()).into_iter().map(|e| e.name).collect();
+        assert!(names.contains(&"Recette 1".to_owned()), "{names:?}");
+        assert!(names.contains(&"Recette-1".to_owned()), "{names:?}");
+        // Renommer l'un garde l'autre ; réenregistrer réécrit son propre fichier.
+        save(dir.path(), &env("Recette 1"), Some("Recette 1")).unwrap();
+        save(dir.path(), &env("Recette un"), Some("Recette-1")).unwrap();
+        let names: Vec<String> = list(dir.path()).into_iter().map(|e| e.name).collect();
+        assert_eq!(names.len(), 3, "{names:?}");
+        assert!(names.contains(&"Recette 1".to_owned()));
+        assert!(names.contains(&"Recette un".to_owned()));
     }
 
     #[test]
