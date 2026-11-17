@@ -3183,3 +3183,81 @@ describe("Lot G - Démarrage et erreurs (0.3)", () => {
     expect(await browser.$(".startup-problem").isExisting()).toBe(false);
   });
 });
+
+describe("Plan qualité, lot A - Corps choisi dans l'éditeur (IN1)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const file = () => path.join(project(), "corps-in1.yml");
+  let server: Server;
+  const received: { type: string; body: string }[] = [];
+
+  beforeAll(async () => {
+    server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk: Buffer) => (body += chunk.toString()));
+      request.on("end", () => {
+        received.push({ type: request.headers["content-type"] ?? "", body });
+        response.writeHead(201, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ id: 1 }));
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = String((server.address() as AddressInfo).port);
+    writeFileSync(
+      file(),
+      `info:\n  name: Corps IN1\n  type: http\nhttp:\n  method: POST\n  url: http://127.0.0.1:${port}/orders\n`,
+    );
+  });
+
+  afterAll(async () => {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  it("le corps JSON choisi dans l'éditeur est enregistré et part au serveur", async () => {
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]')).some((i) =>
+            i.textContent.includes("Corps IN1"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "requête écrite sur disque attendue dans l'arborescence" },
+    );
+    await browser.execute(() => {
+      Array.from(document.querySelectorAll<HTMLElement>('aside [role="treeitem"]'))
+        .find((i) => i.textContent.includes("Corps IN1"))
+        ?.click();
+    });
+    await browser.$(".request-tab .editor__url").waitForExist({ timeout: 10_000 });
+    await clickText(".request-tab .editor__tab", "Corps");
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".request-tab .body__type");
+      if (!select) throw new Error("type de corps introuvable");
+      select.value = "json";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await browser.$(".request-tab .body__content").waitForExist({ timeout: 10_000 });
+    await browser.execute(() => {
+      const area = document.querySelector<HTMLTextAreaElement>(".request-tab .body__content");
+      if (!area) throw new Error("contenu du corps introuvable");
+      area.value = '{"sku": "TSH-BLU-M"}';
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    // Enregistré seul (600 ms) : le fichier porte le type choisi.
+    await browser.waitUntil(() => readFileSync(file(), "utf8").includes("type: json"), {
+      timeout: 10_000,
+      timeoutMsg: "type du corps écrit dans le fichier attendu",
+    });
+    await clickText(".request-tab button", "Envoyer");
+    await browser.waitUntil(() => received.length > 0, {
+      timeout: 15_000,
+      timeoutMsg: "requête reçue par le serveur attendue",
+    });
+    expect(received[0]?.type).toContain("application/json");
+    expect(received[0]?.body).toBe('{"sku": "TSH-BLU-M"}');
+  });
+});

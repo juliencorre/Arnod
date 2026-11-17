@@ -242,7 +242,9 @@ pub struct BodyVariant {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Body {
-    #[serde(rename = "type", default)]
+    /// `kind` dans le JSON échangé avec l'interface (`Body.kind` de `src/types/ipc.ts`) ; le
+    /// fichier OpenCollection écrit `type`, par `opencollection/`.
+    #[serde(default)]
     pub kind: BodyKind,
     #[serde(default)]
     pub variants: Vec<BodyVariant>,
@@ -698,5 +700,21 @@ mod tests {
                 ("page", "1", ParamKind::Query),
             ]
         );
+    }
+
+    /// IN1 : le type du corps porte le même nom des deux côtés de l'IPC. L'interface envoie
+    /// `kind` ; un nom différent laisse le corps à « Aucun » à chaque enregistrement.
+    #[test]
+    fn in1_type_du_corps_nomme_kind_dans_le_json() {
+        let body = Body::raw(BodyKind::Json, "{}");
+        let value = serde_json::to_value(&body).expect("corps sérialisé");
+        assert_eq!(value["kind"], "json");
+        assert!(value.get("type").is_none(), "{value}");
+
+        let mut request = serde_json::to_value(Request::new("x")).expect("requête sérialisée");
+        request["body"] = serde_json::json!({ "kind": "json", "variants": [{ "content": "{}" }], "selected": 0, "other": "" });
+        let read: Request = serde_json::from_value(request).expect("requête de l'interface lue");
+        assert_eq!(read.body.kind, BodyKind::Json);
+        assert_eq!(read.body.content(), "{}");
     }
 }
