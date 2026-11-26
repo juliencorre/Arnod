@@ -219,9 +219,9 @@ pull request dit après laquelle la fusionner. Ordre, avec les lots de `plan-qua
 
 **Lot B - Formes et dispositions** (`claude/alignement-b-formes`)
 
-- [ ] **T2** AM13 à AM18 : cartes, menus, gestion des workspaces, champs de recherche.
-- [ ] **T3** AM19 à AM22 : onglets, Ctrl+Tab, séparations, fenêtre de contenu.
-- [ ] **T4** AM23 à AM27 : champs, pastille de version, en-tête de l'éditeur, sélection.
+- [x] **T2** AM13 à AM18 : cartes, menus, gestion des workspaces, champs de recherche.
+- [x] **T3** AM19 à AM22 : onglets, Ctrl+Tab, séparations, fenêtre de contenu.
+- [x] **T4** AM23 à AM27 : champs, pastille de version, en-tête de l'éditeur, sélection.
 
 **Lot C - Réponse, envoyé et run** (`claude/alignement-c-reponse-run`)
 

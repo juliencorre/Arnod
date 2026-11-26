@@ -100,7 +100,12 @@ describe("SplitHandle (F4, F5)", () => {
     await grip(handle).trigger("pointerdown", { button: 0, pointerId: 1, clientX: 500 });
     await grip(handle).trigger("pointermove", { pointerId: 1, clientX: 600 });
     expect(handle.emitted("preview")?.at(-1)).toEqual([0.6]);
-    expect(handle.get(".handle__bubble").text()).toBe("test 600 px · mock 400 px");
+    expect(handle.get(".handle__bubble").text()).toMatch(/^test 600 px · mock 400 px/);
+    // AM21 (1.4-b) : pendant le glisser, la rangée d'aide dit les gestes et le minimum.
+    expect(handle.get(".handle__help").text()).toBe(
+      "Glisser : redimensionner · Double-clic : parts égales · Flèches : au clavier · Largeur mini : 280 px",
+    );
+    expect(handle.get(".handle__mark").text()).toBe("⇔");
 
     await grip(handle).trigger("pointermove", { pointerId: 1, clientX: 950 });
     expect(handle.emitted("preview")?.at(-1)).toEqual([0.72]);

@@ -2,6 +2,7 @@ import { clearMocks } from "@tauri-apps/api/mocks";
 import { type DOMWrapper, flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { cssValue } from "../css";
 import { installFakeCore } from "../fakeCore";
 import {
   AUTH_SSO,
@@ -205,6 +206,21 @@ describe("projet introuvable (P10)", () => {
       "Le dossier du projet « auth-sso » est introuvable",
     );
     expect(wrapper.get("main h1").text()).toBe("Boutique");
+  });
+
+  it("AM13 (1.1-a) : la carte garde un bord plein ; « Ouvrir » est grisé dans son menu", async () => {
+    const snapshot = boutiqueSnapshot();
+    const missing = snapshot.projects[1];
+    if (missing) missing.status = "missing";
+    installFakeCore(snapshot).missing.add(AUTH_SSO);
+    wrapper = await mountApp();
+    await wrapper.get('main button[aria-label="Actions du projet auth-sso"]').trigger("click");
+    await flushPromises();
+    const open = wrapper.findAll('[role="menuitem"]').find((i) => i.text() === "Ouvrir");
+    expect(open?.attributes("aria-disabled")).toBe("true");
+    expect(
+      cssValue("src/components/projects/ProjectCard.vue", ".card--missing", "border-style"),
+    ).toBeUndefined();
   });
 });
 

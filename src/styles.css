@@ -30,6 +30,7 @@
   --color-success-soft: #e7f4ec; /* Fond d'une vérification ou d'une ligne réussie */
   --color-danger: #b42318;
   --color-danger-soft: #fdeceb; /* Fond d'une vérification ou d'une ligne en échec */
+  --color-danger-inverse: #ff9b8a; /* Action destructrice sur une barre inversée (fond color-text) */
 
   /* Accent : bouton principal */
   --color-accent: #e8962e;
@@ -150,6 +151,7 @@
     --color-success-soft: #1f3327;
     --color-danger: #ff8a80;
     --color-danger-soft: #3d2321;
+    --color-danger-inverse: #b42318;
 
     --color-accent: #eda24c;
     --color-accent-hover: #f3b46a;
@@ -326,6 +328,17 @@ input[type="checkbox"]:focus-visible,
 select:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -1px;
+}
+
+/*
+ * Champ de recherche : jamais le bouton natif d'effacement (⌫ sous WebKitGTK, bleu sous WebView2) ;
+ * les champs d'Arnod se vident par leur × ou par Échap (1.2-e, 4.1-g).
+ */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 /* Texte réservé aux lecteurs d'écran. */

@@ -154,12 +154,17 @@ const note = computed(() => {
   gap: 0.5rem;
 }
 
+/* Libellé au-dessus de son champ, comme dans la maquette (3.4-a, 3.4-b). */
 .field {
-  display: grid;
-  grid-template-columns: 8rem minmax(0, 1fr);
-  align-items: center;
-  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 28rem;
   font-size: var(--text-body);
+}
+
+.field > label {
+  color: var(--color-muted);
 }
 
 .field input,

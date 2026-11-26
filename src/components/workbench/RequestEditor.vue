@@ -631,9 +631,13 @@ watch(
   min-width: 0;
 }
 
+/*
+ * Une seule rangée au-dessus de l'adresse (3.2-a) : le fil d'Ariane, « Délier », puis « ✓ Enregistré »
+ * à droite ; le nom du contrat se coupe s'il le faut.
+ */
 .editor__top {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.5rem;
@@ -641,9 +645,11 @@ watch(
 
 .editor__crumbs {
   display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
   align-items: baseline;
   gap: 0.5rem;
+  min-width: 0;
   margin: 0;
   font-size: var(--text-body);
   color: var(--color-muted);
@@ -655,13 +661,20 @@ watch(
 }
 
 .editor__contract {
+  min-width: 0;
   padding: 0;
+  overflow: hidden;
   border: 0;
   font: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--color-link);
   background: none;
   cursor: pointer;
-  overflow-wrap: anywhere;
+}
+
+.editor__crumbs > :not(.editor__contract) {
+  flex: none;
 }
 
 .editor__version {
@@ -675,8 +688,10 @@ watch(
 
 .editor__saved {
   display: flex;
+  flex: none;
   gap: 0.375rem;
   margin: 0;
+  white-space: nowrap;
   font-size: var(--text-body);
   color: var(--color-muted);
 }
@@ -914,7 +929,7 @@ watch(
 
 .editor__meta {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 0.75rem;
 }
 

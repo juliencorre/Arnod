@@ -909,7 +909,7 @@ describe("Contrats de services", () => {
     await name.waitForDisplayed({ timeout: 10_000 });
     expect(await name.getText()).toBe("Animalerie");
     expect(await browser.$(".contract__coverage").getText()).toBe("3 opérations · 0 avec requête");
-    expect(await browser.$(".contract-row__version").getText()).toBe("2.1.0");
+    expect(await browser.$(".contract-row__version").getText()).toBe("v2.1.0");
     expect(readFileSync(path.join(project(), "contracts", "animalerie.yaml"), "utf8")).toBe(
       animalerie(url),
     );

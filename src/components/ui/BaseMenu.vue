@@ -316,6 +316,7 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
             class="menu__item"
             :class="{
               'menu__item--danger': item.tone === 'danger',
+              'menu__item--link': item.tone === 'link',
               'menu__item--active': index === active,
             }"
             :data-level="0"
@@ -367,6 +368,7 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
                 class="menu__item"
                 :class="{
                   'menu__item--danger': child.tone === 'danger',
+                  'menu__item--link': child.tone === 'link',
                   'menu__item--active': childIndex === subActive,
                 }"
                 :data-level="1"
@@ -469,6 +471,11 @@ function role(item: MenuItem): "menuitem" | "menuitemcheckbox" | "menuitemradio"
 
 .menu__item--danger {
   color: var(--color-danger);
+}
+
+/* Ligne d'ajout d'un menu (« + Nouvel environnement »), comme « + Nouveau workspace ». */
+.menu__item--link {
+  color: var(--color-link);
 }
 
 .menu__check {

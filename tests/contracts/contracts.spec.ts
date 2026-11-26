@@ -80,7 +80,8 @@ describe("ajouter un contrat (C1 à C4)", () => {
 
     expect(app?.find("dialog[open]").exists()).toBe(false);
     expect(app?.get(".contract-row").text()).toContain("Petstore");
-    expect(app?.get(".contract-row__version").text()).toBe("1.0.0");
+    // AM24 (3.1-e) : la version en pastille « v1.0.0 ».
+    expect(app?.get(".contract-row__version").text()).toBe("v1.0.0");
     expect(app?.get(".contract__name").text()).toBe("Petstore");
     expect(app?.get(".zone__tab-button[aria-selected='true']").text()).toContain("Petstore");
     expect(app?.get(".toast").text()).toContain("Contrat « Petstore » ajouté.");
@@ -127,7 +128,7 @@ describe("onglet du contrat (C5, C6, C10)", () => {
     await setup(true);
     await openContract(app as AppWrapper);
 
-    expect(app?.get(".contract__version").text()).toBe("version 1.0.0");
+    expect(app?.get(".contract__version").text()).toBe("Contrat v1.0.0");
     expect(app?.get(".contract__kind").text()).toBe("OpenAPI 3.0.3");
     expect(app?.findAll(".group__title").map((t) => t.text())).toEqual(["animaux", "Sans tag"]);
     expect(operationRows(app as AppWrapper)).toEqual([
@@ -263,8 +264,8 @@ describe("source et suppression (C9, C11)", () => {
     await flushPromises();
     expect(core.calls.filter((c) => c.cmd === "contract_save")).toHaveLength(2);
     expect(app?.find(".contract__panel [role='alert']").exists()).toBe(false);
-    expect(app?.get(".contract__version").text()).toBe("version 1.1.0");
-    expect(app?.get(".contract-row__version").text()).toBe("1.1.0");
+    expect(app?.get(".contract__version").text()).toBe("Contrat v1.1.0");
+    expect(app?.get(".contract-row__version").text()).toBe("v1.1.0");
   });
 
   it("une source illisible n'est pas perdue à la fermeture de l'onglet", async () => {

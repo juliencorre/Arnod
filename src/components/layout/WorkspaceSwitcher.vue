@@ -246,9 +246,11 @@ function openActions(workspaceId: string, event?: MouseEvent): void {
   active.value = index;
   row?.focus();
   const rect = row?.getBoundingClientRect();
+  // À côté du sélecteur, jamais par-dessus : ses raccourcis restent lisibles (1.1-b bis).
+  const panel = row?.closest(".switcher__list")?.getBoundingClientRect();
   actionsPosition.value = event
     ? { left: event.clientX, top: event.clientY }
-    : { left: (rect?.right ?? 0) - 8, top: (rect?.top ?? 0) - 4 };
+    : { left: (panel?.right ?? rect?.right ?? 0) + 4, top: (rect?.top ?? 0) - 4 };
   actionsMenu.value?.close(false);
   actionTarget.value = workspaceId;
   void nextTick(() => actionsMenu.value?.open());

@@ -12,6 +12,7 @@ import { nextPlacement } from "@/stores/windows";
 import { requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type { RunView } from "@/types/ipc";
 
+import { cssValue } from "../css";
 import type { AppWrapper } from "../mountApp";
 import { openProject } from "../workbench/helpers";
 
@@ -207,6 +208,11 @@ describe("Ctrl+Tab (1.3-c)", () => {
     const list = () => app?.findAll(".zone__switcher-name").map((n) => n.text()) ?? [];
     expect(list()).toEqual(["Santé", "Créer", "Lister"]);
     expect(app.get('[role="option"][aria-selected="true"]').text()).toContain("Créer");
+    // AM20 (1.3-c) : un voile assombrit la zone derrière la liste.
+    expect(app.find(".zone__scrim").exists()).toBe(true);
+    expect(cssValue("src/components/zones/ZoneView.vue", ".zone__scrim", "background")).toBe(
+      "var(--backdrop)",
+    );
 
     key("Tab", { ctrlKey: true });
     await flushPromises();
@@ -218,6 +224,7 @@ describe("Ctrl+Tab (1.3-c)", () => {
     window.dispatchEvent(new KeyboardEvent("keyup", { key: "Control", code: "ControlLeft" }));
     await flushPromises();
     expect(app.find(".zone__switcher").exists()).toBe(false);
+    expect(app.find(".zone__scrim").exists()).toBe(false);
     // Des lectures (contrats, saisie) peuvent finir après : seule la dernière action de
     // disposition compte.
     expect(core.calls.filter((c) => c.cmd.startsWith("layout_")).at(-1)?.cmd).toBe(

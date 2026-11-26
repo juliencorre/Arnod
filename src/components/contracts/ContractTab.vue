@@ -107,7 +107,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
         <div class="contract__title">
           <h2 class="contract__name">{{ view.name }}</h2>
           <span v-if="view.version && !view.deduced" class="contract__version"
-            >version {{ view.version }}</span
+            >Contrat v{{ view.version }}</span
           >
           <span v-if="kindLabel" class="contract__kind">{{ kindLabel }}</span>
           <code class="contract__file">{{ view.path }}</code>
@@ -316,13 +316,14 @@ function onSourceKeydown(event: KeyboardEvent): void {
   font-weight: 600;
 }
 
+/* Version en pastille, la même que dans l'éditeur d'une requête liée (3.1-e). */
 .contract__version {
   padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-pill);
-  font-size: var(--text-small);
-  font-weight: 600;
-  color: var(--color-link);
-  background: var(--color-accent-soft);
+  font: 600 var(--text-small) var(--font-mono);
+  color: var(--color-text);
+  background: var(--color-chip);
 }
 
 .contract__kind {
