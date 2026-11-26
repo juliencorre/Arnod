@@ -284,6 +284,7 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::workbench::LocalVarView>();
     v.visit::<crate::workbench::EnvironmentView>();
     v.visit::<crate::workbench::EnvironmentsView>();
+    v.visit::<crate::commands::environments::EnvironmentDeleted>();
     v.visit::<crate::workbench::SendOutcome>();
     v.visit::<crate::workbench::UsedVariable>();
     v.visit::<crate::workbench::Sent>();

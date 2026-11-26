@@ -1,8 +1,7 @@
 //! Domaine « sélection » (écran 4.1-a quater) : déplacer, dupliquer, exécuter ou mettre à la
 //! corbeille plusieurs éléments de l'arborescence d'un coup, avec « Annuler ».
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::{Manager, State, WebviewWindow};
@@ -12,7 +11,8 @@ use crate::commands::tree::follow_path;
 use crate::error::{CommandError, CommandErrorKind};
 use crate::layout::windows::Windows;
 use crate::state::AppState;
-use crate::tree::{self, batch, undo::Undo};
+use crate::tree::undo::{Undo, UndoBook};
+use crate::tree::{self, batch};
 use crate::watch::Renamed;
 use crate::windows::{self, ProjectScope};
 use crate::workbench::{RunView, Workbench};
@@ -28,13 +28,7 @@ pub struct BatchResult {
 }
 
 /// Actions récentes, à annuler : projet et fichiers d'avant.
-fn pending() -> &'static Mutex<VecDeque<(Uuid, Uuid, Undo)>> {
-    static PENDING: OnceLock<Mutex<VecDeque<(Uuid, Uuid, Undo)>>> = OnceLock::new();
-    PENDING.get_or_init(|| Mutex::new(VecDeque::new()))
-}
-
-/// Nombre d'actions gardées pour « Annuler ».
-const KEPT: usize = 20;
+static PENDING: Mutex<UndoBook<(Uuid, Undo)>> = Mutex::new(UndoBook::new());
 
 fn changed(window: &WebviewWindow, project: Uuid) {
     windows::project_changed(
@@ -87,13 +81,10 @@ pub fn tree_batch(
         renamed,
         removed,
     );
-    let undo_token = Uuid::new_v4();
-    if let Ok(mut list) = pending().lock() {
-        list.push_back((undo_token, project, undo));
-        while list.len() > KEPT {
-            list.pop_front();
-        }
-    }
+    let undo_token = PENDING
+        .lock()
+        .map(|mut book| book.push((project, undo)))
+        .unwrap_or_else(|_| Uuid::new_v4());
     Ok(BatchResult {
         items: done.items,
         undo_token,
@@ -103,11 +94,11 @@ pub fn tree_batch(
 /// « Annuler » une action sur la sélection.
 #[tauri::command]
 pub fn tree_batch_undo(window: WebviewWindow, undo_token: Uuid) -> Result<(), CommandError> {
-    let entry = pending().lock().ok().and_then(|mut list| {
-        let index = list.iter().position(|(token, _, _)| *token == undo_token)?;
-        list.remove(index)
-    });
-    let Some((_, project, undo)) = entry else {
+    let entry = PENDING
+        .lock()
+        .ok()
+        .and_then(|mut book| book.take(undo_token));
+    let Some((project, undo)) = entry else {
         return Err(CommandError::new(
             CommandErrorKind::UndoExpired,
             "Cette action ne peut plus être annulée.",

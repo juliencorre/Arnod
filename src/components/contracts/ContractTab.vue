@@ -9,6 +9,7 @@
 import { computed, onMounted, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import { onTablistKeydown } from "@/lib/tablist";
 import { contractKey, useContractsStore } from "@/stores/contracts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { OperationView } from "@/types/ipc";
@@ -122,12 +123,18 @@ function onSourceKeydown(event: KeyboardEvent): void {
         </p>
       </header>
 
-      <div role="tablist" aria-label="Vues du contrat" class="contract__tabs">
+      <div
+        role="tablist"
+        aria-label="Vues du contrat"
+        class="contract__tabs"
+        @keydown="onTablistKeydown"
+      >
         <button
           type="button"
           role="tab"
           class="contract__tab"
           :aria-selected="tab === 'operations'"
+          :tabindex="tab === 'operations' ? 0 : -1"
           @click="tab = 'operations'"
         >
           Opérations <span class="contract__badge">{{ total }}</span>
@@ -137,6 +144,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
           role="tab"
           class="contract__tab"
           :aria-selected="tab === 'source'"
+          :tabindex="tab === 'source' ? 0 : -1"
           @click="tab = 'source'"
         >
           Source <span v-if="dirty" class="contract__dirty">●</span>

@@ -195,33 +195,3 @@ pub fn tree_duplicate(
         .and_then(|ctx| tree::duplicate(&ctx.root, &path));
     tree_changed(&window, project, result)
 }
-
-#[tauri::command]
-pub fn tree_delete(
-    window: WebviewWindow,
-    state: State<'_, AppState>,
-    bench: State<'_, Arc<Workbench>>,
-    project: Uuid,
-    path: String,
-    permanent: bool,
-) -> Result<(), CommandError> {
-    let result = state.project_ctx(project).and_then(|ctx| {
-        tree::delete(&ctx.root, &path, permanent)?;
-        bench.remove_status(&ctx, &path);
-        Ok(())
-    });
-    if result.is_ok() {
-        let _ = windows::apply(window.app_handle(), |w: &mut Windows| {
-            w.close_path(project, &path);
-            Ok(())
-        });
-        windows::paths_changed(
-            window.app_handle(),
-            window.label(),
-            project,
-            Vec::new(),
-            vec![path],
-        );
-    }
-    result
-}

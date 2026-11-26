@@ -2,9 +2,11 @@
 /** Confirmation avant d'envoyer une requête qui modifie des données dans un environnement protégé (R8). */
 import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
+import { useGuard } from "@/composables/useGuard";
 import { useWorkbenchStore } from "@/stores/workbench";
 
 const workbench = useWorkbenchStore();
+const guard = useGuard();
 </script>
 
 <template>
@@ -16,7 +18,7 @@ const workbench = useWorkbenchStore();
   >
     <div class="confirm__actions">
       <BaseButton @click="workbench.dismissPending()">Annuler</BaseButton>
-      <BaseButton variant="danger" @click="workbench.confirmPending()"
+      <BaseButton variant="danger" @click="guard(() => workbench.confirmPending())"
         >Envoyer quand même</BaseButton
       >
     </div>

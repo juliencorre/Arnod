@@ -33,6 +33,8 @@ import TrialGeneralize from "@/components/workbench/TrialGeneralize.vue";
 import TrialTransfer from "@/components/workbench/TrialTransfer.vue";
 import TagsEditor from "@/components/workbench/TagsEditor.vue";
 import VariablesEditor from "@/components/workbench/VariablesEditor.vue";
+import { useGuard } from "@/composables/useGuard";
+import { onTablistKeydown } from "@/lib/tablist";
 import { pathParamNames } from "@/lib/url";
 import { KNOWN_VARIABLES, vVariables } from "@/lib/variables";
 import { useCatalogStore } from "@/stores/catalog";
@@ -51,6 +53,7 @@ const contracts = useContractsStore();
 const catalog = useCatalogStore();
 const inputs = useInputStore();
 const toasts = useToastStore();
+const guard = useGuard();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
 const request = computed<RequestDoc | null>(() => editor.value?.draft ?? null);
 const folder = computed(() => {
@@ -189,9 +192,8 @@ function definedIn(variable: UnknownVariable): string {
 
 async function addVariable(variable: UnknownVariable): Promise<void> {
   if (!editor.value) return;
-  const value = variable.definedIn.find((source) => source.value !== null)?.value ?? "";
   try {
-    const env = await inputs.addVariable(editor.value.projectId, variable.name, value);
+    const env = await inputs.declare(editor.value.projectId, [variable]);
     toasts.show(`✓ Variable « ${variable.name} » ajoutée à ${env}.`);
   } catch (cause) {
     toasts.showError(cause);
@@ -430,7 +432,7 @@ watch(
           </div>
         </div>
       </span>
-      <BaseButton v-if="editor?.sending" @click="workbench.cancelSend(editorKey)">
+      <BaseButton v-if="editor?.sending" @click="guard(() => workbench.cancelSend(editorKey))">
         Annuler
       </BaseButton>
       <BaseButton v-else variant="primary" type="submit" :disabled="request.url.trim() === ''">
@@ -475,7 +477,12 @@ watch(
       </div>
     </div>
 
-    <div role="tablist" aria-label="Sections de la requête" class="editor__tabs">
+    <div
+      role="tablist"
+      aria-label="Sections de la requête"
+      class="editor__tabs"
+      @keydown="onTablistKeydown"
+    >
       <button
         v-for="t in tabs"
         :id="`tab-${t.id}`"
@@ -485,6 +492,7 @@ watch(
         class="editor__tab"
         :aria-selected="tab === t.id"
         :aria-controls="`panel-${t.id}`"
+        :tabindex="tab === t.id ? 0 : -1"
         @click="tab = t.id"
       >
         {{ t.label }}

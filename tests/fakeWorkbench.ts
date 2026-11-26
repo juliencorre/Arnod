@@ -432,6 +432,9 @@ function writeStep(wb: FakeWorkbench, folder: string, name: string, seq: number)
   return path;
 }
 
+/** Environnements supprimés, à remettre par « Annuler » (ER1), par jeton. */
+const deletedEnvs = new Map<string, FakeWorkbench["envs"]>();
+
 /** Répond aux commandes du premier usage ; `undefined` pour une commande inconnue. */
 export function handleWorkbench(
   wb: FakeWorkbench,
@@ -476,14 +479,6 @@ export function handleWorkbench(
       const copy = path.replace(".yml", "-copie.yml");
       wb.requests.set(copy, { ...structuredClone(request), name: `${request.name} (copie)` });
       return copy;
-    }
-    case "tree_delete": {
-      const path = String(args.path);
-      wb.requests.delete(path);
-      wb.folders.delete(path);
-      for (const key of [...wb.requests.keys()])
-        if (key.startsWith(`${path}/`)) wb.requests.delete(key);
-      return null;
     }
     case "tree_move":
       return String(args.path);
@@ -573,9 +568,21 @@ export function handleWorkbench(
       else wb.envs.push(env);
       return envView(wb);
     }
-    case "environment_delete":
+    case "environment_delete": {
+      const removed = wb.envs.filter((e) => e.name === args.name);
+      const token = `environnement-${String(deletedEnvs.size + 1)}`;
+      deletedEnvs.set(token, removed);
       wb.envs = wb.envs.filter((e) => e.name !== args.name);
+      return { view: envView(wb), undoToken: token };
+    }
+    case "environment_delete_undo": {
+      const removed =
+        deletedEnvs.get(String(args.undoToken)) ??
+        fail("undoExpired", "Cette suppression ne peut plus être annulée.");
+      deletedEnvs.delete(String(args.undoToken));
+      wb.envs = [...wb.envs, ...removed];
       return envView(wb);
+    }
     case "environments_reorder":
       return envView(wb);
     case "local_set":

@@ -3,6 +3,8 @@
  * Vérifications d'une requête (V2) : opérateurs d'OpenCollection et de Bruno, activables une
  * à une ; la conformité au contrat lié est rappelée (R8 du format OpenCollection).
  */
+import BaseButton from "@/components/ui/BaseButton.vue";
+import RowRemoveButton from "@/components/ui/RowRemoveButton.vue";
 import { OPERATORS } from "@/lib/assertions";
 import type { Assertion, AssertionOperator, AssertionResult, Scalar } from "@/types/ipc";
 
@@ -144,17 +146,10 @@ function resultFor(id: string): boolean | null {
         />
         <span v-else />
         <span class="assertion__origin">{{ ORIGINS[assertion.origin] }}</span>
-        <button
-          type="button"
-          class="assertion__remove"
-          :aria-label="`Supprimer l'assertion ${index + 1}`"
-          @click="remove(index)"
-        >
-          ✕
-        </button>
+        <RowRemoveButton :label="`Supprimer l'assertion ${index + 1}`" @click="remove(index)" />
       </li>
     </ul>
-    <button type="button" class="link" @click="add">+ Assertion</button>
+    <BaseButton class="assertions__add" @click="add">+ Assertion</BaseButton>
   </div>
 </template>
 
@@ -232,26 +227,11 @@ function resultFor(id: string): boolean | null {
   color: var(--color-muted);
 }
 
-.assertion__remove,
-.link {
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
+.assertions__add {
+  align-self: flex-start;
 }
 
-.assertion__remove {
-  font-size: var(--text-body);
-  color: var(--color-muted);
-}
-
-.link {
-  font-size: var(--text-body);
-  font-weight: 600;
-  color: var(--color-link);
-}
-
-:is(.assertion input, .assertion select, .assertion__remove, .link):focus-visible {
+:is(.assertion input, .assertion select):focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;
 }

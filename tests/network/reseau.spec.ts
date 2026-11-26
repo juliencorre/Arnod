@@ -7,6 +7,7 @@ import { clearMocks } from "@tauri-apps/api/mocks";
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { AUTOSAVE_MS } from "@/stores/workbench";
 import type { Auth } from "@/types/ipc";
 
 import { certificateFailureLotH, certificateLotH } from "../fakeNetwork";
@@ -161,8 +162,12 @@ describe("lot H - authentification du projet (3.4-a)", () => {
       .get('input[placeholder="{{authUrl}}/oauth/token"]')
       .setValue("{{authUrl}}/oauth/token");
     await app.get('input[type="password"]').setValue("s3cr3t");
-    await click(app, "dialog[open] button", "Enregistrer");
-    const saved = core.calls.find((c) => c.cmd === "project_auth_save");
+    // ER2 : les réglages s'enregistrent seuls, comme une requête.
+    expect(app.find("dialog[open] .save-state").text()).toBe("Modifications en attente…");
+    await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_MS + 50));
+    await flushPromises();
+    expect(app.get("dialog[open] .save-state").text()).toBe("✓ Enregistré");
+    const saved = core.calls.filter((c) => c.cmd === "project_auth_save").at(-1);
     expect(saved?.args.clientSecret).toBe("s3cr3t");
     expect((saved?.args.auth as Auth).type).toBe("oauth2");
     expect(core.network.auth.get("p-boutique-tests")?.oauth2.clientSecret).toBe(

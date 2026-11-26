@@ -270,9 +270,9 @@ describe("agir sur une requête liée (RC5, R6)", () => {
     expect(opened.content.path).not.toBe("Petstore/animaux/a-lister.yml");
 
     await action("Deuxième page", "Mettre à la corbeille");
-    expect(core.calls.find((c) => c.cmd === "tree_delete")?.args).toMatchObject({
-      path: "Petstore/animaux/b-page-2.yml",
-      permanent: false,
+    expect(core.calls.find((c) => c.cmd === "tree_batch")?.args).toMatchObject({
+      paths: ["Petstore/animaux/b-page-2.yml"],
+      action: { kind: "delete", permanent: false },
     });
     expect(texts(".linked__name")).not.toContain("Deuxième page");
     expect(wrapper().get(".toast").text()).toContain("« Deuxième page » mis à la corbeille.");

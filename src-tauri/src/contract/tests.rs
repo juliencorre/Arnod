@@ -1211,3 +1211,16 @@ fn lot_d_r5_nombre_de_contrats_sans_les_lire() {
     fs::write(dir.path().join("contracts/casse.yaml"), "pas un contrat").unwrap();
     assert_eq!(file::count(dir.path()), 2);
 }
+
+/// ER1 : un contrat supprimé revient tel qu'il était par « Annuler ».
+#[test]
+fn er1_contrat_supprime_remis_par_annuler() {
+    let dir = project();
+    let path = file::add(dir.path(), PETSTORE).unwrap();
+    let before = fs::read_to_string(dir.path().join(&path)).unwrap();
+    let undo = file::delete(dir.path(), &path, true).unwrap();
+    assert!(!dir.path().join(&path).exists());
+    undo.apply().unwrap();
+    assert_eq!(fs::read_to_string(dir.path().join(&path)).unwrap(), before);
+    assert_eq!(file::list(dir.path()).len(), 1);
+}

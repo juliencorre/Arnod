@@ -268,10 +268,10 @@ C, D, E, F, I. Vague 3, en parallèle : G, H, J, K.
 
 **Lot J - Ergonomie et clavier** (`claude/qualite-j-ergonomie`)
 
-- [ ] **T29** ER1, ER2, IN7 : « Annuler » des suppressions, environnements et réglages (Q5).
-- [ ] **T30** IN8, ER6, ER7, ER8 : garde d'action, erreur avec son action, notification d'erreur
+- [x] **T29** ER1, ER2, IN7 : « Annuler » des suppressions, environnements et réglages (Q5).
+- [x] **T30** IN8, ER6, ER7, ER8 : garde d'action, erreur avec son action, notification d'erreur
       qui reste, une forme d'ajout et de retrait.
-- [ ] **T31** AC2, AC3, AC4, AC7, AC8, ER5 : focus rendu, onglets au clavier, cibles, zoom,
+- [x] **T31** AC2, AC3, AC4, AC7, AC8, ER5 : focus rendu, onglets au clavier, cibles, zoom,
       mouvement réduit.
 
 **Lot K - Maintenabilité** (`claude/qualite-k-maintenabilite`)

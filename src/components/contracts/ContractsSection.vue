@@ -299,10 +299,7 @@ async function onRequest(id: string, request: LinkedView): Promise<void> {
     } else if (id === "duplicate") await workbench.duplicate(props.projectId, request.path);
     else if (id === "copy-move")
       transfer.openDialog({ projectId: props.projectId, path: request.path, name: request.name });
-    else if (id === "delete") {
-      await workbench.remove(props.projectId, request.path, false);
-      toasts.show(`« ${request.name} » mis à la corbeille.`);
-    }
+    else if (id === "delete") await workbench.remove(props.projectId, request.path, request.name);
   } catch (caught) {
     toasts.showError(caught);
   }

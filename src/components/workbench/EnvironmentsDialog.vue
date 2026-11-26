@@ -2,11 +2,16 @@
 /**
  * Gestion des environnements du projet : variables partagées (versionnées),
  * variables locales (hors du dépôt) dont les secrets vont dans le coffre du système.
+ * L'environnement s'enregistre seul, comme une requête (ER2) : changer d'environnement, fermer ou
+ * Échap enregistre d'abord ce qui attend, et un échec garde la fenêtre ouverte.
  */
 import { computed, ref, useId, watch } from "vue";
 
+import RowRemoveButton from "@/components/ui/RowRemoveButton.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
+import SaveState from "@/components/ui/SaveState.vue";
+import { useAutosave } from "@/composables/useAutosave";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { EnvironmentDoc, EnvironmentView } from "@/types/ipc";
@@ -43,12 +48,26 @@ const current = computed<EnvironmentView | null>(
   () => list.value.find((e) => e.name === editing.value) ?? null,
 );
 
+/** Enregistre le brouillon (une copie : la saisie peut continuer pendant l'appel). */
+async function saveDraft(): Promise<void> {
+  const doc = draft.value;
+  if (!doc) return;
+  const sent = JSON.parse(JSON.stringify(doc)) as EnvironmentDoc;
+  await workbench.saveEnvironment(props.projectId, sent, editing.value);
+  editing.value = sent.name;
+}
+
+const autosave = useAutosave(() => draft.value, saveDraft);
+const saveState = autosave.state;
+const saveError = autosave.error;
+
 function load(env: EnvironmentView | undefined): void {
   error.value = null;
   localValues.value = {};
   if (!env) {
     editing.value = null;
     draft.value = null;
+    autosave.reset();
     return;
   }
   editing.value = env.name;
@@ -59,6 +78,7 @@ function load(env: EnvironmentView | undefined): void {
     variables: env.variables.map((v) => ({ ...v })),
     locals: [...env.locals],
   };
+  autosave.reset();
 }
 
 watch(
@@ -81,18 +101,27 @@ async function guard(work: () => Promise<void>): Promise<void> {
   }
 }
 
-async function save(): Promise<void> {
-  const doc = draft.value;
-  if (!doc) return;
-  await guard(async () => {
-    const previous = editing.value;
-    await workbench.saveEnvironment(props.projectId, doc, previous);
-    editing.value = doc.name;
-    toasts.show(`Environnement « ${doc.name} » enregistré.`);
-  });
+/** Passe à l'environnement `env` après avoir enregistré celui qui est ouvert. */
+async function select(env: EnvironmentView): Promise<void> {
+  if (await autosave.flush()) load(env);
+}
+
+/**
+ * Fermer (Échap, fond, « Fermer ») : ce qui attend est enregistré d'abord ; un échec, ou une
+ * valeur locale saisie sans choisir où elle va, garde la fenêtre ouverte et le dit.
+ */
+async function close(): Promise<void> {
+  if (!(await autosave.flush())) return;
+  const typed = Object.entries(localValues.value).find(([, value]) => value !== "");
+  if (typed) {
+    error.value = `La valeur de « ${typed[0]} » n'est pas enregistrée : choisissez « Enregistrer » ou « Enregistrer comme secret ».`;
+    return;
+  }
+  emit("close");
 }
 
 async function create(): Promise<void> {
+  if (!(await autosave.flush())) return;
   await guard(async () => {
     let name = "Nouvel environnement";
     for (let n = 2; list.value.some((e) => e.name === name); n++)
@@ -107,16 +136,17 @@ async function create(): Promise<void> {
 }
 
 async function remove(): Promise<void> {
+  if (!(await autosave.flush())) return;
   const name = editing.value;
   if (name === null) return;
   await guard(async () => {
     await workbench.deleteEnvironment(props.projectId, name);
     load(list.value[0]);
-    toasts.show(`Environnement « ${name} » supprimé.`);
   });
 }
 
 async function move(delta: -1 | 1): Promise<void> {
+  if (!(await autosave.flush())) return;
   const names = list.value.map((e) => e.name);
   const index = names.findIndex((n) => n === editing.value);
   const target = index + delta;
@@ -164,7 +194,7 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
     title="Environnements"
     wide
     description="Les variables partagées sont enregistrées dans le projet. Les variables locales restent sur ce poste."
-    @close="emit('close')"
+    @close="close"
   >
     <div class="envs">
       <ul class="envs__list" aria-label="Environnements du projet">
@@ -173,7 +203,7 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
             type="button"
             class="envs__item"
             :aria-current="env.name === editing"
-            @click="load(env)"
+            @click="select(env)"
           >
             {{ env.name }}
           </button>
@@ -181,7 +211,7 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
         <li><BaseButton variant="link" @click="create">+ Nouvel environnement</BaseButton></li>
       </ul>
 
-      <form v-if="draft" class="envs__form" novalidate @submit.prevent="save">
+      <form v-if="draft" class="envs__form" novalidate @submit.prevent="autosave.flush()">
         <label :for="nameId" class="envs__label">Nom</label>
         <input :id="nameId" v-model="draft.name" type="text" autocomplete="off" />
         <label :for="colorId" class="envs__label">Couleur</label>
@@ -205,15 +235,12 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
             type="text"
             :aria-label="`Valeur de la variable ${index + 1}`"
           />
-          <button
-            type="button"
-            :aria-label="`Supprimer la variable ${index + 1}`"
+          <RowRemoveButton
+            :label="`Supprimer la variable ${index + 1}`"
             @click="removeVariable(index)"
-          >
-            ×
-          </button>
+          />
         </div>
-        <button type="button" class="envs__add" @click="addVariable">+ Ajouter une variable</button>
+        <BaseButton class="envs__add" @click="addVariable">+ Variable</BaseButton>
 
         <h3 class="envs__title">Variables locales</h3>
         <p class="envs__hint">
@@ -248,14 +275,14 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
           <BaseButton @click="addLocal">Déclarer</BaseButton>
         </div>
 
-        <p v-if="error" class="envs__error" role="alert">{{ error }}</p>
+        <p v-if="error ?? saveError" class="envs__error" role="alert">{{ error ?? saveError }}</p>
         <div class="envs__actions">
           <BaseButton variant="danger" @click="remove">Supprimer</BaseButton>
           <BaseButton aria-label="Monter l'environnement" @click="move(-1)">↑</BaseButton>
           <BaseButton aria-label="Descendre l'environnement" @click="move(1)">↓</BaseButton>
           <span class="envs__spacer" />
-          <BaseButton @click="emit('close')">Fermer</BaseButton>
-          <BaseButton variant="primary" type="submit">Enregistrer</BaseButton>
+          <SaveState :state="saveState" :error="saveError" @retry="autosave.flush()" />
+          <BaseButton @click="close">Fermer</BaseButton>
         </div>
       </form>
     </div>
@@ -393,13 +420,6 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
 
 .envs__add {
   align-self: flex-start;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: var(--text-body);
-  font-weight: 600;
-  color: var(--color-link);
-  cursor: pointer;
 }
 
 .envs__error {

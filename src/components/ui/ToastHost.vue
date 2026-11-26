@@ -29,6 +29,14 @@ const toasts = useToastStore();
       >
         {{ toasts.current.action.label }}
       </button>
+      <!-- Toute notification se ferme ; une erreur ne se ferme que là (ER7). -->
+      <!-- Le ✕ est dessiné par la feuille de style : le texte de la notification reste le message. -->
+      <button
+        type="button"
+        class="toast__close"
+        aria-label="Fermer la notification"
+        @click="toasts.dismiss()"
+      />
     </div>
   </div>
 </template>
@@ -78,7 +86,33 @@ const toasts = useToastStore();
   text-decoration: underline;
 }
 
-.toast__action:focus-visible {
+.toast__action:focus-visible,
+.toast__close:focus-visible {
   outline: 2px solid var(--color-toast-action);
+}
+
+/* × sans bord, cible de 24 × 24 px (AC4). */
+.toast__close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-toast-text);
+  background: none;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.toast__close::before {
+  content: "✕";
+}
+
+.toast__close:hover {
+  opacity: 1;
 }
 </style>

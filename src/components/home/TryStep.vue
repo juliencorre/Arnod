@@ -15,6 +15,7 @@ import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from
 import NatureForm from "@/components/home/NatureForm.vue";
 import NaturePill from "@/components/steps/NaturePill.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
+import { useGuard } from "@/composables/useGuard";
 import { IpcError } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
@@ -24,10 +25,15 @@ import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { CurlImport, Detection } from "@/types/ipc";
 
-withDefaults(defineProps<{ note?: string; headingLevel?: 2 | 3 }>(), {
-  note: "Sans projet : l'essai est gardé dans « Non classés ».",
-  headingLevel: 2,
-});
+/** `autofocus` : l'entrée a le focus au chargement, en tête de l'accueil (ER5). */
+const props = withDefaults(
+  defineProps<{ note?: string; headingLevel?: 2 | 3; autofocus?: boolean }>(),
+  {
+    note: "Sans projet : l'essai est gardé dans « Non classés ».",
+    headingLevel: 2,
+    autofocus: false,
+  },
+);
 const emit = defineEmits<{ open: [boolean] }>();
 
 const steps = useStepsStore();
@@ -36,6 +42,7 @@ const contracts = useContractsStore();
 const navigation = useNavigationStore();
 const workbench = useWorkbenchStore();
 const toasts = useToastStore();
+const guard = useGuard();
 const ids = { title: useId(), status: useId(), error: useId() };
 const input = useTemplateRef<HTMLInputElement>("input");
 
@@ -78,6 +85,7 @@ onMounted(() => {
   steps.load().catch((cause: unknown) => {
     toasts.showError(cause);
   });
+  if (props.autofocus) input.value?.focus();
 });
 
 // Le cœur reconnaît la nature ; une méthode en tête passe dans le formulaire.
@@ -219,7 +227,7 @@ async function send(): Promise<void> {
             ×
           </button>
         </div>
-        <BaseButton v-if="sending" @click="steps.cancel()">Annuler</BaseButton>
+        <BaseButton v-if="sending" @click="guard(() => steps.cancel())">Annuler</BaseButton>
         <BaseButton v-else type="submit" variant="primary">
           {{ nature?.action ?? "Essayer" }}
         </BaseButton>

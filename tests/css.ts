@@ -58,3 +58,10 @@ export function cssValue(path: string, selector: string, property: string): stri
   }
   return found;
 }
+
+/** Source brute du fichier `path` (relatif au dépôt), pour vérifier une forme du gabarit. */
+export function rawSource(path: string): string {
+  const text = SOURCES[`/${path}`];
+  if (text === undefined) throw new Error(`fichier inconnu : ${path}`);
+  return text;
+}

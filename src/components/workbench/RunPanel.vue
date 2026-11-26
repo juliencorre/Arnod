@@ -5,16 +5,19 @@
  * (ignorables pour ce run), résultat par dossier qui filtre la liste. Le cœur calcule tout
  * (statuts, groupes) ; ce composant ne fait que filtrer et compter pour l'affichage.
  */
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import { useGuard } from "@/composables/useGuard";
 import { formatDuration } from "@/lib/format";
+import { onTablistKeydown } from "@/lib/tablist";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { AssertionResult, RunItem, RunItemStatus } from "@/types/ipc";
 
 const props = defineProps<{ projectId: string }>();
 
 const workbench = useWorkbenchStore();
+const guard = useGuard();
 const run = computed(() => workbench.runs[props.projectId] ?? null);
 /** Le run exécute un test seul (lot E) : son verdict en tête. */
 const soleTest = computed(() => {
@@ -145,34 +148,6 @@ const tabs = computed<{ id: View; label: string; count: number }[]>(() => [
   { id: "slow", label: "Lents", count: counts.value.slow },
 ]);
 
-const tabButtons = ref<HTMLButtonElement[]>([]);
-
-/** Flèches gauche et droite, Début et Fin entre les onglets (motif WAI-ARIA). */
-async function onTabKey(event: KeyboardEvent, index: number): Promise<void> {
-  const last = tabs.value.length - 1;
-  const next =
-    event.key === "ArrowRight"
-      ? index === last
-        ? 0
-        : index + 1
-      : event.key === "ArrowLeft"
-        ? index === 0
-          ? last
-          : index - 1
-        : event.key === "Home"
-          ? 0
-          : event.key === "End"
-            ? last
-            : null;
-  if (next === null) return;
-  event.preventDefault();
-  const tab = tabs.value[next];
-  if (!tab) return;
-  chosen.value = tab.id;
-  await nextTick();
-  tabButtons.value[next]?.focus();
-}
-
 /**
  * Groupe d'une requête (R2, calculé par le cœur) : le plus long chemin de groupe qui la contient,
  * puisque le groupe du dossier exécuté contient aussi ceux de ses sous-dossiers.
@@ -249,8 +224,13 @@ const EMPTY: Record<View, string> = {
         </p>
       </div>
       <span class="run__spacer" />
-      <BaseButton v-if="!run.finished" @click="workbench.cancelRun(projectId)">Annuler</BaseButton>
-      <BaseButton v-else-if="counts.bad > 0" @click="workbench.retryFailures(projectId)">
+      <BaseButton v-if="!run.finished" @click="guard(() => workbench.cancelRun(projectId))"
+        >Annuler</BaseButton
+      >
+      <BaseButton
+        v-else-if="counts.bad > 0"
+        @click="guard(() => workbench.retryFailures(projectId))"
+      >
         Relancer les échecs
       </BaseButton>
     </header>
@@ -265,18 +245,21 @@ const EMPTY: Record<View, string> = {
     <div v-else class="run__body">
       <div class="run__card">
         <div class="run__toolbar">
-          <div role="tablist" aria-label="Requêtes du run" class="run__tabs">
+          <div
+            role="tablist"
+            aria-label="Requêtes du run"
+            class="run__tabs"
+            @keydown="onTablistKeydown"
+          >
             <button
-              v-for="(tab, index) in tabs"
+              v-for="tab in tabs"
               :key="tab.id"
-              ref="tabButtons"
               type="button"
               role="tab"
               class="run__tab"
               :aria-selected="view === tab.id"
               :tabindex="view === tab.id ? 0 : -1"
               @click="chosen = tab.id"
-              @keydown="onTabKey($event, index)"
             >
               {{ tab.label }} <span class="run__tab-count">{{ tab.count }}</span>
             </button>
@@ -345,7 +328,7 @@ const EMPTY: Record<View, string> = {
                       type="button"
                       class="run__link"
                       :aria-label="`Ignorer ${label(check)} pour ce run`"
-                      @click="workbench.ignoreInRun(projectId, item.path, check.id)"
+                      @click="guard(() => workbench.ignoreInRun(projectId, item.path, check.id))"
                     >
                       Ignorer pour ce run
                     </button>

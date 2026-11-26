@@ -362,6 +362,50 @@ fn le_dernier_environnement_utilise_est_retenu() {
     assert_eq!(f.bench.environments(&f.ctx).active, "Local");
 }
 
+/// ER1 : supprimer un environnement retire ses valeurs locales et ses secrets ; « Annuler » remet
+/// tout, dernier choix compris, sans écrire le secret ailleurs que dans le coffre.
+#[test]
+fn er1_environnement_supprime_puis_remis_avec_ses_secrets() {
+    let f = fixture();
+    let mut recette = environment::list(&f.ctx.root).remove(0);
+    recette.name = "Recette".into();
+    recette.locals = vec!["token".into(), "region".into()];
+    f.bench.save_environment(&f.ctx, &recette, None).unwrap();
+    f.bench
+        .set_local(&f.ctx, "Recette", "token", "s3cr3t", true)
+        .unwrap();
+    f.bench
+        .set_local(&f.ctx, "Recette", "region", "eu", false)
+        .unwrap();
+    f.bench.select_environment(&f.ctx, "Recette").unwrap();
+    let key = secret_key(&f.ctx, "Recette", "token");
+
+    let restore = f.bench.delete_environment(&f.ctx, "Recette").unwrap();
+    assert_eq!(f.store.get(&key).unwrap(), None);
+    assert_eq!(f.bench.environments(&f.ctx).active, "Local");
+
+    f.bench.restore_environment(&f.ctx, &restore).unwrap();
+    assert_eq!(f.store.get(&key).unwrap().as_deref(), Some("s3cr3t"));
+    let view = f.bench.environments(&f.ctx);
+    assert_eq!(view.active, "Recette");
+    let env = view
+        .environments
+        .iter()
+        .find(|e| e.environment.name == "Recette")
+        .unwrap();
+    let region = env.local_vars.iter().find(|v| v.name == "region").unwrap();
+    assert_eq!(region.value.as_deref(), Some("eu"));
+    assert!(
+        env.local_vars
+            .iter()
+            .any(|v| v.name == "token" && v.secret && v.has_value)
+    );
+    let local =
+        std::fs::read_to_string(local::project_dir(&f.ctx.data_dir, f.ctx.id).join("local.json"))
+            .unwrap();
+    assert!(!local.contains("s3cr3t"));
+}
+
 /// Petit contrat : `GET /animaux/{id}` renvoie un animal `{ id, nom }`.
 const CONTRAT: &str = r#"openapi: 3.0.3
 info: { title: Animaux, version: 1.0.0 }

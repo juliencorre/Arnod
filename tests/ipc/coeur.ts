@@ -115,6 +115,8 @@ export type DynamicValue = { name: string, description: string, example: string,
 
 export type EnvVariable = { name: string, value: string, };
 
+export type EnvironmentDeleted = { view: EnvironmentsView, undoToken: string, };
+
 export type EnvironmentDoc = { name: string, color: string, protected: boolean, variables: Array<EnvVariable>, locals: Array<string>, };
 
 export type EnvironmentView = { localVars: Array<LocalVarView>, name: string, color: string, protected: boolean, variables: Array<EnvVariable>, locals: Array<string>, };
@@ -493,6 +495,7 @@ export type CheckEnvironmentDoc = Check<Same<Ipc.EnvironmentDoc, EnvironmentDoc>
 export type CheckLocalVarView = Check<Same<Ipc.LocalVarView, LocalVarView>>;
 export type CheckEnvironmentView = Check<Same<Ipc.EnvironmentView, EnvironmentView>>;
 export type CheckEnvironmentsView = Check<Same<Ipc.EnvironmentsView, EnvironmentsView>>;
+export type CheckEnvironmentDeleted = Check<Same<Ipc.EnvironmentDeleted, EnvironmentDeleted>>;
 export type CheckRunItemStatus = Check<Same<Ipc.RunItemStatus, RunItemStatus>>;
 export type CheckRunItem = Check<Same<Ipc.RunItem, RunItem>>;
 export type CheckRunGroup = Check<Same<Ipc.RunGroup, RunGroup>>;

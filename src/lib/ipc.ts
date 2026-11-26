@@ -30,6 +30,7 @@ import type {
   WindowBounds,
   WindowContext,
   WindowsSnapshot,
+  EnvironmentDeleted,
   EnvironmentDoc,
   EnvironmentsView,
   HelloResponse,
@@ -266,9 +267,6 @@ export const ipc = {
   treeDuplicate: (project: string, path: string): Promise<string> =>
     call<string>("tree_duplicate", { project, path }),
 
-  treeDelete: (project: string, path: string, permanent: boolean): Promise<void> =>
-    call<null>("tree_delete", { project, path, permanent }).then(() => undefined),
-
   // --- Requêtes ------------------------------------------------------------
 
   requestRead: (project: string, path: string): Promise<RequestDoc> =>
@@ -328,8 +326,12 @@ export const ipc = {
   ): Promise<EnvironmentsView> =>
     call<EnvironmentsView>("environment_save", { project, environment, previous }),
 
-  environmentDelete: (project: string, name: string): Promise<EnvironmentsView> =>
-    call<EnvironmentsView>("environment_delete", { project, name }),
+  /** Supprime un environnement ; rend les environnements et le jeton de « Annuler » (ER1). */
+  environmentDelete: (project: string, name: string): Promise<EnvironmentDeleted> =>
+    call<EnvironmentDeleted>("environment_delete", { project, name }),
+  /** « Annuler » la suppression : fichiers, place, valeurs locales et secrets reviennent. */
+  environmentDeleteUndo: (undoToken: string): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environment_delete_undo", { undoToken }),
 
   environmentsReorder: (project: string, names: string[]): Promise<EnvironmentsView> =>
     call<EnvironmentsView>("environments_reorder", { project, names }),
@@ -357,8 +359,12 @@ export const ipc = {
     call<ContractView | null>("contract_import_file", { project, replace }),
   contractSave: (project: string, path: string, text: string): Promise<ContractView> =>
     call<ContractView>("contract_save", { project, path, text }),
-  contractDelete: (project: string, path: string, permanent: boolean): Promise<void> =>
-    call<null>("contract_delete", { project, path, permanent }).then(() => undefined),
+  /** Met un contrat à la corbeille ; rend le jeton de « Annuler » (ER1). */
+  contractDelete: (project: string, path: string, permanent: boolean): Promise<string> =>
+    call<string>("contract_delete", { project, path, permanent }),
+  /** « Annuler » la suppression d'un contrat : son fichier revient tel qu'il était. */
+  contractDeleteUndo: (undoToken: string): Promise<void> =>
+    call<null>("contract_delete_undo", { undoToken }).then(() => undefined),
   contractGenerate: (
     project: string,
     path: string,

@@ -2568,16 +2568,24 @@ describe("Lot H - Réseau et authentification", () => {
       timeout: 10_000,
       timeoutMsg: "réglages du projet attendus",
     });
-    await browser.execute(() => {
-      const select = document.querySelector<HTMLSelectElement>("dialog[open] select");
-      if (!select) throw new Error("type introuvable");
-      select.value = "oauth2";
-      select.dispatchEvent(new Event("change"));
-    });
+    const choose = (type: string) =>
+      browser.execute((value) => {
+        const select = document.querySelector<HTMLSelectElement>("dialog[open] select");
+        if (!select) throw new Error("type introuvable");
+        const before = select.value;
+        select.value = value;
+        select.dispatchEvent(new Event("change"));
+        return before;
+      }, type);
+    const previous = await choose("oauth2");
     await browser.$("dialog[open] .oauth2").waitForExist({ timeout: 5_000 });
     expect(await settingsText()).toContain("URL du jeton");
     await screenshot(browser, "h3-reglages-projet");
+    // ER2 : les réglages s'enregistrent seuls ; le type d'origine est remis avant de fermer,
+    // pour que les tests suivants n'héritent pas d'un OAuth 2 vide.
+    await choose(previous);
     await clickText("dialog[open] button", "Fermer");
+    await browser.$("dialog[open]").waitForExist({ reverse: true, timeout: 10_000 });
   });
 });
 

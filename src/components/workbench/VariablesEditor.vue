@@ -8,6 +8,8 @@
  */
 import { computed, ref, watch } from "vue";
 
+import BaseButton from "@/components/ui/BaseButton.vue";
+import RowRemoveButton from "@/components/ui/RowRemoveButton.vue";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { ExtractedValue, Extraction, VariableUser } from "@/types/ipc";
 
@@ -107,18 +109,11 @@ watch(
           >{{ lastOf(extraction)?.text ?? "—" }}</span
         >
         <span class="vars__scope">le test</span>
-        <button
-          type="button"
-          class="vars__remove"
-          :aria-label="`Supprimer ${nameOf(extraction, index)}`"
-          @click="remove(index)"
-        >
-          ✕
-        </button>
+        <RowRemoveButton :label="`Supprimer ${nameOf(extraction, index)}`" @click="remove(index)" />
       </div>
     </div>
     <p class="vars__add">
-      <button type="button" class="vars__button" @click="add">+ Variable</button>
+      <BaseButton @click="add">+ Variable</BaseButton>
       <span class="hint"
         >ou «&nbsp;Garder&nbsp;» une valeur tirée dans «&nbsp;Envoyé&nbsp;» ;
         <code>body.chemin</code>, <code>headers.Nom</code>, <code>status</code></span
@@ -230,33 +225,12 @@ watch(
   color: var(--color-muted);
 }
 
-.vars__remove {
-  border: 0;
-  background: none;
-  font-size: var(--text-body);
-  line-height: 1;
-  color: var(--color-muted);
-  cursor: pointer;
-}
-
 .vars__add {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   margin: 0;
-}
-
-.vars__button {
-  min-height: var(--control-sm);
-  padding: 0 0.625rem;
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  font: inherit;
-  font-size: var(--text-body);
-  color: var(--color-text);
-  cursor: pointer;
 }
 
 .hint {
@@ -340,7 +314,7 @@ watch(
   background: var(--color-sidebar);
 }
 
-:is(.vars__input, .vars__remove, .vars__button, .vars__user):focus-visible,
+:is(.vars__input, .vars__user):focus-visible,
 .vars__row input[type="checkbox"]:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;

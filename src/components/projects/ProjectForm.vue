@@ -10,7 +10,7 @@
  * unicité) sont vérifiées par le cœur : ses erreurs s'affichent sous le champ
  * concerné.
  */
-import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from "vue";
+import { computed, nextTick, ref, useId, useTemplateRef, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
@@ -116,10 +116,6 @@ watch(
 
 watch(name, () => {
   errors.value.name = null;
-});
-
-onMounted(() => {
-  if (props.mode === "firstRun") nameInput.value?.focus();
 });
 
 function message(error: unknown): string {
