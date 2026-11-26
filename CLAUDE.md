@@ -858,6 +858,12 @@ AC4, AC7, AC8 ; décision Q5).
 - Environnements et réglages du projet s'enregistrent seuls (`useAutosave`, `SaveState`) : fermer,
   Échap ou changer d'élément enregistre d'abord ce qui attend ; un échec garde la fenêtre ouverte.
 - Ajouter une ligne : un `BaseButton` « + Nom » ; la retirer : `RowRemoveButton` (×, 24 px).
+- Arbre du référentiel (T25, AC1) : un seul arrêt de tabulation (`TREE_TAB_STOP`, fourni par
+  `TreePanel` : dernière ligne focalisée, sinon celle de l'onglet actif, sinon la première) ;
+  haut, bas, Début, Fin dans `lib/treeKeyboard.ts` ; Droite, Gauche, F2, Suppr, Maj+F10 et la
+  touche Menu dans `TreeRow`. ⋯ est hors de l'ordre de tabulation et ne paraît qu'au survol ou au
+  focus. Un nom coupé a son infobulle (`v-title-if-cut`, `lib/truncate.ts`, DE5) ; la ligne d'une
+  opération est nommée par son texte visible, puis ses marques (AC9).
 - Toute liste d'onglets (`role="tablist"`) prend `onTablistKeydown` (`lib/tablist.ts`) et un
   `tabindex` itinérant (0 sur l'onglet choisi, -1 sinon). Toute cible fait 24 × 24 px au moins.
 - Focus : `BaseDialog` rend le focus à l'élément qui l'avait à l'ouverture ; `useFocusRescue`

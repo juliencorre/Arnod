@@ -11,6 +11,7 @@ import { computed } from "vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import StatusMark from "@/components/workbench/StatusMark.vue";
+import { vTitleIfCut } from "@/lib/truncate";
 import { startRequestDrag } from "@/lib/requestDrag";
 import { useToastStore } from "@/stores/toasts";
 import { useTransferStore } from "@/stores/transfer";
@@ -97,7 +98,7 @@ const status = computed(() => workbench.statuses[props.projectId]?.[props.reques
           {{ request.method }}
         </span>
         <span v-else class="linked__lead linked__link" aria-hidden="true">↳</span>
-        <span class="linked__name">{{ request.name }}</span>
+        <span v-title-if-cut class="linked__name">{{ request.name }}</span>
         <span class="linked__end">
           <span v-if="dirty" class="linked__dirty" title="Modifiée, non enregistrée">●</span>
           <StatusMark v-if="status" class="linked__status" :status="status" />

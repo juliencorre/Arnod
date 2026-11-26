@@ -7,8 +7,13 @@
  * Pendant un filtre (docs/plan-mvp-d-barre-laterale.md, F2, F3), les dossiers sont dépliés sans
  * changer leur état enregistré, la partie trouvée du nom est surlignée et une requête trouvée
  * par son adresse le dit.
+ *
+ * Lot H (AC1) : une ligne n'est un arrêt de tabulation que si l'arbre la désigne
+ * (`TREE_TAB_STOP`) ; ⋯ n'en est pas un (Maj+F10 ou la touche Menu l'ouvrent). Droite déplie ou
+ * va au premier enfant, Gauche replie ou remonte au parent, F2 renomme, Suppr met à la corbeille.
+ * DE5 : un nom coupé a son infobulle.
  */
-import { computed, ref } from "vue";
+import { computed, inject, ref, useTemplateRef } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
@@ -18,6 +23,8 @@ import { SECTION_ICONS } from "@/components/ui/sectionIcons";
 import { countStatuses, requestPaths } from "@/lib/status";
 import { highlight, matchedByUrl, type TreeFilter } from "@/lib/treeFilter";
 import { REQUEST_DRAG, dragged, startRequestDrag } from "@/lib/requestDrag";
+import { firstChildItem, parentItem, TREE_TAB_STOP } from "@/lib/treeKeyboard";
+import { vTitleIfCut } from "@/lib/truncate";
 import { useToastStore } from "@/stores/toasts";
 import { useSelectionStore } from "@/stores/selection";
 import { useTransferStore } from "@/stores/transfer";
@@ -43,6 +50,10 @@ const emit = defineEmits<{ action: [id: string, node: TreeNode, target?: string]
 
 const workbench = useWorkbenchStore();
 const windows = useWindowsStore();
+const tabStop = inject(TREE_TAB_STOP, null);
+/** Seul arrêt de tabulation de l'arbre (hors arbre, chaque ligne en est un). */
+const isTabStop = computed(() => tabStop === null || tabStop.value === props.node.path);
+const menu = useTemplateRef<InstanceType<typeof BaseMenu>>("menu");
 
 const isOpen = computed(
   () =>
@@ -162,8 +173,53 @@ async function pasteHere(mode?: "copy" | "move"): Promise<void> {
   }
 }
 
-/** Ctrl+C, Ctrl+X, Ctrl+V et Ctrl+Z sur la ligne (code de la touche, pour l'AZERTY). */
+/**
+ * Touches de la ligne (AC1) : Droite, Gauche, F2, Suppr, Maj+F10 et la touche Menu ; puis
+ * Ctrl+C, Ctrl+X, Ctrl+V et Ctrl+Z (code de la touche, pour l'AZERTY).
+ */
 function onKeydown(event: KeyboardEvent): void {
+  if (onTreeKey(event)) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+  onClipboardKey(event);
+}
+
+/** Touches de l'arbre propres à la ligne ; `true` si la touche est prise. */
+function onTreeKey(event: KeyboardEvent): boolean {
+  if (event.altKey || event.ctrlKey || event.metaKey) return false;
+  const item = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  if (!item) return false;
+  const folder = props.node.kind === "folder";
+  // Pendant un filtre, les dossiers restent dépliés (F3) : Droite et Gauche ne font que naviguer.
+  const foldable = folder && (props.filter ?? null) === null;
+  if ((event.shiftKey && event.key === "F10") || event.key === "ContextMenu") {
+    menu.value?.open();
+    return true;
+  }
+  if (event.shiftKey) return false;
+  switch (event.key) {
+    case "ArrowRight":
+      if (foldable && !isOpen.value) void workbench.toggleFolder(props.projectId, props.node.path);
+      else if (folder) firstChildItem(item)?.focus();
+      return true;
+    case "ArrowLeft":
+      if (foldable && isOpen.value) void workbench.toggleFolder(props.projectId, props.node.path);
+      else parentItem(item)?.focus();
+      return true;
+    case "F2":
+      emit("action", "rename", props.node);
+      return true;
+    case "Delete":
+      emit("action", "delete", props.node);
+      return true;
+    default:
+      return false;
+  }
+}
+
+function onClipboardKey(event: KeyboardEvent): void {
   if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
   const node = props.node;
   const source = { projectId: props.projectId, path: node.path, name: node.name };
@@ -297,6 +353,7 @@ function activate(preview = true): void {
         :aria-expanded="node.kind === 'folder' ? isOpen : undefined"
         :aria-selected="isSelected || picked"
         :aria-level="depth + 1"
+        :tabindex="isTabStop ? 0 : -1"
         :data-path="node.path"
         :draggable="node.kind === 'request'"
         @dragstart="onDragStart"
@@ -304,8 +361,6 @@ function activate(preview = true): void {
         @click="onClick"
         @keydown.space="onSpace"
         @dblclick="activate(false)"
-        @keydown.right="isTest && !isOpen && workbench.toggleFolder(projectId, node.path)"
-        @keydown.left="isTest && isOpen && workbench.toggleFolder(projectId, node.path)"
       >
         <template v-if="node.kind === 'folder'">
           <span class="row__lead" aria-hidden="true">
@@ -321,7 +376,7 @@ function activate(preview = true): void {
               <path d="M1.5 3.5h4l1.2 1.4h5.8v6.6h-11z" />
             </svg>
           </span>
-          <span class="row__name">{{ node.name }}</span>
+          <span v-title-if-cut class="row__name">{{ node.name }}</span>
           <StatusCount class="row__count" :count="folderCount" :fallback="node.requestCount" />
         </template>
         <template v-else>
@@ -332,7 +387,7 @@ function activate(preview = true): void {
             {{ node.method }}
           </span>
           <span v-if="step" class="row__step" :aria-label="`Étape ${step}`">{{ step }}</span>
-          <span class="row__name"
+          <span v-title-if-cut class="row__name"
             ><template v-for="(part, index) in nameParts" :key="index"
               ><mark v-if="part.hit" class="row__hit">{{ part.text }}</mark
               ><template v-else>{{ part.text }}</template></template
@@ -346,12 +401,20 @@ function activate(preview = true): void {
           </span>
         </template>
       </button>
-      <BaseMenu :items="items" :label="`Actions pour ${node.name}`" align="end" @select="onSelect">
+      <BaseMenu
+        ref="menu"
+        :items="items"
+        :label="`Actions pour ${node.name}`"
+        align="end"
+        @select="onSelect"
+      >
         <template #trigger="{ attrs }">
+          <!-- Hors de l'ordre de tabulation (AC1) : Maj+F10 ou la touche Menu sur la ligne. -->
           <button
             type="button"
             class="row__more"
             v-bind="attrs"
+            tabindex="-1"
             :aria-label="`Actions pour ${node.name}`"
           >
             ⋯
@@ -537,12 +600,29 @@ function activate(preview = true): void {
   color: var(--color-danger);
 }
 
+/*
+ * ⋯ au survol, au focus de la ligne et sur la ligne ouverte (DE5, 1.2-a) ; caché, il rend sa
+ * largeur au nom.
+ */
 .row__more {
+  flex: none;
+  width: 0;
+  overflow: hidden;
   border: 0;
   background: none;
-  padding: 0.125rem 0.5rem;
+  padding: 0.125rem 0;
   color: var(--color-muted);
   cursor: pointer;
+  opacity: 0;
+}
+
+.row:hover .row__more,
+.row:focus-within .row__more,
+.row--selected .row__more,
+.row__more[aria-expanded="true"] {
+  width: auto;
+  padding-inline: 0.5rem;
+  opacity: 1;
 }
 
 .children {

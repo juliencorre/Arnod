@@ -49,8 +49,12 @@ type Field = HTMLInputElement | HTMLTextAreaElement;
 interface MarkState {
   overlay: HTMLElement;
   known: ReadonlySet<string> | null;
+  /** Texte et variables connues du dernier rendu : un nouveau rendu n'a lieu que s'ils changent. */
+  shown: { text: string; known: ReadonlySet<string> | null } | null;
   observer: ResizeObserver | null;
   sync: () => void;
+  scroll: () => void;
+  resize: () => void;
 }
 
 const states = new WeakMap<Field, MarkState>();
@@ -98,7 +102,15 @@ function place(field: Field, overlay: HTMLElement): void {
   overlay.scrollTop = field.scrollTop;
 }
 
-function render(field: Field, state: MarkState): void {
+/**
+ * Redessine le calque si le texte du champ ou les variables connues ont changé (PI6) : un champ
+ * dont le composant se re-rend sans changement (les 200 lignes d'un `PairsEditor` quand une seule
+ * change) ne refait ni découpage ni mise en page. `force` : la taille du champ a changé.
+ */
+function render(field: Field, state: MarkState, force = false): void {
+  const shown = state.shown;
+  if (!force && shown?.text === field.value && shown.known === state.known) return;
+  state.shown = { text: field.value, known: state.known };
   const segments = state.known ? variableSegments(field.value, state.known) : [];
   const unknown = segments.filter((s) => s.unknown).map((s) => s.text);
   state.overlay.hidden = unknown.length === 0;
@@ -140,15 +152,24 @@ export const vVariables: Directive<Field, ReadonlySet<string> | null> = {
     const state: MarkState = {
       overlay,
       known: binding.value ?? null,
+      shown: null,
       observer: null,
       sync: () => {
         render(field, state);
       },
+      // Le défilement ne déplace que le texte : le calque suit, sans nouvelle mise en page.
+      scroll: () => {
+        overlay.scrollLeft = field.scrollLeft;
+        overlay.scrollTop = field.scrollTop;
+      },
+      resize: () => {
+        if (!overlay.hidden) render(field, state, true);
+      },
     };
     field.addEventListener("input", state.sync);
-    field.addEventListener("scroll", state.sync);
+    field.addEventListener("scroll", state.scroll);
     if (typeof ResizeObserver !== "undefined") {
-      state.observer = new ResizeObserver(state.sync);
+      state.observer = new ResizeObserver(state.resize);
       state.observer.observe(field);
     }
     states.set(field, state);
@@ -164,7 +185,7 @@ export const vVariables: Directive<Field, ReadonlySet<string> | null> = {
     const state = states.get(field);
     if (!state) return;
     field.removeEventListener("input", state.sync);
-    field.removeEventListener("scroll", state.sync);
+    field.removeEventListener("scroll", state.scroll);
     state.observer?.disconnect();
     state.overlay.remove();
     states.delete(field);

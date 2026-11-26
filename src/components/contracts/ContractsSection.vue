@@ -27,7 +27,9 @@ import type { MenuItem } from "@/components/ui/menu";
 import NameDialog from "@/components/workbench/NameDialog.vue";
 import StatusCount from "@/components/workbench/StatusCount.vue";
 import StatusMark from "@/components/workbench/StatusMark.vue";
+import { countLabel } from "@/lib/format";
 import { countStatuses } from "@/lib/status";
+import { vTitleIfCut } from "@/lib/truncate";
 import { useCatalogStore } from "@/stores/catalog";
 import { type ContractNode, useContractsStore } from "@/stores/contracts";
 import { useSidebarStore } from "@/stores/sidebar";
@@ -73,8 +75,9 @@ function family(status: number | null): string {
   return status === null ? "none" : `${String(Math.floor(status / 100))}xx`;
 }
 
+/** Texte visible d'une réponse attendue : son code (« — » sans code) et son nom. */
 function exampleLabel(example: ExampleRef): string {
-  return `${example.status === null ? "" : String(example.status)} ${example.name}`.trim();
+  return `${example.status === null ? "—" : String(example.status)} ${example.name || "Sans nom"}`;
 }
 
 /** Réponse ouverte depuis la barre latérale, sur l'endpoint de l'onglet actif (E3). */
@@ -270,10 +273,21 @@ async function onOperation(
   }
 }
 
+/**
+ * Nom accessible de la ligne d'une opération (AC9) : son texte visible d'abord (« GET /orders »),
+ * puis ce que montrent ses marques (réponses attendues, dernier résultat) ou « créer la requête ».
+ */
 function operationLabel(contract: ContractSummary, operation: OperationNode): string {
-  const what = `${operation.method} ${operation.path}`;
-  if (operation.requests.length > 0) return `Ouvrir ${what}`;
-  return creatable(contract, operation) ? `Créer la requête de ${what}` : what;
+  const parts = [`${operation.method} ${operation.path}`];
+  if (operation.requests.length === 0) {
+    if (creatable(contract, operation)) parts.push("créer la requête");
+    return parts.join(", ");
+  }
+  const examples = examplesOf(operation).length;
+  if (examples > 0) parts.push(countLabel(examples, "réponse attendue", "réponses attendues"));
+  const status = endpointStatus(operation);
+  if (status) parts.push(status.passed ? "réussie" : "en échec");
+  return parts.join(", ");
 }
 
 /** Actions de l'endpoint, sur la ligne de son opération (RC5, Q4 du lot D). */
@@ -443,7 +457,7 @@ async function rename(name: string): Promise<void> {
             @dblclick="contracts.show(projectId, contract.path)"
           >
             <span class="contract-row__badge" aria-hidden="true">API</span>
-            <span class="contract-row__name">{{ contract.name }}</span>
+            <span v-title-if-cut class="contract-row__name">{{ contract.name }}</span>
             <span v-if="contract.version && !contract.deduced" class="contract-row__version"
               >v{{ contract.version }}</span
             >
@@ -541,7 +555,11 @@ async function rename(name: string): Promise<void> {
                     class="crow__main"
                     :class="{ 'crow__main--empty': operation.requests.length === 0 }"
                     :aria-label="operationLabel(contract, operation)"
-                    :title="operation.summary ?? `${operation.method} ${operation.path}`"
+                    :title="
+                      operation.summary
+                        ? `${operation.method} ${operation.path} · ${operation.summary}`
+                        : `${operation.method} ${operation.path}`
+                    "
                     :disabled="operation.requests.length === 0 && !creatable(contract, operation)"
                     :draggable="operation.requests.length > 0"
                     @dragstart="onOperationDragStart($event, operation)"
@@ -613,7 +631,7 @@ async function rename(name: string): Promise<void> {
                       <button
                         type="button"
                         class="crow__main crow__example"
-                        :aria-label="`Ouvrir la réponse attendue ${exampleLabel(example)}`"
+                        :aria-label="`${exampleLabel(example)}, réponse attendue`"
                         @click="openExample(operation, example)"
                       >
                         <span

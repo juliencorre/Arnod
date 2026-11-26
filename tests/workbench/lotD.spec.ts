@@ -235,7 +235,7 @@ describe("réponses attendues dans l'arborescence (3.2-a3, E1 à E3)", () => {
 
   it("le nombre sur l'endpoint ; dépliée, les réponses par code (E1, E2)", async () => {
     await petstore();
-    const post = wrapper().get('[aria-label="Ouvrir POST /pets"]');
+    const post = wrapper().get('[aria-label="POST /pets"], [aria-label^="POST /pets,"]');
     expect(post.get(".crow__examples").text()).toBe("2");
     await click(wrapper(), '[aria-label="Déplier POST /pets"]');
     const rows = wrapper().findAll(".crow__example");
@@ -250,7 +250,7 @@ describe("réponses attendues dans l'arborescence (3.2-a3, E1 à E3)", () => {
   it("un clic ouvre l'endpoint sur la réponse choisie (E3)", async () => {
     const core = await petstore();
     await click(wrapper(), '[aria-label="Déplier POST /pets"]');
-    await click(wrapper(), '[aria-label="Ouvrir la réponse attendue 400 Erreur de validation"]');
+    await click(wrapper(), '[aria-label="400 Erreur de validation, réponse attendue"]');
     expect(core.calls.filter((c) => c.cmd === "layout_open_selection").at(-1)?.args).toEqual({
       content: { kind: "request", projectId: expect.any(String), path: "Petstore/creer.yml" },
     });
