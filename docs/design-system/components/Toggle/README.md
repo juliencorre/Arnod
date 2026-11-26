@@ -7,7 +7,7 @@ Source : `src/components/ui/ToggleSwitch.vue` (aperçu statique recopié à la m
 ## Quand l'employer
 
 Un réglage oui / non qui prend effet sans bouton « Enregistrer ». Allumé : fond `color-accent`.
-Éteint : fond `color-chip`, bord `color-border-strong`. Pour un choix dans une liste, préférer un
+Éteint : fond `color-chip`, bord `color-border-control` (3:1). Pour un choix dans une liste, préférer un
 menu à choix unique.
 
 ## Ce que fournit l'appelant
