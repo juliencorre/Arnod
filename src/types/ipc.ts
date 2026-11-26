@@ -1427,16 +1427,23 @@ export interface DrawnValue {
   source: string | null;
 }
 
+/**
+ * D'où vient une variable lue par un envoi (`UsedSource`, AM29) : variable partagée de
+ * l'environnement, variable locale de cet environnement, ou valeur extraite (variable d'exécution).
+ */
+export type UsedSource = "environment" | "local" | "extracted";
+
 /** Variable lue par un envoi (`UsedVariable`) ; un secret est masqué. */
 export interface UsedVariable {
   name: string;
   value: string;
-  /** Variable d'exécution (valeur extraite), et non de l'environnement. */
-  runtime: boolean;
+  source: UsedSource;
 }
 
 /** Ce qui est parti (`Sent`, VD2). */
 export interface Sent {
+  /** Environnement de l'envoi, sur la ligne d'état de la réponse (5.1-b, AM28). */
+  environment: string;
   method: string;
   url: string;
   headers: [string, string][];

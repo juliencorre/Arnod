@@ -287,6 +287,7 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::commands::environments::EnvironmentDeleted>();
     v.visit::<crate::workbench::SendOutcome>();
     v.visit::<crate::workbench::UsedVariable>();
+    v.visit::<crate::workbench::UsedSource>();
     v.visit::<crate::workbench::Sent>();
     v.visit::<crate::workbench::ItemStatus>();
     v.visit::<crate::workbench::RunItem>();

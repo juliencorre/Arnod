@@ -53,6 +53,17 @@ export function formatDayTime(timestampMs: number): string {
   return dayTimeFormatter.format(new Date(timestampMs));
 }
 
+const clockFormatter = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+/** Fin d'un run (5.2-f) : « aujourd'hui 10:42 » le jour même, sinon « 9 nov., 14:05 ». */
+export function formatFinished(timestampMs: number, nowMs: number = Date.now()): string {
+  const day = new Date(timestampMs);
+  const today = new Date(nowMs);
+  return day.toDateString() === today.toDateString()
+    ? `aujourd'hui ${clockFormatter.format(day)}`
+    : formatDayTime(timestampMs);
+}
+
 /**
  * Chemin découpé après chaque séparateur (« / » ou « \ »), pour ne le couper qu'entre deux
  * dossiers : « /home/a/b » donne « / », « home/ », « a/ », « b ».

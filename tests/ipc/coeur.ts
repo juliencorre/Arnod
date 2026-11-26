@@ -311,7 +311,7 @@ export type Scalar = boolean | number | number | string;
 
 export type SendOutcome = { response: HttpResponse, assertions: Array<AssertionResult>, passed: boolean, slow: boolean, sent: Sent | null, };
 
-export type Sent = { method: string, url: string, headers: Array<[string, string]>, body: string | null, drawn: Array<DrawnValue>, used: Array<UsedVariable>, extracted: Array<ExtractedValue>, };
+export type Sent = { environment: string, method: string, url: string, headers: Array<[string, string]>, body: string | null, drawn: Array<DrawnValue>, used: Array<UsedVariable>, extracted: Array<ExtractedValue>, };
 
 export type Side = "right" | "bottom";
 
@@ -405,7 +405,9 @@ export type UpdatePrefs = { automatic: boolean, channel: UpdateChannel, lastChec
 
 export type UpdatesView = { current: string, prefs: UpdatePrefs, latest: Release | null, checked: boolean, installable: boolean, install: InstallState, };
 
-export type UsedVariable = { name: string, value: string, runtime: boolean, };
+export type UsedSource = "environment" | "local" | "extracted";
+
+export type UsedVariable = { name: string, value: string, source: UsedSource, };
 
 export type VariableSource = { environment: string, value: string | null, };
 
@@ -581,6 +583,7 @@ export type CheckImportDone = Check<Same<Ipc.ImportDone, ImportDone>>;
 export type CheckExtraction = Check<Same<Ipc.Extraction, Extraction>>;
 export type CheckExtractedValue = Check<Same<Ipc.ExtractedValue, ExtractedValue>>;
 export type CheckDrawnValue = Check<Same<Ipc.DrawnValue, DrawnValue>>;
+export type CheckUsedSource = Check<Same<Ipc.UsedSource, UsedSource>>;
 export type CheckUsedVariable = Check<Same<Ipc.UsedVariable, UsedVariable>>;
 export type CheckSent = Check<Same<Ipc.Sent, Sent>>;
 export type CheckRunTest = Check<Same<Ipc.RunTest, RunTest>>;

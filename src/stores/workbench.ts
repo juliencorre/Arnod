@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, reactive, ref, watch, type ComputedRef } from "vue";
 
 import { events, ipc, IpcError } from "@/lib/ipc";
+import { targetOf } from "@/lib/url";
 import { contentKey, MAIN_WINDOW, useWindowsStore } from "@/stores/windows";
 import { useToastStore } from "@/stores/toasts";
 import type {
@@ -960,6 +961,27 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return projectId ? (activeEnvironment(projectId) ?? "") : "";
   }
 
+  /**
+   * Ce que la confirmation d'un environnement protégé cite (3.3-c, AM31) : la méthode et le
+   * chemin d'un envoi, et l'hôte visé, lus dans l'adresse avec les variables de l'environnement.
+   */
+  function pendingTarget(): { method: string | null; path: string | null; host: string | null } {
+    const action = pending.value;
+    const none = { method: null, path: null, host: null };
+    if (action === null) return none;
+    const projectId = action.kind === "send" ? editors[action.key]?.projectId : action.projectId;
+    if (!projectId) return none;
+    const view = environments.value[projectId];
+    const env = view?.environments.find((e) => e.name === view.active);
+    const values = Object.fromEntries((env?.variables ?? []).map((v) => [v.name, v.value]));
+    if (action.kind === "send") {
+      const draft = editors[action.key]?.draft;
+      if (!draft) return none;
+      return { method: draft.method, ...targetOf(draft.url, values) };
+    }
+    return { method: null, path: null, host: targetOf("{{baseUrl}}", values).host };
+  }
+
   // --- Interconnexion (F11) --------------------------------------------------
 
   /** Modification faite dans une autre fenêtre. */
@@ -1360,6 +1382,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     confirmPending,
     dismissPending,
     pendingEnvironment,
+    pendingTarget,
     onProjectChange,
     subscribe,
     // Lot E : tests et étapes.

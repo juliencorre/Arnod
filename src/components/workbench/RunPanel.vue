@@ -4,12 +4,16 @@
  * résumé, barre, onglets « Échecs », « Tous », « Lents », détail des vérifications en échec
  * (ignorables pour ce run), résultat par dossier qui filtre la liste. Le cœur calcule tout
  * (statuts, groupes) ; ce composant ne fait que filtrer et compter pour l'affichage.
+ *
+ * AM30 (5.2-e, 5.2-f) : fil d'Ariane du dossier exécuté, puis « Exécution en cours » ou « Dernière
+ * exécution » ; date de fin ; « Relancer les échecs » en bouton plein ; « Ouvrir le test » sur
+ * l'échec d'une étape.
  */
 import { computed, ref, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import { useGuard } from "@/composables/useGuard";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatFinished } from "@/lib/format";
 import { onTablistKeydown } from "@/lib/tablist";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { AssertionResult, RunItem, RunItemStatus } from "@/types/ipc";
@@ -27,12 +31,14 @@ const soleTest = computed(() => {
     : null;
 });
 
-const heading = computed(() => {
+/** Fil d'Ariane (AM30) : la section, le contrat ou les dossiers, puis l'état de l'exécution. */
+const crumbs = computed<string[]>(() => {
   const current = run.value;
-  if (!current) return "";
-  if (current.contract) return `Run du contrat « ${current.contract} »`;
-  if (soleTest.value) return `Test « ${soleTest.value.name} »`;
-  return `Run de ${current.folder === "" ? "tout le projet" : current.folder}`;
+  if (!current) return [];
+  const place = current.contract
+    ? ["Contrats de service", current.contract]
+    : ["Référentiel de tests", ...current.folder.split("/").filter((s) => s !== "")];
+  return [...place, current.finished ? "Dernière exécution" : "Exécution en cours"];
 });
 
 const LABELS: Record<RunItemStatus, string> = {
@@ -110,6 +116,7 @@ const meta = computed(() => {
   ];
   if (current.finishedAt !== null) {
     parts.push(formatDuration(Math.max(0, current.finishedAt - current.startedAt)));
+    parts.push(formatFinished(current.finishedAt));
   }
   return parts.join(" · ");
 });
@@ -214,7 +221,14 @@ const EMPTY: Record<View, string> = {
     <header class="run__head">
       <div class="run__intro">
         <p class="run__meta">{{ meta }}</p>
-        <h2 class="run__title">{{ heading }}</h2>
+        <h2 class="run__title">
+          <template v-for="(crumb, index) in crumbs" :key="index"
+            ><span v-if="index > 0" class="run__sep" aria-hidden="true"> / </span
+            ><span :class="{ 'run__crumb--current': index === crumbs.length - 1 }">{{
+              crumb
+            }}</span></template
+          >
+        </h2>
         <p class="run__progress" role="status">
           <template v-if="run.finished && !run.cancelled && counts.bad > 0 && !soleTest">
             {{ plural(counts.passed, "réussi") }},
@@ -229,6 +243,7 @@ const EMPTY: Record<View, string> = {
       >
       <BaseButton
         v-else-if="counts.bad > 0"
+        variant="primary"
         @click="guard(() => workbench.retryFailures(projectId))"
       >
         Relancer les échecs
@@ -305,6 +320,15 @@ const EMPTY: Record<View, string> = {
                     @click="workbench.openRequest(projectId, item.path)"
                   >
                     {{ item.name }}
+                  </button>
+                  <button
+                    v-if="item.test !== null && isBad(item)"
+                    type="button"
+                    class="run__link run__open-test"
+                    :aria-label="`Ouvrir le test de ${item.name}`"
+                    @click="workbench.openTest(projectId, item.test)"
+                  >
+                    Ouvrir le test
                   </button>
                   <span v-if="firstFailure(item)" class="run__check">
                     — {{ firstFailure(item) }}
@@ -443,6 +467,11 @@ const EMPTY: Record<View, string> = {
   font-size: var(--text-body);
   font-weight: 600;
   color: var(--color-muted);
+}
+
+/* Dernier maillon du fil d'Ariane : l'état de l'exécution (AM30). */
+.run__crumb--current {
+  color: var(--color-text);
 }
 
 .run__progress {

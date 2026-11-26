@@ -649,6 +649,7 @@ pages:
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 5 écarts ajoutés ; b passe de « livré » à « en partie »."
       - "2026-11-26 : 0 : « Environnements · <projet> » (plan-alignement-maquette, lot A, AM9)."
       - "2026-11-26 : a : environnement enregistré seul (« ✓ Enregistré »), Échap ne jette rien, × et « + Variable » ; une suppression se rattrape par « Annuler » (plan-qualite-mvp, lot J, ER1, ER2, ER8)."
+      - "2026-11-26 : c : « Envoyer vers <env> ? » avec le cadenas, la requête et l'hôte visés, bouton plein ; cadenas sur la pastille d'un environnement protégé (plan-alignement-maquette, lot C, AM31)."
     ecrans:
       "0":
         etat: livré
@@ -675,9 +676,6 @@ pages:
       c:
         etat: livré
         pr: [27]
-        ecart:
-          texte: "Titre générique « Environnement protégé », sans méthode, chemin ni hôte, et « Envoyer quand même » en rouge ; la maquette titre « Envoyer vers Pré-production ? » avec un cadenas, cite la requête et propose « Envoyer vers Pré-production » en bouton plein ; pas de 🔒 sur la pastille d'environnement (N2, N5)."
-          aligner: code
   "3.4":
     nom: "Authentification"
     version: [MVP, V3, V5]
@@ -840,6 +838,7 @@ pages:
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 4 écarts ajoutés, 2 réécrits ou complétés."
       - "2026-11-26 : c : « Laisser dans la requête » pour une requête libre (plan-alignement-maquette, lot A, AM10)."
       - "2026-11-26 : a, b, c : barre des étapes sur une rangée qui défile ; échec affiché une fois dans un panneau dépliable, « Ignorer pour ce résultat » ; note du coffre lisible (plan-qualite-mvp, lot I, DE8, DE10, ER3, DE2)."
+      - "2026-11-26 : b bis : un clic sur une valeur du corps propose « Extraire dans une variable », la valeur extraite est marquée « → nom » (plan-alignement-maquette, lot C, AM32)."
     ecrans:
       a:
         etat: livré
@@ -862,7 +861,7 @@ pages:
         pr: [51]
         captures: [23-variables]
         ecart:
-          - texte: "« Extraire dans une variable » part d'un résultat du filtre JSONPath de la réponse, pas d'un clic sur la valeur dans le corps ; la portée est toujours « le test » (variable d'exécution). La valeur extraite n'est pas marquée « → order.id » dans le corps."
+          - texte: "La portée d'une extraction est toujours « le test » (variable d'exécution)."
             aligner: code
           - texte: "Chaque extraction a une case d'activation et un × de retrait (EX1)."
             aligner: maquette
@@ -1012,6 +1011,7 @@ pages:
       - "2026-11-26 : c : la note cite l'assertion de durée telle qu'écrite (plan-alignement-maquette, lot A, AM12)."
       - "2026-11-26 : b, h : réponse vide en texte neutre, éditeur à 58 % et onglets sur une ligne à 1280 px, compteurs en pastille ; barre des étapes sur une rangée (plan-qualite-mvp, lot I, DE1, DE3, DE7, DE8)."
       - "2026-11-26 : b : l'erreur d'envoi propose « Ajouter » et « Environnements… », sinon « Réessayer » ; onglets de l'éditeur et de la réponse aux flèches (plan-qualite-mvp, lot J, ER6, AC3)."
+      - "2026-11-26 : b, h : statut en pastille et environnement de l'envoi à droite ; onglet Envoyé avec « URL résolue », en-têtes d'abord, valeurs tirées surlignées dans le corps, source de chaque variable et note (plan-alignement-maquette, lot C, AM28, AM29)."
     ecrans:
       a:
         etat: livré
@@ -1024,8 +1024,6 @@ pages:
         pr: [27, 42]
         captures: [19-verification-en-echec]
         ecart:
-          - texte: "Ligne d'état : statut en texte simple, sans l'environnement ; la maquette met « 201 Created » en pastille verte et l'environnement à droite, comme le code le fait déjà sur un échec réseau (5.1-i) (aussi 5.1-b bis à 5.1-h)."
-            aligner: code
           - texte: "Verdict « Réussie » ou « Échec · N assertion(s) » et onglet « Assertions (N) » ; la maquette écrit « Assertions 4/5 » (avec DE10)."
             aligner: à décider
           - texte: "L'éditeur montre Nom, Description et Étiquettes, les onglets Docs et Réglages, la méthode à part, chaque en-tête sur deux rangées (avec sa description) et la rangée « Réponses attendues » (EP1, EP4, EP8) ; la maquette met le nom en titre et la méthode dans le champ d'adresse."
@@ -1080,10 +1078,8 @@ pages:
         pr: [51, 55]
         captures: [25-valeurs-dynamiques]
         ecart:
-          - texte: "« Envoyé » montre aussi les variables utilisées, les valeurs extraites et les en-têtes envoyés ; la liste s'ouvre au-dessus du curseur quand la place manque dessous ; « $date » (date du jour) et « $date:+3d » (décalée) sont deux lignes de la liste."
-            aligner: maquette
-          - texte: "Onglet Envoyé : corps envoyé en texte brut, sans les valeurs tirées surlignées, sans titre « URL résolue » ni note « Exactement ce qui est parti… », en-têtes après les variables ; la source dit « environnement » ou « extraite » au lieu du nom de l'environnement ou de « locale »."
-            aligner: code
+          texte: "« Envoyé » montre aussi les variables utilisées, les valeurs extraites et les en-têtes envoyés ; la liste s'ouvre au-dessus du curseur quand la place manque dessous ; « $date » (date du jour) et « $date:+3d » (décalée) sont deux lignes de la liste."
+          aligner: maquette
       i:
         etat: livré
         version: MVP
@@ -1105,6 +1101,7 @@ pages:
       - "2026-11-09 : Run d'un dossier, d'un projet ou d'un contrat ; relancer les échecs."
       - "2026-11-12 : Écrans repris de « Exécution » (d, e, f)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 5 écarts ajoutés, 1 réécrit ou complété ; d passe de « livré » à « en partie »."
+      - "2026-11-26 : e, f : fil d'Ariane « … / v2 / Dernière exécution », date de fin, « Relancer les échecs » en bouton plein, « Ouvrir le test » sur l'échec d'une étape (plan-alignement-maquette, lot C, AM30)."
     ecrans:
       d:
         etat: en partie
@@ -1117,8 +1114,6 @@ pages:
         pr: [27, 42]
         captures: [20-run-dossier]
         ecart:
-          - texte: "Titre « Test « Commandes » » au lieu du fil d'Ariane « … / v2 / Dernière exécution » ; « Relancer les échecs » en bouton secondaire (maquette : plein) ; ni « Ouvrir le test » sur un échec, ni date de fin (R1 du plan de fin du premier usage) (aussi 5.2-f)."
-            aligner: code
           - texte: "« run #3 » et « en même temps » (RU1)."
             aligner: maquette
           - texte: "En cours (d'après le code, sans capture) : « Annuler » au lieu d'« Arrêter », « En cours · 17/28 » au lieu de « 17 / 28 · 2 en échec · 2,1 s », sans « Les échecs remontent en tête… » ni « L'exécution continue si vous allez ailleurs… »."
@@ -1128,10 +1123,8 @@ pages:
         pr: [27, 42]
         captures: [20-run-dossier]
         ecart:
-          - texte: "L'encadré « Ce poste garde la dernière … » de la maquette est remplacé par « Résultat par dossier » et « Résultat par test » (regroupements ajoutés)."
-            aligner: maquette
-          - texte: "Titre, « Relancer les échecs » secondaire, ni « Ouvrir le test » ni date de fin : voir 5.2-e."
-            aligner: code
+          texte: "L'encadré « Ce poste garde la dernière … » de la maquette est remplacé par « Résultat par dossier » et « Résultat par test » (regroupements ajoutés)."
+          aligner: maquette
   "5.3":
     nom: "Ligne de commande"
     version: [V2, V7]

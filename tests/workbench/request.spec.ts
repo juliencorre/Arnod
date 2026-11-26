@@ -70,7 +70,7 @@ describe("éditer et envoyer une requête", () => {
     expect(app.find("dialog[open]").exists()).toBe(true);
 
     core.workbench.nextSend = okOutcome();
-    await click(app, "dialog[open] button", "Envoyer quand même");
+    await click(app, "dialog[open] button", "Envoyer vers Local");
     const sends = core.calls.filter((c) => c.cmd === "request_send");
     expect(sends.map((s) => s.args.confirmed)).toEqual([false, true]);
     expect(app.get(".response").text()).toContain("200 OK");

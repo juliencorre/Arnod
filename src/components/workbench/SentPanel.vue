@@ -4,9 +4,13 @@
  * la requête telle qu'elle est partie (secrets masqués par le cœur), les valeurs dynamiques tirées
  * à cet envoi, les variables lues et les valeurs extraites. « Garder » range une valeur tirée dans
  * une variable du test : une extraction de la valeur envoyée, ajoutée à la requête.
+ *
+ * AM29 : « URL résolue », « En-têtes », le corps envoyé avec ses valeurs tirées surlignées, puis
+ * les variables utilisées et leur source (nom de l'environnement, « locale », « extraite »).
  */
 import { computed } from "vue";
 
+import { drawnParts, sourceLabel } from "@/lib/sent";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { DrawnValue } from "@/types/ipc";
 
@@ -27,6 +31,11 @@ const body = computed(() => {
   }
 });
 
+/** Corps découpé autour des valeurs tirées, pour les surligner. */
+const bodyParts = computed(() =>
+  body.value === null ? [] : drawnParts(body.value, sent.value?.drawn ?? []),
+);
+
 /** Variable où la valeur tirée est déjà gardée, d'après les extractions de la requête. */
 function keptAs(drawn: DrawnValue): string | null {
   if (drawn.source === null) return null;
@@ -40,14 +49,27 @@ function keep(drawn: DrawnValue): void {
 
 <template>
   <div v-if="sent" class="sent" role="tabpanel" aria-label="Requête envoyée" tabindex="0">
+    <h3 class="sent__title">URL résolue</h3>
     <p class="sent__line">
       <span class="sent__method">{{ sent.method }}</span>
       <code class="sent__url">{{ sent.url }}</code>
     </p>
 
+    <h3 class="sent__title">En-têtes · {{ sent.headers.length }}</h3>
+    <dl class="sent__headers">
+      <template v-for="([name, value], index) in sent.headers" :key="index">
+        <dt>{{ name }}</dt>
+        <dd>{{ value }}</dd>
+      </template>
+    </dl>
+
     <template v-if="body !== null">
       <h3 class="sent__title">Corps envoyé</h3>
-      <pre class="sent__body">{{ body }}</pre>
+      <pre class="sent__body"><template v-for="(part, index) in bodyParts" :key="index"><mark
+            v-if="part.drawn"
+            class="sent__drawn"
+            :title="`Tirée à cet envoi : {{${part.drawn}}}`"
+          >{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></pre>
     </template>
 
     <template v-if="sent.drawn.length > 0">
@@ -84,7 +106,9 @@ function keep(drawn: DrawnValue): void {
         <li v-for="used in sent.used" :key="used.name" class="sent__row">
           <code class="sent__name">{{ used.name }}</code>
           <code class="sent__value" :title="used.value">{{ used.value }}</code>
-          <span class="sent__origin">{{ used.runtime ? "extraite" : "environnement" }}</span>
+          <span class="sent__origin" :class="`sent__origin--${used.source}`">{{
+            sourceLabel(used.source, sent.environment)
+          }}</span>
         </li>
       </ul>
     </template>
@@ -105,13 +129,10 @@ function keep(drawn: DrawnValue): void {
       </ul>
     </template>
 
-    <h3 class="sent__title">En-têtes envoyés · {{ sent.headers.length }}</h3>
-    <dl class="sent__headers">
-      <template v-for="([name, value], index) in sent.headers" :key="index">
-        <dt>{{ name }}</dt>
-        <dd>{{ value }}</dd>
-      </template>
-    </dl>
+    <p class="sent__note">
+      Exactement ce qui est parti sur le réseau, variables remplacées. Les secrets restent masqués ;
+      «&nbsp;Copier en cURL&nbsp;» les remplace par <code>$TOKEN</code>.
+    </p>
   </div>
   <p v-else class="sent__empty">Envoyez la requête pour voir ce qui part.</p>
 </template>
@@ -249,5 +270,21 @@ function keep(drawn: DrawnValue): void {
 .sent__headers dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+/* Variable locale : sa valeur reste sur le poste (5.1-h). */
+.sent__origin--local {
+  padding: 0 0.3125rem;
+  border-radius: var(--radius-md);
+  color: var(--color-link);
+  background: var(--color-accent-soft);
+}
+
+/* Valeur tirée à cet envoi, dans le corps envoyé (AM29). */
+.sent__drawn {
+  padding: 0 0.125rem;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  background: var(--color-accent-soft);
 }
 </style>
