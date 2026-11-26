@@ -260,6 +260,11 @@ C, D, E, F, I. Vague 3, en parallèle : G, H, J, K.
       couples ajoutés à `tests/theme.spec.ts`.
 - [x] **T27** DE3, DE6, DE8, DE9 : vue partagée, points de départ, barre des étapes, accueil.
 - [x] **T28** DE7, DE10, ER3, ER4 : compteurs, sélection, échec affiché une fois, libellés.
+- [x] **T36** Skill Impeccable dans le dépôt (`.claude/skills/impeccable/`, `PRODUCT.md`,
+      `DESIGN.md` généré par `scripts/design-system.mjs`) ; son détecteur dans `npm run check` et
+      la CI (`scripts/impeccable-detect.mjs`) ; passage sur l'aperçu rendu
+      (`scripts/impeccable-apercu.mjs`) ; constats DI1 à DI6 de
+      [`audit-impeccable-2026-11.md`](audit-impeccable-2026-11.md) corrigés, DI7 renvoyé à Q12.
 
 **Lot J - Ergonomie et clavier** (`claude/qualite-j-ergonomie`)
 
@@ -321,3 +326,4 @@ Questions ouvertes, à trancher avant le lot cité.
 | Q9  | `reqwest` 0.13 pour n'avoir qu'un client HTTP : maintenant (lot K) ou à la prochaine montée de Tauri ?                                                    | K   | À trancher                                                                                                         |
 | Q10 | Bords de contrôle à 3:1 : foncer les bords de tous les champs, ou seulement cases, interrupteurs et focus ?                                               | I   | 2026-11-17 : cases, interrupteurs, radios et focus ; jeton `--color-border-control` (#8f8a83, #7d7871)             |
 | Q11 | Barre des étapes trop haute (DE8) : une rangée qui défile, ou « Étape n / total » avec un menu ?                                                          | I   | 2026-11-17 : une rangée qui défile                                                                                 |
+| Q12 | Texte indicatif des champs et numéros de ligne à 4,5:1 (Impeccable, DI7) : foncer `--color-subtle`, ou passer ces textes en `--color-muted` ?             | J   | À trancher                                                                                                         |

@@ -318,6 +318,8 @@ watch(
 
 <template>
   <section v-if="request" ref="editorRoot" class="editor" aria-label="Requête" @keydown="onKeydown">
+    <!-- Titre pour les lecteurs d'écran : les sections de l'éditeur (h3) ont un parent (DI5). -->
+    <h2 class="visually-hidden">Requête {{ request.name }}</h2>
     <div class="editor__top">
       <p v-if="contract" class="editor__crumbs">
         <span>Contrats de service</span>
