@@ -20,6 +20,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const PORT = 9333;
 const LAUNCHER = path.join(ROOT, ".claude", "skills", "impeccable", "scripts", "impeccable");
+// Interpréteur par chemin absolu, jamais cherché dans PATH (l'outil ne sert que sous Linux).
+const SHELL = "/bin/sh";
 
 const argv = process.argv.slice(2);
 const dark = argv.includes("--sombre");
@@ -59,7 +61,7 @@ try {
     let json = "[]";
     try {
       json = execFileSync(
-        "sh",
+        SHELL,
         [
           LAUNCHER,
           "detect",

@@ -23,9 +23,12 @@ const args = [
   ...(targets.length > 0 ? targets : ["src/"]),
 ];
 
-const result = windows
-  ? spawnSync("cmd.exe", ["/d", "/s", "/c", launcher, ...args], { cwd: root, stdio: "inherit" })
-  : spawnSync("sh", [launcher, ...args], { cwd: root, stdio: "inherit" });
+// Interpréteur par chemin absolu, jamais cherché dans PATH (comme startup::open_external du cœur).
+const shell = windows
+  ? path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "cmd.exe")
+  : "/bin/sh";
+const shellArgs = windows ? ["/d", "/s", "/c", launcher, ...args] : [launcher, ...args];
+const result = spawnSync(shell, shellArgs, { cwd: root, stdio: "inherit" });
 if (result.error) {
   console.error(`Détecteur Impeccable indisponible : ${result.error.message}`);
   process.exit(1);
