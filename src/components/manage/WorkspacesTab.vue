@@ -100,7 +100,11 @@ async function setColor(color: string): Promise<void> {
           </button>
         </li>
       </ul>
-      <BaseButton variant="link" @click="dialogs.openNewWorkspace({ open: false })">
+      <BaseButton
+        variant="link"
+        class="list__add"
+        @click="dialogs.openNewWorkspace({ open: false })"
+      >
         + Nouveau workspace
       </BaseButton>
       <p class="list__note">
@@ -116,17 +120,20 @@ async function setColor(color: string): Promise<void> {
       <form class="detail__name" novalidate @submit.prevent="saveName">
         <label :for="nameId" class="detail__label">Nom</label>
         <div class="detail__name-row">
-          <ColorDot :color="workspace.color" />
-          <input
-            :id="nameId"
-            v-model="name"
-            class="detail__input"
-            type="text"
-            autocomplete="off"
-            :aria-invalid="nameError !== null"
-            :aria-describedby="nameError ? nameErrorId : undefined"
-            @blur="saveName"
-          />
+          <!-- La pastille de couleur est dans le champ du nom (1.1-d). -->
+          <span class="detail__field" :class="{ 'detail__field--invalid': nameError !== null }">
+            <ColorDot :color="workspace.color" />
+            <input
+              :id="nameId"
+              v-model="name"
+              class="detail__input"
+              type="text"
+              autocomplete="off"
+              :aria-invalid="nameError !== null"
+              :aria-describedby="nameError ? nameErrorId : undefined"
+              @blur="saveName"
+            />
+          </span>
           <BaseMenu :items="colorItems" label="Couleur du workspace" @select="setColor">
             <template #trigger="{ attrs }">
               <button v-bind="attrs" type="button" class="detail__color">Couleur ▾</button>
@@ -251,6 +258,11 @@ async function setColor(color: string): Promise<void> {
   color: var(--color-muted);
 }
 
+/* « + Nouveau workspace » à gauche, comme les autres lignes d'ajout (1.1-d). */
+.list__add {
+  align-self: flex-start;
+}
+
 .list__note {
   margin: auto 0 0;
   font-size: var(--text-body);
@@ -286,27 +298,42 @@ async function setColor(color: string): Promise<void> {
   gap: 0.75rem;
 }
 
-.detail__input {
+.detail__field {
+  display: flex;
   flex: 1;
+  align-items: center;
+  gap: 0.5rem;
   max-width: 28rem;
   box-sizing: border-box;
   min-height: var(--control-md);
-  padding: 0.3125rem 0.625rem;
+  padding: 0 0.625rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  font: inherit;
-  font-weight: 600;
-  color: var(--color-text);
   background: var(--color-surface);
 }
 
-.detail__input[aria-invalid="true"] {
+.detail__field:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -1px;
+}
+
+.detail__field--invalid {
   border-color: var(--color-danger);
 }
 
-.detail__input:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: -1px;
+.detail__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3125rem 0;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-text);
+  background: none;
+}
+
+.detail__input:focus {
+  outline: none;
 }
 
 .detail__color {
@@ -334,6 +361,11 @@ async function setColor(color: string): Promise<void> {
   margin: 0;
   font-size: var(--text-body);
   color: var(--color-muted);
+}
+
+.detail__delete .detail__muted {
+  flex: 1;
+  min-width: 0;
 }
 
 .projects {
@@ -395,9 +427,10 @@ async function setColor(color: string): Promise<void> {
   color: var(--color-danger);
 }
 
+/* L'explication à droite du bouton de suppression (1.1-d). */
 .detail__delete {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 1rem;
   margin-top: auto;

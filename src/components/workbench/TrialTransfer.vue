@@ -176,8 +176,10 @@ async function submit(): Promise<void> {
   width: min(32rem, 80vw);
 }
 
+/* Libellé d'un champ : texte secondaire, petite taille (composant Field, 2.2-b, 2.2-d). */
 .transfer__label {
-  font-weight: 600;
+  font-size: var(--text-small);
+  color: var(--color-muted);
 }
 
 .transfer__input {

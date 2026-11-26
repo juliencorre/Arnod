@@ -884,6 +884,7 @@ Référence : `docs/audit-impeccable-2026-11.md` (constats DI1 à DI7) et `docs/
   ou son exception se déclare à côté de la valeur (`/* impeccable-disable-line <règle>: raison */`) ;
   une exception qui ne sert plus fait échouer. Le passage sur l'aperçu rendu
   (`scripts/impeccable-apercu.mjs`, deux thèmes) se relance à chaque lot qui touche l'interface.
-- Une barre sombre (notification, sélection multiple) prend les jetons `--color-toast-*` ; une
-  sélection est un fond `--color-accent-soft`, jamais une barre sur le côté ; un texte estompé
-  l'est par sa couleur, jamais par l'opacité.
+- Une notification prend les jetons `--color-toast-*` ; la barre de la sélection multiple est
+  inversée (fond `--color-text`, « Supprimer » en `--color-danger-inverse`, Q2 du plan
+  d'alignement) ; une sélection est un fond `--color-accent-soft`, jamais une barre sur le côté ;
+  un texte estompé l'est par sa couleur, jamais par l'opacité.

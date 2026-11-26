@@ -24,15 +24,16 @@ const BAR = "src/components/workbench/SelectionBar.vue";
 const CONTRACTS = "src/components/contracts/ContractsSection.vue";
 
 describe("constats d'Impeccable (DI1 à DI6)", () => {
-  it("DI1 : la barre de la sélection multiple prend les jetons des notifications", () => {
+  it("DI1 : la barre de la sélection multiple est inversée, « Supprimer » en danger inverse", () => {
+    // Décision Q2 du plan d'alignement (AM27) : contraste vérifié par tests/theme.spec.ts.
     expect({
       background: cssValue(BAR, ".selection", "background"),
       color: cssValue(BAR, ".selection", "color"),
       danger: cssValue(BAR, ".selection__action--danger", "color"),
     }).toEqual({
-      background: "var(--color-toast-bg)",
-      color: "var(--color-toast-text)",
-      danger: "var(--color-toast-danger)",
+      background: "var(--color-text)",
+      color: "var(--color-bg)",
+      danger: "var(--color-danger-inverse)",
     });
   });
 

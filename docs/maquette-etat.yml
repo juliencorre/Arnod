@@ -148,14 +148,13 @@ pages:
       - "2026-11-13 : Nombre de contrats de service sur les cartes de projet (lot D, PR #48)."
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 10 écarts ajoutés."
+      - "2026-11-26 : a, b bis, d, e : carte introuvable au bord plein et « Ouvrir » grisé ; actions d'un workspace à côté du sélecteur ; gestion des workspaces mise en forme ; outils à droite du titre (plan-alignement-maquette, lot B, AM13 à AM16)."
     ecrans:
       a:
         etat: livré
         pr: [9, 27, 48]
         captures: [03-workspace-boutique, 24-cartes-contrats]
         ecart:
-          - texte: "Carte d'un projet introuvable : bord plein dans la maquette, pointillé dans le code ; « Ouvrir » y est grisé dans la maquette, actif dans le menu ⋯ du code (P10)."
-            aligner: code
           - texte: "Le menu ⋯ dit « Afficher dans « Tous les projets » » et « Le projet reste dans « Tous les projets ». » au lieu de « le référentiel » (O9)."
             aligner: maquette
           - texte: "Chemins : la maquette les abrège (« ~/dev/auth-sso »), l'application montre le chemin absolu, coupé sur deux lignes dans les cartes (aussi 1.1-a bis, 1.1-d, 1.2-d) ; la carte d'un projet introuvable n'a pas de ligne de contrats (maquette : « aucun contrat de service »)."
@@ -172,10 +171,8 @@ pages:
         pr: [36]
         captures: [02b-selecteur-workspace]
         ecart:
-          - texte: "Menu ⋯ d'un workspace sans en-tête (« PAIEMENTS »), avec « Changer la couleur ▸ » au lieu du nuancier, « Gérer les workspaces… » et le raccourci Suppr (S4) ; création dans une fenêtre sous le sélecteur, avec « Annuler » (S3)."
-            aligner: maquette
-          - texte: "Le sous-menu « Changer la couleur ▸ » chevauche le menu et cache la fin de « Ctrl+Maj+W »."
-            aligner: code
+          texte: "Menu ⋯ d'un workspace sans en-tête (« PAIEMENTS »), avec « Changer la couleur ▸ » au lieu du nuancier, « Gérer les workspaces… » et le raccourci Suppr (S4) ; création dans une fenêtre sous le sélecteur, avec « Annuler » (S3)."
+          aligner: maquette
       c:
         etat: livré
         pr: [14]
@@ -186,9 +183,6 @@ pages:
         etat: livré
         pr: [10]
         captures: [04-gerer-workspaces]
-        ecart:
-          texte: "« + Nouveau workspace » centré (maquette : à gauche) ; la pastille de couleur est hors du champ « Nom » ; l'explication passe sous « Supprimer ce workspace » (maquette : à droite)."
-          aligner: code
       e:
         etat: livré
         pr: [10, 11, 39]
@@ -196,8 +190,6 @@ pages:
         ecart:
           - texte: "Pas de colonne « Contrats » ; l'application place l'entrée « Essayer une étape » en tête de la page, absente de l'écran."
             aligner: à décider
-          - texte: "La recherche et les boutons sont sur une rangée sous le texte ; la maquette les met à droite du texte (aussi 2.2-f)."
-            aligner: code
           - texte: "Le rappel « Ouvrez un projet ici… » est sous « + Ouvrir un projet », sans « Vous êtes sur… » (S9) ; au dépôt d'un projet, « Ajouter à « X » » au lieu de « Déposer : ajouter à… » (S6)."
             aligner: maquette
   "1.2":
@@ -220,6 +212,7 @@ pages:
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 6 écarts ajoutés, 2 réécrits ou complétés."
       - "2026-11-26 : d : « Directement dans le référentiel de tests, sans contrat. » et « vos premiers tests » (plan-alignement-maquette, lot A, AM2)."
       - "2026-11-26 : d : quatre cartes sur toute la largeur, « + Environnement » sur une ligne (plan-qualite-mvp, lot I, DE6)."
+      - "2026-11-26 : a bis, e : « + Nouvel environnement » en couleur de lien ; champ de filtre sans bouton natif (plan-alignement-maquette, lot B, AM17, AM18)."
       - "2026-11-26 : Sélection multiple et réponse attendue ouverte en fond accent doux, sans barre sur le côté ; opération sans requête estompée par la couleur (a quater, 3.2-a3, Impeccable DI2, DI4, PR #85)."
     ecrans:
       "0": { etat: remplacé }
@@ -237,10 +230,8 @@ pages:
         pr: [33]
         captures: [08b-menu-environnement]
         ecart:
-          - texte: "✓ à gauche de l'environnement actif (composant Menu du design system) ; pas d'« Aucun environnement » : « Local » existe dans chaque projet ; rangée d'onglets de workspaces encore dessinée (S8)."
-            aligner: maquette
-          - texte: "« + Nouvel environnement » en texte foncé ; la maquette l'écrit en couleur de lien, comme « + Nouveau workspace » dans le code."
-            aligner: code
+          texte: "✓ à gauche de l'environnement actif (composant Menu du design system) ; pas d'« Aucun environnement » : « Local » existe dans chaque projet ; rangée d'onglets de workspaces encore dessinée (S8)."
+          aligner: maquette
       "a ter":
         etat: livré
         pr: [33, 48, 65]
@@ -264,10 +255,8 @@ pages:
         pr: [48]
         captures: [21-filtre-referentiel]
         ecart:
-          - texte: "Passage trouvé souligné et en gras (pas de fond) ; dossiers avec leur nombre de requêtes non filtré ; le filtre ne porte pas sur les requêtes rangées sous les contrats (la maquette ne le montre que sur le référentiel)."
-            aligner: maquette
-          - texte: "Le champ de filtre montre aussi le bouton natif d'effacement (⌫ sous WebKitGTK, bleu sous WebView2), collé au compte « 1 sur 4 », en plus du × : `appearance: none` sur `::-webkit-search-cancel-button` reste sans effet (TreeFilter.vue)."
-            aligner: code
+          texte: "Passage trouvé souligné et en gras (pas de fond) ; dossiers avec leur nombre de requêtes non filtré ; le filtre ne porte pas sur les requêtes rangées sous les contrats (la maquette ne le montre que sur le référentiel)."
+          aligner: maquette
   "1.3":
     nom: "Onglets"
     version: MVP
@@ -279,16 +268,15 @@ pages:
       - "2026-11-12 : Nom aligné sur le contenu (fichier « Récents »)."
       - "2026-11-13 : Aperçu en italique et ◐, « +N » avec « Fermer les autres » et « Fermer tout », Ctrl+Tab dans l'ordre d'utilisation (plan-mvp-f-onglets-clavier, PR #57)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 2 écarts ajoutés."
+      - "2026-11-26 : a, c : × sur l'onglet actif, au survol ou au focus ; voile derrière Ctrl+Tab (plan-alignement-maquette, lot B, AM19, AM20)."
     ecrans:
       a:
         etat: livré
         pr: [27, 57]
         captures: [25-onglet-apercu]
         ecart:
-          - texte: "Les onglets restent dans la zone, sous la barre du système (barre de titre intégrée : écart transverse) ; pas d'onglets d'anomalie ni d'exigence (contenus à venir)."
-            aligner: maquette
-          - texte: "× seulement sur l'onglet actif dans la maquette ; le code le montre sur tous les onglets (aussi 1.3-b, 1.3-c et 1.4)."
-            aligner: code
+          texte: "Les onglets restent dans la zone, sous la barre du système (barre de titre intégrée : écart transverse) ; pas d'onglets d'anomalie ni d'exigence (contenus à venir)."
+          aligner: maquette
       b:
         {
           etat: livré,
@@ -305,10 +293,8 @@ pages:
         pr: [57]
         captures: [27-ctrl-tab]
         ecart:
-          - texte: "Pas d'étoile ☆ (favoris, hors MVP) ; la liste s'ouvre au centre de la zone active."
-            aligner: maquette
-          - texte: "La maquette assombrit la fenêtre derrière la liste Ctrl+Tab ; le code n'a pas de voile."
-            aligner: code
+          texte: "Pas d'étoile ☆ (favoris, hors MVP) ; la liste s'ouvre au centre de la zone active."
+          aligner: maquette
   "1.4":
     nom: "Fenêtres et zones"
     version: MVP
@@ -323,15 +309,13 @@ pages:
       - "2026-11-13 : Ctrl+J et Ctrl+\\, dans le menu Fenêtre et sur l'icône de l'en-tête du résultat, gardés par fenêtre (plan-mvp-f-onglets-clavier, PR #57)."
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 7 écarts ajoutés, 1 réécrit ou complété."
+      - "2026-11-26 : b, h : bulle de taille nommée, poignée ⇔ et rangée d'aide ; pastille d'environnement et « ● Épinglée » dans la fenêtre de contenu (plan-alignement-maquette, lot B, AM21, AM22)."
     ecrans:
       a: { etat: livré, pr: [27], captures: [06-zones] }
       b:
         etat: livré
         pr: [27]
         captures: [06-zones]
-        ecart:
-          texte: "La bulle de taille affiche « 560 px · 459 px » au lieu des noms des zones (« test 500 px · mock 456 px ») : ZoneLayout ne passe pas `names` à SplitHandle ; ni poignée ⇔ au milieu de la séparation, ni rangée d'aide (« Glisser : redimensionner · Double-clic : parts égales · Alt+Maj+flèches · Largeur mini : 280 px »), seulement une infobulle."
-          aligner: code
       c:
         etat: livré
         pr: [27]
@@ -359,9 +343,6 @@ pages:
       h:
         etat: livré
         pr: [27]
-        ecart:
-          texte: "Pastille d'environnement (« ■ Local ») avant « Rattacher » dans la maquette, absente de ContentWindow.vue ; « Épinglée » en pastille accent doux avec ● dans la maquette, neutre dans le code (aussi 1.4-g)."
-          aligner: code
       i:
         etat: livré
         pr: [34]
@@ -479,6 +460,7 @@ pages:
       - "2026-11-13 : Essais d'un contrat déduit rangés dans un projet, sous une copie du contrat ou sous un contrat du projet, avec « Annuler » (d)."
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 7 écarts ajoutés, 1 réécrit ou complété."
+      - "2026-11-26 : b, d, f : libellés de champ en texte secondaire ; outils à droite du titre (plan-alignement-maquette, lot B, AM16, AM23)."
     ecrans:
       a:
         etat: livré
@@ -497,8 +479,6 @@ pages:
         ecart:
           - texte: "L'étape n'est plus liée au contrat (une étape n'est jamais liée, lot E) : elle quitte l'endpoint et n'est plus vérifiée contre lui ; « Transférer vers les templates » attend les templates ; le nom proposé est celui de l'essai ; « Requête au point ? » est un bloc sous l'éditeur, bouton secondaire."
             aligner: à décider
-          - texte: "Libellés des champs (« Nom du test », « Ranger dans », « Projet », « Contrat de service ») en graisse 600 ; la maquette et le composant Field du design system les écrivent en texte secondaire, taille small (aussi 2.2-d)."
-            aligner: code
           - texte: "Pied des fenêtres sans bande teintée ni trait au-dessus : le Dialog du design system n'en a pas (aussi 2.3-b)."
             aligner: maquette
       c:
@@ -515,10 +495,8 @@ pages:
         pr: [60]
         captures: [29-ranger-dans-un-projet]
         ecart:
-          - texte: "« Ranger dans un projet… » est dans le menu ⋯ du contrat déduit : une fenêtre choisit le projet et le contrat (copie du contrat déduit ou contrat du projet, dont chaque essai rejoint l'opération qui sert son chemin) ; un essai sans opération reste dans « Non classés » ; la notification dit « N essais rangés » (pas « tests »)."
-            aligner: maquette
-          - texte: "Libellés des champs en graisse 600 au lieu du texte secondaire du composant Field (comme 2.2-b)."
-            aligner: code
+          texte: "« Ranger dans un projet… » est dans le menu ⋯ du contrat déduit : une fenêtre choisit le projet et le contrat (copie du contrat déduit ou contrat du projet, dont chaque essai rejoint l'opération qui sert son chemin) ; un essai sans opération reste dans « Non classés » ; la notification dit « N essais rangés » (pas « tests »)."
+          aligner: maquette
       f:
         etat: livré
         pr: [35, 39]
@@ -526,8 +504,6 @@ pages:
         ecart:
           - texte: "La ligne « Non classés » propose « Oublier » au lieu de « Ranger… » (qui est dans le menu ⋯ du contrat déduit, 2.2-d) ; pas de note « …vide, il passe en fin de liste » : Non classés reste toujours en tête (R5)."
             aligner: maquette
-          - texte: "Recherche, « Importer… » et « Nouveau projet » sous le sous-titre ; la maquette les met à droite du titre (aussi 1.1-e)."
-            aligner: code
           - texte: "Le nombre sous « Non classés » compte des « essais » ; la maquette écrit « 3 tests »."
             aligner: à décider
   "2.3":
@@ -588,6 +564,7 @@ pages:
       - "2026-11-12 : Écrans repris de « Contrats de service » (e, f, g) ; a à d forment 3.2."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 4 écarts ajoutés, 1 réécrit ou complété."
       - "2026-11-26 : f : « Nouveau contrat de service », « Créer le contrat » (plan-alignement-maquette, lot A, AM7)."
+      - "2026-11-26 : e : version du contrat en pastille « v2.1.0 » (plan-alignement-maquette, lot B, AM24)."
     ecrans:
       e:
         etat: livré
@@ -598,8 +575,6 @@ pages:
             aligner: à décider
           - texte: "« ▶ Exécuter (3) » en bouton secondaire, « 3 opérations · 3 avec requête » et « Requête › » sur chaque ligne au lieu de « ▶ Lancer les 7 requêtes » (bouton plein), « Endpoints de ce contrat · 7 » et ▶ par ligne (C5, C10)."
             aligner: maquette
-          - texte: "Version en texte simple (« version 2.1.0 », « 2.1.0 » dans la barre latérale) ; la maquette l'écrit en pastille « Contrat v2.4.0 », comme l'éditeur du contrat."
-            aligner: code
       f:
         etat: livré
         pr: [28]
@@ -629,25 +604,22 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 5 écarts ajoutés, 3 réécrits ou complétés."
       - "2026-11-26 : c : « La requête « … » devient l'étape 1 d'un nouveau test du référentiel. », assertions accordées (plan-alignement-maquette, lot A, AM8)."
+      - "2026-11-26 : a, a2 : en-tête de l'éditeur sur une rangée, Nom, Description et Étiquettes sur une rangée (plan-alignement-maquette, lot B, AM25)."
     ecrans:
       a:
         etat: livré
         pr: [32]
         captures: [12-endpoint]
         ecart:
-          - texte: "L'endpoint porte « + Test » et un onglet « Tests et templates » ; dans l'application l'endpoint est une requête : « Envoyer », onglets Assertions et Variables, « Délier » du contrat."
-            aligner: maquette
-          - texte: "En-tête de l'éditeur : « Étiquettes » passe sur une rangée sous Nom et Description (maquette : troisième colonne) ; « ✓ Enregistré » est seul sur une rangée à gauche (maquette : à droite du fil d'Ariane) ; à 1280 px « Délier » passe seul sur une ligne, soit trois rangées avant l'adresse (aussi 3.2-a2 et a3)."
-            aligner: code
+          texte: "L'endpoint porte « + Test » et un onglet « Tests et templates » ; dans l'application l'endpoint est une requête : « Envoyer », onglets Assertions et Variables, « Délier » du contrat."
+          aligner: maquette
       a2:
         etat: livré
         pr: [32]
         captures: [12-endpoint]
         ecart:
-          - texte: "« Envoyer » au lieu de « + Test », pas d'onglet « Tests et templates » : l'endpoint est une requête (comme 3.2-a)."
-            aligner: maquette
-          - texte: "Disposition de l'en-tête de l'éditeur (Étiquettes, « ✓ Enregistré », « Délier ») : voir 3.2-a."
-            aligner: code
+          texte: "« Envoyer » au lieu de « + Test », pas d'onglet « Tests et templates » : l'endpoint est une requête (comme 3.2-a)."
+          aligner: maquette
       a3:
         etat: livré
         version: MVP
@@ -729,6 +701,7 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : « ✓ Enregistré » au lieu d'« Enregistrer » (ER2) ; cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 4 écarts ajoutés, 1 réécrit ou complété."
       - "2026-11-26 : g : la note des cookies reçus en texte secondaire (plan-qualite-mvp, lot I, DE1)."
+      - "2026-11-26 : a : libellés au-dessus des champs de l'authentification (plan-alignement-maquette, lot B, AM26)."
     ecrans:
       a:
         etat: livré
@@ -742,8 +715,6 @@ pages:
             aligner: code
           - texte: "« OAuth 2 (identifiants client) » en un seul choix au lieu de « Type » et « Flux », sans la phrase sur le code d'autorisation ; « Identifiants envoyés » et la note du jeton en plus ; « requêtes » au lieu de « tests » (R8, R9, OA4)."
             aligner: maquette
-          - texte: "Le libellé « Type » est à gauche de sa liste ; la maquette le place comme celui des autres champs."
-            aligner: code
       b:
         etat: livré
         pr: [27, 32]
@@ -791,7 +762,8 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : g : note « après l'étape n » en couleur de texte, sélection en fond accent doux (DE2, DE7) ; cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 7 écarts ajoutés ; a bis passe de « livré » à « en partie », a ter passe de « livré » à « en partie »."
       - "2026-11-26 : g : note « après l'étape n » en couleur de texte (plan-qualite-mvp, lot I, DE2)."
-      - "2026-11-26 : Barre de la sélection multiple lisible en thème sombre (jetons des notifications) ; destination choisie et éléments choisis en fond accent doux, sans barre sur le côté (a quater, g, Impeccable DI1, DI4, PR #85)."
+      - "2026-11-26 : a quater, g : « Supprimer » en rouge lisible sur la barre de sélection ; recherche du copier-déplacer avec sa loupe, sans bouton natif (plan-alignement-maquette, lot B, AM27, AM18)."
+      - "2026-11-26 : Destination choisie et éléments choisis en fond accent doux, sans barre sur le côté (a quater, g, Impeccable DI4, PR #85)."
     ecrans:
       a:
         etat: livré
@@ -817,10 +789,8 @@ pages:
         pr: [66]
         captures: [35-selection-multiple]
         ecart:
-          - texte: "La sélection se fait dans l'arborescence seulement : pas encore de vue en tableau d'un dossier avec cases à cocher ni « Tout sélectionner » ; la barre d'actions est la même."
-            aligner: à décider
-          - texte: "« Supprimer » de la barre de sélection est en couleur d'accent ; la maquette l'écrit en rouge clair : une action destructrice prend color-danger (design system), dans un ton lisible sur la barre sombre."
-            aligner: code
+          texte: "La sélection se fait dans l'arborescence seulement : pas encore de vue en tableau d'un dossier avec cases à cocher ni « Tout sélectionner » ; la barre d'actions est la même."
+          aligner: à décider
       b:
         etat: livré
         pr: [27, 51]
@@ -859,8 +829,6 @@ pages:
         ecart:
           - texte: "Une étape n'est jamais liée à un contrat (lot E, R1) : vers un test, « N'est plus liée à POST /orders » au lieu de « Reste liée » ; seules les opérations de même méthode sont proposées, sans « nouvel endpoint… » ni « Nouveau test dans… » ; « Non classés » n'est pas une destination ; la place dans le test se choisit sous la liste."
             aligner: à décider
-          - texte: "Le champ de recherche est un champ de recherche natif : bouton d'effacement natif (bleu sous WebView2, ⌫ sous WebKitGTK) et loupe qui disparaît à la saisie ; la maquette garde la loupe, sans bouton d'effacement (comme le filtre du référentiel, 1.2-e)."
-            aligner: code
           - texte: "La destination choisie est un fond accent doux, sans barre orange sur le côté : la forme unique d'une sélection (DE7, Impeccable DI4)."
             aligner: maquette
   "4.2":

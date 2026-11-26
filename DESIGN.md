@@ -18,6 +18,7 @@ colors:
   success-soft: "#e7f4ec"
   danger: "#b42318"
   danger-soft: "#fdeceb"
+  danger-inverse: "#ff9b8a"
   accent: "#e8962e"
   accent-hover: "#d9822a"
   accent-text: "#1d1b18"
@@ -25,7 +26,6 @@ colors:
   toast-bg: "#1d1b18"
   toast-text: "#fbfaf8"
   toast-action: "#f0a54a"
-  toast-danger: "#ff8a80"
   ws-gray: "#a39d93"
   ws-orange: "#e8962e"
   ws-blue: "#3f7fd6"
@@ -202,6 +202,7 @@ statut ne passe jamais par la couleur seule.
 | `--color-success-soft` | `#e7f4ec` | `#1f3327` | Fond d'une vérification ou d'une ligne de run réussie. |
 | `--color-danger` | `#b42318` | `#ff8a80` | Échec, erreur, action destructrice, méthode DELETE ; 4,5:1 sur color-bg, color-surface, color-sidebar et color-danger-soft. |
 | `--color-danger-soft` | `#fdeceb` | `#3d2321` | Fond d'une vérification ou d'une ligne de run en échec. |
+| `--color-danger-inverse` | `#ff9b8a` | `#b42318` | Action destructrice sur une barre inversée (fond color-text, comme la barre de sélection) : 4,5:1 sur color-text dans les deux thèmes (vérifié par tests/theme.spec.ts). |
 | `--color-accent` | `#e8962e` | `#eda24c` | Seule couleur d'action : fond du bouton principal, interrupteur allumé. Texte posé dessus : color-accent-text. |
 | `--color-accent-hover` | `#d9822a` | `#f3b46a` | Bouton principal survolé. |
 | `--color-accent-text` | `#1d1b18` | `#1d1b18` | Texte sur color-accent et color-accent-hover, 4,5:1 dans les deux thèmes. |
@@ -209,7 +210,6 @@ statut ne passe jamais par la couleur seule.
 | `--color-toast-bg` | `#1d1b18` | `#3a3631` | Fond des notifications (sombre en thème clair, relevé en thème sombre). |
 | `--color-toast-text` | `#fbfaf8` | `#ede9e3` | Texte des notifications, 4,5:1 sur color-toast-bg. |
 | `--color-toast-action` | `#f0a54a` | `#f0b46a` | Action d'une notification (« Annuler »), 4,5:1 sur color-toast-bg. |
-| `--color-toast-danger` | `#ff8a80` | `#ff8a80` | Action destructrice posée sur color-toast-bg (« Supprimer » de la barre de sélection), 4,5:1 sur ce fond. |
 | `--color-ws-gray` | `#a39d93` | `#8f887e` | Pastille du workspace « Gris » (ColorDot, menus) : décorative, toujours à côté du nom du workspace. |
 | `--color-ws-orange` | `#e8962e` | `#eda24c` | Pastille du workspace « Orange » (ColorDot, menus) : décorative, toujours à côté du nom du workspace. |
 | `--color-ws-blue` | `#3f7fd6` | `#6b9be6` | Pastille du workspace « Bleu » (ColorDot, menus) : décorative, toujours à côté du nom du workspace. |

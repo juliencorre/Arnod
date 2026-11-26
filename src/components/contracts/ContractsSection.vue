@@ -447,9 +447,9 @@ async function rename(name: string): Promise<void> {
           >
             <span class="contract-row__badge" aria-hidden="true">API</span>
             <span class="contract-row__name">{{ contract.name }}</span>
-            <span v-if="contract.version && !contract.deduced" class="contract-row__version">{{
-              contract.version
-            }}</span>
+            <span v-if="contract.version && !contract.deduced" class="contract-row__version"
+              >v{{ contract.version }}</span
+            >
             <span v-if="contract.error" class="contract-row__invalid" aria-label="illisible"
               >⚠</span
             >
@@ -871,8 +871,11 @@ async function rename(name: string): Promise<void> {
 
 .contract-row__version {
   margin-left: auto;
+  padding: 0 0.375rem;
+  border-radius: var(--radius-pill);
   font: var(--text-caption) var(--font-mono);
-  color: var(--color-muted);
+  color: var(--color-text);
+  background: var(--color-chip);
 }
 
 .contract-row__invalid {
