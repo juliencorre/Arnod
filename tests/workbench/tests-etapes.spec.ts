@@ -134,7 +134,7 @@ describe("extractions (4.2-b bis)", () => {
     }));
     await click(app, '[role="treeitem"]', "Créer");
     await click(app, ".editor__tab", "Variables");
-    await click(app, ".vars__button", "+ Variable");
+    await click(app, "button", "+ Variable");
     await app.get(".vars__name").setValue("client.id");
     await app.findAll(".vars__input")[1]?.setValue("body.id");
     await waitAutosave();

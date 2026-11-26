@@ -9,6 +9,7 @@ import { computed, ref, watch } from "vue";
 
 import ExpectedResponses from "@/components/workbench/ExpectedResponses.vue";
 import ResponsePanel from "@/components/workbench/ResponsePanel.vue";
+import { onTablistKeydown } from "@/lib/tablist";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useWorkbenchStore } from "@/stores/workbench";
 
@@ -55,12 +56,13 @@ const expectedCount = computed(() => editor.value?.draft?.examples.length ?? 0);
 
 <template>
   <div class="side">
-    <div role="tablist" aria-label="Résultat" class="side__tabs">
+    <div role="tablist" aria-label="Résultat" class="side__tabs" @keydown="onTablistKeydown">
       <button
         type="button"
         role="tab"
         class="side__tab"
         :aria-selected="side === 'response'"
+        :tabindex="side === 'response' ? 0 : -1"
         @click="side = 'response'"
       >
         Réponse
@@ -70,6 +72,7 @@ const expectedCount = computed(() => editor.value?.draft?.examples.length ?? 0);
         role="tab"
         class="side__tab"
         :aria-selected="side === 'expected'"
+        :tabindex="side === 'expected' ? 0 : -1"
         @click="side = 'expected'"
       >
         Réponses attendues

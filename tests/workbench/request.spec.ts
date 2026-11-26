@@ -292,7 +292,7 @@ describe("réponses attendues (EP8, EP9)", () => {
     await click(app, '[role="treeitem"]', "Santé");
     await click(app, ".side__tab", "Réponses attendues");
     expect(app.get(".expected").text()).toContain("Aucune réponse attendue.");
-    await click(app, ".action", "+ Réponse");
+    await click(app, "button", "+ Réponse");
     await app.get(".grid input[type=number]").setValue("201");
     await app.findAll(".grid input")[1]?.setValue("Created");
     await app.findAll(".grid input")[2]?.setValue("Commande créée");

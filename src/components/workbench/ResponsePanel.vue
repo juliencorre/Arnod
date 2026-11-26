@@ -12,14 +12,22 @@ import ResponseBody from "@/components/workbench/ResponseBody.vue";
 import SentPanel from "@/components/workbench/SentPanel.vue";
 import TimelinePanel from "@/components/workbench/TimelinePanel.vue";
 import NetworkFailurePanel from "@/components/workbench/NetworkFailurePanel.vue";
+import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
+import { useGuard } from "@/composables/useGuard";
 import { durationLabel } from "@/lib/assertions";
 import { countLabel, formatBytes, formatDuration } from "@/lib/format";
+import { onTablistKeydown } from "@/lib/tablist";
+import { useInputStore } from "@/stores/input";
+import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { AssertionResult } from "@/types/ipc";
 
 const props = defineProps<{ editorKey: string }>();
 
 const workbench = useWorkbenchStore();
+const inputs = useInputStore();
+const toasts = useToastStore();
+const guard = useGuard();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
 const outcome = computed(() => editor.value?.outcome ?? null);
 // Lot K (5.1-c) : la chronologie remplace la ligne « Attente · Réception ».
@@ -64,6 +72,23 @@ function removable(check: AssertionResult): boolean {
     (editor.value?.draft?.assertions.some((a) => a.id === check.id) ?? false)
   );
 }
+
+// --- Erreur d'envoi et son action (ER6) -------------------------------------------
+
+/** Variables inconnues de la requête, d'après la dernière analyse de la saisie. */
+const unknown = computed(() => inputs.inputs.get(props.editorKey)?.unknown ?? []);
+const unknownNames = computed(() => unknown.value.map((v) => v.name).join(", "));
+const environment = computed(() =>
+  editor.value ? workbench.activeEnvironment(editor.value.projectId) : null,
+);
+const managingEnvironments = ref(false);
+
+async function declareUnknown(): Promise<void> {
+  if (!editor.value || unknown.value.length === 0) return;
+  const names = unknownNames.value;
+  const env = await inputs.declare(editor.value.projectId, unknown.value);
+  toasts.show(`✓ ${names} ajoutée${unknown.value.length > 1 ? "s" : ""} à ${env}.`);
+}
 </script>
 
 <template>
@@ -76,9 +101,24 @@ function removable(check: AssertionResult): boolean {
       :failure="editor.sendFailure"
       :environment="workbench.activeEnvironment(editor.projectId)"
     />
-    <p v-else-if="editor?.sendError" class="response__error" role="alert">
-      {{ editor.sendError }}
-    </p>
+    <!-- ER6 : l'erreur d'envoi propose son action (5.1-b). -->
+    <div v-else-if="editor?.sendError" class="response__error" role="alert">
+      <p class="response__error-title"><span aria-hidden="true">✕</span> Requête non envoyée</p>
+      <p class="response__error-message">{{ editor.sendError }}</p>
+      <p class="response__error-actions">
+        <template v-if="unknown.length > 0">
+          <BaseButton @click="guard(declareUnknown)">
+            Ajouter<span class="visually-hidden"> {{ unknownNames }} à {{ environment }}</span>
+          </BaseButton>
+          <BaseButton @click="managingEnvironments = true">Environnements…</BaseButton>
+        </template>
+        <BaseButton v-else @click="guard(() => workbench.send(editorKey))">Réessayer</BaseButton>
+      </p>
+      <p v-if="unknown.length > 0" class="response__error-hint">
+        « Ajouter » déclare {{ unknownNames }} dans {{ environment }} ; la requête n'est pas
+        modifiée.
+      </p>
+    </div>
     <p v-else-if="!outcome" class="response__info">Envoyez la requête pour voir la réponse.</p>
     <template v-else>
       <div class="response__summary">
@@ -100,7 +140,12 @@ function removable(check: AssertionResult): boolean {
         </span>
         <span v-if="outcome.slow" class="response__slow">Lente</span>
       </div>
-      <div role="tablist" aria-label="Contenu de la réponse" class="response__tabs">
+      <div
+        role="tablist"
+        aria-label="Contenu de la réponse"
+        class="response__tabs"
+        @keydown="onTablistKeydown"
+      >
         <button
           v-for="[id, label, count] in [
             ['body', 'Corps', 0],
@@ -114,6 +159,7 @@ function removable(check: AssertionResult): boolean {
           role="tab"
           class="response__tab"
           :aria-selected="view === id"
+          :tabindex="view === id ? 0 : -1"
           @click="view = id"
         >
           {{ label }}
@@ -162,7 +208,7 @@ function removable(check: AssertionResult): boolean {
             <span v-if="check.ignored" class="check__message">ignorée pour ce résultat</span>
           </li>
         </ul>
-        <BaseButton @click="workbench.proposeAssertions(editorKey)">
+        <BaseButton @click="guard(() => workbench.proposeAssertions(editorKey))">
           Proposer des assertions
         </BaseButton>
       </div>
@@ -184,7 +230,7 @@ function removable(check: AssertionResult): boolean {
                 type="button"
                 class="failure__link"
                 :aria-label="`Ignorer ${labelOf(check)} pour ce résultat`"
-                @click="workbench.ignoreCheck(editorKey, check.id)"
+                @click="guard(() => workbench.ignoreCheck(editorKey, check.id))"
               >
                 Ignorer pour ce résultat
               </button>
@@ -193,7 +239,7 @@ function removable(check: AssertionResult): boolean {
                 type="button"
                 class="failure__link"
                 :aria-label="`Retirer l'assertion ${labelOf(check)}`"
-                @click="workbench.removeCheck(editorKey, check.id)"
+                @click="guard(() => workbench.removeCheck(editorKey, check.id))"
               >
                 Retirer l'assertion
               </button>
@@ -202,6 +248,13 @@ function removable(check: AssertionResult): boolean {
         </ul>
       </details>
     </template>
+    <EnvironmentsDialog
+      v-if="managingEnvironments && editor"
+      :open="managingEnvironments"
+      :project-id="editor.projectId"
+      :start-new="false"
+      @close="managingEnvironments = false"
+    />
   </section>
 </template>
 
@@ -219,11 +272,32 @@ function removable(check: AssertionResult): boolean {
 }
 
 .response__error {
-  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
   padding: 0.625rem 0.75rem;
   border-radius: var(--radius-md);
-  color: var(--color-danger);
   background: var(--color-danger-soft);
+}
+
+.response__error p {
+  margin: 0;
+}
+
+.response__error-title {
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.response__error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.response__error-hint {
+  font-size: var(--text-small);
+  color: var(--color-muted);
 }
 
 .response__summary {

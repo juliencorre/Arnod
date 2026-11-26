@@ -841,6 +841,29 @@ Référence : écran 4.1-a quater.
   Maj+clic dans l'ordre affiché, Ctrl+Espace ou Maj+Espace au clavier), `SelectionBar.vue` (monté
   par `SharedDialogs`, Échap vide la sélection).
 
+## Ergonomie et clavier
+
+Référence : `docs/plan-qualite-mvp.md`, lot J (T29 à T31 : ER1, ER2, ER5 à ER8, IN7, IN8, AC2 à
+AC4, AC7, AC8 ; décision Q5).
+
+- Toute suppression se rattrape par « Annuler » dans sa notification : requête, dossier ou test
+  par `tree_batch` (une sélection d'un élément, `workbench.remove`), contrat par
+  `contract_delete_undo`, environnement par `environment_delete_undo` (fichiers, place dans la
+  chaîne, valeurs locales et secrets, gardés en mémoire seulement). Les annulations d'un domaine
+  vivent dans un `tree::undo::UndoBook` (20 au plus, un jeton ne sert qu'une fois).
+- Une notification d'erreur reste jusqu'à sa fermeture (✕) ; l'action d'une notification rend sa
+  promesse à `runAction`, qui notifie son échec.
+- Un bouton branché sur une action asynchrone du store passe par `useGuard()` : un refus du cœur
+  est notifié, jamais muet. Une erreur d'envoi propose son action (`ResponsePanel`).
+- Environnements et réglages du projet s'enregistrent seuls (`useAutosave`, `SaveState`) : fermer,
+  Échap ou changer d'élément enregistre d'abord ce qui attend ; un échec garde la fenêtre ouverte.
+- Ajouter une ligne : un `BaseButton` « + Nom » ; la retirer : `RowRemoveButton` (×, 24 px).
+- Toute liste d'onglets (`role="tablist"`) prend `onTablistKeydown` (`lib/tablist.ts`) et un
+  `tabindex` itinérant (0 sur l'onglet choisi, -1 sinon). Toute cible fait 24 × 24 px au moins.
+- Focus : `BaseDialog` rend le focus à l'élément qui l'avait à l'ouverture ; `useFocusRescue`
+  (monté par `AppShell`) le pose sur l'onglet actif quand une vue ou un onglet nouveau l'a laissé
+  sur `body`. Zoom au clavier (Ctrl+molette, Ctrl+=, Ctrl+-) et `prefers-reduced-motion` suivis.
+
 ## Brouillons, sortie et instance unique
 
 Référence : `docs/plan-qualite-mvp.md`, lot C (T9 à T12 : IN2 à IN6, IN9, ES8 ; règles R6, R11 ;

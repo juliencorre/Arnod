@@ -22,12 +22,15 @@ import ProjectView from "@/components/projects/ProjectView.vue";
 import StepsCatalog from "@/components/steps/StepsCatalog.vue";
 import WorkspaceHome from "@/components/workspaces/WorkspaceHome.vue";
 import SplitHandle from "@/components/zones/SplitHandle.vue";
+import { useFocusRescue } from "@/composables/useFocusRescue";
 import { useNavigationStore } from "@/stores/navigation";
 import { useWindowsStore } from "@/stores/windows";
 
 const navigation = useNavigationStore();
 const windows = useWindowsStore();
 const body = useTemplateRef<HTMLElement>("body");
+const main = useTemplateRef<HTMLElement>("main");
+useFocusRescue(main);
 
 const allView = computed(() => (navigation.view.kind === "all" ? navigation.view : null));
 const workspaceView = computed(() =>
@@ -148,7 +151,7 @@ const detachHover = ref(false);
           </button>
           <WorkspaceSwitcher />
         </div>
-        <main class="shell__main">
+        <main ref="main" class="shell__main" tabindex="-1">
           <AllProjects v-if="allView" :highlight-project-id="allView.highlightProjectId" />
           <WorkspaceHome v-else-if="workspaceView" :workspace-id="workspaceView.workspaceId" />
           <ProjectView
@@ -214,6 +217,11 @@ const detachHover = ref(false);
   transition:
     margin 0.2s,
     box-shadow 0.2s;
+}
+
+/* Reçoit le focus perdu (AC2) sans contour : seul un contrôle montre le focus. */
+.shell__main:focus {
+  outline: none;
 }
 
 .shell__main {

@@ -121,7 +121,10 @@ async function addStep(): Promise<void> {
   font-size: var(--text-body);
 }
 
+/* Cible de 24 × 24 px au moins (AC4, WCAG 2.5.8). */
 .steps__test {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
   padding: 0 0.375rem;
   border: 0;
   border-radius: var(--radius-sm);

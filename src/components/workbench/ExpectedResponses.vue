@@ -6,6 +6,8 @@
  */
 import { computed, ref, useId, watch } from "vue";
 
+import BaseButton from "@/components/ui/BaseButton.vue";
+import RowRemoveButton from "@/components/ui/RowRemoveButton.vue";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -148,19 +150,15 @@ function setStatus(text: string): void {
           >
             ⧉
           </button>
-          <button
-            type="button"
-            class="icon"
-            :aria-label="`Supprimer la réponse ${label(example)}`"
+          <RowRemoveButton
+            :label="`Supprimer la réponse ${label(example)}`"
             @click="remove(index)"
-          >
-            ✕
-          </button>
+          />
           <span class="expected__chevron" aria-hidden="true">›</span>
         </li>
       </ul>
       <div class="expected__actions">
-        <button type="button" class="action action--strong" @click="add">+ Réponse</button>
+        <BaseButton @click="add">+ Réponse</BaseButton>
         <button type="button" class="action" :disabled="last === null" @click="addFromLast">
           Depuis la dernière réponse reçue<template v-if="last"> · {{ last }}</template>
         </button>
@@ -214,9 +212,7 @@ function setStatus(text: string): void {
       </div>
       <div class="expected__section">
         <h3 class="section">En-têtes de la réponse</h3>
-        <button type="button" class="action" @click="current.headers.push({ name: '', value: '' })">
-          + En-tête
-        </button>
+        <BaseButton @click="current.headers.push({ name: '', value: '' })">+ En-tête</BaseButton>
       </div>
       <div v-for="(header, index) in current.headers" :key="index" class="header-row">
         <input
@@ -233,14 +229,10 @@ function setStatus(text: string): void {
           placeholder="Valeur"
           :aria-label="`Valeur de l'en-tête ${String(index + 1)}`"
         />
-        <button
-          type="button"
-          class="icon"
-          :aria-label="`Supprimer l'en-tête ${header.name || String(index + 1)}`"
+        <RowRemoveButton
+          :label="`Supprimer l'en-tête ${header.name || String(index + 1)}`"
           @click="current.headers.splice(index, 1)"
-        >
-          ✕
-        </button>
+        />
       </div>
       <div class="expected__section">
         <label class="section" :for="ids.body">Corps de la réponse</label>
@@ -374,10 +366,6 @@ function setStatus(text: string): void {
 .action:disabled {
   color: var(--color-subtle);
   cursor: default;
-}
-
-.action--strong {
-  font-weight: 600;
 }
 
 .action--danger {

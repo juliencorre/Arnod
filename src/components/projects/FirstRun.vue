@@ -34,7 +34,7 @@ const focused = ref(false);
       </p>
     </div>
     <div class="first-run__column">
-      <TryStep @open="focused = $event" />
+      <TryStep autofocus @open="focused = $event" />
       <template v-if="!focused">
         <p class="first-run__or" aria-hidden="true"><span>ou</span></p>
         <div class="first-run__cards">

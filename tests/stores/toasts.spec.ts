@@ -30,6 +30,19 @@ describe("useToastStore", () => {
     expect(toasts.current).toBeNull();
   });
 
+  it("ER7 : une erreur reste jusqu'à sa fermeture, même après le survol", () => {
+    const toasts = useToastStore();
+    toasts.showError(new Error("Le contrat est illisible."));
+    vi.advanceTimersByTime(TOAST_DURATION_MS * 10);
+    expect(toasts.current?.message).toBe("Le contrat est illisible.");
+    toasts.pause();
+    toasts.resume();
+    vi.advanceTimersByTime(TOAST_DURATION_MS * 10);
+    expect(toasts.current).not.toBeNull();
+    toasts.dismiss();
+    expect(toasts.current).toBeNull();
+  });
+
   it("remplace la notification précédente et repart pour un délai complet", () => {
     const toasts = useToastStore();
     toasts.show("première");

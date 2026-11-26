@@ -4,12 +4,16 @@
  * fois, reprise par les requêtes qui l'héritent. OAuth 2 par identifiants client : le secret va
  * au coffre de l'environnement, le fichier n'en garde que la référence ; le jeton de
  * l'environnement est obtenu et renouvelé seul (lot H, docs/plan-mvp-h-reseau-auth.md).
+ * Les réglages s'enregistrent seuls, comme une requête (ER2) : fermer enregistre d'abord ce qui
+ * attend, et un échec garde la fenêtre ouverte.
  */
 import { computed, ref, useId, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
+import SaveState from "@/components/ui/SaveState.vue";
 import AuthEditor from "@/components/workbench/AuthEditor.vue";
+import { useAutosave } from "@/composables/useAutosave";
 import { authLabel, formatClock } from "@/lib/auth";
 import { countLabel } from "@/lib/format";
 import { useCatalogStore } from "@/stores/catalog";
@@ -37,14 +41,39 @@ const view = computed(() => network.projectAuth);
 const draft = ref<Auth | null>(null);
 const secret = ref("");
 const busy = ref(false);
+
+/** Enregistre le brouillon et le secret saisi (au coffre) : une copie, la saisie peut continuer. */
+async function saveDraft(): Promise<void> {
+  const id = projectId.value;
+  const env = environment.value;
+  if (id === null || env === null || !draft.value) return;
+  const auth = JSON.parse(JSON.stringify(draft.value)) as Auth;
+  await network.saveProjectAuth(id, env, auth, secret.value || null);
+}
+
+const autosave = useAutosave(
+  () => (draft.value ? { auth: draft.value, secret: secret.value } : null),
+  saveDraft,
+);
+const saveState = autosave.state;
+const saveError = autosave.error;
+
+// Le brouillon est repris de la vue à son chargement seulement : une réponse à un
+// enregistrement, un jeton renouvelé ou oublié ne remplacent pas une saisie en cours.
 watch(
   view,
-  (current) => {
+  (current, previous) => {
+    if (current !== null && previous !== null && previous !== undefined) return;
     draft.value = current ? (JSON.parse(JSON.stringify(current.auth)) as Auth) : null;
     secret.value = "";
+    autosave.reset();
   },
   { immediate: true },
 );
+
+async function close(): Promise<void> {
+  if (await autosave.flush()) network.closeProjectSettings();
+}
 
 const NO_INHERIT: Inherited = {
   auth: null,
@@ -74,16 +103,6 @@ async function run(action: () => Promise<void>): Promise<void> {
   }
 }
 
-function save(): Promise<void> {
-  return run(async () => {
-    const id = projectId.value;
-    const env = environment.value;
-    if (id === null || env === null || !draft.value) return;
-    await network.saveProjectAuth(id, env, draft.value, secret.value || null);
-    toasts.show("Authentification du projet enregistrée.");
-  });
-}
-
 function renew(): Promise<void> {
   return run(async () => {
     if (projectId.value === null || environment.value === null) return;
@@ -105,7 +124,7 @@ function forget(): Promise<void> {
     :title="`${projectName} · Réglages du projet`"
     description="Valent pour tout le projet ; un dossier ou une requête peut les remplacer."
     wide
-    @close="network.closeProjectSettings()"
+    @close="close"
   >
     <div class="settings">
       <div role="tablist" aria-label="Réglages du projet" class="settings__tabs">
@@ -185,15 +204,21 @@ function forget(): Promise<void> {
       <p v-else class="settings__muted">Chargement des réglages…</p>
     </div>
     <template #footer>
-      <BaseButton @click="network.closeProjectSettings()">Fermer</BaseButton>
-      <BaseButton variant="primary" :disabled="busy || !draft" @click="save"
-        >Enregistrer</BaseButton
-      >
+      <p v-if="saveError" class="settings__error" role="alert">{{ saveError }}</p>
+      <SaveState :state="saveState" :error="saveError" @retry="autosave.flush()" />
+      <BaseButton @click="close">Fermer</BaseButton>
     </template>
   </BaseDialog>
 </template>
 
 <style scoped>
+.settings__error {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-body);
+  color: var(--color-danger);
+}
+
 .settings {
   display: flex;
   flex-direction: column;

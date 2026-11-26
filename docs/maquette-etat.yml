@@ -22,12 +22,7 @@ transverses:
   - texte: "Espacements : le design system décrit les pas employés (space-2 à space-32), sans variables dans le code ni règle dans la maquette."
     aligner: à décider
     page: "0.5"
-  - texte: "Formes uniques : l'ajout d'une ligne en bouton « + Nom », le retrait par × ; le code mêle liens et pointillés, « ✕ Supprimer » et « Retirer » (ER8). Compteurs en pastille et sélection en fond --color-accent-soft sont alignés (DE7, lot I)."
-    aligner: code
-    page: "0.5"
-  - texte: "Suppressions : toute suppression se rattrape par « Annuler » dans sa notification, et une notification d'erreur reste jusqu'à sa fermeture ; le code supprime sans annulation un dossier ou un test, un contrat, un environnement, et efface les erreurs après 6 s (ER1, ER7)."
-    aligner: code
-  - texte: "Clavier et cibles : l'arbre se parcourt aux flèches (Début, Fin, F2, Suppr, Maj+F10), les onglets de l'éditeur et de la réponse aussi ; toute cible fait 24 px au moins ; le focus revient au déclencheur après une fermeture ; le code n'a ni flèches dans l'arbre ni dans ces onglets, a des cibles de 11 à 23 px et perd le focus après plusieurs actions (AC1 à AC4)."
+  - texte: "Clavier de l'arbre : l'arbre se parcourt aux flèches (Début, Fin, F2, Suppr, Maj+F10) ; le code n'a pas de flèches dans l'arbre (AC1, lot H du plan-qualite-mvp). Onglets de l'éditeur et de la réponse, cibles de 24 px et focus rendu sont alignés (AC2 à AC4, lot J)."
     aligner: code
   - texte: "Cases à cocher et boutons radio cochés : noirs (#1d1b18) dans la maquette, à la couleur d'accent dans l'application (accent-color: var(--color-accent), styles.css), dont l'habillage vaut pour toute case (CLAUDE.md) ; vu en 1.6-e, 1.6-g et 2.3-b."
     aligner: maquette
@@ -655,6 +650,7 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : « ✓ Enregistré » au lieu d'« Enregistrer », × pour retirer une variable, « + Variable » en bouton secondaire, sélection en fond accent doux, case au bord de contrôle (ER2, DE4, DE7)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 5 écarts ajoutés ; b passe de « livré » à « en partie »."
       - "2026-11-26 : 0 : « Environnements · <projet> » (plan-alignement-maquette, lot A, AM9)."
+      - "2026-11-26 : a : environnement enregistré seul (« ✓ Enregistré »), Échap ne jette rien, × et « + Variable » ; une suppression se rattrape par « Annuler » (plan-qualite-mvp, lot J, ER1, ER2, ER8)."
     ecrans:
       "0":
         etat: livré
@@ -668,7 +664,7 @@ pages:
         pr: [27]
         captures: [08c-environnements]
         ecart:
-          - texte: "Environnements enregistrés sur place comme les requêtes (« ✓ Enregistré », Échap ne jette rien), dans un tableau unique avec la portée de chaque variable, l'utilisation et « Copier depuis un autre projet… » ; le code garde un dialogue modal avec « Enregistrer », qui perd les modifications à la fermeture, et deux listes ordonnées par ↑ ↓ (ER2 ; Q5 du plan-qualite-mvp : enregistrement automatique)."
+          - texte: "Environnements dans un tableau unique avec la portée de chaque variable, l'utilisation et « Copier depuis un autre projet… » ; le code garde un dialogue modal (enregistré seul depuis le lot J, ER2) et deux listes ordonnées par ↑ ↓."
             aligner: code
           - texte: "« Couleur » en liste sous le nom (maquette : « Couleur ▾ » à droite du nom) ; « Environnement protégé (confirmation… modifie des données) » au lieu de « Demander une confirmation avant POST, PUT, PATCH et DELETE » ; « Supprimer » au lieu de « Supprimer l'environnement » ; la liste n'a ni numéro ni adresse."
             aligner: code
@@ -701,6 +697,7 @@ pages:
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 4 écarts ajoutés, 1 réécrit ou complété."
       - "2026-11-26 : g : la note des cookies reçus en texte secondaire (plan-qualite-mvp, lot I, DE1)."
       - "2026-11-26 : a : libellés au-dessus des champs de l'authentification (plan-alignement-maquette, lot B, AM26)."
+      - "2026-11-26 : a : réglages du projet enregistrés seuls, Échap ne jette rien (plan-qualite-mvp, lot J, ER2)."
     ecrans:
       a:
         etat: livré
@@ -710,8 +707,6 @@ pages:
         ecart:
           - texte: "Réglages du projet en fenêtre modale, avec le seul onglet Authentification (Général et Critères de sortie viendront) ; le secret client saisi va au coffre de l'environnement et le fichier garde {{oauth2ClientSecret}} ; une nouvelle requête est « Aucune » et non « Hériter » : elle est comptée « sans authentification »."
             aligner: maquette
-          - texte: "Réglages du projet enregistrés seuls, comme les requêtes ; le code garde « Enregistrer » et perd les modifications à la fermeture (ER2) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
           - texte: "« OAuth 2 (identifiants client) » en un seul choix au lieu de « Type » et « Flux », sans la phrase sur le code d'autorisation ; « Identifiants envoyés » et la note du jeton en plus ; « requêtes » au lieu de « tests » (R8, R9, OA4)."
             aligner: maquette
       b:
@@ -1015,6 +1010,7 @@ pages:
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 8 écarts ajoutés, 2 réécrits ou complétés."
       - "2026-11-26 : c : la note cite l'assertion de durée telle qu'écrite (plan-alignement-maquette, lot A, AM12)."
       - "2026-11-26 : b, h : réponse vide en texte neutre, éditeur à 58 % et onglets sur une ligne à 1280 px, compteurs en pastille ; barre des étapes sur une rangée (plan-qualite-mvp, lot I, DE1, DE3, DE7, DE8)."
+      - "2026-11-26 : b : l'erreur d'envoi propose « Ajouter » et « Environnements… », sinon « Réessayer » ; onglets de l'éditeur et de la réponse aux flèches (plan-qualite-mvp, lot J, ER6, AC3)."
     ecrans:
       a:
         etat: livré
@@ -1027,8 +1023,6 @@ pages:
         pr: [27, 42]
         captures: [19-verification-en-echec]
         ecart:
-          - texte: "Une erreur d'envoi propose son action (« Ajouter », « Environnements… ») ; le code montre l'erreur seule (ER6) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
           - texte: "Ligne d'état : statut en texte simple, sans l'environnement ; la maquette met « 201 Created » en pastille verte et l'environnement à droite, comme le code le fait déjà sur un échec réseau (5.1-i) (aussi 5.1-b bis à 5.1-h)."
             aligner: code
           - texte: "Verdict « Réussie » ou « Échec · N assertion(s) » et onglet « Assertions (N) » ; la maquette écrit « Assertions 4/5 » (avec DE10)."

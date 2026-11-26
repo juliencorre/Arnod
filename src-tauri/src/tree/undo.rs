@@ -1,8 +1,13 @@
 //! De quoi remettre des fichiers d'un projet comme avant (« Annuler ») : rangement des essais
-//! (2.2-d), copie ou déplacement d'une requête (lot J), actions sur une sélection (4.1-a quater).
+//! (2.2-d), copie ou déplacement d'une requête (lot J), actions sur une sélection (4.1-a quater),
+//! suppression d'un contrat ou d'un environnement (ER1). `UndoBook` garde les dernières
+//! annulations d'un domaine, retrouvées par leur jeton.
 
+use std::collections::VecDeque;
 use std::fs;
 use std::path::PathBuf;
+
+use uuid::Uuid;
 
 use crate::contract::file as contract_file;
 use crate::error::CommandError;
@@ -74,5 +79,65 @@ impl Undo {
             contract_file::write_text(path, text)?;
         }
         Ok(())
+    }
+}
+
+/// Annulations en attente d'un domaine (sélection, transfert, contrat, environnement) : les
+/// `KEPT` dernières, chacune retrouvée une fois par son jeton. Constructible en `static`.
+#[derive(Debug)]
+pub struct UndoBook<T> {
+    entries: VecDeque<(Uuid, T)>,
+}
+
+impl<T> UndoBook<T> {
+    /// Nombre d'annulations gardées ; la plus ancienne part la première.
+    pub const KEPT: usize = 20;
+
+    pub const fn new() -> Self {
+        Self {
+            entries: VecDeque::new(),
+        }
+    }
+
+    /// Garde `entry` et rend son jeton.
+    pub fn push(&mut self, entry: T) -> Uuid {
+        let token = Uuid::new_v4();
+        self.entries.push_back((token, entry));
+        while self.entries.len() > Self::KEPT {
+            self.entries.pop_front();
+        }
+        token
+    }
+
+    /// Reprend l'annulation du jeton `token` : `None` si elle est oubliée ou déjà faite.
+    pub fn take(&mut self, token: Uuid) -> Option<T> {
+        let index = self.entries.iter().position(|(t, _)| *t == token)?;
+        self.entries.remove(index).map(|(_, entry)| entry)
+    }
+}
+
+impl<T> Default for UndoBook<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ER1 : un jeton ne sert qu'une fois, et seules les `KEPT` dernières annulations restent.
+    #[test]
+    fn er1_carnet_jeton_unique_et_vingt_dernieres() {
+        let mut book = UndoBook::new();
+        let first = book.push(0);
+        let tokens: Vec<Uuid> = (1..=UndoBook::<i32>::KEPT as i32)
+            .map(|n| book.push(n))
+            .collect();
+        assert_eq!(book.take(first), None, "la plus ancienne est oubliée");
+        let last = *tokens.last().unwrap();
+        assert_eq!(book.take(last), Some(UndoBook::<i32>::KEPT as i32));
+        assert_eq!(book.take(last), None, "un jeton ne sert qu'une fois");
+        assert_eq!(book.take(tokens[0]), Some(1));
     }
 }

@@ -10,6 +10,8 @@
  */
 import { computed, nextTick, ref, useId, useTemplateRef } from "vue";
 
+import BaseButton from "@/components/ui/BaseButton.vue";
+import RowRemoveButton from "@/components/ui/RowRemoveButton.vue";
 import { useKnownVariables, vVariables } from "@/lib/variables";
 import { useInputStore } from "@/stores/input";
 import type { Pair, PairsFormat, ParamKind, TextError } from "@/types/ipc";
@@ -207,14 +209,7 @@ function syncGutter(): void {
           :placeholder="valueTitle ?? 'Valeur'"
           :aria-label="`Valeur, ligne ${String(position + 1)}`"
         />
-        <button
-          type="button"
-          class="pairs__remove"
-          :aria-label="`Supprimer ${nameOf(pair, position)}`"
-          @click="remove(index)"
-        >
-          ✕
-        </button>
+        <RowRemoveButton :label="`Supprimer ${nameOf(pair, position)}`" @click="remove(index)" />
         <input
           v-model="pair.description"
           class="pairs__input pairs__description"
@@ -224,7 +219,7 @@ function syncGutter(): void {
           :aria-label="`Description, ligne ${String(position + 1)}`"
         />
       </div>
-      <button type="button" class="pairs__add" @click="add">{{ addLabel ?? "+ Ligne" }}</button>
+      <BaseButton class="pairs__add" @click="add">{{ addLabel ?? "+ Ligne" }}</BaseButton>
     </template>
   </div>
 </template>
@@ -380,32 +375,12 @@ function syncGutter(): void {
 
 .pairs__input:focus-visible,
 .pairs__check:focus-visible,
-.pairs__remove:focus-visible,
-.pairs__add:focus-visible,
 .pairs__mode:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;
 }
 
-.pairs__remove {
-  border: 0;
-  background: none;
-  font-size: var(--text-body);
-  line-height: 1;
-  color: var(--color-muted);
-  cursor: pointer;
-}
-
 .pairs__add {
   align-self: flex-start;
-  min-height: var(--control-sm);
-  padding: 0 0.625rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  font: inherit;
-  font-size: var(--text-body);
-  color: var(--color-text);
-  cursor: pointer;
 }
 </style>

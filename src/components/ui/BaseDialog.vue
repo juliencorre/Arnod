@@ -6,7 +6,7 @@
  * plus large, pour un contenu en deux colonnes (liste et formulaire). `closable` : un bouton
  * ✕ « Fermer » dans l'en-tête, pour une fenêtre sans bouton de fin (préférences, ER4).
  */
-import { onMounted, useId, useTemplateRef, watch } from "vue";
+import { onBeforeUnmount, onMounted, useId, useTemplateRef, watch } from "vue";
 
 const props = defineProps<{
   open: boolean;
@@ -21,16 +21,43 @@ const dialog = useTemplateRef<HTMLDialogElement>("dialog");
 const titleId = useId();
 const descriptionId = useId();
 
+/** Élément qui avait le focus à l'ouverture : il le retrouve à la fermeture (AC2). */
+let returnFocus: HTMLElement | null = null;
+
+/**
+ * Rend le focus au déclencheur s'il est encore là et que le focus est resté dans la fenêtre ou
+ * retombé sur `body` : un parent qui retire la fenêtre (`v-if`) ne le laisse pas perdu.
+ */
+function restoreFocus(): void {
+  const target = returnFocus;
+  returnFocus = null;
+  if (!target?.isConnected) return;
+  const active = document.activeElement;
+  if (active === null || active === document.body || dialog.value?.contains(active) === true) {
+    target.focus();
+  }
+}
+
 function sync(open: boolean): void {
   const element = dialog.value;
   if (!element) return;
-  if (open && !element.open) element.showModal();
-  if (!open && element.open) element.close();
+  if (open && !element.open) {
+    returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    element.showModal();
+  }
+  if (!open && element.open) {
+    element.close();
+    restoreFocus();
+  }
 }
 
 watch(() => props.open, sync);
 onMounted(() => {
   sync(props.open);
+});
+onBeforeUnmount(() => {
+  if (dialog.value?.open === true) dialog.value.close();
+  restoreFocus();
 });
 
 function onClick(event: MouseEvent): void {

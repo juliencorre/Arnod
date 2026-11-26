@@ -328,13 +328,46 @@ pub fn save(
     })
 }
 
-/// Supprime un environnement ; le dernier ne peut pas l'être.
-pub fn delete(root: &Path, name: &str) -> Result<(), CommandError> {
+/// Ce que la suppression d'un environnement retire du projet, pour « Annuler » (ER1) : le texte
+/// de ses fichiers, sa place dans la chaîne et sa protection (`extensions.arnod`).
+#[derive(Debug, Clone)]
+pub struct Removed {
+    name: String,
+    files: Vec<(PathBuf, String)>,
+    position: Option<usize>,
+    protected: bool,
+}
+
+impl Removed {
+    /// Nom de l'environnement supprimé, tel qu'il était écrit.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+/// Supprime un environnement ; le dernier ne peut pas l'être. Rend de quoi le remettre.
+pub fn delete(root: &Path, name: &str) -> Result<Removed, CommandError> {
     let all = files(root);
     if all.len() <= 1 {
         return Err(invalid("Un projet garde au moins un environnement."));
     }
+    let meta = collection::read_meta(root);
+    let mut removed = Removed {
+        name: all
+            .iter()
+            .find(|f| same_name(&f.environment.name, name))
+            .map_or_else(|| name.to_owned(), |f| f.environment.name.clone()),
+        files: Vec::new(),
+        position: meta
+            .environment_order
+            .iter()
+            .position(|entry| same_name(entry, name)),
+        protected: meta.protected.iter().any(|entry| same_name(entry, name)),
+    };
     for file in all.iter().filter(|f| same_name(&f.environment.name, name)) {
+        if let Ok(text) = fs::read_to_string(&file.path) {
+            removed.files.push((file.path.clone(), text));
+        }
         let _ = fs::remove_file(&file.path);
         crate::watch::settle(&file.path);
     }
@@ -342,6 +375,46 @@ pub fn delete(root: &Path, name: &str) -> Result<(), CommandError> {
         meta.environment_order
             .retain(|entry| !same_name(entry, name));
         meta.protected.retain(|entry| !same_name(entry, name));
+    })?;
+    Ok(removed)
+}
+
+/// Remet un environnement supprimé (« Annuler », ER1) : ses fichiers tels qu'ils étaient (sous un
+/// autre nom de fichier si le sien a été repris), sa place dans la chaîne et sa protection. Un
+/// environnement du même nom créé depuis n'est jamais écrasé.
+pub fn restore(root: &Path, removed: &Removed) -> Result<(), CommandError> {
+    if let Some(taken) = list(root)
+        .into_iter()
+        .find(|env| same_name(&env.name, &removed.name))
+    {
+        return Err(invalid(format!(
+            "Un environnement « {} » existe de nouveau dans ce projet : la suppression ne peut plus être annulée.",
+            taken.name
+        )));
+    }
+    fs::create_dir_all(dir(root))
+        .map_err(|error| CommandError::io("Création du dossier impossible", &dir(root), &error))?;
+    for (path, text) in &removed.files {
+        let target = if path.exists() {
+            free_file(root, &removed.name, None)
+        } else {
+            path.clone()
+        };
+        crate::contract::file::write_text(&target, text)?;
+    }
+    collection::update_meta(root, |meta| {
+        if let Some(position) = removed.position
+            && !meta
+                .environment_order
+                .iter()
+                .any(|entry| same_name(entry, &removed.name))
+        {
+            let at = position.min(meta.environment_order.len());
+            meta.environment_order.insert(at, removed.name.clone());
+        }
+        if removed.protected && !meta.protected.iter().any(|p| same_name(p, &removed.name)) {
+            meta.protected.push(removed.name.clone());
+        }
     })
 }
 
@@ -365,6 +438,43 @@ mod tests {
             }],
             locals: vec!["token".into()],
         }
+    }
+
+    /// ER1 : « Annuler » remet l'environnement supprimé, à sa place dans la chaîne et protégé ;
+    /// un environnement du même nom créé depuis n'est jamais écrasé.
+    #[test]
+    fn er1_environnement_supprime_remis_a_sa_place() {
+        let dir = tempfile::tempdir().unwrap();
+        init(dir.path()).unwrap();
+        save(dir.path(), &env("Recette"), None).unwrap();
+        let mut prod = env("Production");
+        prod.protected = true;
+        save(dir.path(), &prod, None).unwrap();
+        let names = |root: &Path| list(root).into_iter().map(|e| e.name).collect::<Vec<_>>();
+        reorder(
+            dir.path(),
+            &["Local".into(), "Production".into(), "Recette".into()],
+        )
+        .unwrap();
+        let before = fs::read_to_string(file_for(dir.path(), "Production")).unwrap();
+
+        let removed = delete(dir.path(), "production").unwrap();
+        assert_eq!(names(dir.path()), ["Local", "Recette"]);
+        restore(dir.path(), &removed).unwrap();
+        assert_eq!(names(dir.path()), ["Local", "Production", "Recette"]);
+        assert!(list(dir.path())[1].protected);
+        assert_eq!(
+            fs::read_to_string(file_for(dir.path(), "Production")).unwrap(),
+            before
+        );
+
+        let removed = delete(dir.path(), "Production").unwrap();
+        save(dir.path(), &env("Production"), None).unwrap();
+        assert_eq!(
+            restore(dir.path(), &removed).unwrap_err().kind,
+            CommandErrorKind::InvalidRequest
+        );
+        assert!(!list(dir.path()).iter().any(|e| e.protected));
     }
 
     /// ES1 : un environnement illisible (marqueurs de fusion Git) n'est jamais remplacé par un

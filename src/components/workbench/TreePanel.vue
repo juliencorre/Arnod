@@ -184,10 +184,7 @@ async function onAction(id: string, node: TreeNode, target?: string): Promise<vo
       await guard(() => workbench.addStep(props.projectId, node.path));
       break;
     case "delete":
-      await guard(async () => {
-        await workbench.remove(props.projectId, node.path, false);
-        toasts.show(`« ${node.name} » mis à la corbeille.`);
-      });
+      await guard(() => workbench.remove(props.projectId, node.path, node.name));
       break;
   }
 }

@@ -125,7 +125,7 @@ describe("résultat détachable", () => {
 
     await core.emit(EVENTS.result, shared({ outcome: null, error: "Hôte introuvable." }));
     await flushPromises();
-    expect(app.get("[role='alert']").text()).toBe("Hôte introuvable.");
+    expect(app.get(".response__error-message").text()).toBe("Hôte introuvable.");
   });
 
   it("ignore l'écho de ses propres envois", async () => {

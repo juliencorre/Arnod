@@ -11,7 +11,7 @@ describe("couleurs d'état et de texte (DE1, DE2, AC6)", () => {
     const file = "src/components/workbench/ResponsePanel.vue";
     expect(cssValue(file, ".response__info", "color")).toBe("var(--color-muted)");
     expect(cssValue(file, ".response__info", "background")).toBeUndefined();
-    expect(cssValue(file, ".response__error", "color")).toBe("var(--color-danger)");
+    expect(cssValue(file, ".response__error-title", "color")).toBe("var(--color-danger)");
   });
 
   it("DE2 : les trois textes illisibles en sombre prennent la couleur du texte ou du lien", () => {

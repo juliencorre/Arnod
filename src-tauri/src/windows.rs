@@ -364,6 +364,8 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>, window: WindowState) {
                 .min_inner_size(min_width, 360.0)
                 // Glisser-déposer HTML (onglets, projets), comme la fenêtre principale.
                 .disable_drag_drop_handler()
+                // Ctrl+ +, Ctrl+ − et Ctrl+0 agrandissent le contenu (AC7), comme la principale.
+                .zoom_hotkeys_enabled(true)
                 // Montrée prête (`window_ready`), ou au plus tard après 300 ms (lot G, 0.3-a).
                 .visible(false);
         if let Some(bounds) = window.bounds {
@@ -607,6 +609,19 @@ pub fn paths_changed<R: Runtime>(
 mod tests {
     use super::*;
     use crate::layout::Content;
+
+    /// AC7 : la fenêtre principale accepte le zoom au clavier ; les fenêtres détachées le
+    /// reçoivent de leur constructeur (`zoom_hotkeys_enabled`).
+    #[test]
+    fn ac7_zoom_au_clavier_dans_la_fenetre_principale() {
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(
+            conf.pointer("/app/windows/0/zoomHotkeysEnabled"),
+            Some(&serde_json::Value::Bool(true))
+        );
+        assert!(include_str!("windows.rs").contains(".zoom_hotkeys_enabled(true)"));
+    }
 
     #[test]
     fn enregistre_et_recharge_windows_json() {

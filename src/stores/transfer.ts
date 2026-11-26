@@ -107,7 +107,10 @@ export const useTransferStore = defineStore("transfer", () => {
       {
         action: {
           label: "Annuler",
-          run: () => void undo(),
+          // L'échec de l'annulation est notifié par `runAction` (IN7) : la promesse lui est rendue.
+          run: async () => {
+            await undo();
+          },
         },
       },
     );

@@ -341,6 +341,18 @@ input[type="search"]::-webkit-search-decoration {
   appearance: none;
 }
 
+/* Mouvement réduit à la demande du système (AC8) : transitions et animations quasi immédiates. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Texte réservé aux lecteurs d'écran. */
 .visually-hidden {
   position: absolute;

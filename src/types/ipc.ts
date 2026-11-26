@@ -54,7 +54,6 @@ export type CommandName =
   | "tree_rename"
   | "tree_move"
   | "tree_duplicate"
-  | "tree_delete"
   | "request_read"
   | "request_save"
   | "request_send"
@@ -68,6 +67,7 @@ export type CommandName =
   | "environment_select"
   | "environment_save"
   | "environment_delete"
+  | "environment_delete_undo"
   | "environments_reorder"
   | "local_set"
   | "run_start"
@@ -83,6 +83,7 @@ export type CommandName =
   | "contract_import_file"
   | "contract_save"
   | "contract_delete"
+  | "contract_delete_undo"
   | "contract_generate"
   | "contract_run"
   | "steps_catalog"
@@ -645,6 +646,15 @@ export interface EnvironmentView extends EnvironmentDoc {
 export interface EnvironmentsView {
   environments: EnvironmentView[];
   active: string;
+}
+
+/**
+ * Environnements après une suppression, et le jeton de « Annuler » (`environment_delete_undo`,
+ * ER1). Équivalent Rust : `commands::environments::EnvironmentDeleted`.
+ */
+export interface EnvironmentDeleted {
+  view: EnvironmentsView;
+  undoToken: string;
 }
 
 export type RunItemStatus =

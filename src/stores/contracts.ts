@@ -293,12 +293,21 @@ export const useContractsStore = defineStore("contracts", () => {
    * Met un contrat à la corbeille (C11) ; ses onglets se ferment partout et ses requêtes reviennent
    * dans le référentiel de tests (R6).
    */
+  /** Met un contrat à la corbeille, avec « Annuler » dans la notification (ER1). */
   async function remove(projectId: string, path: string, name: string): Promise<void> {
-    await ipc.contractDelete(projectId, path, false);
+    const undoToken = await ipc.contractDelete(projectId, path, false);
     await windows.load();
     Reflect.deleteProperty(open, contractKey(projectId, path));
     await sync(projectId);
-    toasts.show(`Contrat « ${name} » mis à la corbeille.`);
+    toasts.show(`Contrat « ${name} » mis à la corbeille.`, {
+      action: {
+        label: "Annuler",
+        run: async () => {
+          await ipc.contractDeleteUndo(undoToken);
+          await sync(projectId);
+        },
+      },
+    });
   }
 
   function toggle(key: string, operation: string): void {

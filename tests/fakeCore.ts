@@ -399,7 +399,15 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           if (updated !== undefined) return updated;
           // Sélection multiple (4.1-a quater).
           const batched = handleBatch(core.workbench, cmd, args);
-          if (batched !== undefined) return batched;
+          if (batched !== undefined) {
+            if (cmd === "tree_batch" && (args.action as { kind: string }).kind === "delete") {
+              // Le cœur ferme les onglets de ce qui est mis à la corbeille et le diffuse.
+              for (const path of args.paths as string[])
+                closePath(core.windows, String(args.project), path);
+              void core.emitWindows();
+            }
+            return batched;
+          }
           const contracts = handleContracts(core.contracts, core.workbench, cmd, args);
           const handled =
             contracts !== undefined ? contracts : handleWorkbench(core.workbench, cmd, args);
@@ -411,7 +419,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
               statuses: structuredClone(core.workbench.statuses),
             });
           }
-          if (cmd === "tree_delete" || cmd === "contract_delete") {
+          if (cmd === "contract_delete") {
             // Le cœur ferme les onglets de ce qui est supprimé et le diffuse.
             closePath(core.windows, String(args.project), String(args.path));
             void core.emitWindows();

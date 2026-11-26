@@ -16,6 +16,7 @@ use crate::error::{CommandError, CommandErrorKind};
 use crate::request::assertions::{AssertionResult, ResponseData};
 use crate::request::file as request_file;
 use crate::request::model::{ContractLink, Example, Method, Request};
+use crate::tree::undo::Undo;
 use crate::tree::{self, ENVIRONMENTS_DIR, TreeNode};
 
 /// Dossier des contrats, à la racine du projet (réservé comme `environments/`).
@@ -624,12 +625,16 @@ pub fn save(root: &Path, path: &str, text: &str) -> Result<(), CommandError> {
     write_text(&absolute, text)
 }
 
-/// Met un contrat à la corbeille, ou le supprime définitivement (C11).
-pub fn delete(root: &Path, path: &str, permanent: bool) -> Result<(), CommandError> {
+/// Met un contrat à la corbeille, ou le supprime définitivement (C11). Rend de quoi le remettre
+/// (« Annuler », ER1) : son texte, lu avant la suppression.
+pub fn delete(root: &Path, path: &str, permanent: bool) -> Result<Undo, CommandError> {
     let absolute = resolve_path(root, path)?;
+    let mut undo = Undo::default();
     if !absolute.exists() {
-        return Ok(());
+        return Ok(undo);
     }
+    let text = fs::read_to_string(&absolute)
+        .map_err(|e| CommandError::io("Lecture du contrat impossible", &absolute, &e))?;
     let result = if permanent {
         fs::remove_file(&absolute)
             .map_err(|e| CommandError::io("Suppression impossible", &absolute, &e))
@@ -642,7 +647,9 @@ pub fn delete(root: &Path, path: &str, permanent: bool) -> Result<(), CommandErr
         })
     };
     crate::watch::settle(&absolute);
-    result
+    result?;
+    undo.restored(absolute, text);
+    Ok(undo)
 }
 
 /// Dossier d'un nom à la racine, hors des dossiers réservés.

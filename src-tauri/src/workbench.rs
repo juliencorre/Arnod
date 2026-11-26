@@ -472,6 +472,16 @@ fn not_found(message: &str) -> CommandError {
     CommandError::new(CommandErrorKind::NotFound, message)
 }
 
+/// De quoi remettre un environnement supprimé (« Annuler », ER1), gardé en mémoire par le cœur.
+#[derive(Debug, Clone)]
+pub struct EnvironmentRestore {
+    removed: environment::Removed,
+    locals: Option<Vec<LocalVar>>,
+    last: bool,
+    /// Clé du coffre et valeur de chaque secret retiré.
+    secrets: Vec<(String, String)>,
+}
+
 fn secret_key(ctx: &ProjectCtx, environment: &str, name: &str) -> String {
     secrets::key(ctx.id, environment, name)
 }
@@ -659,18 +669,61 @@ impl Workbench {
         local::save(&ctx.data_dir, ctx.id, &data)
     }
 
-    pub fn delete_environment(&self, ctx: &ProjectCtx, name: &str) -> Result<(), CommandError> {
-        environment::delete(&ctx.root, name)?;
+    /// Supprime un environnement, ses valeurs locales et ses secrets ; rend de quoi tout remettre
+    /// (« Annuler », ER1). Les secrets sont lus avant d'être retirés du coffre et ne sont gardés
+    /// qu'en mémoire, jamais écrits.
+    pub fn delete_environment(
+        &self,
+        ctx: &ProjectCtx,
+        name: &str,
+    ) -> Result<EnvironmentRestore, CommandError> {
         let mut data = local::load(&ctx.data_dir, ctx.id);
-        for var in data.locals.remove(name).unwrap_or_default() {
-            if var.secret {
-                self.secrets.delete(&secret_key(ctx, name, &var.name))?;
+        let locals = data.locals.get(name).cloned();
+        let mut secrets = Vec::new();
+        for var in locals.iter().flatten().filter(|var| var.secret) {
+            let key = secret_key(ctx, name, &var.name);
+            if let Some(value) = self.secrets.get(&key)? {
+                secrets.push((key, value));
             }
         }
-        if data.last_environment.as_deref() == Some(name) {
+        let removed = environment::delete(&ctx.root, name)?;
+        for (key, _) in &secrets {
+            self.secrets.delete(key)?;
+        }
+        data.locals.remove(name);
+        let last = data.last_environment.as_deref() == Some(name);
+        if last {
             data.last_environment = None;
         }
-        local::save(&ctx.data_dir, ctx.id, &data)
+        local::save(&ctx.data_dir, ctx.id, &data)?;
+        Ok(EnvironmentRestore {
+            removed,
+            locals,
+            last,
+            secrets,
+        })
+    }
+
+    /// Remet un environnement supprimé : fichiers, valeurs locales, dernier choix et secrets.
+    pub fn restore_environment(
+        &self,
+        ctx: &ProjectCtx,
+        restore: &EnvironmentRestore,
+    ) -> Result<(), CommandError> {
+        environment::restore(&ctx.root, &restore.removed)?;
+        let name = restore.removed.name();
+        let mut data = local::load(&ctx.data_dir, ctx.id);
+        if let Some(locals) = &restore.locals {
+            data.locals.insert(name.to_owned(), locals.clone());
+        }
+        if restore.last {
+            data.last_environment = Some(name.to_owned());
+        }
+        local::save(&ctx.data_dir, ctx.id, &data)?;
+        for (key, value) in &restore.secrets {
+            self.secrets.set(key, value)?;
+        }
+        Ok(())
     }
 
     /// Renseigne la valeur locale d'une variable ; un secret va dans le coffre (R9).

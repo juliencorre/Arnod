@@ -53,6 +53,8 @@ describe("accueil (A1 à A5)", () => {
     expect(app.find(".first-run__card").exists()).toBe(true);
     expect(app.find(".first-run__import").exists()).toBe(true);
     expect(app.find(".nature-form").exists()).toBe(false);
+    // ER5 : le focus arrive sur l'entrée « Essayer une étape », en tête de l'accueil.
+    expect(document.activeElement).toBe(tryInput(app).element);
     // DE9 : un seul bouton plein, « Essayer » ; champ et boutons à la hauteur des contrôles.
     expect(app.findAll("main .button--primary").map((b) => b.text())).toEqual(["Essayer"]);
     expect(cssValue("src/components/home/TryStep.vue", ".try__box", "height")).toBe(

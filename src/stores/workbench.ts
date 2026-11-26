@@ -749,8 +749,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     await refreshTree(projectId);
   }
 
-  async function remove(projectId: string, path: string, permanent: boolean): Promise<void> {
-    await ipc.treeDelete(projectId, path, permanent);
+  /**
+   * Met la requête, le dossier ou le test `path` à la corbeille, avec « Annuler » dans la
+   * notification (ER1) : le cœur le fait comme pour une sélection d'un élément (`tree_batch`).
+   */
+  async function remove(projectId: string, path: string, name: string): Promise<void> {
+    const done = await ipc.treeBatch(projectId, [path], { kind: "delete", permanent: false });
     for (const [key, editor] of Object.entries(editors)) {
       if (
         editor.projectId === projectId &&
@@ -760,6 +764,15 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       }
     }
     await refreshTree(projectId);
+    useToastStore().show(`« ${name} » mis à la corbeille.`, {
+      action: {
+        label: "Annuler",
+        run: async () => {
+          await ipc.treeBatchUndo(done.undoToken);
+          await refreshTree(projectId);
+        },
+      },
+    });
   }
 
   /** Enregistre les requêtes modifiées sous `path` avant de le déplacer. */
@@ -788,8 +801,18 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     environments.value[projectId] = await ipc.environmentSave(projectId, env, previous);
   }
 
+  /** Supprime l'environnement `name`, avec « Annuler » dans la notification (ER1). */
   async function deleteEnvironment(projectId: string, name: string): Promise<void> {
-    environments.value[projectId] = await ipc.environmentDelete(projectId, name);
+    const done = await ipc.environmentDelete(projectId, name);
+    environments.value[projectId] = done.view;
+    useToastStore().show(`Environnement « ${name} » supprimé.`, {
+      action: {
+        label: "Annuler",
+        run: async () => {
+          environments.value[projectId] = await ipc.environmentDeleteUndo(done.undoToken);
+        },
+      },
+    });
   }
 
   async function reorderEnvironments(projectId: string, names: string[]): Promise<void> {
