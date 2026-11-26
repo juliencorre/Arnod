@@ -9,6 +9,7 @@ import { computed, ref } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
+import LockIcon from "@/components/ui/LockIcon.vue";
 import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import { useCatalogStore } from "@/stores/catalog";
 import { useToastStore } from "@/stores/toasts";
@@ -95,11 +96,13 @@ defineExpose({ manage });
         type="button"
         class="chip"
         :class="{ 'chip--compact': compact }"
-        :aria-label="`Environnement de ${projectName} : ${active.name}`"
+        :aria-label="`Environnement de ${projectName} : ${active.name}${active.protected ? ' (protégé)' : ''}`"
         :title="open ? undefined : `Environnement du projet : ${active.name}`"
       >
         <span class="chip__swatch" :style="{ background: swatch(active) }" aria-hidden="true" />
         <span class="chip__name">{{ active.name }}</span>
+        <!-- AM31 : un environnement protégé porte son cadenas sur la pastille. -->
+        <LockIcon v-if="active.protected" class="chip__lock" />
         <span class="chip__caret" aria-hidden="true">▾</span>
       </button>
     </template>
@@ -167,6 +170,10 @@ defineExpose({ manage });
 .chip__caret {
   flex: none;
   font-size: 0.625rem;
+  color: var(--color-muted);
+}
+
+.chip__lock {
   color: var(--color-muted);
 }
 </style>

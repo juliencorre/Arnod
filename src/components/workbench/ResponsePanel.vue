@@ -122,6 +122,7 @@ async function declareUnknown(): Promise<void> {
     <p v-else-if="!outcome" class="response__info">Envoyez la requête pour voir la réponse.</p>
     <template v-else>
       <div class="response__summary">
+        <!-- AM28 (5.1-b) : statut en pastille, puis durée, taille ; l'environnement à droite. -->
         <span
           class="response__status"
           :class="outcome.response.status < 400 ? 'response__status--ok' : 'response__status--ko'"
@@ -139,6 +140,9 @@ async function declareUnknown(): Promise<void> {
           }}
         </span>
         <span v-if="outcome.slow" class="response__slow">Lente</span>
+        <span v-if="outcome.sent" class="response__env" title="Environnement de l'envoi">{{
+          outcome.sent.environment
+        }}</span>
       </div>
       <div
         role="tablist"
@@ -309,17 +313,32 @@ async function declareUnknown(): Promise<void> {
 }
 
 .response__status {
-  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-pill);
+  font: 600 var(--text-small) var(--font-mono);
 }
 
-.response__status--ok,
+.response__status--ok {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.response__status--ko {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
 .response__verdict--ok {
   color: var(--color-success);
 }
 
-.response__status--ko,
 .response__verdict--ko {
   color: var(--color-danger);
+}
+
+.response__env {
+  margin-left: auto;
+  color: var(--color-muted);
 }
 
 .response__slow {

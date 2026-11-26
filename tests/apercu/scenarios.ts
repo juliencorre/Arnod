@@ -359,6 +359,7 @@ function commandesLotE(): FakeCore {
       },
     },
     sent: {
+      environment: "Recette fonctionnelle",
       method: "POST",
       url: "https://recette.boutique.dev/orders",
       headers: [["Content-Type", "application/json"]],
@@ -381,7 +382,10 @@ function commandesLotE(): FakeCore {
           source: "request.body.requestedAt",
         },
       ],
-      used: [{ name: "baseUrl", value: "https://recette.boutique.dev", runtime: false }],
+      used: [
+        { name: "baseUrl", value: "https://recette.boutique.dev", source: "environment" },
+        { name: "token", value: "••••••••", source: "local" },
+      ],
       extracted: [{ name: "order.id", source: "body.id", value: "ord_8F2kQ", message: null }],
     },
   });

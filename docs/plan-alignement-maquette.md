@@ -225,11 +225,11 @@ pull request dit après laquelle la fusionner. Ordre, avec les lots de `plan-qua
 
 **Lot C - Réponse, envoyé et run** (`claude/alignement-c-reponse-run`)
 
-- [ ] **T5** AM28 : environnement porté par le résultat, ligne d'état en pastille.
-- [ ] **T6** AM29 : onglet Envoyé (sources, valeurs tirées surlignées).
-- [ ] **T7** AM30 : écran du run (fil d'Ariane, date, actions).
-- [ ] **T8** AM31 : confirmation d'un environnement protégé.
-- [ ] **T9** AM32 : extraire depuis une valeur du corps (Should).
+- [x] **T5** AM28 : environnement porté par le résultat, ligne d'état en pastille.
+- [x] **T6** AM29 : onglet Envoyé (sources, valeurs tirées surlignées).
+- [x] **T7** AM30 : écran du run (fil d'Ariane, date, actions).
+- [x] **T8** AM31 : confirmation d'un environnement protégé.
+- [x] **T9** AM32 : extraire depuis une valeur du corps (Should).
 
 **Lot D - Environnements et authentification** (`claude/alignement-d-environnements`)
 

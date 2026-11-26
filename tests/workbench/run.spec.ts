@@ -32,11 +32,15 @@ describe("run d'un dossier", () => {
       environment: "Local",
     });
     const run = app.get(".run");
-    expect(run.get(".run__title").text()).toBe("Test « Clients »");
+    expect(run.get(".run__title").text()).toBe(
+      "Référentiel de tests / Clients / Dernière exécution",
+    );
     expect(run.get(".run__progress").text().replace(/\s+/g, " ")).toBe(
       "Test en échec à l'étape 1 · 0/2 étapes",
     );
-    expect(run.get(".run__meta").text()).toBe("run #1 · Local · 8 en même temps · 4,1 s");
+    expect(run.get(".run__meta").text()).toMatch(
+      /^run #1 · Local · 8 en même temps · 4,1 s · (aujourd'hui \d\d:\d\d|\d+ \S+ \d\d:\d\d)$/,
+    );
     // « Échecs » est montré d'abord ; « Tous » liste chaque requête.
     expect(run.findAll(".run__item")).toHaveLength(1);
     await click(app, ".run__tab", "Tous");

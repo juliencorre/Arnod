@@ -499,7 +499,9 @@ Référence : `docs/plan-mvp-a-reponse.md` (lot A, cas F1 à F8, règles R1 à R
 - Chaque valeur JSON mise en forme et chaque correspondance portent le même chemin canonique
   (`$.items[0].sku`) : l'interface surligne en comparant des chemins, jamais en relisant le JSON.
 - Une correspondance porte la vérification qu'elle donne (`FilterMatch.assertion`, cible
-  `body.…` sans joker) ; le store `response` l'ajoute au brouillon, qui s'enregistre seul.
+  `body.…` sans joker) ; le store `response` l'ajoute au brouillon, qui s'enregistre seul. Un clic
+  sur une valeur du corps propose « Extraire dans une variable » : `response.extractAt` relit son
+  chemin canonique par `response_filter` (AM32) ; la valeur extraite est marquée « → nom ».
 - Enregistrer passe par `response_save` (sélecteur natif appelé depuis Rust) ; effacer par
   `response_clear` (`ResultBook::clear`, diffusé par `arnod://resultat`). Un corps tronqué à 5 Mo
   est signalé à la copie et à l'enregistrement.
@@ -595,7 +597,9 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
   tirées par `resolve.rs` à chaque occurrence, jamais inconnues (un nom inconnu part tel quel).
   `SendOutcome.sent` porte ce qui est parti (masqué), les valeurs tirées (avec leur source si elles
   forment seules une valeur envoyée), les variables lues et les valeurs extraites (onglet « Envoyé »,
-  `SentPanel.vue`) ; « Garder » ajoute l'extraction de la valeur envoyée.
+  `SentPanel.vue`) ; « Garder » ajoute l'extraction de la valeur envoyée. `Sent.environment` donne
+  l'environnement de l'envoi (ligne d'état de la réponse) et `UsedVariable.source` l'origine de
+  chaque variable (`environment`, `local`, `extracted`), calculées par le cœur (AM28, AM29).
 - Le cœur garde la requête envoyée avec le résultat (`RequestResult.request`) ; le store compare le
   brouillon (JSON aux clés triées) pour « modifié, pas encore envoyé » et « Revenir à la version
   envoyée » (`isChangedSinceSent`, `revertToSent`).

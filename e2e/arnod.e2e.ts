@@ -975,7 +975,9 @@ describe("Contrats de services", () => {
       timeout: 15_000,
       timeoutMsg: "run du contrat non réussi",
     });
-    expect(await browser.$(".run__title").getText()).toContain("Run du contrat « Animalerie »");
+    expect(await browser.$(".run__title").getText()).toContain(
+      "Contrats de service / Animalerie /",
+    );
     expect(await browser.$$(".run__item--passed").length).toBe(3);
   });
 
@@ -1660,7 +1662,7 @@ describe("Premier usage : assertions, run et statuts", () => {
     });
     expect(await progress.getText()).toBe("Test en échec à l'étape 1 · 0/2 étapes");
     expect(await browser.$(".run__meta").getText()).toMatch(
-      /^run #\d+ · Local · 8 en même temps · \d/,
+      /^run #\d+ · Local · 8 en même temps · \d.* · aujourd'hui \d\d:\d\d$/,
     );
     expect(await browser.$('.run__tab[aria-selected="true"]').getText()).toContain("Échecs");
     const failures = await browser.$$(".run__item").map((item) => item.getText());

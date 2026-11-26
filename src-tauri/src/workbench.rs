@@ -89,6 +89,19 @@ pub struct SendOutcome {
     pub sent: Option<Sent>,
 }
 
+/// D'où vient une variable lue par un envoi (5.1-h, AM29).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum UsedSource {
+    /// Variable partagée de l'environnement de l'envoi.
+    Environment,
+    /// Variable locale de cet environnement (valeur sur le poste, ou au coffre).
+    Local,
+    /// Variable d'exécution : valeur extraite par une étape ou un envoi précédent.
+    Extracted,
+}
+
 /// Variable lue par un envoi (VD2) : un secret est masqué.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -96,8 +109,7 @@ pub struct SendOutcome {
 pub struct UsedVariable {
     pub name: String,
     pub value: String,
-    /// Variable d'exécution (valeur extraite), et non de l'environnement.
-    pub runtime: bool,
+    pub source: UsedSource,
 }
 
 /// Requête envoyée, secrets masqués, avec ses valeurs tirées, ses variables
@@ -106,6 +118,8 @@ pub struct UsedVariable {
 #[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Sent {
+    /// Environnement de l'envoi, montré sur la ligne d'état de la réponse (5.1-b, AM28).
+    pub environment: String,
     pub method: String,
     pub url: String,
     pub headers: Vec<(String, String)>,
@@ -120,11 +134,22 @@ impl Sent {
     fn of(
         prepared: &Prepared,
         variables: &Variables,
+        locals: &[String],
         runtime: &BTreeMap<String, String>,
         extracted: Vec<ExtractedValue>,
     ) -> Self {
         let mask = |text: &str| variables.mask(text);
+        let source = |name: &str| {
+            if runtime.contains_key(name) {
+                UsedSource::Extracted
+            } else if locals.iter().any(|local| local == name) {
+                UsedSource::Local
+            } else {
+                UsedSource::Environment
+            }
+        };
         Self {
+            environment: variables.environment.clone(),
             method: prepared.method.as_str().to_owned(),
             url: mask(&prepared.url),
             headers: prepared
@@ -144,7 +169,7 @@ impl Sent {
                     } else {
                         mask(variables.values.get(name).map_or("", String::as_str))
                     },
-                    runtime: runtime.contains_key(name),
+                    source: source(name),
                 })
                 .collect(),
             extracted: extracted
@@ -913,7 +938,13 @@ impl Workbench {
         self.keep_runtime(ctx.id, &kept);
         let response = Self::mask_response(&variables, raw);
         let mut outcome = Self::outcome(&ctx.root, &request, response);
-        outcome.sent = Some(Sent::of(&prepared, &variables, &runtime, extracted));
+        outcome.sent = Some(Sent::of(
+            &prepared,
+            &variables,
+            &environment.locals,
+            &runtime,
+            extracted,
+        ));
         Ok(outcome)
     }
 

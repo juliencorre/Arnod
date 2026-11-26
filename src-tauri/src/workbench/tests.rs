@@ -1080,7 +1080,8 @@ async fn lot_e_un_envoi_seul_extrait_tire_et_montre_ce_qui_est_parti() {
     assert_eq!(sent.drawn.len(), 1);
     assert_eq!(sent.drawn[0].source.as_deref(), Some("request.body.ref"));
     assert_eq!(sent.used[0].name, "baseUrl");
-    assert!(!sent.used[0].runtime);
+    assert_eq!(sent.used[0].source, UsedSource::Environment);
+    assert_eq!(sent.environment, "Local");
     assert_eq!(sent.extracted[0].value.as_deref(), Some("/commandes/9"));
     assert_eq!(sent.extracted[1].value.as_ref(), Some(&sent.drawn[0].value));
 
@@ -1099,7 +1100,10 @@ async fn lot_e_un_envoi_seul_extrait_tire_et_montre_ce_qui_est_parti() {
         .unwrap();
     assert_eq!(outcome.response.status, 200);
     let used = outcome.sent.unwrap().used;
-    assert!(used.iter().any(|u| u.name == "commande" && u.runtime));
+    assert!(
+        used.iter()
+            .any(|u| u.name == "commande" && u.source == UsedSource::Extracted)
+    );
 }
 
 #[test]

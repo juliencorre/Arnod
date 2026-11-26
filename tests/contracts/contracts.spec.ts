@@ -242,7 +242,7 @@ describe("onglet du contrat (C5, C6, C10)", () => {
       environment: "Local",
       confirmed: false,
     });
-    expect(app?.get(".run__title").text()).toContain("Run du contrat « Petstore »");
+    expect(app?.get(".run__title").text()).toContain("Contrats de service / Petstore /");
     expect(app?.findAll(".run__item")).toHaveLength(3);
   });
 });

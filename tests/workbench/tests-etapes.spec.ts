@@ -152,6 +152,7 @@ describe("extractions (4.2-b bis)", () => {
       if (creer) creer.extractions = [{ name: "client.id", source: "body.id", enabled: true }];
       c.workbench.nextSend = okOutcome({
         sent: {
+          environment: "Local",
           method: "POST",
           url: "https://api.test/clients",
           headers: [["Content-Type", "application/json"]],
@@ -164,7 +165,7 @@ describe("extractions (4.2-b bis)", () => {
             },
             { name: "$timestamp", value: "1794495731", source: null },
           ],
-          used: [{ name: "baseUrl", value: "https://api.test", runtime: false }],
+          used: [{ name: "baseUrl", value: "https://api.test", source: "environment" }],
           extracted: [{ name: "client.id", source: "body.id", value: "cus_7", message: null }],
         },
       });

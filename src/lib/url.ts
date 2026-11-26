@@ -18,3 +18,24 @@ export function pathParamNames(url: string): string[] {
   }
   return names;
 }
+
+/**
+ * Chemin et hôte d'une adresse, pour la confirmation d'un environnement protégé (3.3-c, AM31) :
+ * les `{{nom}}` connus de `values` sont remplacés, puis l'adresse est lue. Une adresse illisible
+ * garde son texte en chemin, sans hôte.
+ */
+export function targetOf(
+  url: string,
+  values: Record<string, string>,
+): { path: string; host: string | null } {
+  const resolved = url.replace(
+    /\{\{\s*([^{}]+?)\s*\}\}/g,
+    (all, name: string) => values[name] ?? all,
+  );
+  try {
+    const parsed = new URL(resolved);
+    return { path: decodeURI(parsed.pathname) + parsed.search, host: parsed.host };
+  } catch {
+    return { path: url, host: null };
+  }
+}
