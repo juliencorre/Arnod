@@ -3,7 +3,8 @@
  * Fenêtre modale sur l'élément `<dialog>` natif : focus piégé, fermeture par
  * Échap ou clic sur le fond. Le parent garde la main sur `open` : Échap et le
  * clic sur le fond émettent `close` sans fermer d'eux-mêmes. `wide` : une fenêtre
- * plus large, pour un contenu en deux colonnes (liste et formulaire).
+ * plus large, pour un contenu en deux colonnes (liste et formulaire). `closable` : un bouton
+ * ✕ « Fermer » dans l'en-tête, pour une fenêtre sans bouton de fin (préférences, ER4).
  */
 import { onMounted, useId, useTemplateRef, watch } from "vue";
 
@@ -12,6 +13,7 @@ const props = defineProps<{
   title: string;
   description?: string;
   wide?: boolean;
+  closable?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -48,7 +50,13 @@ function onClick(event: MouseEvent): void {
     @click="onClick"
   >
     <div class="dialog__panel">
-      <h2 :id="titleId" class="dialog__title">{{ title }}</h2>
+      <div v-if="closable" class="dialog__head">
+        <h2 :id="titleId" class="dialog__title">{{ title }}</h2>
+        <button type="button" class="dialog__close" aria-label="Fermer" @click="emit('close')">
+          ✕
+        </button>
+      </div>
+      <h2 v-else :id="titleId" class="dialog__title">{{ title }}</h2>
       <p v-if="description" :id="descriptionId" class="dialog__description">
         {{ description }}
       </p>
@@ -104,6 +112,38 @@ function onClick(event: MouseEvent): void {
   margin: 0;
   font-size: var(--text-title);
   font-weight: 600;
+}
+
+.dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* ✕ sans bord, cible de 24 × 24 px au moins (consignes de la maquette de référence). */
+.dialog__close {
+  display: grid;
+  place-items: center;
+  min-width: var(--control-sm);
+  min-height: var(--control-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.dialog__close:hover {
+  color: var(--color-text);
+  background: var(--color-chip);
+}
+
+.dialog__close:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .dialog__description {

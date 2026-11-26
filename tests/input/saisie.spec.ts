@@ -120,7 +120,7 @@ describe("variables inconnues soulignées (5.1-b ter)", () => {
     expect(app.find("dialog").exists()).toBe(true);
   });
 
-  it("un nombre ou un point par onglet rempli", async () => {
+  it("DE7 : un compteur en pastille, une seule forme (plus de point « rempli »)", async () => {
     ({ app } = await openOrder());
     const tab = (label: string) => {
       const found = app?.findAll('[role="tab"]').find((t) => t.text().startsWith(label));
@@ -128,10 +128,8 @@ describe("variables inconnues soulignées (5.1-b ter)", () => {
       return found;
     };
     expect(tab("En-têtes").get(".editor__badge").text()).toBe("2");
-    expect(tab("Corps").find(".editor__dot").exists()).toBe(true);
-    expect(tab("Corps").text()).toContain("rempli");
-    expect(tab("Auth").find(".editor__dot").exists()).toBe(false);
-    expect(tab("Docs").find(".editor__dot").exists()).toBe(false);
+    expect(tab("Corps").text()).toBe("Corps");
+    expect(app.find(".editor__dot").exists()).toBe(false);
   });
 
   it("liste, grisés, les en-têtes ajoutés par Arnod à l'envoi", async () => {

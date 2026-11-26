@@ -94,7 +94,7 @@ async function toLocal(): Promise<void> {
 
 .secret__note {
   font-size: var(--text-small);
-  color: var(--color-accent-text);
+  color: var(--color-text);
 }
 
 .secret__note code {

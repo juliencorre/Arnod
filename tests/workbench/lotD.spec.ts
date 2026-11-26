@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { Example } from "@/types/ipc";
 
+import { cssValue } from "../css";
 import type { FakeCore } from "../fakeCore";
 import { PETSTORE_OPERATIONS, PETSTORE_SOURCE } from "../fakeContracts";
 import { newRequest } from "../fakeWorkbench";
@@ -164,6 +165,12 @@ describe("projet créé (1.2-d) et menu « + » (1.2-a ter)", () => {
         .findAll("main .start__action")
         .map((b) => b.text()),
     ).toEqual(["Importer…", "+ Contrat", "+ Test", "+ Environnement"]);
+    // DE6 : quatre colonnes sans colonne vide ; « + Environnement » sur une ligne.
+    const welcome = "src/components/zones/ProjectWelcome.vue";
+    expect(cssValue(welcome, ".start__cards", "grid-template-columns")).toBe(
+      "repeat(auto-fit, minmax(11rem, 1fr))",
+    );
+    expect(cssValue(welcome, ".start__action", "white-space")).toBe("nowrap");
     // AM2 (1.2-d) : les textes des cartes « Décrire un contrat » et « Écrire un test ».
     const start = wrapper().get("main .start").text();
     expect(start).toContain("Vous y écrirez vos premiers tests.");

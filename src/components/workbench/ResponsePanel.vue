@@ -13,7 +13,7 @@ import SentPanel from "@/components/workbench/SentPanel.vue";
 import TimelinePanel from "@/components/workbench/TimelinePanel.vue";
 import NetworkFailurePanel from "@/components/workbench/NetworkFailurePanel.vue";
 import { durationLabel } from "@/lib/assertions";
-import { formatBytes, formatDuration } from "@/lib/format";
+import { countLabel, formatBytes, formatDuration } from "@/lib/format";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { AssertionResult } from "@/types/ipc";
 
@@ -41,6 +41,7 @@ const failures = computed(
   () => outcome.value?.assertions.filter((a) => !a.passed && !a.ignored) ?? [],
 );
 const failed = computed(() => failures.value.length);
+const passed = computed(() => outcome.value?.assertions.filter((a) => a.passed).length ?? 0);
 
 /** Lot H (3.4-g) : la réponse pose un cookie, gardé pour l'environnement. */
 const setsCookie = computed(
@@ -93,18 +94,20 @@ function removable(check: AssertionResult): boolean {
           class="response__verdict"
           :class="outcome.passed ? 'response__verdict--ok' : 'response__verdict--ko'"
         >
-          {{ outcome.passed ? "Réussie" : `Échec · ${failed} assertion(s)` }}
+          {{
+            outcome.passed ? "Réussie" : `Échec · ${countLabel(failed, "assertion", "assertions")}`
+          }}
         </span>
         <span v-if="outcome.slow" class="response__slow">Lente</span>
       </div>
       <div role="tablist" aria-label="Contenu de la réponse" class="response__tabs">
         <button
-          v-for="[id, label] in [
-            ['body', 'Corps'],
-            ['headers', `En-têtes (${outcome.response.headers.length})`],
-            ['checks', `Assertions (${outcome.assertions.length})`],
-            ['sent', 'Envoyé'],
-            ['timeline', 'Chronologie'],
+          v-for="[id, label, count] in [
+            ['body', 'Corps', 0],
+            ['headers', 'En-têtes', outcome.response.headers.length],
+            ['checks', 'Assertions', outcome.assertions.length],
+            ['sent', 'Envoyé', 0],
+            ['timeline', 'Chronologie', 0],
           ] as const"
           :key="id"
           type="button"
@@ -114,6 +117,7 @@ function removable(check: AssertionResult): boolean {
           @click="view = id"
         >
           {{ label }}
+          <span v-if="count" class="response__badge">{{ count }}</span>
         </button>
       </div>
       <!-- Corps : format, aperçu, actions et filtre JSONPath (docs/plan-mvp-a-reponse.md). -->
@@ -155,29 +159,37 @@ function removable(check: AssertionResult): boolean {
             <span aria-hidden="true">{{ check.passed ? "✓" : check.ignored ? "–" : "✕" }}</span>
             <span class="check__target">{{ labelOf(check) }}</span>
             <span v-if="check.message" class="check__message">{{ check.message }}</span>
-            <span v-if="check.ignored" class="check__message">ignorée pour ce run</span>
+            <span v-if="check.ignored" class="check__message">ignorée pour ce résultat</span>
           </li>
         </ul>
         <BaseButton @click="workbench.proposeAssertions(editorKey)">
           Proposer des assertions
         </BaseButton>
       </div>
-      <ul v-if="failures.length > 0" class="failures" aria-label="Assertions en échec">
-        <li v-for="check in failures" :key="check.id" class="failure">
-          <p class="failure__title"><span aria-hidden="true">✕</span> {{ labelOf(check) }}</p>
-          <p v-if="check.message" class="failure__message">{{ check.message }}</p>
-          <p class="failure__actions">
-            <button
-              type="button"
-              class="failure__link"
-              :aria-label="`Ignorer ${labelOf(check)} pour ce run`"
-              @click="workbench.ignoreCheck(editorKey, check.id)"
-            >
-              Ignorer pour ce run
-            </button>
-            <template v-if="removable(check)">
-              ·
+      <!-- Un échec est affiché une fois (DE10) : dans ce panneau dépliable, sauf sous l'onglet
+           Assertions, dont la liste le montre déjà. -->
+      <details v-if="failures.length > 0 && view !== 'checks'" class="failures" open>
+        <summary class="failures__summary">
+          <span>{{ countLabel(failed, "assertion en échec", "assertions en échec") }}</span>
+          <span v-if="passed > 0" class="failures__passed">
+            {{ countLabel(passed, "réussie", "réussies") }}
+          </span>
+        </summary>
+        <ul class="failures__list" aria-label="Assertions en échec">
+          <li v-for="check in failures" :key="check.id" class="failure">
+            <p class="failure__title"><span aria-hidden="true">✕</span> {{ labelOf(check) }}</p>
+            <p v-if="check.message" class="failure__message">{{ check.message }}</p>
+            <p class="failure__actions">
               <button
+                type="button"
+                class="failure__link"
+                :aria-label="`Ignorer ${labelOf(check)} pour ce résultat`"
+                @click="workbench.ignoreCheck(editorKey, check.id)"
+              >
+                Ignorer pour ce résultat
+              </button>
+              <button
+                v-if="removable(check)"
                 type="button"
                 class="failure__link"
                 :aria-label="`Retirer l'assertion ${labelOf(check)}`"
@@ -185,10 +197,10 @@ function removable(check: AssertionResult): boolean {
               >
                 Retirer l'assertion
               </button>
-            </template>
-          </p>
-        </li>
-      </ul>
+            </p>
+          </li>
+        </ul>
+      </details>
     </template>
   </section>
 </template>
@@ -201,7 +213,11 @@ function removable(check: AssertionResult): boolean {
   min-width: 0;
 }
 
-.response__info,
+.response__info {
+  margin: 0;
+  color: var(--color-muted);
+}
+
 .response__error {
   margin: 0;
   padding: 0.625rem 0.75rem;
@@ -239,14 +255,33 @@ function removable(check: AssertionResult): boolean {
   background: var(--color-chip);
 }
 
+/* Une rangée d'onglets, qui défile s'il le faut (DE3). */
 .response__tabs {
   display: flex;
+  flex-wrap: nowrap;
   gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--color-border);
 }
 
+.response__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* Compteur en pastille, comme dans l'éditeur (DE7). */
+.response__badge {
+  margin-left: 0.25rem;
+  padding: 0 0.375rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  background: var(--color-chip);
+}
+
 .response__tab {
-  padding: 0.375rem 0.75rem;
+  flex: none;
+  padding: 0.375rem 0.375rem;
+  white-space: nowrap;
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
@@ -323,19 +358,44 @@ function removable(check: AssertionResult): boolean {
   color: var(--color-muted);
 }
 
+/* Échecs du résultat, en un panneau dépliable (DE10). */
 .failures {
+  margin: 0.25rem 0 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.failures__summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.failures__summary:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.failures__passed {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+.failures__list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin: 0.25rem 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .failure {
   padding: 0.625rem 0.75rem;
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-danger);
   background: var(--color-danger-soft);
 }
 
@@ -352,17 +412,20 @@ function removable(check: AssertionResult): boolean {
 }
 
 .failure__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
   margin: 0.375rem 0 0;
   font-size: var(--text-body);
-  color: var(--color-muted);
 }
 
+/* Action textuelle : couleur de lien, graisse 600, sans soulignement (ER3, 4.2-b). */
 .failure__link {
   padding: 0;
   border: 0;
   background: none;
   font: inherit;
-  text-decoration: underline;
+  font-weight: 600;
   color: var(--color-link);
   cursor: pointer;
 }

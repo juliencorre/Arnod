@@ -278,7 +278,7 @@ async function submit(): Promise<void> {
       <BaseButton v-if="mode === 'dialog'" @click="emit('cancel')">Annuler</BaseButton>
       <BaseButton
         type="submit"
-        variant="primary"
+        :variant="mode === 'firstRun' ? 'secondary' : 'primary'"
         :class="{ 'actions__submit--wide': mode === 'firstRun' }"
         :disabled="!canSubmit"
       >
@@ -436,6 +436,5 @@ async function submit(): Promise<void> {
 
 .actions__submit--wide {
   width: 100%;
-  padding-block: 0.75rem;
 }
 </style>

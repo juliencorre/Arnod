@@ -71,12 +71,25 @@ describe("assertions en échec (VT1 à VT4)", () => {
     const failure = app?.get(".failure");
     expect(failure?.get(".failure__title").text()).toBe("✕ headers.Location");
     expect(failure?.get(".failure__message").text()).toBe("en-tête absent de la réponse");
-    expect(app?.get(".response__verdict").text()).toBe("Échec · 1 assertion(s)");
+    expect(app?.get(".response__verdict").text()).toBe("Échec · 1 assertion");
   });
 
-  it("ignore l'échec pour ce run, sans toucher à la requête (VT2)", async () => {
+  it("DE10 : l'échec s'affiche une fois, dans un panneau dépliable, pas sous l'onglet Assertions", async () => {
+    await sendFailing();
+    const panel = app?.get("details.failures");
+    expect(panel?.attributes("open")).toBeDefined();
+    expect(panel?.findAll("summary span").map((s) => s.text())).toEqual([
+      "1 assertion en échec",
+      "1 réussie",
+    ]);
+    await click(app as AppWrapper, ".response__tab", "Assertions");
+    expect(app?.find("details.failures").exists()).toBe(false);
+    expect(app?.findAll(".response__checks .check--ko")).toHaveLength(1);
+  });
+
+  it("ER3 : ignore l'échec pour ce résultat, sans toucher à la requête (VT2)", async () => {
     const { core } = await sendFailing();
-    await click(app as AppWrapper, ".failure__link", "Ignorer pour ce run");
+    await click(app as AppWrapper, ".failure__link", "Ignorer pour ce résultat");
     expect(core.calls.find((c) => c.cmd === "result_ignore_check")?.args).toMatchObject({
       path: "Clients/creer.yml",
       check: "location",
@@ -103,9 +116,11 @@ describe("assertions en échec (VT1 à VT4)", () => {
 
   it("le bouton se déclenche au clavier et l'origine s'affiche (VT4)", async () => {
     await sendFailing();
-    const ignore = app?.findAll(".failure__link").find((b) => b.text() === "Ignorer pour ce run");
+    const ignore = app
+      ?.findAll(".failure__link")
+      .find((b) => b.text() === "Ignorer pour ce résultat");
     expect(ignore?.element.tagName).toBe("BUTTON");
-    expect(ignore?.attributes("aria-label")).toBe("Ignorer headers.Location pour ce run");
+    expect(ignore?.attributes("aria-label")).toBe("Ignorer headers.Location pour ce résultat");
     await click(app as AppWrapper, '.editor [role="tab"]', "Assertions");
     const origins = app?.findAll(".assertion__origin").map((o) => o.text());
     expect(origins).toEqual(["par défaut", "manuelle"]);

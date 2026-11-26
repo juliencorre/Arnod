@@ -59,6 +59,7 @@ onBeforeUnmount(() => {
     :open="network.preferencesOpen"
     title="Préférences"
     wide
+    closable
     @close="network.closePreferences()"
   >
     <div class="preferences">

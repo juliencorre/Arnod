@@ -7,6 +7,7 @@
   --color-accent-soft: #fdf1e1;
   --color-border: #e6e2db;
   --color-border-strong: #cfc9bf;
+  --color-border-control: #8f8a83;
   --color-text: #1d1b18;
   --color-muted: #6b665e;
   --color-subtle: #8b857b;
@@ -69,6 +70,7 @@
   --color-accent-soft: #3a2c1a;
   --color-border: #36322d;
   --color-border-strong: #4a453e;
+  --color-border-control: #7d7871;
   --color-text: #ede9e3;
   --color-muted: #b0a99e;
   --color-subtle: #8a8378;

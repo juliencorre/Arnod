@@ -178,7 +178,8 @@ function start(id: Start): void {
 
 .start__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  /* auto-fit : les quatre cartes prennent toute la largeur, sans colonne vide (DE6). */
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: 1rem;
   margin: 0;
   padding: 0;
@@ -210,6 +211,8 @@ function start(id: Start): void {
 }
 
 .start__action {
+  align-self: flex-start;
   margin-top: 0.5rem;
+  white-space: nowrap;
 }
 </style>

@@ -22,13 +22,7 @@ transverses:
   - texte: "Espacements : le design system décrit les pas employés (space-2 à space-32), sans variables dans le code ni règle dans la maquette."
     aligner: à décider
     page: "0.5"
-  - texte: "Bords de contrôle : cases à cocher, interrupteurs, boutons radio et anneau de focus prennent un jeton --color-border-control à 3:1 (#8f8a83 en clair, #7d7871 en sombre) ; les champs gardent --color-border. Le code dessine cases et interrupteur éteint en --color-border-strong (1,65:1) ou --color-border (1,19:1) et le focus de la poignée de séparation en accent (2,28:1) (DE4, AC5 ; Q10 du plan-qualite-mvp)."
-    aligner: code
-    page: "0.5"
-  - texte: "Couleurs de texte : --color-accent-text seulement sur un fond accent, --color-subtle seulement pour les indications ; le code les emploie sur du texte à lire (1.6-g, 4.1-g et 4.2-c en thème sombre ; aide du filtre et en-têtes ajoutés à 3,3:1) (DE2, AC6)."
-    aligner: code
-    page: "0.5"
-  - texte: "Formes uniques : un compteur en pastille, la sélection en fond --color-accent-soft, l'ajout d'une ligne en bouton « + Nom », le retrait par × ; le code mêle « (1) », point « • », soulignement et plein noir, liens et pointillés, « ✕ Supprimer » et « Retirer » (DE7, ER8)."
+  - texte: "Formes uniques : l'ajout d'une ligne en bouton « + Nom », le retrait par × ; le code mêle liens et pointillés, « ✕ Supprimer » et « Retirer » (ER8). Compteurs en pastille et sélection en fond --color-accent-soft sont alignés (DE7, lot I)."
     aligner: code
     page: "0.5"
   - texte: "Suppressions : toute suppression se rattrape par « Annuler » dans sa notification, et une notification d'erreur reste jusqu'à sa fermeture ; le code supprime sans annulation un dossier ou un test, un contrat, un environnement, et efface les erreurs après 6 s (ER1, ER7)."
@@ -132,6 +126,7 @@ pages:
     journal:
       - "2026-11-12 : Design system « Arnod » tiré du code ; couleurs du code, échelles de texte et de rayons de la maquette ; page générée depuis docs/design-system/."
       - "2026-11-12 : Échelles appliquées au code (texte à 13 px, hauteurs 28, 32 et 40 px, rayons 2, 6 et 10 px, cases et listes aux couleurs du design system) ; bouton principal et teintes proches alignés dans les écrans (plan-qualite-interface)."
+      - "2026-11-26 : Bord de contrôle --color-border-control à 3:1 (cases, radios, interrupteur, focus de la séparation) et couleurs de texte alignés ; compteurs en pastille, sélection en fond accent doux (plan-qualite-mvp, lot I : DE2, DE4, DE7, AC5, AC6)."
     ecrans:
       a: { etat: référence }
       b: { etat: référence }
@@ -224,6 +219,7 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : nom long coupé avec son infobulle, ⋯ au survol et au focus, sélection en fond accent doux, compteur en pastille (DE5, DE7) ; d inchangé, déjà sur quatre colonnes."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 6 écarts ajoutés, 2 réécrits ou complétés."
       - "2026-11-26 : d : « Directement dans le référentiel de tests, sans contrat. » et « vos premiers tests » (plan-alignement-maquette, lot A, AM2)."
+      - "2026-11-26 : d : quatre cartes sur toute la largeur, « + Environnement » sur une ligne (plan-qualite-mvp, lot I, DE6)."
     ecrans:
       "0": { etat: remplacé }
       a:
@@ -258,10 +254,8 @@ pages:
         pr: [36, 40, 48]
         captures: [02-projet-cree]
         ecart:
-          - texte: "Points de départ sur quatre colonnes ; « + Environnement » tient maintenant sur une ligne, mais le code laisse une cinquième colonne vide à 1280 px (auto-fill, minmax(11rem, 1fr)) (DE6) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
-          - texte: "L'accueil du projet n'est pas dans un onglet (maquette : onglet « boutique-tests × »)."
-            aligner: à décider
+          texte: "L'accueil du projet n'est pas dans un onglet (maquette : onglet « boutique-tests × »)."
+          aligner: à décider
       "d bis": { etat: à faire, version: V4 }
       e:
         etat: livré
@@ -404,15 +398,13 @@ pages:
       - "2026-11-16 : Écran e aligné sur le code : les préférences sont une fenêtre modale à deux sections (« Réseau et certificats », « Mises à jour »), sans onglet ; proxy du système, aucun ou manuel, délai de connexion seul, autorités du système et autorités ajoutées, vérification toujours faite (ni PAC ni identification Windows). L'écran g passe dans la même fenêtre modale."
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : e et g : bouton ✕ « Fermer » dans l'en-tête des préférences (ER4) ; g : « Vérifier maintenant » en couleur de lien et la même section en thème sombre, cases et radios au bord de contrôle (DE2, DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 1 écart ajouté."
+      - "2026-11-26 : e, g : bouton ✕ « Fermer » des préférences, « Vérifier maintenant » en couleur de lien (plan-qualite-mvp, lot I, ER4, DE2)."
     ecrans:
       e:
         etat: livré
         version: MVP
         pr: [58]
         captures: [h1-preferences-reseau]
-        ecart:
-          texte: "Bouton de fermeture ✕ dans l'en-tête des préférences ; le code ne ferme que par Échap ou le voile (ER4) (plan-qualite-mvp, maquette de référence)."
-          aligner: code
       f: { etat: à faire, version: V1 }
       "f bis": { etat: à faire, version: V1 }
       g:
@@ -420,11 +412,6 @@ pages:
         version: MVP
         pr: [63, 67]
         captures: [32-mises-a-jour]
-        ecart:
-          - texte: "« Vérifier maintenant » en couleur de lien, lisible dans les deux thèmes ; le code l'écrit en --color-accent-text hors d'un fond accent : 1,06:1 en thème sombre (DE2) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
-          - texte: "Bouton de fermeture ✕ dans l'en-tête des préférences, comme en 1.6-e ; le code ne ferme que par Échap ou le voile (ER4) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
   "2.1":
     nom: "Accueil et premier essai"
     version: MVP
@@ -442,16 +429,15 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : « Essayer » seul bouton plein, « Créer le projet » et « Choisir un dossier ou un fichier… » en boutons secondaires, champs et boutons à 32 px (DE9)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 6 écarts ajoutés."
       - "2026-11-26 : a, a ter, a sexies : formulaire du projet, note « Reconnu : … » ou « Nature choisie : … », « ⇩ Importer l'existant… », en-tête « REST · requête » et pastille cerclée (plan-alignement-maquette, lot A, AM3 à AM5)."
+      - "2026-11-26 : a : un seul bouton plein (« Essayer »), contrôles à la hauteur courante (plan-qualite-mvp, lot I, DE9)."
     ecrans:
       a:
         etat: livré
         pr: [8, 35]
         captures: [01-premier-lancement]
         ecart:
-          - texte: "Un seul bouton plein (« Essayer ») ; « Créer le projet » en bouton secondaire ; contrôles aux hauteurs --control-* ; le code montre deux boutons pleins de 37 et 42 px et un champ de 35 px (DE9) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
-          - texte: "La carte Importer cite SoapUI, Bruno, Postman, Playwright, OpenAPI, WSDL, AsyncAPI, Squash TM et Xray et dit « déposez-les ici » ; l'application importe Bruno, OpenAPI et un projet Arnod (« Arnod reconnaît le format »), par « Choisir un dossier… » ou « ou un fichier… » comme en 2.3-a, qui contredit cet écran."
-            aligner: maquette
+          texte: "La carte Importer cite SoapUI, Bruno, Postman, Playwright, OpenAPI, WSDL, AsyncAPI, Squash TM et Xray et dit « déposez-les ici » ; l'application importe Bruno, OpenAPI et un projet Arnod (« Arnod reconnaît le format »), par « Choisir un dossier… » ou « ou un fichier… » comme en 2.3-a, qui contredit cet écran."
+          aligner: maquette
       "a bis":
         etat: livré
         pr: [27]
@@ -741,6 +727,7 @@ pages:
       - "2026-11-13 : OAuth 2 par identifiants client réglé au projet, jeton obtenu et renouvelé ; cookies gardés par environnement, listés et vidables (a, g, lot H, PR #58)."
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : « ✓ Enregistré » au lieu d'« Enregistrer » (ER2) ; cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 4 écarts ajoutés, 1 réécrit ou complété."
+      - "2026-11-26 : g : la note des cookies reçus en texte secondaire (plan-qualite-mvp, lot I, DE1)."
     ecrans:
       a:
         etat: livré
@@ -770,10 +757,8 @@ pages:
         pr: [58]
         captures: [h4-cookies]
         ecart:
-          - texte: "Les cookies gardés sont listés sous les en-têtes de la requête, sans ligne « Cookie … automatique » parmi eux."
-            aligner: maquette
-          - texte: "La note « Les cookies reçus rejoignent ceux de l'environnement… » est en rouge d'erreur (response__info), comme l'attente de la réponse en 5.1-b (DE1) ; la maquette l'écrit en texte secondaire."
-            aligner: code
+          texte: "Les cookies gardés sont listés sous les en-têtes de la requête, sans ligne « Cookie … automatique » parmi eux."
+          aligner: maquette
   "3.5":
     nom: "Mocks"
     version: V5
@@ -804,6 +789,7 @@ pages:
       - "2026-11-16 : Sélection multiple : Ctrl+clic, Maj+clic, barre Déplacer vers…, Dupliquer, Exécuter, Supprimer, avec « Annuler » (a quater, PR #66)."
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : g : note « après l'étape n » en couleur de texte, sélection en fond accent doux (DE2, DE7) ; cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 7 écarts ajoutés ; a bis passe de « livré » à « en partie », a ter passe de « livré » à « en partie »."
+      - "2026-11-26 : g : note « après l'étape n » en couleur de texte (plan-qualite-mvp, lot I, DE2)."
     ecrans:
       a:
         etat: livré
@@ -871,8 +857,6 @@ pages:
         ecart:
           - texte: "Une étape n'est jamais liée à un contrat (lot E, R1) : vers un test, « N'est plus liée à POST /orders » au lieu de « Reste liée » ; seules les opérations de même méthode sont proposées, sans « nouvel endpoint… » ni « Nouveau test dans… » ; « Non classés » n'est pas une destination ; la place dans le test se choisit sous la liste."
             aligner: à décider
-          - texte: "Note « après l'étape n » en couleur de texte, lisible dans les deux thèmes ; le code l'écrit en --color-accent-text : 1,06:1 en thème sombre (DE2) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
           - texte: "Le champ de recherche est un champ de recherche natif : bouton d'effacement natif (bleu sous WebView2, ⌫ sous WebKitGTK) et loupe qui disparaît à la saisie ; la maquette garde la loupe, sans bouton d'effacement (comme le filtre du référentiel, 1.2-e)."
             aligner: code
   "4.2":
@@ -891,6 +875,7 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : a : barre des étapes d'un test de six étapes sur une rangée qui défile, étape active visible, fondu au bord coupé (DE8) ; b : échec d'assertion affiché une fois dans une liste dépliable, « Ignorer pour ce résultat », liens d'action en couleur de lien (DE10, ER3) ; c : note du coffre en couleur de texte (DE2) ; compteurs en pastille, sélection en fond accent doux (DE7)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 4 écarts ajoutés, 2 réécrits ou complétés."
       - "2026-11-26 : c : « Laisser dans la requête » pour une requête libre (plan-alignement-maquette, lot A, AM10)."
+      - "2026-11-26 : a, b, c : barre des étapes sur une rangée qui défile ; échec affiché une fois dans un panneau dépliable, « Ignorer pour ce résultat » ; note du coffre lisible (plan-qualite-mvp, lot I, DE8, DE10, ER3, DE2)."
     ecrans:
       a:
         etat: livré
@@ -899,8 +884,6 @@ pages:
         ecart:
           - texte: "Pas de réglage « Si une étape échoue » (le test s'arrête toujours, Q2, V4), ni de réglages du test ni de campagnes sous la liste ; pas de poignée ⋮⋮ (glisser une étape : 4.1-f)."
             aligner: maquette
-          - texte: "Barre des étapes sur une rangée qui défile, l'étape active toujours visible ; le code passe sur deux ou trois rangées dès quatre étapes (DE8) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
           - texte: "L'aide de « + Ajouter une étape » ne propose qu'une nouvelle requête (une requête existante ou une opération d'un contrat relèvent de R11 du lot E) ; la maquette écrit encore « 2 vérifications »."
             aligner: maquette
       b:
@@ -908,10 +891,8 @@ pages:
         pr: [27, 42, 51, 65]
         captures: [19-verification-en-echec]
         ecart:
-          - texte: "Échec d'une assertion affiché une fois (liste dépliable), « Ignorer pour ce résultat » sur un envoi seul, liens d'action en couleur de lien ; le code répète chaque échec dans une carte, écrit « assertion(s) » et « Ignorer pour ce run », liens rouges soulignés (DE10, ER3) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
-          - texte: "La liste des assertions de l'écran n'est pas rendue (« {{ a.target }} », « {{ a.op }} ») (aussi 4.9-a et 0.4-a)."
-            aligner: maquette
+          texte: "La liste des assertions de l'écran n'est pas rendue (« {{ a.target }} », « {{ a.op }} ») (aussi 4.9-a et 0.4-a)."
+          aligner: maquette
       "b bis":
         etat: livré
         pr: [51]
@@ -926,10 +907,8 @@ pages:
         pr: [65]
         captures: [33-secret-en-clair]
         ecart:
-          - texte: "Rien de la requête n'est écrit avant le choix (« Non enregistré : choisissez où va le jeton » au lieu de « Enregistré, sauf le jeton ») ; la variable locale va dans l'environnement actif ; jeton, mot de passe, clé d'API et secret client OAuth 2 sont repérés. « La requête est enregistrée automatiquement dans le projet… » au lieu de « Ce test est enregistré… »."
-            aligner: maquette
-          - texte: "Note du coffre en couleur de texte, lisible dans les deux thèmes ; le code l'écrit en --color-accent-text : 1,27:1 en thème sombre (DE2) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
+          texte: "Rien de la requête n'est écrit avant le choix (« Non enregistré : choisissez où va le jeton » au lieu de « Enregistré, sauf le jeton ») ; la variable locale va dans l'environnement actif ; jeton, mot de passe, clé d'API et secret client OAuth 2 sont repérés. « La requête est enregistrée automatiquement dans le projet… » au lieu de « Ce test est enregistré… »."
+          aligner: maquette
   "4.3":
     nom: "Tests en schéma"
     version: [V4, V5, V6]
@@ -1067,6 +1046,7 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : b : réponse vide et envoi en cours en texte secondaire neutre, erreur d'envoi avec son action (« Ajouter », « Environnements… »), vue partagée à 1280 px sur une ligne (DE1, DE3, ER6) ; h : barre des étapes sur une rangée qui défile (DE8) ; compteurs en pastille, sélection en fond accent doux, interrupteur éteint au bord de contrôle (DE4, DE7)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 8 écarts ajoutés, 2 réécrits ou complétés."
       - "2026-11-26 : c : la note cite l'assertion de durée telle qu'écrite (plan-alignement-maquette, lot A, AM12)."
+      - "2026-11-26 : b, h : réponse vide en texte neutre, éditeur à 58 % et onglets sur une ligne à 1280 px, compteurs en pastille ; barre des étapes sur une rangée (plan-qualite-mvp, lot I, DE1, DE3, DE7, DE8)."
     ecrans:
       a:
         etat: livré
@@ -1079,7 +1059,7 @@ pages:
         pr: [27, 42]
         captures: [19-verification-en-echec]
         ecart:
-          - texte: "Panneau de réponse vide ou en attente en texte secondaire neutre ; vue partagée à 1280 × 775 avec une adresse lisible et les onglets de l'éditeur et du résultat sur une ligne ; une erreur d'envoi propose son action. Le code écrit « Envoyez la requête pour voir la réponse. » et « Envoi en cours… » en rouge d'erreur, laisse 274 px à l'adresse et passe les onglets sur deux rangées, et montre l'erreur seule (DE1, DE3, ER6) (plan-qualite-mvp, maquette de référence)."
+          - texte: "Une erreur d'envoi propose son action (« Ajouter », « Environnements… ») ; le code montre l'erreur seule (ER6) (plan-qualite-mvp, maquette de référence)."
             aligner: code
           - texte: "Ligne d'état : statut en texte simple, sans l'environnement ; la maquette met « 201 Created » en pastille verte et l'environnement à droite, comme le code le fait déjà sur un échec réseau (5.1-i) (aussi 5.1-b bis à 5.1-h)."
             aligner: code
@@ -1139,8 +1119,6 @@ pages:
         ecart:
           - texte: "« Envoyé » montre aussi les variables utilisées, les valeurs extraites et les en-têtes envoyés ; la liste s'ouvre au-dessus du curseur quand la place manque dessous ; « $date » (date du jour) et « $date:+3d » (décalée) sont deux lignes de la liste."
             aligner: maquette
-          - texte: "Barre des étapes sur une rangée qui défile ; le code passe sur deux ou trois rangées et repousse le corps vers le bas (DE8) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
           - texte: "Onglet Envoyé : corps envoyé en texte brut, sans les valeurs tirées surlignées, sans titre « URL résolue » ni note « Exactement ce qui est parti… », en-têtes après les variables ; la source dit « environnement » ou « extraite » au lieu du nom de l'environnement ou de « locale »."
             aligner: code
       i:

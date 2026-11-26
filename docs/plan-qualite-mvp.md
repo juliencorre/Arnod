@@ -256,10 +256,10 @@ C, D, E, F, I. Vague 3, en parallèle : G, H, J, K.
 
 **Lot I - Lisibilité** (`claude/qualite-i-lisibilite`)
 
-- [ ] **T26** DE1, DE2, DE4, AC5, AC6 : couleurs d'état et de texte, bord de contrôle (Q10),
+- [x] **T26** DE1, DE2, DE4, AC5, AC6 : couleurs d'état et de texte, bord de contrôle (Q10),
       couples ajoutés à `tests/theme.spec.ts`.
-- [ ] **T27** DE3, DE6, DE8, DE9 : vue partagée, points de départ, barre des étapes, accueil.
-- [ ] **T28** DE7, DE10, ER3, ER4 : compteurs, sélection, échec affiché une fois, libellés.
+- [x] **T27** DE3, DE6, DE8, DE9 : vue partagée, points de départ, barre des étapes, accueil.
+- [x] **T28** DE7, DE10, ER3, ER4 : compteurs, sélection, échec affiché une fois, libellés.
 
 **Lot J - Ergonomie et clavier** (`claude/qualite-j-ergonomie`)
 

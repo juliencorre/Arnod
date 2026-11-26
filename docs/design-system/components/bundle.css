@@ -49,11 +49,50 @@ input[type="checkbox"] {
   width: 1rem;
   height: 1rem;
   margin: 0;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   appearance: none;
   cursor: pointer;
+}
+
+/* Bouton radio : même bord de contrôle à 3:1 que la case (DE4), point foncé une fois choisi. */
+input[type="radio"] {
+  display: inline-grid;
+  flex: none;
+  place-content: center;
+  box-sizing: border-box;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="radio"]:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+input[type="radio"]:checked::after {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-text);
+  content: "";
+}
+
+input[type="radio"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[type="radio"]:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 input[type="checkbox"]:checked {
@@ -207,7 +246,7 @@ select:focus-visible {
   width: 2.25rem;
   height: 1.25rem;
   padding: 0;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-pill);
   background: var(--color-chip);
   cursor: inherit;
@@ -469,6 +508,38 @@ select:focus-visible {
   margin: 0;
   font-size: var(--text-title);
   font-weight: 600;
+}
+
+.dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* ✕ sans bord, cible de 24 × 24 px au moins (consignes de la maquette de référence). */
+.dialog__close {
+  display: grid;
+  place-items: center;
+  min-width: var(--control-sm);
+  min-height: var(--control-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.dialog__close:hover {
+  color: var(--color-text);
+  background: var(--color-chip);
+}
+
+.dialog__close:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .dialog__description {

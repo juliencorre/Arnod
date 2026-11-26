@@ -18,7 +18,8 @@
 
   /* Bordures */
   --color-border: #e6e2db;
-  --color-border-strong: #cfc9bf; /* Cases à cocher, séparateurs marqués */
+  --color-border-strong: #cfc9bf; /* Séparateurs marqués, survol d'un bouton */
+  --color-border-control: #8f8a83; /* Cases, interrupteurs, radios : 3:1 au moins (DE4) */
 
   /* Textes */
   --color-text: #1d1b18;
@@ -139,6 +140,7 @@
 
     --color-border: #36322d;
     --color-border-strong: #4a453e;
+    --color-border-control: #7d7871;
 
     --color-text: #ede9e3;
     --color-muted: #b0a99e;
@@ -254,11 +256,50 @@ input[type="checkbox"] {
   width: 1rem;
   height: 1rem;
   margin: 0;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   appearance: none;
   cursor: pointer;
+}
+
+/* Bouton radio : même bord de contrôle à 3:1 que la case (DE4), point foncé une fois choisi. */
+input[type="radio"] {
+  display: inline-grid;
+  flex: none;
+  place-content: center;
+  box-sizing: border-box;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="radio"]:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+input[type="radio"]:checked::after {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-text);
+  content: "";
+}
+
+input[type="radio"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[type="radio"]:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 input[type="checkbox"]:checked {
