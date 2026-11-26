@@ -2088,7 +2088,8 @@ describe("Lot B : saisie, texte et cURL", () => {
     expect(state.unknown).toContain("apiVersion est inconnue dans Local");
     expect(state.marked).toBe("{{apiVersion}}");
     expect(state.tabs).toContain("En-têtes 2");
-    expect(state.tabs.some((t) => t.startsWith("Corps ●"))).toBe(true);
+    // DE7 (lot I) : un compteur en pastille, plus de point « rempli » sur l'onglet Corps.
+    expect(state.tabs).toContain("Corps");
 
     await inEditor(essai, { kind: "click", value: "En-têtes" });
     await browser.waitUntil(
