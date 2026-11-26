@@ -54,6 +54,7 @@ export type CommandName =
   | "tree_rename"
   | "tree_move"
   | "tree_duplicate"
+  | "tree_reorder"
   | "request_read"
   | "request_save"
   | "request_send"

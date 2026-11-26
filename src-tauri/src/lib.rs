@@ -189,6 +189,7 @@ pub fn run() {
             commands::tree::tree_rename,
             commands::tree::tree_move,
             commands::tree::tree_duplicate,
+            commands::tree::tree_reorder,
             commands::requests::request_read,
             commands::requests::request_save,
             commands::requests::request_send,

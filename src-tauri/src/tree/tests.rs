@@ -603,3 +603,46 @@ fn am37_nouveau_test_nomme_sur_place() {
         .collect();
     assert_eq!(names, ["Annuler"]);
 }
+
+/// AM38 (4.1-a ter) : le contenu d'un dossier se réordonne, dossiers et requêtes mêlés ; le rang
+/// va dans `info.seq` d'une requête et dans le `folder.yml` d'un dossier, créé conforme.
+#[test]
+fn am38_reordonner_le_contenu_d_un_dossier() {
+    let dir = project();
+    create_folder(dir.path(), "", "commandes").unwrap();
+    create_folder(dir.path(), "commandes", "erreurs").unwrap();
+    create_folder(dir.path(), "commandes", "v2").unwrap();
+    let annuler = create_request(dir.path(), "commandes", Some("Annuler")).unwrap();
+    let children = |root: &std::path::Path| -> Vec<String> {
+        match read(root).unwrap().into_iter().next().unwrap() {
+            TreeNode::Folder { children, .. } => children
+                .into_iter()
+                .map(|c| match c {
+                    TreeNode::Folder { name, .. } | TreeNode::Request { name, .. } => name,
+                })
+                .collect(),
+            TreeNode::Request { .. } => unreachable!(),
+        }
+    };
+    // Sans rang : les dossiers d'abord, puis les requêtes, par nom.
+    assert_eq!(children(dir.path()), ["erreurs", "v2", "Annuler"]);
+    reorder(
+        dir.path(),
+        "commandes",
+        &[
+            annuler.clone(),
+            "commandes/v2".into(),
+            "commandes/erreurs".into(),
+        ],
+    )
+    .unwrap();
+    assert_eq!(children(dir.path()), ["Annuler", "v2", "erreurs"]);
+    let folder_file = dir.path().join("commandes/erreurs").join(FOLDER_FILE);
+    let value = yaml::read(&folder_file).unwrap();
+    assert_eq!(value["info"]["seq"], 3.0);
+    assert!(schema::check(Part::Folder, &value).is_ok());
+    // Un chemin hors du dossier est refusé : rien ne change.
+    let refused = reorder(dir.path(), "commandes", &["autre.yml".into()]);
+    assert!(refused.is_err());
+    assert_eq!(children(dir.path()), ["Annuler", "v2", "erreurs"]);
+}

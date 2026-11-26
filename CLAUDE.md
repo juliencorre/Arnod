@@ -754,6 +754,22 @@ règles R1 à R8), écrans 0.3-a, 0.3-b, 0.3-b bis, 0.3-b ter.
   `window_ready` après le premier rendu ; `windows::show_later` les montre après 300 ms sinon, avec
   le squelette (`StartupSkeleton`), jamais un écran « Chargement… ».
 
+## Dossiers
+
+Référence : `docs/plan-alignement-maquette.md`, lot E (AM36 à AM39 ; décisions Q3, Q4), écrans
+4.1-a, 4.1-a bis, 4.1-a ter et 5.2-d.
+
+- Un clic sur un dossier ordinaire ouvre sa vue (contenu `folder`, `FolderTab.vue`, en aperçu) ;
+  son chevron le plie. La vue compte pour l'affichage sur `TreeNode` (`lib/tree.ts` :
+  `folderSummary`, `testCount`) et les statuts ; « + Test » nomme le test sur place
+  (`tree_create_test` avec `name`).
+- Ordre d'un dossier : rang (`info.seq` d'une requête, du `folder.yml` d'un dossier), puis les
+  dossiers avant les requêtes, puis le nom (`tree::read`). `tree_reorder` écrit les rangs de 1 à n
+  (`folder.yml` créé conforme au besoin) ; ⋮⋮ se glisse ou se déplace par ↑ ↓, et un dépôt sur le
+  milieu d'un sous-dossier l'y range (`tree_move`).
+- Menu ⋯ d'un dossier selon 4.1-a (« Dans le dossier « … » », Ctrl+N et Ctrl+Maj+N sur la ligne,
+  « Dupliquer un test… », « Déplacer vers… » par la fenêtre de la sélection) ; ▶ et « + » au survol.
+
 ## Copier et déplacer
 
 Référence : écrans 4.1-f, 4.1-g et 3.2-c (lot J).

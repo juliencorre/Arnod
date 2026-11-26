@@ -5,6 +5,9 @@
  * « + Sous-dossier », « ▶ Exécuter le dossier », puis le contenu dans l'ordre d'exécution :
  * #, Type, Nom, Contenu, Résultat. Un test ou un sous-dossier se nomme sur place (« Entrée pour
  * créer »). Les nombres sont des comptages d'affichage sur l'arborescence fournie par le cœur.
+ *
+ * AM38 (4.1-a ter) : ⋮⋮ réordonne les lignes (glisser, ou ↑ ↓ sur la poignée) ; déposer un
+ * élément sur le milieu d'un sous-dossier l'y range. Le cœur écrit les rangs (`tree_reorder`).
  */
 import { computed, nextTick, ref, useId, useTemplateRef } from "vue";
 
@@ -21,6 +24,7 @@ const props = defineProps<{ projectId: string; path: string }>();
 const workbench = useWorkbenchStore();
 const guard = useGuard();
 const titleId = useId();
+const handleHintId = useId();
 
 const folder = computed<FolderNode | null>(() =>
   findFolder(workbench.trees[props.projectId]?.tests ?? [], props.path),
@@ -72,6 +76,84 @@ function open(node: TreeNode): void {
   if (node.kind === "request") void workbench.openRequest(props.projectId, node.path);
   else if (node.test) void workbench.openTest(props.projectId, node.path);
   else void workbench.openFolder(props.projectId, node.path);
+}
+
+// --- Réordonner et ranger (AM38) --------------------------------------------------------
+
+const ROW_DRAG = "application/x-arnod-ligne";
+const table = useTemplateRef<HTMLElement>("table");
+/** Ligne survolée pendant un glisser, et où irait l'élément. */
+const dropping = ref<{ path: string; where: "before" | "after" | "into" } | null>(null);
+let dragged: string | null = null;
+
+/** Nouvel ordre : `path` retiré, puis remis à la place `index` (dans la liste sans lui). */
+function moved(path: string, index: number): string[] {
+  const order = (folder.value?.children ?? []).map((child) => child.path).filter((p) => p !== path);
+  order.splice(Math.max(0, Math.min(index, order.length)), 0, path);
+  return order;
+}
+
+async function focusHandle(path: string): Promise<void> {
+  await nextTick();
+  table.value
+    ?.querySelector<HTMLElement>(`.folder__handle[data-path="${CSS.escape(path)}"]`)
+    ?.focus();
+}
+
+/** ↑ ↓ sur la poignée : la ligne monte ou descend d'un rang (R12, équivalent du glisser). */
+function onHandleKey(event: KeyboardEvent, node: TreeNode, index: number): void {
+  const delta = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
+  if (delta === 0) return;
+  event.preventDefault();
+  const count = folder.value?.children.length ?? 0;
+  const target = index + delta;
+  if (target < 0 || target >= count) return;
+  guard(async () => {
+    await workbench.reorder(props.projectId, props.path, moved(node.path, target));
+    await focusHandle(node.path);
+  });
+}
+
+function onDragStart(event: DragEvent, node: TreeNode): void {
+  dragged = node.path;
+  event.dataTransfer?.setData(ROW_DRAG, node.path);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+
+/** Place du dépôt dans la ligne : avant, après, ou dans un sous-dossier (son milieu). */
+function placeOf(event: DragEvent, node: TreeNode): "before" | "after" | "into" {
+  const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const ratio = box.height > 0 ? (event.clientY - box.top) / box.height : 0.5;
+  if (kindOf(node) === "folder" && ratio > 0.25 && ratio < 0.75) return "into";
+  return ratio < 0.5 ? "before" : "after";
+}
+
+function onDragOver(event: DragEvent, node: TreeNode): void {
+  if (dragged === null || dragged === node.path) return;
+  event.preventDefault();
+  dropping.value = { path: node.path, where: placeOf(event, node) };
+}
+
+function onDrop(event: DragEvent, node: TreeNode, index: number): void {
+  const source = dragged ?? event.dataTransfer?.getData(ROW_DRAG) ?? null;
+  const where = dropping.value?.where ?? "before";
+  dropping.value = null;
+  dragged = null;
+  if (source === null || source === "" || source === node.path) return;
+  event.preventDefault();
+  if (where === "into") {
+    guard(() => workbench.move(props.projectId, source, node.path));
+    return;
+  }
+  const from = folder.value?.children.findIndex((child) => child.path === source) ?? -1;
+  // Index dans la liste sans l'élément glissé.
+  const at = (where === "before" ? index : index + 1) - (from >= 0 && from < index ? 1 : 0);
+  guard(() => workbench.reorder(props.projectId, props.path, moved(source, at)));
+}
+
+function onDragEnd(): void {
+  dragged = null;
+  dropping.value = null;
 }
 
 // --- Nom saisi sur place (« Entrée pour créer ») -----------------------------------------
@@ -133,9 +215,14 @@ function cancelCreate(): void {
       <p class="folder__summary">{{ summary }}</p>
     </header>
 
-    <table class="folder__table">
+    <p :id="handleHintId" class="visually-hidden">
+      Flèches haut et bas pour déplacer la ligne ; glisser pour réordonner, ou déposer sur un
+      sous-dossier pour l'y ranger.
+    </p>
+    <table ref="table" class="folder__table">
       <thead>
         <tr>
+          <th scope="col" class="folder__grip"><span class="visually-hidden">Ordre</span></th>
           <th scope="col" class="folder__num">#</th>
           <th scope="col">Type</th>
           <th scope="col">Nom</th>
@@ -144,7 +231,30 @@ function cancelCreate(): void {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(node, index) in folder.children" :key="node.path" class="folder__row">
+        <tr
+          v-for="(node, index) in folder.children"
+          :key="node.path"
+          class="folder__row"
+          :class="dropping?.path === node.path && `folder__row--${dropping.where}`"
+          @dragover="onDragOver($event, node)"
+          @dragleave="dropping = null"
+          @drop="onDrop($event, node, index)"
+        >
+          <td class="folder__grip">
+            <button
+              type="button"
+              class="folder__handle"
+              draggable="true"
+              :data-path="node.path"
+              :aria-label="`Déplacer ${node.name}`"
+              :aria-describedby="handleHintId"
+              @dragstart="onDragStart($event, node)"
+              @dragend="onDragEnd"
+              @keydown="onHandleKey($event, node, index)"
+            >
+              ⋮⋮
+            </button>
+          </td>
           <td class="folder__num">{{ index + 1 }}</td>
           <td>
             <span
@@ -166,6 +276,7 @@ function cancelCreate(): void {
           </td>
         </tr>
         <tr v-if="creating" class="folder__row folder__row--new">
+          <td class="folder__grip" />
           <td class="folder__num">{{ folder.children.length + 1 }}</td>
           <td>
             <span class="folder__kind">{{ creating === "test" ? "test" : "dossier" }}</span>
@@ -194,7 +305,10 @@ function cancelCreate(): void {
     <p v-if="folder.children.length === 0 && !creating" class="folder__empty">
       Dossier vide : « + Test » y crée un test, « + Sous-dossier » un dossier.
     </p>
-    <p class="folder__note">L'ordre de la liste est l'ordre d'exécution.</p>
+    <p class="folder__note">
+      L'ordre de la liste est l'ordre d'exécution. Glissez ⋮⋮ pour réordonner, ou déposez un élément
+      sur un sous-dossier pour l'y ranger.
+    </p>
   </section>
   <p v-else class="folder__empty">Ce dossier n'existe plus.</p>
 </template>
@@ -269,6 +383,42 @@ function cancelCreate(): void {
 .folder__num {
   width: 2rem;
   color: var(--color-muted);
+}
+
+.folder__grip {
+  width: 1.5rem;
+}
+
+.folder__handle {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  color: var(--color-muted);
+  cursor: grab;
+}
+
+.folder__handle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+/* Où irait la ligne glissée : un trait avant ou après, un cadre pour « ranger dans ». */
+.folder__row--before td {
+  box-shadow: inset 0 2px 0 var(--color-accent);
+}
+
+.folder__row--after td {
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+.folder__row--into td {
+  background-color: var(--color-accent-soft);
 }
 
 .folder__method {

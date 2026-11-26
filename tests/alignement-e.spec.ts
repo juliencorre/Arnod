@@ -147,7 +147,12 @@ describe("vue d'un dossier (AM37, 4.1-a bis)", () => {
     expect(app.get(".folder__summary").text()).toBe(
       "dossier · 1 test et 1 requête libre · 1 test au total",
     );
-    const rows = app.findAll(".folder__row").map((row) => row.findAll("td").map((td) => td.text()));
+    const rows = app.findAll(".folder__row").map((row) =>
+      row
+        .findAll("td")
+        .map((td) => td.text())
+        .slice(1),
+    );
     expect(rows).toEqual([
       ["1", "test", "v2", "2 étapes", "—"],
       ["2", "DELETE", "Annuler", "—", "—"],
@@ -185,5 +190,60 @@ describe("vue d'un dossier (AM37, 4.1-a bis)", () => {
       name: "Relancer",
     });
     expect(core.workbench.folders.has("commandes/Relancer")).toBe(true);
+  });
+});
+
+describe("réordonner et ranger dans la vue d'un dossier (AM38, 4.1-a ter)", () => {
+  async function openView(withFolder = false): Promise<FakeCore> {
+    const opened = await openProject((c) => {
+      const wb = c.workbench;
+      wb.folders.add("commandes");
+      wb.folders.add("commandes/v2");
+      wb.requests.set("commandes/v2/creer.yml", newRequest("Créer", { method: "POST", seq: 1 }));
+      wb.requests.set("commandes/annuler.yml", newRequest("Annuler", { method: "DELETE" }));
+      if (withFolder) wb.folders.add("commandes/erreurs");
+    });
+    app = opened.app;
+    await click(app, '[role="treeitem"][data-path="commandes"]');
+    return opened.core;
+  }
+
+  const names = (): string[] =>
+    app?.findAll(".folder__row .folder__name").map((n) => n.text()) ?? [];
+
+  it("↑ sur la poignée fait monter la ligne ; le rang est écrit par le cœur", async () => {
+    const core = await openView();
+    expect(names()).toEqual(["v2", "Annuler"]);
+    const handle = app?.get('.folder__handle[data-path="commandes/annuler.yml"]');
+    (handle?.element as HTMLElement).focus();
+    await handle?.trigger("keydown", { key: "ArrowUp" });
+    await flushPromises();
+    expect(core.calls.find((c) => c.cmd === "tree_reorder")?.args).toEqual({
+      project: "p-boutique-tests",
+      folder: "commandes",
+      order: ["commandes/annuler.yml", "commandes/v2"],
+    });
+    expect(names()).toEqual(["Annuler", "v2"]);
+    // Le focus reste sur la poignée de la ligne déplacée.
+    expect((document.activeElement as HTMLElement | null)?.dataset.path).toBe(
+      "commandes/annuler.yml",
+    );
+  });
+
+  it("déposer une ligne sur un sous-dossier l'y range", async () => {
+    const core = await openView(true);
+    const handle = app?.get('.folder__handle[data-path="commandes/annuler.yml"]');
+    await handle?.trigger("dragstart");
+    const target = app
+      ?.findAll(".folder__row")
+      .find((row) => row.find(".folder__name").text() === "erreurs");
+    await target?.trigger("dragover");
+    expect(target?.classes()).toContain("folder__row--into");
+    await target?.trigger("drop");
+    await flushPromises();
+    expect(core.calls.find((c) => c.cmd === "tree_move")?.args).toMatchObject({
+      path: "commandes/annuler.yml",
+      targetFolder: "commandes/erreurs",
+    });
   });
 });

@@ -753,6 +753,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     await openRequest(projectId, copy);
   }
 
+  /** Réordonne le contenu du dossier `folder` dans l'ordre `order` (4.1-a ter, AM38). */
+  async function reorder(projectId: string, folder: string, order: string[]): Promise<void> {
+    await ipc.treeReorder(projectId, folder, order);
+    await refreshTree(projectId);
+  }
+
   /** Duplique le dossier ou le test `path` à côté de lui (« (copie) », AM36). */
   async function duplicateFolder(projectId: string, path: string): Promise<void> {
     await ipc.treeBatch(projectId, [path], { kind: "duplicate" });
@@ -1390,6 +1396,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     rename,
     duplicate,
     duplicateFolder,
+    reorder,
     move,
     remove,
     selectEnvironment,

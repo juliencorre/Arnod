@@ -113,6 +113,8 @@ export interface FakeWorkbench {
   /** Requêtes par chemin ; les dossiers se déduisent des chemins et de `folders`. */
   requests: Map<string, RequestDoc>;
   folders: Set<string>;
+  /** Rang d'un dossier (`info.seq` de son `folder.yml`, AM38). */
+  folderSeq: Map<string, number>;
   /** Fichiers de requête illisibles : listés sans méthode, comme `tree::read` (A10). */
   unreadable: Set<string>;
   envs: EnvironmentDoc[];
@@ -141,6 +143,7 @@ export function createFakeWorkbench(): FakeWorkbench {
   return {
     requests: new Map(),
     folders: new Set(),
+    folderSeq: new Map(),
     unreadable: new Set(),
     envs: [
       {
@@ -233,15 +236,24 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
         },
       });
     }
+    // Comme `tree::read` (AM38) : rang d'abord, puis les dossiers avant les requêtes, puis le nom.
     const key = (node: TreeNode): string => node.name.toLowerCase();
-    requests.sort((x, y) => {
+    const all = [
+      ...nodes.map((node) => ({
+        seq: wb.folderSeq.get(node.path) ?? Number.POSITIVE_INFINITY,
+        kind: 0,
+        node,
+      })),
+      ...requests.map((r) => ({ ...r, kind: 1 })),
+    ];
+    all.sort((x, y) => {
       if (x.seq !== y.seq) return x.seq < y.seq ? -1 : 1;
+      if (x.kind !== y.kind) return x.kind - y.kind;
       const a = key(x.node);
       const b = key(y.node);
       return a < b ? -1 : a > b ? 1 : 0;
     });
-    nodes.push(...requests.map((r) => r.node));
-    return nodes;
+    return all.map((entry) => entry.node);
   };
   return build("");
 }
@@ -657,6 +669,16 @@ export function handleWorkbench(
     // Lot E : tests et étapes.
     case "test_read":
       return testView(wb, String(args.path));
+    case "tree_reorder": {
+      // Règles du cœur (tree::reorder) : rang de 1 à n, dossiers compris (AM38).
+      const order = args.order as string[];
+      order.forEach((path, index) => {
+        const request = wb.requests.get(path);
+        if (request) request.seq = index + 1;
+        else if (wb.folders.has(path)) wb.folderSeq.set(path, index + 1);
+      });
+      return null;
+    }
     case "tree_create_test": {
       const parent = String(args.parent);
       // AM37 : un nom saisi sur place ; pris, il est refusé (tree::create_test_named).

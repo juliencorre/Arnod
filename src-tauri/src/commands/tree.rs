@@ -195,3 +195,19 @@ pub fn tree_duplicate(
         .and_then(|ctx| tree::duplicate(&ctx.root, &path));
     tree_changed(&window, project, result)
 }
+
+/// Réordonne le contenu d'un dossier (4.1-a ter, AM38) : rang de 1 à n dans l'ordre donné.
+#[tauri::command]
+pub fn tree_reorder(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    project: Uuid,
+    folder: String,
+    order: Vec<String>,
+) -> Result<(), CommandError> {
+    let result = state
+        .project_ctx(project)
+        .and_then(|ctx| tree::reorder(&ctx.root, &folder, &order))
+        .map(|_| ());
+    tree_changed(&window, project, result)
+}

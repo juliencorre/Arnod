@@ -268,6 +268,10 @@ export const ipc = {
   treeDuplicate: (project: string, path: string): Promise<string> =>
     call<string>("tree_duplicate", { project, path }),
 
+  /** Réordonne le contenu d'un dossier : rang de 1 à n dans l'ordre `order` (AM38). */
+  treeReorder: (project: string, folder: string, order: string[]): Promise<void> =>
+    call<null>("tree_reorder", { project, folder, order }).then(() => undefined),
+
   // --- Requêtes ------------------------------------------------------------
 
   requestRead: (project: string, path: string): Promise<RequestDoc> =>
