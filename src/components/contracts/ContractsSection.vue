@@ -1041,10 +1041,10 @@ async function rename(name: string): Promise<void> {
   font-size: var(--text-small);
 }
 
+/* Couleur du compteur : StatusCount (vert, rouge, sinon neutre) ; ne pas la fixer ici. */
 .crow__count {
   margin-left: auto;
   font-size: var(--text-small);
-  color: var(--color-muted);
 }
 
 .crow__hint {
