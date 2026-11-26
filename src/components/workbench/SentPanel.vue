@@ -10,6 +10,7 @@
  */
 import { computed } from "vue";
 
+import { tokenLine } from "@/lib/auth";
 import { drawnParts, sourceLabel } from "@/lib/sent";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { DrawnValue } from "@/types/ipc";
@@ -62,6 +63,14 @@ function keep(drawn: DrawnValue): void {
         <dd>{{ value }}</dd>
       </template>
     </dl>
+
+    <!-- AM35 (3.4-b) : le jeton OAuth 2 ajouté à l'envoi, jamais sa valeur. -->
+    <template v-if="sent.oauth2">
+      <h3 class="sent__title">Jeton OAuth 2</h3>
+      <p class="sent__token">
+        {{ tokenLine(sent.oauth2.status) }} · de <code>{{ sent.oauth2.tokenUrl }}</code>
+      </p>
+    </template>
 
     <template v-if="body !== null">
       <h3 class="sent__title">Corps envoyé</h3>
@@ -286,5 +295,11 @@ function keep(drawn: DrawnValue): void {
   border-radius: var(--radius-sm);
   color: inherit;
   background: var(--color-accent-soft);
+}
+
+.sent__token {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-muted);
 }
 </style>

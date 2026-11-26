@@ -6,7 +6,7 @@ use serde::Serialize;
 use tauri::{Manager, State, WebviewWindow};
 use uuid::Uuid;
 
-use crate::environment::{self, Environment};
+use crate::environment::{self, Environment, NewEnvironment};
 use crate::error::{CommandError, CommandErrorKind};
 use crate::state::AppState;
 use crate::tree::undo::UndoBook;
@@ -135,6 +135,27 @@ pub fn environment_delete_undo(
     };
     let ctx = state.project_ctx(project)?;
     bench.restore_environment(&ctx, &restore)?;
+    windows::project_changed(
+        window.app_handle(),
+        window.label(),
+        project,
+        ProjectScope::Environments,
+        None,
+    );
+    Ok(bench.environments(&ctx))
+}
+
+/// Crée un environnement depuis la fenêtre « Nouvel environnement » (3.3-b, AM34).
+#[tauri::command]
+pub fn environment_create(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
+    project: Uuid,
+    environment: NewEnvironment,
+) -> Result<EnvironmentsView, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    environment::create(&ctx.root, &environment)?;
     windows::project_changed(
         window.app_handle(),
         window.label(),

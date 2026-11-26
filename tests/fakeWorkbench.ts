@@ -23,6 +23,7 @@ import type {
   TestView,
   TreeNode,
   VariableUser,
+  NewEnvironment,
 } from "@/types/ipc";
 
 export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): RequestDoc {
@@ -574,6 +575,31 @@ export function handleWorkbench(
       deletedEnvs.set(token, removed);
       wb.envs = wb.envs.filter((e) => e.name !== args.name);
       return { view: envView(wb), undoToken: token };
+    }
+    case "environment_create": {
+      // Règles du cœur (environment::create) : variables partagées et noms des locales repris,
+      // `baseUrl` posée, place dans la chaîne.
+      const created = args.environment as NewEnvironment;
+      if (wb.envs.some((e) => e.name.toLowerCase() === created.name.toLowerCase()))
+        fail("nameTaken", `Un environnement « ${created.name} » existe déjà dans ce projet.`);
+      const source = wb.envs.find((e) => e.name === created.copyFrom);
+      const variables = (source?.variables ?? []).map((v) => ({ ...v }));
+      if (created.baseUrl !== "") {
+        const base = variables.find((v) => v.name === "baseUrl");
+        if (base) base.value = created.baseUrl;
+        else variables.unshift({ name: "baseUrl", value: created.baseUrl });
+      }
+      const env = {
+        name: created.name,
+        color: "gray",
+        protected: created.protected,
+        variables,
+        locals: [...(source?.locals ?? [])],
+      };
+      const at =
+        created.after === null ? 0 : wb.envs.findIndex((e) => e.name === created.after) + 1;
+      wb.envs.splice(at, 0, env);
+      return envView(wb);
     }
     case "environment_delete_undo": {
       const removed =

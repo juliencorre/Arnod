@@ -167,6 +167,7 @@ describe("extractions (4.2-b bis)", () => {
           ],
           used: [{ name: "baseUrl", value: "https://api.test", source: "environment" }],
           extracted: [{ name: "client.id", source: "body.id", value: "cus_7", message: null }],
+          oauth2: null,
         },
       });
     }));

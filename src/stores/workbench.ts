@@ -25,6 +25,7 @@ import type {
   PathGeneralization,
   TransferredTrial,
   NetworkFailure,
+  NewEnvironment,
 } from "@/types/ipc";
 
 /** Attente après la dernière modification avant l'enregistrement automatique (EP1). */
@@ -802,6 +803,11 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     environments.value[projectId] = await ipc.environmentSave(projectId, env, previous);
   }
 
+  /** Crée un environnement (3.3-b, AM34) : le cœur reprend les variables et le range. */
+  async function createEnvironment(projectId: string, environment: NewEnvironment): Promise<void> {
+    environments.value[projectId] = await ipc.environmentCreate(projectId, environment);
+  }
+
   /** Supprime l'environnement `name`, avec « Annuler » dans la notification (ER1). */
   async function deleteEnvironment(projectId: string, name: string): Promise<void> {
     const done = await ipc.environmentDelete(projectId, name);
@@ -1373,6 +1379,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     selectEnvironment,
     saveEnvironment,
     deleteEnvironment,
+    createEnvironment,
     reorderEnvironments,
     setLocal,
     runFolder,

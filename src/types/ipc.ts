@@ -68,6 +68,7 @@ export type CommandName =
   | "environment_save"
   | "environment_delete"
   | "environment_delete_undo"
+  | "environment_create"
   | "environments_reorder"
   | "local_set"
   | "run_start"
@@ -646,6 +647,21 @@ export interface EnvironmentView extends EnvironmentDoc {
 export interface EnvironmentsView {
   environments: EnvironmentView[];
   active: string;
+}
+
+/**
+ * Nouvel environnement, depuis la fenêtre « Nouvel environnement » (3.3-b, AM34). Équivalent
+ * Rust : `environment::NewEnvironment`.
+ */
+export interface NewEnvironment {
+  name: string;
+  /** Adresse de base, qui devient la variable `baseUrl` ; vide : aucune. */
+  baseUrl: string;
+  /** Environnement dont les variables partagées et les noms des locales sont repris. */
+  copyFrom: string | null;
+  /** Environnement après lequel il prend place ; `null` : en tête de la chaîne. */
+  after: string | null;
+  protected: boolean;
 }
 
 /**
@@ -1451,6 +1467,14 @@ export interface Sent {
   drawn: DrawnValue[];
   used: UsedVariable[];
   extracted: ExtractedValue[];
+  /** Jeton OAuth 2 ajouté à l'envoi, s'il y en a un (3.4-b, AM35). */
+  oauth2: SentToken | null;
+}
+
+/** Jeton OAuth 2 d'un envoi (`SentToken`), jamais sa valeur. */
+export interface SentToken {
+  tokenUrl: string;
+  status: TokenStatus | null;
 }
 
 /** Verdict d'un test dans un run (`RunTest`, R4). */

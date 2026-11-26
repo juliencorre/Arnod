@@ -387,6 +387,7 @@ function commandesLotE(): FakeCore {
         { name: "token", value: "••••••••", source: "local" },
       ],
       extracted: [{ name: "order.id", source: "body.id", value: "ord_8F2kQ", message: null }],
+      oauth2: null,
     },
   });
   return core;

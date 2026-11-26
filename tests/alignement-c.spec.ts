@@ -42,6 +42,7 @@ const SENT: Sent = {
     { name: "client.id", value: "cus_7", source: "extracted" },
   ],
   extracted: [],
+  oauth2: null,
 };
 
 async function sent(): Promise<AppWrapper> {

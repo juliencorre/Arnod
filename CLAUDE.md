@@ -683,6 +683,9 @@ règles R1 à R15), écrans 1.6-e, 5.1-i, 3.4-a, 3.4-g.
 - Cookies : magasin par projet et environnement (`network::cookies`), persistants dans
   `projects/<id>/cookies.json` (poste), de session en mémoire ; jamais ajoutés si la requête a son
   propre en-tête `Cookie` ; valeurs `HttpOnly` masquées.
+- Authentification héritée (3.4-b, AM35) : « Type » propose « Hériter » ; la carte de
+  `AuthEditor` lit le jeton par `network.tokenStatus` (sans toucher aux réglages ouverts) et
+  `Sent.oauth2` (`SentToken`, jamais la valeur) donne la section « Jeton OAuth 2 » de l'onglet Envoyé.
 - Préférences : `PreferencesDialog` (Ctrl+, et `arnod://preferences` du menu Fichier, adressé à
   une fenêtre) ; une section de plus s'ajoute à `SECTIONS` et au type `PreferencesSection` du
   store `network`.
@@ -859,6 +862,9 @@ AC4, AC7, AC8 ; décision Q5).
   promesse à `runAction`, qui notifie son échec.
 - Un bouton branché sur une action asynchrone du store passe par `useGuard()` : un refus du cœur
   est notifié, jamais muet. Une erreur d'envoi propose son action (`ResponsePanel`).
+- « + Nouvel environnement » ouvre `NewEnvironmentDialog` (3.3-b, AM34) ; le cœur crée et range
+  l'environnement (`environment_create` : variables partagées et noms des locales repris, jamais
+  les valeurs locales ni les secrets, `baseUrl`, place dans la chaîne).
 - Environnements et réglages du projet s'enregistrent seuls (`useAutosave`, `SaveState`) : fermer,
   Échap ou changer d'élément enregistre d'abord ce qui attend ; un échec garde la fenêtre ouverte.
 - Ajouter une ligne : un `BaseButton` « + Nom » ; la retirer : `RowRemoveButton` (×, 24 px).

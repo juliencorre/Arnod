@@ -17,6 +17,7 @@ use crate::environment::{self, Environment};
 use crate::error::{CommandError, CommandErrorKind};
 use crate::http::{Cancel, HttpResponse};
 use crate::local::{self, LocalData, LocalVar};
+use crate::network::oauth::TokenStatus;
 use crate::network::{Network, Session};
 use crate::request::assertions::{self, AssertionResult, DEFAULT_LIMIT, ResponseData};
 use crate::request::extract::{self, ExtractedValue};
@@ -112,6 +113,16 @@ pub struct UsedVariable {
     pub source: UsedSource,
 }
 
+/// Jeton OAuth 2 d'un envoi (3.4-b, AM35), jamais sa valeur : serveur de jetons, et quand le
+/// jeton gardé a été obtenu et expire.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct SentToken {
+    pub token_url: String,
+    pub status: Option<TokenStatus>,
+}
+
 /// Requête envoyée, secrets masqués, avec ses valeurs tirées, ses variables
 /// et ses valeurs extraites (VD2, EX3).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -127,6 +138,8 @@ pub struct Sent {
     pub drawn: Vec<DrawnValue>,
     pub used: Vec<UsedVariable>,
     pub extracted: Vec<ExtractedValue>,
+    /// Jeton OAuth 2 ajouté à l'envoi, s'il y en a un (AM35).
+    pub oauth2: Option<SentToken>,
 }
 
 impl Sent {
@@ -179,6 +192,10 @@ impl Sent {
                     e
                 })
                 .collect(),
+            oauth2: prepared.oauth2.as_ref().map(|grant| SentToken {
+                token_url: mask(&grant.token_url),
+                status: None,
+            }),
         }
     }
 }
@@ -938,13 +955,17 @@ impl Workbench {
         self.keep_runtime(ctx.id, &kept);
         let response = Self::mask_response(&variables, raw);
         let mut outcome = Self::outcome(&ctx.root, &request, response);
-        outcome.sent = Some(Sent::of(
+        let mut sent = Sent::of(
             &prepared,
             &variables,
             &environment.locals,
             &runtime,
             extracted,
-        ));
+        );
+        if let Some(token) = sent.oauth2.as_mut() {
+            token.status = self.network.token_status(ctx.id, &environment.name);
+        }
+        outcome.sent = Some(sent);
         Ok(outcome)
     }
 
