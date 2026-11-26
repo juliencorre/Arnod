@@ -56,6 +56,8 @@ const expectedCount = computed(() => editor.value?.draft?.examples.length ?? 0);
 
 <template>
   <div class="side">
+    <!-- Titre pour les lecteurs d'écran : les sections du résultat (h3) ont un parent (DI5). -->
+    <h2 class="visually-hidden">Résultat</h2>
     <div role="tablist" aria-label="Résultat" class="side__tabs" @keydown="onTablistKeydown">
       <button
         type="button"

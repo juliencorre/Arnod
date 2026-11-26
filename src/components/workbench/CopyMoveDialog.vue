@@ -483,7 +483,6 @@ async function submit(mode: TransferMode): Promise<void> {
 .copy-move__option--active,
 .copy-move__option--active:hover {
   background: var(--color-accent-soft);
-  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .copy-move__label {
