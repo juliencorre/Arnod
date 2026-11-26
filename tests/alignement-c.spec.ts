@@ -7,6 +7,7 @@ import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { drawnParts } from "@/lib/sent";
+import { targetOf } from "@/lib/url";
 import type { Sent } from "@/types/ipc";
 
 import { cssValue } from "./css";
@@ -196,5 +197,18 @@ describe("extraire depuis une valeur du corps (AM32, 4.2-b bis)", () => {
     expect(app.get(".tok__extracted").text()).toBe("→ id");
     // Une clé ne se propose pas : seules les valeurs portent leur chemin.
     expect(app.findAll(".code .tok--key[data-path]")).toHaveLength(0);
+  });
+});
+
+describe("cible d'une requête pour la confirmation (AM31)", () => {
+  it("remplace les variables connues, espaces compris, et lit l'hôte", () => {
+    expect(targetOf("{{ baseUrl }}/orders?x=1", { baseUrl: "https://preprod.test" })).toEqual({
+      path: "/orders?x=1",
+      host: "preprod.test",
+    });
+    expect(targetOf("{{inconnue}}/orders", {})).toEqual({
+      path: "{{inconnue}}/orders",
+      host: null,
+    });
   });
 });

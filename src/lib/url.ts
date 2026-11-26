@@ -28,9 +28,10 @@ export function targetOf(
   url: string,
   values: Record<string, string>,
 ): { path: string; host: string | null } {
+  // Sans quantificateur paresseux encadré d'espaces : pas de retour arrière coûteux (S8786).
   const resolved = url.replace(
-    /\{\{\s*([^{}]+?)\s*\}\}/g,
-    (all, name: string) => values[name] ?? all,
+    /\{\{([^{}]*)\}\}/g,
+    (all, name: string) => values[name.trim()] ?? all,
   );
   try {
     const parsed = new URL(resolved);
