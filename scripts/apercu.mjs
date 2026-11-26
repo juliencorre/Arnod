@@ -124,8 +124,12 @@ async function main() {
   const opts = options(process.argv.slice(2));
   if (opts.liste) {
     const src = readFileSync(join(ROOT, "tests", "apercu", "scenarios.ts"), "utf8");
-    for (const m of src.matchAll(/^ {2}"?([\w.-]+)"?: \{\n {4}description: "([^"]*)"/gm)) {
-      console.log(`${m[1].padEnd(32)} ${m[2]}`);
+    // Un nom peut contenir une espace (« 4.1-a quater ») : il est alors cité entre guillemets,
+    // prêt à passer en argument. Prettier renvoie une longue description à la ligne.
+    const cle = /^ {2}(?:"([^"]+)"|([\w.-]+)): \{\n {4}description:\s+"([^"]*)"/gm;
+    for (const [, cite, nu, description] of src.matchAll(cle)) {
+      const nom = cite ?? nu;
+      console.log(`${(nom.includes(" ") ? `"${nom}"` : nom).padEnd(32)} ${description}`);
     }
     return;
   }
