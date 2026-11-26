@@ -744,6 +744,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     await openRequest(projectId, copy);
   }
 
+  /** Duplique le dossier ou le test `path` à côté de lui (« (copie) », AM36). */
+  async function duplicateFolder(projectId: string, path: string): Promise<void> {
+    await ipc.treeBatch(projectId, [path], { kind: "duplicate" });
+    await refreshTree(projectId);
+  }
+
   async function move(projectId: string, path: string, targetFolder: string): Promise<void> {
     await saveUnder(projectId, path);
     const next = await ipc.treeMove(projectId, path, targetFolder);
@@ -1374,6 +1380,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     createFolder,
     rename,
     duplicate,
+    duplicateFolder,
     move,
     remove,
     selectEnvironment,

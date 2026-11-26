@@ -26,6 +26,7 @@ import { visiblePaths } from "@/lib/tree";
 import { filterTree, parseFilter } from "@/lib/treeFilter";
 import { onTreeKeydown, TREE_TAB_STOP } from "@/lib/treeKeyboard";
 import { useCatalogStore } from "@/stores/catalog";
+import { useSelectionStore } from "@/stores/selection";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
 import { useTransferStore } from "@/stores/transfer";
@@ -42,6 +43,7 @@ const projectName = computed(() => useCatalogStore().projectById(props.projectId
 const toasts = useToastStore();
 const sidebar = useSidebarStore();
 const transfer = useTransferStore();
+const selection = useSelectionStore();
 
 // --- Section repliable et filtre (lot D) ---------------------------------------
 
@@ -226,6 +228,16 @@ async function onAction(id: string, node: TreeNode, target?: string): Promise<vo
       break;
     case "delete":
       await guard(() => workbench.remove(props.projectId, node.path, node.name));
+      break;
+    // AM36 : « Dupliquer un test… » d'un dossier, et « Déplacer vers… » par la fenêtre de la
+    // sélection (un élément choisi).
+    case "duplicate-test":
+      if (target) await guard(() => workbench.duplicateFolder(props.projectId, target));
+      break;
+    case "move-to":
+      selection.clear();
+      selection.toggle(props.projectId, node.path);
+      selection.moving = true;
       break;
   }
 }

@@ -12,6 +12,10 @@
  * (`TREE_TAB_STOP`) ; ⋯ n'en est pas un (Maj+F10 ou la touche Menu l'ouvrent). Droite déplie ou
  * va au premier enfant, Gauche replie ou remonte au parent, F2 renomme, Suppr met à la corbeille.
  * DE5 : un nom coupé a son infobulle.
+ *
+ * Lot E de l'alignement (AM36, AM39, 4.1-a, 5.2-d) : le menu ⋯ d'un dossier suit la maquette
+ * (« Dans le dossier « … » », raccourcis, « Dupliquer un test… », « Déplacer vers… ») ; au
+ * survol d'un dossier, ▶ lance son run et « + » y crée un test, une requête ou un sous-dossier.
  */
 import { computed, inject, ref, useTemplateRef } from "vue";
 
@@ -30,6 +34,7 @@ import { useSelectionStore } from "@/stores/selection";
 import { useTransferStore } from "@/stores/transfer";
 import { useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
+import type { FolderNode } from "@/lib/tree";
 import type { TreeNode } from "@/types/ipc";
 
 const props = defineProps<{
@@ -122,14 +127,23 @@ const items = computed<MenuItem[]>(() => {
     ];
   }
   if (props.node.kind === "folder") {
+    // AM36 (4.1-a) : les entrées de la maquette, avec leurs raccourcis.
+    const tests = props.node.children.filter(
+      (child): child is FolderNode => child.kind === "folder" && child.test,
+    );
     return [
-      { id: "new-test", label: "Nouveau test" },
-      { id: "new-request", label: "Nouvelle requête" },
-      { id: "new-folder", label: "Nouveau dossier" },
-      { id: "run", label: "Exécuter le dossier", separatorBefore: true },
-      { id: "rename", label: "Renommer", separatorBefore: true },
-      move,
-      remove,
+      { id: "new-test", label: "Nouveau test", shortcut: "Ctrl+N" },
+      { id: "new-folder", label: "Nouveau dossier", shortcut: "Ctrl+Maj+N" },
+      {
+        id: "duplicate-test",
+        label: "Dupliquer un test…",
+        disabled: tests.length === 0,
+        children: tests.map((test) => ({ id: `duplicate-test:${test.path}`, label: test.name })),
+      },
+      { id: "rename", label: "Renommer", shortcut: "F2", separatorBefore: true },
+      { id: "move-to", label: "Déplacer vers…" },
+      { id: "run", label: "Exécuter les tests du dossier", separatorBefore: true },
+      { id: "delete", label: "Supprimer le dossier", tone: "danger", separatorBefore: true },
     ];
   }
   return [
@@ -144,8 +158,17 @@ const items = computed<MenuItem[]>(() => {
 
 function onSelect(id: string): void {
   if (id.startsWith("move:")) emit("action", "move", props.node, id.slice(5));
+  else if (id.startsWith("duplicate-test:"))
+    emit("action", "duplicate-test", props.node, id.slice(15));
   else emit("action", id, props.node);
 }
+
+/** « + » au survol d'un dossier (AM36) : ce qui se crée dedans. */
+const ADD_ITEMS: MenuItem[] = [
+  { id: "new-test", label: "Nouveau test", shortcut: "Ctrl+N" },
+  { id: "new-request", label: "Requête libre" },
+  { id: "new-folder", label: "Nouveau dossier", shortcut: "Ctrl+Maj+N" },
+];
 
 // --- Lot J : copier, couper, coller, annuler et glisser ----------------------------
 
@@ -188,6 +211,17 @@ function onKeydown(event: KeyboardEvent): void {
 
 /** Touches de l'arbre propres à la ligne ; `true` si la touche est prise. */
 function onTreeKey(event: KeyboardEvent): boolean {
+  // AM36 : sur un dossier, Ctrl+N et Ctrl+Maj+N créent dedans (code de la touche, pour l'AZERTY).
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    event.code === "KeyN" &&
+    props.node.kind === "folder" &&
+    !isTest.value
+  ) {
+    emit("action", event.shiftKey ? "new-folder" : "new-test", props.node);
+    return true;
+  }
   if (event.altKey || event.ctrlKey || event.metaKey) return false;
   const item = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
   if (!item) return false;
@@ -401,10 +435,45 @@ function activate(preview = true): void {
           </span>
         </template>
       </button>
+      <!-- AM39 (5.2-d) et AM36 : ▶ et « + » au survol d'un dossier ; au clavier, le menu ⋯. -->
+      <template v-if="node.kind === 'folder' && !isTest">
+        <button
+          type="button"
+          class="row__tool"
+          tabindex="-1"
+          :aria-label="`Exécuter les tests de ${node.name}`"
+          :title="`Exécuter les tests de ${node.name}`"
+          @click="emit('action', 'run', node)"
+        >
+          ▶
+        </button>
+        <BaseMenu
+          :items="ADD_ITEMS"
+          :label="`Ajouter dans ${node.name}`"
+          align="end"
+          @select="(id) => emit('action', id, node)"
+        >
+          <template #trigger="{ attrs }">
+            <button
+              type="button"
+              class="row__tool"
+              v-bind="attrs"
+              tabindex="-1"
+              :aria-label="`Ajouter dans ${node.name}`"
+              :title="`Ajouter dans ${node.name}`"
+            >
+              +
+            </button>
+          </template>
+        </BaseMenu>
+      </template>
       <BaseMenu
         ref="menu"
         :items="items"
         :label="`Actions pour ${node.name}`"
+        :heading="
+          node.kind === 'folder' && !isTest ? `Dans le dossier « ${node.name} »` : undefined
+        "
         align="end"
         @select="onSelect"
       >
@@ -604,6 +673,7 @@ function activate(preview = true): void {
  * ⋯ au survol, au focus de la ligne et sur la ligne ouverte (DE5, 1.2-a) ; caché, il rend sa
  * largeur au nom.
  */
+.row__tool,
 .row__more {
   flex: none;
   width: 0;
@@ -617,9 +687,13 @@ function activate(preview = true): void {
 }
 
 .row:hover .row__more,
+.row:hover .row__tool,
 .row:focus-within .row__more,
+.row:focus-within .row__tool,
 .row--selected .row__more,
-.row__more[aria-expanded="true"] {
+.row--selected .row__tool,
+.row__more[aria-expanded="true"],
+.row__tool[aria-expanded="true"] {
   width: auto;
   padding-inline: 0.5rem;
   opacity: 1;
