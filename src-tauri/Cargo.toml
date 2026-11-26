@@ -68,6 +68,7 @@ cookie = "0.18"
 # (`network::phases`) ; traits déjà tirés par reqwest, mêmes versions.
 tower-layer = "0.3"
 tower-service = "0.3"
+tauri-plugin-updater = { version = "2.14", default-features = false, features = ["rustls-tls"] }
 
 # Lot H : proxy du système lu dans le registre (`Internet Settings`), crate de Microsoft sans
 # autre dépendance que les liaisons Windows déjà tirées par Tauri.
