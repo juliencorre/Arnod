@@ -749,32 +749,25 @@ pages:
       - "2026-11-26 : g : note « après l'étape n » en couleur de texte (plan-qualite-mvp, lot I, DE2)."
       - "2026-11-26 : a quater, g : « Supprimer » en rouge lisible sur la barre de sélection ; recherche du copier-déplacer avec sa loupe, sans bouton natif (plan-alignement-maquette, lot B, AM27, AM18)."
       - "2026-11-26 : Destination choisie et éléments choisis en fond accent doux, sans barre sur le côté (a quater, g, Impeccable DI4, PR #85)."
+      - "2026-11-26 : a, a bis, a ter : menu ⋯ d'un dossier de la maquette, « + » et ▶ au survol ; un clic sur un dossier ouvre sa vue (fil d'Ariane, résumé, « + Test », « + Sous-dossier », « ▶ Exécuter le dossier », tableau #, Type, Nom, Contenu, Résultat, nom saisi sur place) ; ⋮⋮ réordonne (rangs info.seq et folder.yml) et range dans un sous-dossier, ↑ ↓ au clavier ; a bis et a ter passent à « livré » (plan-alignement-maquette, lot E, AM36 à AM38)."
     ecrans:
       a:
         etat: livré
         pr: [27, 40, 42]
         captures: [19-verification-en-echec]
-        ecart:
-          texte: "Le menu ⋯ d'un dossier n'a ni en-tête (« Dans le dossier « paiements » »), ni raccourcis (Ctrl+N, Ctrl+Maj+N, F2), ni « Dupliquer un test… » ; « Exécuter le dossier » au lieu de « Exécuter les tests du dossier », « Mettre à la corbeille » et le sous-menu « Déplacer vers » en plus ; pas de « + » au survol d'un dossier."
-          aligner: code
       "a bis":
-        etat: en partie
+        etat: livré
         pr: [27]
-        ecart:
-          texte: "Un clic sur un dossier le plie ou le déplie : pas de vue du dossier listant ses sous-dossiers et ses tests dans l'ordre d'exécution, ni « + Test » et « + Sous-dossier » avec saisie du nom sur place (« Entrée pour créer »), ni colonnes Contenu et Résultat ; l'onglet d'un dossier qui range des dossiers dit seulement « ce n'est pas un test » (A2 du plan du premier usage)."
-          aligner: code
+        captures: [21b-vue-dossier]
       "a ter":
-        etat: en partie
+        etat: livré
         pr: [27]
-        ecart:
-          texte: "Seules les requêtes se glissent (vers un dossier, un test, une étape ou une opération, 4.1-f) : pas de poignée ⋮⋮ pour réordonner, et un dossier ne se glisse pas dans un autre."
-          aligner: code
       "a quater":
         etat: livré
         pr: [66]
         captures: [35-selection-multiple]
         ecart:
-          texte: "La sélection se fait dans l'arborescence seulement : pas encore de vue en tableau d'un dossier avec cases à cocher ni « Tout sélectionner » ; la barre d'actions est la même."
+          texte: "La vue en tableau d'un dossier (4.1-a bis) n'a ni cases à cocher ni « Tout sélectionner » : la sélection se fait dans l'arborescence ; la barre d'actions est la même."
           aligner: à décider
       b:
         etat: livré
@@ -1097,13 +1090,11 @@ pages:
       - "2026-11-12 : Écrans repris de « Exécution » (d, e, f)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 5 écarts ajoutés, 1 réécrit ou complété ; d passe de « livré » à « en partie »."
       - "2026-11-26 : e, f : fil d'Ariane « … / v2 / Dernière exécution », date de fin, « Relancer les échecs » en bouton plein, « Ouvrir le test » sur l'échec d'une étape (plan-alignement-maquette, lot C, AM30)."
+      - "2026-11-26 : d : ▶ au survol d'un dossier et « ▶ Exécuter le dossier » dans sa vue ; d passe à « livré » (plan-alignement-maquette, lot E, AM39)."
     ecrans:
       d:
-        etat: en partie
+        etat: livré
         pr: [27, 42]
-        ecart:
-          texte: "« ▶ Exécuter le dossier » existe dans le menu ⋯ d'un dossier et dans l'onglet d'un test, mais pas en ▶ au survol de la ligne, ni dans une vue du dossier (4.1-a bis)."
-          aligner: code
       e:
         etat: livré
         pr: [27, 42]

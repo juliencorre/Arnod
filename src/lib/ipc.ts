@@ -268,6 +268,10 @@ export const ipc = {
   treeDuplicate: (project: string, path: string): Promise<string> =>
     call<string>("tree_duplicate", { project, path }),
 
+  /** Réordonne le contenu d'un dossier : rang de 1 à n dans l'ordre `order` (AM38). */
+  treeReorder: (project: string, folder: string, order: string[]): Promise<void> =>
+    call<null>("tree_reorder", { project, folder, order }).then(() => undefined),
+
   // --- Requêtes ------------------------------------------------------------
 
   requestRead: (project: string, path: string): Promise<RequestDoc> =>
@@ -590,8 +594,12 @@ export const ipc = {
     call<TestView>("test_read", { project, path }),
 
   /** « Nouveau test » : dossier du test et son étape 1 (NT1). */
-  treeCreateTest: (project: string, parent: string): Promise<CreatedTest> =>
-    call<CreatedTest>("tree_create_test", { project, parent }),
+  /** « Nouveau test » sous `parent`, nommé `name` (vue du dossier, AM37) ou par défaut. */
+  treeCreateTest: (
+    project: string,
+    parent: string,
+    name: string | null = null,
+  ): Promise<CreatedTest> => call<CreatedTest>("tree_create_test", { project, parent, name }),
 
   /** « + Étape » : étape suivante du test ; renvoie son chemin (NT2). */
   treeAddStep: (project: string, test: string): Promise<string> =>

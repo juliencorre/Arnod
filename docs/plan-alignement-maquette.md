@@ -238,9 +238,11 @@ pull request dit après laquelle la fusionner. Ordre, avec les lots de `plan-qua
 
 **Lot E - Dossiers** (`claude/alignement-e-dossiers`)
 
-- [ ] **T12** AM36, AM39 : menu d'un dossier, ▶ au survol.
-- [ ] **T13** AM37 : vue du dossier (cœur `tree_folder_view`, onglet `folder`).
-- [ ] **T14** AM38 : réordonner et ranger par ⋮⋮ et au clavier (`tree_reorder`).
+- [x] **T12** AM36, AM39 : menu d'un dossier, ▶ au survol.
+- [x] **T13** AM37 : vue du dossier (onglet `folder`). Sans commande `tree_folder_view` : l'arborescence
+      fournie par le cœur et les statuts suffisent, la vue ne fait que des comptages d'affichage ;
+      `tree_create_test` reçoit le nom saisi sur place.
+- [x] **T14** AM38 : réordonner et ranger par ⋮⋮ et au clavier (`tree_reorder`).
 
 **Lot F - Import** (`claude/alignement-f-import`)
 

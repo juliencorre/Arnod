@@ -47,6 +47,10 @@ pub enum Content {
     /// (`docs/plan-mvp-e-tests-etapes.md`, TE2).
     #[serde(rename_all = "camelCase")]
     Test { project_id: Uuid, path: String },
+    /// Vue d'un dossier du référentiel : son contenu dans l'ordre d'exécution, par son chemin
+    /// relatif (4.1-a bis, AM37).
+    #[serde(rename_all = "camelCase")]
+    Folder { project_id: Uuid, path: String },
 }
 
 impl Content {
@@ -57,7 +61,8 @@ impl Content {
             | Self::Run { project_id }
             | Self::Contract { project_id, .. }
             | Self::ImportReport { project_id }
-            | Self::Test { project_id, .. } => Some(*project_id),
+            | Self::Test { project_id, .. }
+            | Self::Folder { project_id, .. } => Some(*project_id),
             Self::Result => None,
         }
     }
@@ -715,6 +720,10 @@ impl Layout {
                         | Content::Test {
                             project_id: id,
                             path,
+                        }
+                        | Content::Folder {
+                            project_id: id,
+                            path,
                         } = &mut tab.content
                             && *id == project_id
                             && let Some(rest) = within(path, from)
@@ -747,6 +756,10 @@ impl Layout {
                     path: tab_path,
                 }
                 | Content::Test {
+                    project_id: id,
+                    path: tab_path,
+                }
+                | Content::Folder {
                     project_id: id,
                     path: tab_path,
                 } => *id == project_id && within(tab_path, path).is_some(),

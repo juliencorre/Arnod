@@ -97,8 +97,9 @@ fn read_dir(
 ) -> Result<Vec<TreeNode>, CommandError> {
     let entries = fs::read_dir(dir)
         .map_err(|error| CommandError::io("Lecture du dossier impossible", dir, &error))?;
-    let mut folders = Vec::new();
-    // Requêtes avec leur rang (`info.seq`), qui décide de l'ordre des étapes (R1).
+    // Dossiers et requêtes avec leur rang (`info.seq` d'une requête ou du `folder.yml` d'un
+    // dossier) : il décide de l'ordre des étapes (R1) et de celui de la vue d'un dossier (AM38).
+    let mut folders: Vec<(Option<f64>, TreeNode)> = Vec::new();
     let mut requests: Vec<(Option<f64>, TreeNode)> = Vec::new();
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
@@ -127,13 +128,16 @@ fn read_dir(
             let children = children?;
             let request_count = children.iter().map(TreeNode::count).sum();
             let test = is_test(&children);
-            folders.push(TreeNode::Folder {
-                name,
-                path: relative,
-                children,
-                request_count,
-                test,
-            });
+            folders.push((
+                folder_seq(&path),
+                TreeNode::Folder {
+                    name,
+                    path: relative,
+                    children,
+                    request_count,
+                    test,
+                },
+            ));
         } else if is_request_file(&path) {
             let stem = path
                 .file_stem()
@@ -172,15 +176,117 @@ fn read_dir(
     let key = |node: &TreeNode| match node {
         TreeNode::Folder { name, .. } | TreeNode::Request { name, .. } => sort_key(name),
     };
-    folders.sort_by_key(key);
-    // Rang écrit d'abord, puis le nom (R1) : sans rang, l'ordre alphabétique reste.
-    requests.sort_by(|(a, x), (b, y)| {
+    // Rang écrit d'abord, puis les dossiers avant les requêtes, puis le nom (R1, AM38) : sans
+    // rang, les dossiers puis les requêtes, dans l'ordre alphabétique.
+    let mut all: Vec<(Option<f64>, u8, TreeNode)> = folders
+        .into_iter()
+        .map(|(seq, node)| (seq, 0, node))
+        .chain(requests.into_iter().map(|(seq, node)| (seq, 1, node)))
+        .collect();
+    all.sort_by(|(a, ka, x), (b, kb, y)| {
         a.unwrap_or(f64::INFINITY)
             .total_cmp(&b.unwrap_or(f64::INFINITY))
+            .then_with(|| ka.cmp(kb))
             .then_with(|| key(x).cmp(&key(y)))
     });
-    folders.extend(requests.into_iter().map(|(_, node)| node));
-    Ok(folders)
+    Ok(all.into_iter().map(|(_, _, node)| node).collect())
+}
+
+/// Rang d'un dossier : `info.seq` de son `folder.yml`, s'il en a un.
+fn folder_seq(dir: &Path) -> Option<f64> {
+    let value = yaml::read(&dir.join(FOLDER_FILE)).ok()?;
+    value.get("info")?.get("seq")?.as_f64()
+}
+
+/// Réordonne le contenu du dossier `folder` (4.1-a ter, AM38) : `order` donne les chemins de
+/// ses éléments dans le nouvel ordre, qui devient leur rang de 1 à n (`info.seq` d'une requête,
+/// du `folder.yml` d'un dossier, créé au besoin). Un élément absent de `order` garde sa place
+/// après eux ; un chemin qui n'est pas dans le dossier est refusé, rien n'est écrit.
+pub fn reorder(root: &Path, folder: &str, order: &[String]) -> Result<undo::Undo, CommandError> {
+    let dir = resolve(root, folder)?;
+    if !dir.is_dir() {
+        return Err(CommandError::new(
+            CommandErrorKind::NotFound,
+            "Ce dossier n'existe plus.",
+        ));
+    }
+    let mut targets = Vec::with_capacity(order.len());
+    for path in order {
+        let target = resolve(root, path)?;
+        if target.parent() != Some(dir.as_path()) || !target.exists() {
+            return Err(invalid_request(
+                "Un élément à ranger n'est plus dans ce dossier.",
+            ));
+        }
+        targets.push(target);
+    }
+    let mut undo = undo::Undo::default();
+    for (index, target) in targets.iter().enumerate() {
+        let seq = (index + 1) as f64;
+        if target.is_dir() {
+            set_folder_seq(target, seq, &mut undo)?;
+        } else if let Ok(mut request) = file::read(target) {
+            // Un fichier illisible garde sa place : il n'est jamais réécrit.
+            if request.seq == Some(seq) {
+                continue;
+            }
+            if let Ok(text) = fs::read_to_string(target) {
+                undo.restored(target.clone(), text);
+            }
+            request.seq = Some(seq);
+            file::write(target, &request)?;
+        }
+    }
+    Ok(undo)
+}
+
+/// Écrit le rang d'un dossier dans son `folder.yml`, créé avec son nom s'il n'existe pas.
+fn set_folder_seq(dir: &Path, seq: f64, undo: &mut undo::Undo) -> Result<(), CommandError> {
+    let path = dir.join(FOLDER_FILE);
+    let mut value = if path.exists() {
+        let text = fs::read_to_string(&path)
+            .map_err(|error| CommandError::io("Lecture impossible", &path, &error))?;
+        let value = yaml::read(&path)?;
+        if value
+            .get("info")
+            .and_then(|i| i.get("seq"))
+            .and_then(serde_json::Value::as_f64)
+            == Some(seq)
+        {
+            return Ok(());
+        }
+        undo.restored(path.clone(), text);
+        value
+    } else {
+        undo.created(path.clone());
+        let name = dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        serde_json::json!({ "info": { "name": name, "type": "folder" } })
+    };
+    let Some(info) = value.as_object_mut().map(|object| {
+        object
+            .entry("info")
+            .or_insert_with(|| serde_json::json!({}))
+    }) else {
+        return Err(invalid_request(
+            "Le fichier folder.yml de ce dossier est illisible.",
+        ));
+    };
+    let Some(info) = info.as_object_mut() else {
+        return Err(invalid_request(
+            "Le fichier folder.yml de ce dossier est illisible.",
+        ));
+    };
+    info.insert("seq".to_owned(), serde_json::Value::from(seq));
+    // Un contenu non conforme n'est jamais écrit (format OpenCollection strict).
+    schema::check(Part::Folder, &value).map_err(|reason| {
+        invalid_request(format!(
+            "Le rang du dossier n'a pas pu être écrit : {reason}"
+        ))
+    })?;
+    yaml::write(&path, &value)
 }
 
 /// Référentiel de tests (docs/plan-requetes-dans-contrats.md, R1, R5, R6) :
@@ -624,8 +730,8 @@ pub mod undo;
 
 mod test;
 pub use test::{
-    CreatedTest, StepView, TestView, VariableUser, add_step, create_test, extracted_before,
-    is_test, test_view, variable_users,
+    CreatedTest, StepView, TestView, VariableUser, add_step, create_test, create_test_named,
+    extracted_before, is_test, test_view, variable_users,
 };
 
 #[cfg(test)]

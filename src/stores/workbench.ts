@@ -621,14 +621,23 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return windows.openSelection({ kind: "test", projectId, path }, preview);
   }
 
+  /** Ouvre la vue d'un dossier (4.1-a bis, AM37) : en aperçu d'un simple clic (Q4). */
+  function openFolder(projectId: string, path: string, preview = false): Promise<boolean> {
+    return windows.openSelection({ kind: "folder", projectId, path }, preview);
+  }
+
   /** Déplie un dossier replié de la barre latérale. */
   async function unfold(projectId: string, path: string): Promise<void> {
     if (trees.value[projectId]?.collapsed.includes(path)) await toggleFolder(projectId, path);
   }
 
   /** « Nouveau test » (NT1) : dossier et étape 1 créés, étape ouverte, curseur dans l'adresse. */
-  async function createTest(projectId: string, parent: string): Promise<string> {
-    const created = await ipc.treeCreateTest(projectId, parent);
+  async function createTest(
+    projectId: string,
+    parent: string,
+    name: string | null = null,
+  ): Promise<string> {
+    const created = await ipc.treeCreateTest(projectId, parent, name);
     await unfold(projectId, parent);
     await refreshTree(projectId);
     focusUrl.value = requestKey(projectId, created.step);
@@ -742,6 +751,18 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     const copy = await ipc.treeDuplicate(projectId, path);
     await refreshTree(projectId);
     await openRequest(projectId, copy);
+  }
+
+  /** Réordonne le contenu du dossier `folder` dans l'ordre `order` (4.1-a ter, AM38). */
+  async function reorder(projectId: string, folder: string, order: string[]): Promise<void> {
+    await ipc.treeReorder(projectId, folder, order);
+    await refreshTree(projectId);
+  }
+
+  /** Duplique le dossier ou le test `path` à côté de lui (« (copie) », AM36). */
+  async function duplicateFolder(projectId: string, path: string): Promise<void> {
+    await ipc.treeBatch(projectId, [path], { kind: "duplicate" });
+    await refreshTree(projectId);
   }
 
   async function move(projectId: string, path: string, targetFolder: string): Promise<void> {
@@ -1374,6 +1395,8 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     createFolder,
     rename,
     duplicate,
+    duplicateFolder,
+    reorder,
     move,
     remove,
     selectEnvironment,
@@ -1397,6 +1420,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     focusUrl,
     loadTest,
     openTest,
+    openFolder,
     createTest,
     addStep,
     keepDrawn,

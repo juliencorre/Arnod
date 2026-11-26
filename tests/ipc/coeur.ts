@@ -71,7 +71,7 @@ export type ConflictItem = { key: string, label: string, disk: string | null, dr
 
 export type ConflictSide = "disk" | "draft";
 
-export type ContentRef = { "kind": "request", projectId: string, path: string, } | { "kind": "run", projectId: string, } | { "kind": "contract", projectId: string, path: string, } | { "kind": "result" } | { "kind": "importReport", projectId: string, } | { "kind": "test", projectId: string, path: string, };
+export type ContentRef = { "kind": "request", projectId: string, path: string, } | { "kind": "run", projectId: string, } | { "kind": "contract", projectId: string, path: string, } | { "kind": "result" } | { "kind": "importReport", projectId: string, } | { "kind": "test", projectId: string, path: string, } | { "kind": "folder", projectId: string, path: string, };
 
 export type ContentTab = { id: string, content: ContentRef, preview: boolean, };
 

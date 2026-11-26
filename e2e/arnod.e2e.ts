@@ -1576,7 +1576,14 @@ describe("Premier usage : assertions, run et statuts", () => {
   }
 
   async function createRequest(name: string): Promise<void> {
-    await rowAction("Commandes", "Nouvelle requête");
+    // Dossier ordinaire (vide) : « + » au survol, « Requête libre » (AM36) ; test : menu ⋯.
+    const plain = await browser.execute(
+      () => document.querySelector('aside button[aria-label="Ajouter dans Commandes"]') !== null,
+    );
+    if (plain) {
+      await clickHidden('aside button[aria-label="Ajouter dans Commandes"]');
+      await clickText('aside [role="menuitem"]', "Requête libre");
+    } else await rowAction("Commandes", "Nouvelle requête");
     await nameIt(name);
     await browser.waitUntil(async () => (await zoneTabs()).flat().includes(name), {
       timeout: 10_000,
@@ -1608,6 +1615,15 @@ describe("Premier usage : assertions, run et statuts", () => {
       timeoutMsg: "dossier « Commandes » attendu",
     });
     expect(existsSync(path.join(project(), "Commandes"))).toBe(true);
+    // 4.1-a bis (AM37) : un clic sur le dossier ouvre sa vue ; l'onglet est refermé ensuite.
+    await clickHidden('aside [role="treeitem"][data-path="Commandes"]');
+    await browser.$(".folder").waitForExist({ timeout: 10_000 });
+    expect(await browser.$(".folder__summary").getText()).toBe(
+      "dossier · 0 test · 0 test au total",
+    );
+    await screenshot(browser, "21b-vue-dossier");
+    await clickHidden('button[aria-label="Fermer Commandes"]');
+    await browser.$(".folder").waitForExist({ reverse: true, timeout: 10_000 });
 
     await createRequest("Lister les commandes");
     await inRequest("Lister les commandes", { kind: "url", value: `${url}/commandes` });

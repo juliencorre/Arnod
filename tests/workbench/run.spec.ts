@@ -195,7 +195,7 @@ describe("écran du run (maquette 1f)", () => {
       .findAll('li[role="presentation"]')
       .find((li) => li.get('[role="treeitem"]').text().includes("Vide"));
     await row?.get(".row__more").trigger("click");
-    await click(app, '[role="menuitem"]', "Exécuter le dossier");
+    await click(app, '[role="menuitem"]', "Exécuter les tests du dossier");
     expect(core.commands()).toContain("run_start");
     expect(app.get(".run__empty").text()).toBe("Aucune requête à exécuter dans ce dossier.");
   });

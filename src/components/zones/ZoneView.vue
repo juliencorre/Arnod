@@ -21,6 +21,7 @@ import type { MenuItem } from "@/components/ui/menu";
 import ContractTab from "@/components/contracts/ContractTab.vue";
 import ImportReportTab from "@/components/import/ImportReportTab.vue";
 import RunPanel from "@/components/workbench/RunPanel.vue";
+import FolderTab from "@/components/zones/FolderTab.vue";
 import ProjectWelcome from "@/components/zones/ProjectWelcome.vue";
 import RequestTab from "@/components/zones/RequestTab.vue";
 import ResultTab from "@/components/zones/ResultTab.vue";
@@ -579,6 +580,12 @@ const welcome = computed(
         <ResultTab v-else-if="activeTab.content.kind === 'result'" :key="activeTab.id" />
         <TestTab
           v-else-if="activeTab.content.kind === 'test'"
+          :key="activeTab.id"
+          :project-id="activeTab.content.projectId"
+          :path="activeTab.content.path"
+        />
+        <FolderTab
+          v-else-if="activeTab.content.kind === 'folder'"
           :key="activeTab.id"
           :project-id="activeTab.content.projectId"
           :path="activeTab.content.path"
