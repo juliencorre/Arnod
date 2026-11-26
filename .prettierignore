@@ -12,7 +12,11 @@ docs/opencollection/*.json
 docs/design-system/tokens.json
 docs/design-system/tokens.css
 docs/design-system/components/bundle.css
+DESIGN.md
 .maquette
 .apercu
 # Généré par src-tauri/src/ts_mirror.rs (cargo test)
 tests/ipc/coeur.ts
+# Skill Impeccable, installée par npx impeccable install (fichiers du fournisseur)
+.claude/skills/impeccable
+.claude/agents/impeccable-*.md

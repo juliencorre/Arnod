@@ -525,7 +525,6 @@ function toggleFromChevron(): void {
 /* 4.1-a quater : élément de la sélection multiple. */
 .row--picked {
   background: var(--color-accent-soft);
-  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 /* Lot J : une requête glissée sera déposée ici. */
@@ -663,7 +662,7 @@ function toggleFromChevron(): void {
 }
 
 .row__dirty {
-  font-size: 0.625rem;
+  font-size: 0.625rem; /* impeccable-disable-line design-system-font-size: glyphe ● de modification (exception R1 à R8) */
   color: var(--color-accent);
 }
 

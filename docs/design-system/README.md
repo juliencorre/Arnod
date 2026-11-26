@@ -41,11 +41,19 @@ et focus 3:1). Un composant n'écrit jamais une couleur en dur : il prend un jet
 - **Textes.** `color-text` pour le texte principal, `color-muted` pour le secondaire,
   `color-subtle` seulement pour les indications et l'état désactivé (3:1, jamais pour un texte à
   lire), `color-link` pour les liens et actions textuelles.
+- **Bordures.** `color-border` pour les champs, cartes, menus et fenêtres, `color-border-strong`
+  pour les séparateurs marqués et le survol d'un bouton, `color-border-control` (3:1) pour le bord
+  des cases à cocher, des boutons radio et de l'interrupteur éteint.
 - **États.** `color-success` et `color-danger`, avec leurs fonds `color-success-soft` et
-  `color-danger-soft` pour une ligne ou une vérification. Toujours accompagnés de ✓ ou ✕.
+  `color-danger-soft` pour une ligne ou une vérification. Toujours accompagnés de ✓ ou ✕. Sur la
+  barre inversée de la sélection multiple (fond `color-text`), l'action destructrice prend
+  `color-danger-inverse`.
 - **Action.** `color-accent` en fond, `color-accent-text` dessus (foncé dans les deux thèmes,
   7,2:1 en clair), `color-accent-hover` au survol.
 - **Notifications.** `color-toast-bg`, `color-toast-text`, `color-toast-action`.
+- **Code.** Corps de réponse mis en forme : `color-code-string`, `color-code-number`,
+  `color-code-keyword`, `color-code-tag`, `color-code-attr` (4,5:1) ; valeur trouvée par le
+  filtre en `color-match`.
 - **Workspaces.** `color-ws-gray` à `color-ws-teal` : pastilles décoratives (`ColorDot`).
 - **Familles d'étapes.** `color-family-<famille>-bg`, `-border` et `-text` pour les pastilles de
   nature (`NaturePill`) : Appels, Données, Messages, Traitements, Interface, Code, Fichiers.
@@ -117,7 +125,8 @@ lieu d'en écrire de nouveaux.
 
 - **Button** (`BaseButton`) : principal, secondaire, danger, lien. Un seul bouton plein par vue,
   et il est orange : pas de bouton plein d'une autre couleur.
-- **Field** : champ, liste déroulante et case à cocher, habillés par les règles de base.
+- **Field** : champ, liste déroulante, case à cocher et bouton radio, habillés par les règles de
+  base.
 - **Toggle** (`ToggleSwitch`) : interrupteur `role="switch"` avec son libellé.
 - **SearchInput** : champ de recherche, Échap le vide.
 - **Menu** (`BaseMenu`) : menu accessible au clavier, avec choix, nuanciers, mentions, raccourcis.

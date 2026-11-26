@@ -206,6 +206,7 @@ pages:
       - "2026-11-26 : d : « Directement dans le référentiel de tests, sans contrat. » et « vos premiers tests » (plan-alignement-maquette, lot A, AM2)."
       - "2026-11-26 : d : quatre cartes sur toute la largeur, « + Environnement » sur une ligne (plan-qualite-mvp, lot I, DE6)."
       - "2026-11-26 : a bis, e : « + Nouvel environnement » en couleur de lien ; champ de filtre sans bouton natif (plan-alignement-maquette, lot B, AM17, AM18)."
+      - "2026-11-26 : Sélection multiple et réponse attendue ouverte en fond accent doux, sans barre sur le côté ; opération sans requête estompée par la couleur (a quater, 3.2-a3, Impeccable DI2, DI4, PR #85)."
       - "2026-11-26 : a : nom coupé avec son infobulle, ⋯ au survol et au focus, qui rend sa place au nom ; l'arbre se parcourt aux flèches (Début, Fin, F2, Suppr, Maj+F10), un seul arrêt de tabulation ; lignes d'un contrat nommées par leur texte visible (plan-qualite-mvp, lot H, T25 : AC1, AC9, DE5)."
     ecrans:
       "0": { etat: remplacé }
@@ -747,6 +748,7 @@ pages:
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 7 écarts ajoutés ; a bis passe de « livré » à « en partie », a ter passe de « livré » à « en partie »."
       - "2026-11-26 : g : note « après l'étape n » en couleur de texte (plan-qualite-mvp, lot I, DE2)."
       - "2026-11-26 : a quater, g : « Supprimer » en rouge lisible sur la barre de sélection ; recherche du copier-déplacer avec sa loupe, sans bouton natif (plan-alignement-maquette, lot B, AM27, AM18)."
+      - "2026-11-26 : Destination choisie et éléments choisis en fond accent doux, sans barre sur le côté (a quater, g, Impeccable DI4, PR #85)."
       - "2026-11-26 : a, a bis, a ter : menu ⋯ d'un dossier de la maquette, « + » et ▶ au survol ; un clic sur un dossier ouvre sa vue (fil d'Ariane, résumé, « + Test », « + Sous-dossier », « ▶ Exécuter le dossier », tableau #, Type, Nom, Contenu, Résultat, nom saisi sur place) ; ⋮⋮ réordonne (rangs info.seq et folder.yml) et range dans un sous-dossier, ↑ ↓ au clavier ; a bis et a ter passent à « livré » (plan-alignement-maquette, lot E, AM36 à AM38)."
     ecrans:
       a:
@@ -803,8 +805,10 @@ pages:
         pr: [62]
         captures: [31-copier-deplacer]
         ecart:
-          texte: "Une étape n'est jamais liée à un contrat (lot E, R1) : vers un test, « N'est plus liée à POST /orders » au lieu de « Reste liée » ; seules les opérations de même méthode sont proposées, sans « nouvel endpoint… » ni « Nouveau test dans… » ; « Non classés » n'est pas une destination ; la place dans le test se choisit sous la liste."
-          aligner: à décider
+          - texte: "Une étape n'est jamais liée à un contrat (lot E, R1) : vers un test, « N'est plus liée à POST /orders » au lieu de « Reste liée » ; seules les opérations de même méthode sont proposées, sans « nouvel endpoint… » ni « Nouveau test dans… » ; « Non classés » n'est pas une destination ; la place dans le test se choisit sous la liste."
+            aligner: à décider
+          - texte: "La destination choisie est un fond accent doux, sans barre orange sur le côté : la forme unique d'une sélection (DE7, Impeccable DI4)."
+            aligner: maquette
   "4.2":
     nom: "Tests et étapes"
     version: MVP
