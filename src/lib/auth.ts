@@ -94,9 +94,10 @@ export function authVariables(auth: Auth): string[] {
   ];
   const names: string[] = [];
   for (const field of fields) {
-    for (const match of field.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)) {
-      const name = match[1];
-      if (name !== undefined && !names.includes(name)) names.push(name);
+    // Sans quantificateur paresseux encadré d'espaces : pas de retour arrière coûteux (S8786).
+    for (const match of field.matchAll(/\{\{([^{}]*)\}\}/g)) {
+      const name = match[1]?.trim();
+      if (name !== undefined && name !== "" && !names.includes(name)) names.push(name);
     }
   }
   return names;
