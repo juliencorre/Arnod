@@ -1,0 +1,15 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font-size",
+        "value": "16px",
+        "files": ["src/styles.css"],
+        "createdAt": "2026-11-26T20:46:09.642Z",
+        "reason": "Taille de la racine (base des rem) ; le texte de l'interface est à 13 px"
+      }
+    ]
+  }
+}

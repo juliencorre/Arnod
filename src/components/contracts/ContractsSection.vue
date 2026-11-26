@@ -1036,8 +1036,9 @@ async function rename(name: string): Promise<void> {
   color: var(--color-danger);
 }
 
+/* Réponse attendue ouverte : la forme unique d'une sélection (DE7, DI4). */
 .crow--shown {
-  background: var(--color-chip);
+  background: var(--color-accent-soft);
 }
 
 .crow__example {
@@ -1068,8 +1069,9 @@ async function rename(name: string): Promise<void> {
   color: var(--color-muted);
 }
 
+/* Estompée par la couleur, pas par l'opacité : le texte garde 4,5:1 (DI2). */
 .crow__main--empty .crow__method {
-  opacity: 0.7;
+  color: var(--color-muted);
 }
 
 .crow__method--get {

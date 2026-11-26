@@ -53,6 +53,9 @@ jobs:
       # `cargo test` tournent dans les jobs de build.
       - name: Design system à jour
         run: node scripts/design-system.mjs --check
+      # Règles de design écrites (lot I) : moteur de la skill Impeccable, vérifié par empreinte.
+      - name: Détecteur Impeccable
+        run: node scripts/impeccable-detect.mjs
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck

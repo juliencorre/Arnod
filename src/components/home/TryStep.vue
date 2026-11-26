@@ -365,7 +365,7 @@ async function send(): Promise<void> {
   border: 0;
   border-radius: var(--radius-sm);
   font: inherit;
-  font-size: 1rem;
+  font-size: 1rem; /* impeccable-disable-line design-system-font-size: glyphe × d'effacement (exception R1 à R8) */
   line-height: 1;
   color: var(--color-muted);
   background: none;
