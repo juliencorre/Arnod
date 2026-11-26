@@ -59,6 +59,9 @@ export function useTabInfo(): (tab: ContentTab) => TabInfo {
         dirty: false,
       };
     }
+    if (content.kind === "folder") {
+      return { name: content.path.split("/").at(-1) ?? content.path, badge: "DOS", dirty: false };
+    }
     const key = requestKey(content.projectId, content.path);
     const draft = workbench.editors[key]?.draft;
     const node = findRequest(workbench.trees[content.projectId]?.nodes ?? [], content.path);

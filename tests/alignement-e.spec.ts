@@ -125,3 +125,65 @@ describe("menu d'un dossier et outils au survol (AM36, AM39 ; 4.1-a, 5.2-d)", ()
     expect(folderRow(app, "commandes/v2").find(".row__tool").exists()).toBe(false);
   });
 });
+
+describe("vue d'un dossier (AM37, 4.1-a bis)", () => {
+  async function openView(): Promise<FakeCore> {
+    const opened = await openShop();
+    app = opened.app;
+    await click(app, '[role="treeitem"][data-path="commandes"]');
+    return opened.core;
+  }
+
+  it("un clic sur un dossier ouvre sa vue en aperçu ; le chevron plie", async () => {
+    const core = await openView();
+    expect(core.calls.filter((c) => c.cmd === "layout_open_selection").at(-1)?.args).toEqual({
+      content: { kind: "folder", projectId: "p-boutique-tests", path: "commandes" },
+      preview: true,
+    });
+    if (!app) throw new Error("application absente");
+    expect(app.get(".folder__crumbs").text().replace(/\s+/g, " ")).toBe(
+      "Référentiel de tests / commandes",
+    );
+    expect(app.get(".folder__summary").text()).toBe(
+      "dossier · 1 test et 1 requête libre · 1 test au total",
+    );
+    const rows = app.findAll(".folder__row").map((row) => row.findAll("td").map((td) => td.text()));
+    expect(rows).toEqual([
+      ["1", "test", "v2", "2 étapes", "—"],
+      ["2", "DELETE", "Annuler", "—", "—"],
+    ]);
+    await folderRow(app, "commandes").get(".row__chevron").trigger("click");
+    await flushPromises();
+    expect(core.workbench.collapsed).toContain("commandes");
+  });
+
+  it("« + Sous-dossier » et « + Test » nomment sur place, « ▶ Exécuter le dossier » lance le run", async () => {
+    const core = await openView();
+    if (!app) throw new Error("application absente");
+    await click(app, ".folder button", "+ Sous-dossier");
+    const field = app.get(".folder__create input");
+    expect(document.activeElement).toBe(field.element);
+    await field.setValue("erreurs");
+    await app.get(".folder__create").trigger("submit");
+    await flushPromises();
+    expect(core.calls.find((c) => c.cmd === "tree_create_folder")?.args).toMatchObject({
+      parent: "commandes",
+      name: "erreurs",
+    });
+    await click(app, ".folder button", "▶ Exécuter le dossier");
+    expect(core.calls.find((c) => c.cmd === "run_start")?.args).toMatchObject({
+      folder: "commandes",
+    });
+    await click(app, ".zone__tab-button", "commandes");
+    await click(app, ".folder button", "+ Test");
+    await app.get(".folder__create input").setValue("Relancer");
+    await app.get(".folder__create").trigger("submit");
+    await flushPromises();
+    // Le test est créé avec son nom ; son étape 1 s'ouvre, comme depuis la barre latérale.
+    expect(core.calls.find((c) => c.cmd === "tree_create_test")?.args).toMatchObject({
+      parent: "commandes",
+      name: "Relancer",
+    });
+    expect(core.workbench.folders.has("commandes/Relancer")).toBe(true);
+  });
+});

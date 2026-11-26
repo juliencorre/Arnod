@@ -175,11 +175,25 @@ fn write_step(root: &Path, dir: &Path, name: &str, seq: f64) -> Result<String, C
 /// « Nouveau test » (R11) : dossier « Nouveau test » (nom libre suivant) dans
 /// `parent`, et son étape 1.
 pub fn create_test(root: &Path, parent: &str) -> Result<CreatedTest, CommandError> {
+    create_test_named(root, parent, None)
+}
+
+/// « + Test » de la vue d'un dossier (4.1-a bis, AM37) : le test reçoit le nom saisi sur place ;
+/// un nom déjà pris est refusé et rien n'est créé. Sans nom, « Nouveau test », « Nouveau test 2 »…
+pub fn create_test_named(
+    root: &Path,
+    parent: &str,
+    name: Option<&str>,
+) -> Result<CreatedTest, CommandError> {
     let parent_dir = resolve(root, parent)?;
     if !parent_dir.is_dir() {
         return Err(not_found("Le dossier parent n'existe plus."));
     }
-    let folder = create_folder(root, parent, &unique_folder_name(&parent_dir))?;
+    let name = match name.map(str::trim).filter(|n| !n.is_empty()) {
+        Some(name) => name.to_owned(),
+        None => unique_folder_name(&parent_dir),
+    };
+    let folder = create_folder(root, parent, &name)?;
     let dir = resolve(root, &folder)?;
     let step = write_step(root, &dir, "Étape 1", 1.0)?;
     Ok(CreatedTest { folder, step })

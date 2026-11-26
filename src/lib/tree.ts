@@ -41,3 +41,35 @@ export function visiblePaths(nodes: TreeNode[], open: (folder: FolderNode) => bo
   walk(nodes);
   return paths;
 }
+
+/** Ce que range un dossier, pour la vue du dossier (4.1-a bis, AM37). */
+export interface FolderSummary {
+  /** Tests rangés directement dans le dossier. */
+  tests: number;
+  /** Sous-dossiers qui ne sont pas des tests. */
+  folders: number;
+  /** Requêtes libres rangées directement (hors test). */
+  requests: number;
+  /** Tests du dossier et de tous ses sous-dossiers. */
+  total: number;
+}
+
+/** Tests d'un nœud et de ses sous-dossiers. */
+export function testCount(node: TreeNode): number {
+  if (node.kind !== "folder") return 0;
+  if (node.test) return 1;
+  return node.children.reduce((sum, child) => sum + testCount(child), 0);
+}
+
+/** Comptage d'affichage d'un dossier : tests, sous-dossiers, requêtes libres, tests au total. */
+export function folderSummary(folder: FolderNode): FolderSummary {
+  let tests = 0;
+  let folders = 0;
+  let requests = 0;
+  for (const child of folder.children) {
+    if (child.kind === "request") requests += 1;
+    else if (child.test) tests += 1;
+    else folders += 1;
+  }
+  return { tests, folders, requests, total: testCount(folder) };
+}

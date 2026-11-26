@@ -83,5 +83,12 @@ export function isRunning(content: ContentRef, activity: Activity): boolean {
         (live?.items.some((item) => item.path === content.path && item.status === "running") ??
           false)
       );
+    case "folder":
+      // Vue d'un dossier (AM37) : une de ses requêtes est jouée par le run en cours.
+      return (
+        live?.items.some(
+          (item) => item.path.startsWith(`${content.path}/`) && item.status === "running",
+        ) ?? false
+      );
   }
 }

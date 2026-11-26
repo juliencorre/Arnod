@@ -585,3 +585,21 @@ fn pu5_renommage_de_dossier_defait_si_la_seconde_etape_echoue() {
         .collect();
     assert!(hidden.is_empty(), "{hidden:?}");
 }
+
+/// AM37 (4.1-a bis) : un test nommé sur place dans la vue du dossier ; un nom pris ne crée rien.
+#[test]
+fn am37_nouveau_test_nomme_sur_place() {
+    let dir = project();
+    create_folder(dir.path(), "", "commandes").unwrap();
+    let created = create_test_named(dir.path(), "commandes", Some(" Annuler ")).unwrap();
+    assert_eq!(created.folder, "commandes/Annuler");
+    assert_eq!(created.step, "commandes/Annuler/etape-1.yml");
+    let taken = create_test_named(dir.path(), "commandes", Some("annuler"));
+    assert_eq!(taken.unwrap_err().kind, CommandErrorKind::NameTaken);
+    let names: Vec<String> = std::fs::read_dir(dir.path().join("commandes"))
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(names, ["Annuler"]);
+}

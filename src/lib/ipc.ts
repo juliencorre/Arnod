@@ -590,8 +590,12 @@ export const ipc = {
     call<TestView>("test_read", { project, path }),
 
   /** « Nouveau test » : dossier du test et son étape 1 (NT1). */
-  treeCreateTest: (project: string, parent: string): Promise<CreatedTest> =>
-    call<CreatedTest>("tree_create_test", { project, parent }),
+  /** « Nouveau test » sous `parent`, nommé `name` (vue du dossier, AM37) ou par défaut. */
+  treeCreateTest: (
+    project: string,
+    parent: string,
+    name: string | null = null,
+  ): Promise<CreatedTest> => call<CreatedTest>("tree_create_test", { project, parent, name }),
 
   /** « + Étape » : étape suivante du test ; renvoie son chemin (NT2). */
   treeAddStep: (project: string, test: string): Promise<string> =>

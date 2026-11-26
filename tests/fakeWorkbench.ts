@@ -659,7 +659,11 @@ export function handleWorkbench(
       return testView(wb, String(args.path));
     case "tree_create_test": {
       const parent = String(args.parent);
-      let name = "Nouveau test";
+      // AM37 : un nom saisi sur place ; pris, il est refusé (tree::create_test_named).
+      const asked = typeof args.name === "string" ? args.name.trim() : "";
+      let name = asked === "" ? "Nouveau test" : asked;
+      if (asked !== "" && wb.folders.has(parent === "" ? name : `${parent}/${name}`))
+        fail("nameTaken", `« ${name} » existe déjà dans ce dossier.`);
       for (let n = 2; wb.folders.has(parent === "" ? name : `${parent}/${name}`); n += 1)
         name = `Nouveau test ${String(n)}`;
       const folder = parent === "" ? name : `${parent}/${name}`;

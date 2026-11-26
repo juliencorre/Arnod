@@ -74,11 +74,11 @@ const byUrl = computed(
     (props.filter ?? null) !== null &&
     matchedByUrl(props.node, props.filter as TreeFilter),
 );
-/** Requête (ou test) affiché dans l'onglet actif de cette fenêtre. */
+/** Requête, test ou dossier affiché dans l'onglet actif de cette fenêtre. */
 const isSelected = computed(() => {
   const content = windows.activeTab?.content;
   return (
-    (content?.kind === "request" || content?.kind === "test") &&
+    (content?.kind === "request" || content?.kind === "test" || content?.kind === "folder") &&
     content.projectId === props.projectId &&
     content.path === props.node.path
   );
@@ -360,13 +360,17 @@ function onSpace(event: KeyboardEvent): void {
 }
 
 function activate(preview = true): void {
-  // Un test s'ouvre dans son onglet ; son chevron le replie (lot E, TE1).
+  // Un test s'ouvre dans son onglet ; un dossier, dans sa vue (AM37, Q4) ; leur chevron plie.
   if (isTest.value) void workbench.openTest(props.projectId, props.node.path, preview);
-  else if (props.node.kind === "folder") {
-    // Pendant un filtre, les dossiers restent dépliés (F3).
-    if (preview && (props.filter ?? null) === null)
-      void workbench.toggleFolder(props.projectId, props.node.path);
-  } else void workbench.openRequest(props.projectId, props.node.path, preview);
+  else if (props.node.kind === "folder")
+    void workbench.openFolder(props.projectId, props.node.path, preview);
+  else void workbench.openRequest(props.projectId, props.node.path, preview);
+}
+
+/** Le chevron plie ou déplie, sauf pendant un filtre, qui garde les dossiers dépliés (F3). */
+function toggleFromChevron(): void {
+  if ((props.filter ?? null) === null)
+    void workbench.toggleFolder(props.projectId, props.node.path);
 }
 </script>
 
@@ -398,11 +402,9 @@ function activate(preview = true): void {
       >
         <template v-if="node.kind === 'folder'">
           <span class="row__lead" aria-hidden="true">
-            <span
-              class="row__chevron"
-              @click.stop="isTest && workbench.toggleFolder(projectId, node.path)"
-              >{{ isOpen ? "▾" : "▸" }}</span
-            >
+            <span class="row__chevron" @click.stop="toggleFromChevron">{{
+              isOpen ? "▾" : "▸"
+            }}</span>
             <svg v-if="isTest" class="row__flask" width="14" height="14" viewBox="0 0 16 16">
               <path v-for="(d, index) in FLASK" :key="index" :d="d" />
             </svg>

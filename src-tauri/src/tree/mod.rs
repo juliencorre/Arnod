@@ -624,7 +624,7 @@ pub mod undo;
 
 mod test;
 pub use test::{
-    CreatedTest, StepView, TestView, VariableUser, add_step, create_test, extracted_before,
+    CreatedTest, StepView, TestView, VariableUser, add_step, create_test, create_test_named, extracted_before,
     is_test, test_view, variable_users,
 };
 

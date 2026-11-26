@@ -782,7 +782,9 @@ export type ContentRef =
   /** Dernier rapport d'import d'un projet (docs/plan-mvp-c-import-bruno.md, 2.3-f). */
   | { kind: "importReport"; projectId: string }
   /** Test du projet, dossier d'étapes (docs/plan-mvp-e-tests-etapes.md, TE2). */
-  | { kind: "test"; projectId: string; path: string };
+  | { kind: "test"; projectId: string; path: string }
+  /** Vue d'un dossier du référentiel, son contenu dans l'ordre d'exécution (4.1-a bis, AM37). */
+  | { kind: "folder"; projectId: string; path: string };
 
 /** Onglet de contenu d'une zone (`Tab`). */
 export interface ContentTab {

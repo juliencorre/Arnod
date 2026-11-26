@@ -39,6 +39,7 @@ fn names(layout: &Layout) -> Vec<Vec<String>> {
                     Content::Result => "résultat".to_owned(),
                     Content::ImportReport { .. } => "rapport".to_owned(),
                     Content::Test { path, .. } => format!("test:{path}"),
+                    Content::Folder { path, .. } => format!("dossier:{path}"),
                 })
                 .collect()
         })
@@ -1070,4 +1071,30 @@ fn r8_barre_laterale_masquee_gardee_par_la_fenetre_principale() {
     old.as_object_mut().unwrap().remove("sidebarHidden");
     let read: WindowState = serde_json::from_value(old).unwrap();
     assert!(!read.sidebar_hidden);
+}
+
+/// AM37 (4.1-a bis) : la vue d'un dossier est un contenu `folder` ; elle suit le renommage d'un
+/// dossier parent et se ferme quand le dossier part à la corbeille.
+#[test]
+fn am37_la_vue_d_un_dossier_suit_renommage_et_suppression() {
+    let project = Uuid::from_u128(9);
+    let mut layout = Layout::single(Vec::new());
+    layout
+        .open(
+            Content::Folder {
+                project_id: project,
+                path: "commandes/v2".into(),
+            },
+            None,
+        )
+        .unwrap();
+    layout.rename_path(project, "commandes", "ventes");
+    assert_eq!(names(&layout), [["dossier:ventes/v2"]]);
+    let json = serde_json::to_value(&layout.zones()[0].tabs[0].content).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({ "kind": "folder", "projectId": project.to_string(), "path": "ventes/v2" })
+    );
+    layout.close_path(project, "ventes");
+    assert!(layout.zones()[0].tabs.is_empty());
 }

@@ -69,7 +69,12 @@ describe("filtrer le référentiel (1.2-e, F1 à F5)", () => {
   it("filtre par nom et adresse, dossiers dépliés, compte affiché ; Échap efface", async () => {
     ({ app } = await openProject(commandes));
     // Un dossier replié reste replié dans l'état enregistré, mais se déplie pendant le filtre.
-    await click(wrapper(), '.tree [role="treeitem"]', "commandes");
+    // Le chevron plie ; un clic sur le nom ouvre la vue du dossier (AM37, Q4).
+    const folder = wrapper()
+      .findAll('.tree [role="treeitem"]')
+      .find((item) => item.text().includes("commandes"));
+    await folder?.get(".row__chevron").trigger("click");
+    await flushPromises();
     expect(treeNames()).not.toContain("Changer le statut");
 
     await filterInput().setValue("stat");

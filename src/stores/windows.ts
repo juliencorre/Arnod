@@ -99,6 +99,8 @@ export function contentKey(content: ContentRef): string {
       return `${content.projectId}::import`;
     case "test":
       return `${content.projectId}::test::${content.path}`;
+    case "folder":
+      return `${content.projectId}::dossier::${content.path}`;
   }
 }
 

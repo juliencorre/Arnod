@@ -621,14 +621,23 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return windows.openSelection({ kind: "test", projectId, path }, preview);
   }
 
+  /** Ouvre la vue d'un dossier (4.1-a bis, AM37) : en aperçu d'un simple clic (Q4). */
+  function openFolder(projectId: string, path: string, preview = false): Promise<boolean> {
+    return windows.openSelection({ kind: "folder", projectId, path }, preview);
+  }
+
   /** Déplie un dossier replié de la barre latérale. */
   async function unfold(projectId: string, path: string): Promise<void> {
     if (trees.value[projectId]?.collapsed.includes(path)) await toggleFolder(projectId, path);
   }
 
   /** « Nouveau test » (NT1) : dossier et étape 1 créés, étape ouverte, curseur dans l'adresse. */
-  async function createTest(projectId: string, parent: string): Promise<string> {
-    const created = await ipc.treeCreateTest(projectId, parent);
+  async function createTest(
+    projectId: string,
+    parent: string,
+    name: string | null = null,
+  ): Promise<string> {
+    const created = await ipc.treeCreateTest(projectId, parent, name);
     await unfold(projectId, parent);
     await refreshTree(projectId);
     focusUrl.value = requestKey(projectId, created.step);
@@ -1404,6 +1413,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     focusUrl,
     loadTest,
     openTest,
+    openFolder,
     createTest,
     addStep,
     keepDrawn,
