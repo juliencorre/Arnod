@@ -293,14 +293,18 @@ async function send(): Promise<void> {
 
 .try__row {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
 }
 
+/* Champ et bouton à la hauteur courante des contrôles (DE9). */
 .try__box {
   display: flex;
   flex: 1;
   align-items: center;
+  box-sizing: border-box;
   min-width: 0;
+  height: var(--control-md);
   border: 1.5px solid var(--color-text);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -341,8 +345,9 @@ async function send(): Promise<void> {
 
 .try__input {
   flex: 1;
+  align-self: stretch;
   min-width: 0;
-  padding: 0.625rem 0.75rem;
+  padding: 0 0.75rem;
   border: 0;
   font-family: var(--font-mono);
   font-size: var(--text-body);

@@ -4,11 +4,12 @@
  */
 import { clearMocks } from "@tauri-apps/api/mocks";
 import { flushPromises } from "@vue/test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AUTOSAVE_MS } from "@/stores/workbench";
 import type { RequestDoc } from "@/types/ipc";
 
+import { cssValue } from "../css";
 import { newRequest, okOutcome } from "../fakeWorkbench";
 import type { AppWrapper } from "../mountApp";
 import { click, openProject } from "./helpers";
@@ -75,6 +76,25 @@ describe("test = dossier d'étapes (4.2-a)", () => {
     const chips = app.findAll(".steps__chip");
     expect(chips.map((c) => c.text())).toEqual(["1 · Créer", "2 · Lister", "3 · Étape 3"]);
     expect(app.get('.steps__chip[aria-current="step"]').text()).toBe("3 · Étape 3");
+  });
+
+  it("DE8 : l'étape ouverte est amenée dans la rangée, qui défile au lieu de passer à la ligne", async () => {
+    const reveal = vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(() => {});
+    ({ app } = await openProject());
+    await click(app, '[role="treeitem"]', "Clients");
+    await click(app, ".test button", "+ Étape");
+    await flushPromises();
+    const target = reveal.mock.contexts.at(-1) as HTMLElement | undefined;
+    expect(target?.textContent.trim()).toBe("3 · Étape 3");
+    expect(reveal.mock.calls.at(-1)?.[0]).toEqual({ block: "nearest", inline: "nearest" });
+    const file = "src/components/workbench/StepBar.vue";
+    expect(cssValue(file, ".steps__list", "flex-wrap")).toBe("nowrap");
+    expect(cssValue(file, ".steps__list", "overflow-x")).toBe("auto");
+    expect(cssValue(file, ".steps", "flex-wrap")).toBe("nowrap");
+    // DE7 : l'étape ouverte se marque d'un fond accent doux, pas d'un plein noir.
+    expect(cssValue(file, '.steps__chip[aria-current="step"]', "background")).toBe(
+      "var(--color-accent-soft)",
+    );
   });
 });
 

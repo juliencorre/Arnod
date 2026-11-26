@@ -23,8 +23,9 @@ const COLOR_NOTES = {
   "color-accent-soft":
     "Ligne sélectionnée ou mise en évidence, élément actif d'un menu. Texte : color-text.",
   "color-border": "Bordure des champs, cartes, menus et fenêtres ; séparateurs.",
-  "color-border-strong":
-    "Cases à cocher, bord de l'interrupteur, séparateurs marqués, survol d'un bouton.",
+  "color-border-strong": "Séparateurs marqués, bord d'un champ de recherche, survol d'un bouton.",
+  "color-border-control":
+    "Bord des cases à cocher, des boutons radio et de l'interrupteur éteint : 3:1 au moins sur color-bg, color-surface et color-sidebar (WCAG 1.4.11, vérifié par tests/theme.spec.ts).",
   "color-text":
     "Texte principal, 4,5:1 sur color-bg, color-surface, color-sidebar, color-chip et color-accent-soft (vérifié par tests/theme.spec.ts).",
   "color-muted":

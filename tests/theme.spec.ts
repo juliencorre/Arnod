@@ -106,6 +106,12 @@ const PAIRS: { foreground: string[]; background: string[]; minimum: number }[] =
     background: ["--color-bg", "--color-surface", "--color-sidebar"],
     minimum: 3,
   },
+  // Bord des cases, radios et de l'interrupteur éteint (DE4, WCAG 1.4.11).
+  {
+    foreground: ["--color-border-control"],
+    background: ["--color-bg", "--color-surface", "--color-sidebar"],
+    minimum: 3,
+  },
 ];
 
 describe("thème (styles.css)", () => {

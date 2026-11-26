@@ -84,6 +84,16 @@ describe("lot H - préférences réseau (1.6-e)", () => {
     await flushPromises();
     expect(app.find("dialog[open]").exists()).toBe(false);
   });
+
+  it("ER4 : le bouton ✕ « Fermer » de l'en-tête ferme les préférences", async () => {
+    ({ app } = await openProject());
+    await ctrlComma();
+    const close = app.get('dialog[open] .dialog__head button[aria-label="Fermer"]');
+    expect(close.text()).toBe("✕");
+    await close.trigger("click");
+    await flushPromises();
+    expect(app.find("dialog[open]").exists()).toBe(false);
+  });
 });
 
 describe("lot H - échec réseau expliqué (5.1-i)", () => {

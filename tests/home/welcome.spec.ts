@@ -2,6 +2,7 @@ import { clearMocks } from "@tauri-apps/api/mocks";
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { cssValue } from "../css";
 import { INBOX, installFakeCore } from "../fakeCore";
 import { boutiqueSnapshot, firstRunSnapshot } from "../fixtures";
 import { type AppWrapper, mountApp } from "../mountApp";
@@ -52,6 +53,18 @@ describe("accueil (A1 à A5)", () => {
     expect(app.find(".first-run__card").exists()).toBe(true);
     expect(app.find(".first-run__import").exists()).toBe(true);
     expect(app.find(".nature-form").exists()).toBe(false);
+    // DE9 : un seul bouton plein, « Essayer » ; champ et boutons à la hauteur des contrôles.
+    expect(app.findAll("main .button--primary").map((b) => b.text())).toEqual(["Essayer"]);
+    expect(cssValue("src/components/home/TryStep.vue", ".try__box", "height")).toBe(
+      "var(--control-md)",
+    );
+    expect(
+      cssValue(
+        "src/components/projects/ProjectForm.vue",
+        ".actions__submit--wide",
+        "padding-block",
+      ),
+    ).toBeUndefined();
   });
 
   it("A2 : une adresse collée est reconnue REST ; le formulaire prend la place", async () => {

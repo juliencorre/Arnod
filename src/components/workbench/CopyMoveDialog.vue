@@ -395,7 +395,7 @@ async function submit(mode: TransferMode): Promise<void> {
   background: none;
   font: inherit;
   font-weight: 600;
-  color: var(--color-accent-text);
+  color: var(--color-link);
   cursor: pointer;
 }
 
@@ -467,7 +467,7 @@ async function submit(mode: TransferMode): Promise<void> {
 }
 
 .copy-move__note--accent {
-  color: var(--color-accent-text);
+  color: var(--color-text);
 }
 
 .copy-move__none {

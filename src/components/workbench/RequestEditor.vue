@@ -281,21 +281,17 @@ type Tab =
   "params" | "body" | "headers" | "auth" | "docs" | "settings" | "variables" | "assertions";
 const tab = ref<Tab>("params");
 /** Un nombre pour une liste, un point pour un onglet rempli d'une seule valeur. */
-const tabs = computed<{ id: Tab; label: string; count?: number; filled?: boolean }[]>(() => {
+/** Onglets ; un compteur en pastille, une seule forme (DE7, 5.1-b ter). */
+const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
   const r = request.value;
   const activeQuery = r?.params.filter((p) => p.kind === "query" && p.enabled).length ?? 0;
-  const settings = r ? Object.values(r.settings).some((value) => value !== null) : false;
   return [
     { id: "params", label: "Paramètres", count: activeQuery + pathNames.value.length },
-    { id: "body", label: "Corps", filled: r !== null && r.body.kind !== "none" },
+    { id: "body", label: "Corps" },
     { id: "headers", label: "En-têtes", count: r?.headers.filter((h) => h.enabled).length },
-    {
-      id: "auth",
-      label: "Auth",
-      filled: r !== null && r.auth.type !== "none" && r.auth.type !== "inherit",
-    },
-    { id: "docs", label: "Docs", filled: r !== null && r.docs.trim() !== "" },
-    { id: "settings", label: "Réglages", filled: settings },
+    { id: "auth", label: "Auth" },
+    { id: "docs", label: "Docs" },
+    { id: "settings", label: "Réglages" },
     { id: "variables", label: "Variables", count: r?.extractions.length },
     { id: "assertions", label: "Assertions", count: r?.assertions.length },
   ];
@@ -491,9 +487,6 @@ watch(
       >
         {{ t.label }}
         <span v-if="t.count" class="editor__badge">{{ t.count }}</span>
-        <span v-else-if="t.filled" class="editor__dot">
-          <span aria-hidden="true">●</span><span class="sr-only">, rempli</span>
-        </span>
       </button>
     </div>
 
@@ -942,8 +935,14 @@ watch(
 /* Zone étroite : les onglets passent à la ligne, aucun n'est caché. */
 .editor__tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--color-border);
+}
+
+.editor__tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .editor__tab {
@@ -963,12 +962,6 @@ watch(
   border-bottom-color: var(--color-accent);
   font-weight: 600;
   color: var(--color-text);
-}
-
-.editor__dot {
-  margin-left: 0.25rem;
-  font-size: var(--text-caption);
-  color: var(--color-accent);
 }
 
 .editor__badge {
@@ -1066,7 +1059,7 @@ watch(
 
 .sent--added .sent__name,
 .sent--added .sent__value {
-  color: var(--color-subtle);
+  color: var(--color-muted);
 }
 
 .sent__source {

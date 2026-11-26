@@ -386,7 +386,7 @@ async function submitName(name: string): Promise<void> {
 
 .tree__help {
   padding-left: calc(var(--tree-pad) + var(--tree-indent));
-  color: var(--color-subtle);
+  color: var(--color-muted);
 }
 
 .tree__lead {

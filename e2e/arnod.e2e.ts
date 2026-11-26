@@ -1486,6 +1486,7 @@ describe("Premier usage : assertions, run et statuts", () => {
     | { kind: "url"; value: string }
     | { kind: "method"; value: string }
     | { kind: "click"; value: string }
+    | { kind: "responseTab"; value: string }
     | { kind: "addCheck"; target: string; operator: string }
     | { kind: "editorChecks" }
     | { kind: "state" };
@@ -1515,6 +1516,14 @@ describe("Premier usage : assertions, run et statuts", () => {
         if (action.kind === "click") {
           const found = button(action.value);
           if (!found) throw new Error(`bouton « ${action.value} » introuvable`);
+          found.click();
+        }
+        // Onglet du résultat (ses compteurs sont en pastille, comme ceux de l'éditeur).
+        if (action.kind === "responseTab") {
+          const found = Array.from(tab.querySelectorAll<HTMLElement>(".response__tab")).find((b) =>
+            b.textContent.trim().startsWith(action.value),
+          );
+          if (!found) throw new Error(`onglet du résultat « ${action.value} » introuvable`);
           found.click();
         }
         // Onglet « Vérifications » de l'éditeur (celui de la réponse a son propre onglet).
@@ -1591,7 +1600,7 @@ describe("Premier usage : assertions, run et statuts", () => {
     await createRequest("Lister les commandes");
     await inRequest("Lister les commandes", { kind: "url", value: `${url}/commandes` });
     await sendAndWait("Lister les commandes", "200");
-    await inRequest("Lister les commandes", { kind: "click", value: "Assertions (" });
+    await inRequest("Lister les commandes", { kind: "responseTab", value: "Assertions" });
     await inRequest("Lister les commandes", { kind: "click", value: "Proposer des assertions" });
     await inRequest("Lister les commandes", { kind: "editorChecks" });
     await browser.waitUntil(
@@ -1621,11 +1630,11 @@ describe("Premier usage : assertions, run et statuts", () => {
     await sendAndWait("Créer une commande", "201");
     const failed = await inRequest("Créer une commande", { kind: "state" });
     expect(failed.failures).toEqual(["✕ headers.Location"]);
-    expect(failed.verdict).toBe("Échec · 1 assertion(s)");
+    expect(failed.verdict).toBe("Échec · 1 assertion");
     expect((await treeRow("Créer une commande"))?.status).toBe("✕, en échec");
     await screenshot(browser, "19-verification-en-echec");
 
-    await inRequest("Créer une commande", { kind: "click", value: "Ignorer pour ce run" });
+    await inRequest("Créer une commande", { kind: "click", value: "Ignorer pour ce résultat" });
     await browser.waitUntil(
       async () => (await inRequest("Créer une commande", { kind: "state" })).verdict === "Réussie",
       { timeoutMsg: "verdict recalculé attendu" },
@@ -2079,7 +2088,8 @@ describe("Lot B : saisie, texte et cURL", () => {
     expect(state.unknown).toContain("apiVersion est inconnue dans Local");
     expect(state.marked).toBe("{{apiVersion}}");
     expect(state.tabs).toContain("En-têtes 2");
-    expect(state.tabs.some((t) => t.startsWith("Corps ●"))).toBe(true);
+    // DE7 (lot I) : un compteur en pastille, plus de point « rempli » sur l'onglet Corps.
+    expect(state.tabs).toContain("Corps");
 
     await inEditor(essai, { kind: "click", value: "En-têtes" });
     await browser.waitUntil(

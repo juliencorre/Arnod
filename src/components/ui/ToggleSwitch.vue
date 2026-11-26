@@ -49,7 +49,7 @@ const labelId = useId();
   width: 2.25rem;
   height: 1.25rem;
   padding: 0;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-pill);
   background: var(--color-chip);
   cursor: inherit;

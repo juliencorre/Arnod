@@ -391,7 +391,7 @@ function installOnExit(): void {
   background: none;
   font: inherit;
   font-weight: 600;
-  color: var(--color-accent-text);
+  color: var(--color-link);
   cursor: pointer;
 }
 
