@@ -55,7 +55,7 @@ const items = computed<MenuItem[]>(() => [
     detail: host(env),
   })),
   { id: MANAGE, label: "Gérer les environnements…", shortcut: "Ctrl+Maj+E", separatorBefore: true },
-  { id: CREATE, label: "+ Nouvel environnement" },
+  { id: CREATE, label: "+ Nouvel environnement", tone: "link" },
 ]);
 
 /** Ouvre la gestion des environnements, ou la création d'un nouveau. */

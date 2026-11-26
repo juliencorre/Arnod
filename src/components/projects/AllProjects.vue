@@ -241,16 +241,17 @@ onMounted(async () => {
   padding: 1.75rem 2rem;
 }
 
+/* Recherche et boutons à droite du titre (1.1-e), sous lui seulement dans une fenêtre étroite. */
 .all__header {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
 }
 
 .all__intro {
-  flex: 1 1 28rem;
+  flex: 1 1 18rem;
 }
 
 .all__title {
@@ -299,9 +300,9 @@ onMounted(async () => {
 
 .all__tools {
   display: flex;
-  flex-wrap: wrap;
+  flex: 0 1 34rem;
+  flex-wrap: nowrap;
   gap: 0.75rem;
-  width: min(100%, 44rem);
 }
 
 .all__tools > :first-child {

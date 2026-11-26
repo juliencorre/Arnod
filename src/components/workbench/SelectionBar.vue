@@ -186,8 +186,9 @@ onBeforeUnmount(() => {
   outline-offset: 1px;
 }
 
+/* Action destructrice : rouge lisible sur la barre inversée (4.1-a quater, Q2). */
 .selection__action--danger {
-  color: var(--color-accent);
+  color: var(--color-danger-inverse);
 }
 
 .selection__close {

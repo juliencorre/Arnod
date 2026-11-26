@@ -26,6 +26,7 @@ import RequestTab from "@/components/zones/RequestTab.vue";
 import ResultTab from "@/components/zones/ResultTab.vue";
 import TestTab from "@/components/zones/TestTab.vue";
 import { useTabActions } from "@/composables/useTabActions";
+import { useTabInfo } from "@/composables/useTabInfo";
 import {
   type DropRegion,
   droppedTab,
@@ -35,11 +36,9 @@ import {
   startTabDrag,
 } from "@/lib/dnd";
 import { useCatalogStore } from "@/stores/catalog";
-import { contractKey, useContractsStore } from "@/stores/contracts";
-import { useImportStore } from "@/stores/imports";
 import { byUse, fitTabs, isRunning } from "@/lib/tabs";
 import { useWindowsStore, zonesOf } from "@/stores/windows";
-import { findRequest, requestKey, useWorkbenchStore } from "@/stores/workbench";
+import { requestKey, useWorkbenchStore } from "@/stores/workbench";
 import type { ContentTab, ZoneView } from "@/types/ipc";
 
 const props = defineProps<{ zone: ZoneView; projectId: string | null }>();
@@ -47,8 +46,6 @@ const props = defineProps<{ zone: ZoneView; projectId: string | null }>();
 const windows = useWindowsStore();
 const workbench = useWorkbenchStore();
 const catalog = useCatalogStore();
-const contracts = useContractsStore();
-const imports = useImportStore();
 const actions = useTabActions();
 const strip = useTemplateRef<HTMLElement>("strip");
 const body = useTemplateRef<HTMLElement>("body");
@@ -63,59 +60,7 @@ const activeTab = computed(
 const full = computed(() => windows.zones.length >= 4);
 const single = computed(() => windows.zones.length === 1);
 
-/** Libellé, méthode et état d'un onglet. */
-function info(tab: ContentTab): { name: string; badge: string; dirty: boolean } {
-  const content = tab.content;
-  if (content.kind === "result") return { name: "Résultat", badge: "RES", dirty: false };
-  if (content.kind === "run") {
-    return {
-      name: `Run · ${catalog.projectById(content.projectId)?.name ?? "projet"}`,
-      badge: "RUN",
-      dirty: false,
-    };
-  }
-  if (content.kind === "importReport") {
-    const report = imports.reports[content.projectId];
-    return {
-      name: report ? `Rapport d'import · ${report.collection}` : "Rapport d'import",
-      badge: "⇩",
-      dirty: false,
-    };
-  }
-  if (content.kind === "contract") {
-    const key = contractKey(content.projectId, content.path);
-    const summary = contracts.lists[content.projectId]?.find((c) => c.path === content.path);
-    return {
-      name:
-        contracts.open[key]?.view?.name ??
-        summary?.name ??
-        content.path.split("/").at(-1) ??
-        content.path,
-      badge: "API",
-      dirty: contracts.isDirty(key),
-    };
-  }
-  if (content.kind === "test") {
-    return {
-      name: content.path.split("/").at(-1) ?? content.path,
-      badge: "TEST",
-      dirty: false,
-    };
-  }
-  const key = requestKey(content.projectId, content.path);
-  const draft = workbench.editors[key]?.draft;
-  const node = findRequest(workbench.trees[content.projectId]?.nodes ?? [], content.path);
-  const fallback =
-    content.path
-      .split("/")
-      .at(-1)
-      ?.replace(/\.yml$/, "") ?? content.path;
-  return {
-    name: draft?.name ?? node?.name ?? fallback,
-    badge: draft?.method ?? (node?.kind === "request" ? node.method : null) ?? "GET",
-    dirty: workbench.isDirty(key),
-  };
-}
+const info = useTabInfo();
 
 function activate(tab: ContentTab): void {
   void windows.activate(props.zone.id, tab.id);
@@ -661,6 +606,8 @@ const welcome = computed(
       </p>
     </div>
 
+    <!-- Voile derrière la liste Ctrl+Tab, comme le fond d'une fenêtre modale (1.3-c). -->
+    <div v-if="switcher" class="zone__scrim" aria-hidden="true" />
     <div
       v-if="switcher"
       class="zone__switcher"
@@ -829,6 +776,14 @@ const welcome = computed(
 }
 
 /* Liste de Ctrl+Tab (1.3-c), sur la zone active. */
+.zone__scrim {
+  position: absolute;
+  z-index: 24;
+  inset: 0;
+  background: var(--backdrop);
+  pointer-events: none;
+}
+
 .zone__switcher {
   position: absolute;
   z-index: 25;
@@ -983,6 +938,7 @@ const welcome = computed(
   color: var(--color-accent);
 }
 
+/* × sur l'onglet actif ; sur un autre, au survol ou au focus seulement (1.3-a, Q1). */
 .zone__close {
   padding: 0 0.5rem 0 0.25rem;
   border: none;
@@ -991,6 +947,13 @@ const welcome = computed(
   color: var(--color-subtle);
   background: none;
   cursor: pointer;
+  opacity: 0;
+}
+
+.zone__tab--active .zone__close,
+.zone__tab:hover .zone__close,
+.zone__tab:focus-within .zone__close {
+  opacity: 1;
 }
 
 .zone__close:hover {

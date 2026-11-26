@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { EVENTS } from "@/lib/ipc";
 import type { ProjectChange } from "@/types/ipc";
 
+import { cssValue } from "../css";
 import { installFakeCore, type FakeCore } from "../fakeCore";
 import { newWindow, tab, zonesIn } from "../fakeWindows";
 import { newRequest } from "../fakeWorkbench";
@@ -70,6 +71,10 @@ describe("fenêtre de contenu (F8, F10, F12)", () => {
     app = await mountApp();
 
     expect(app.get('nav[aria-label="Emplacement"]').text()).toBe("boutique-tests›Clients›Lister");
+    // AM22 (1.4-h) : la pastille d'environnement du projet précède « Rattacher ».
+    const bar = app.get(".content-window__bar");
+    const chip = bar.find('[aria-label^="Environnement de boutique-tests"]');
+    expect(chip.exists()).toBe(true);
     expect((app.get(".editor__url").element as HTMLInputElement).value).toBe("{{baseUrl}}/clients");
     expect(app.find("aside").exists()).toBe(false);
     expect(core.calls.filter((c) => c.cmd === "window_set_title").at(-1)?.args).toEqual({
@@ -89,7 +94,15 @@ describe("fenêtre de contenu (F8, F10, F12)", () => {
     await toggle.trigger("click");
     await flushPromises();
     expect(core.calls.find((c) => c.cmd === "layout_set_follow")?.args).toEqual({ follow: false });
-    expect([toggle.text(), toggle.attributes("aria-pressed")]).toEqual(["Épinglée", "false"]);
+    // AM22 (1.4-g) : « ● Épinglée » en pastille accent doux.
+    expect([toggle.text(), toggle.attributes("aria-pressed")]).toEqual(["● Épinglée", "false"]);
+    expect(
+      cssValue(
+        "src/components/windows/ContentWindow.vue",
+        '.content-window__follow[aria-pressed="false"]',
+        "background",
+      ),
+    ).toBe("var(--color-accent-soft)");
 
     await toggle.trigger("click");
     await flushPromises();

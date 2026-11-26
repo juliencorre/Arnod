@@ -106,6 +106,12 @@ const PAIRS: { foreground: string[]; background: string[]; minimum: number }[] =
     background: ["--color-bg", "--color-surface", "--color-sidebar"],
     minimum: 3,
   },
+  // Action destructrice sur la barre de sélection, au fond color-text (4.1-a quater).
+  {
+    foreground: ["--color-danger-inverse"],
+    background: ["--color-text"],
+    minimum: 4.5,
+  },
   // Bord des cases, radios et de l'interrupteur éteint (DE4, WCAG 1.4.11).
   {
     foreground: ["--color-border-control"],

@@ -121,6 +121,17 @@ select:focus-visible {
   outline-offset: -1px;
 }
 
+/*
+ * Champ de recherche : jamais le bouton natif d'effacement (⌫ sous WebKitGTK, bleu sous WebView2) ;
+ * les champs d'Arnod se vident par leur × ou par Échap (1.2-e, 4.1-g).
+ */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* Texte réservé aux lecteurs d'écran. */
 .visually-hidden {
   position: absolute;
@@ -386,6 +397,11 @@ select:focus-visible {
 
 .menu__item--danger {
   color: var(--color-danger);
+}
+
+/* Ligne d'ajout d'un menu (« + Nouvel environnement »), comme « + Nouveau workspace ». */
+.menu__item--link {
+  color: var(--color-link);
 }
 
 .menu__check {

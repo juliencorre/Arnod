@@ -37,6 +37,8 @@ const COLOR_NOTES = {
   "color-success":
     "Réussite : ✓ d'un statut, méthode GET, vérification réussie ; 4,5:1 sur color-bg, color-surface, color-sidebar et color-success-soft.",
   "color-success-soft": "Fond d'une vérification ou d'une ligne de run réussie.",
+  "color-danger-inverse":
+    "Action destructrice sur une barre inversée (fond color-text, comme la barre de sélection) : 4,5:1 sur color-text dans les deux thèmes (vérifié par tests/theme.spec.ts).",
   "color-danger":
     "Échec, erreur, action destructrice, méthode DELETE ; 4,5:1 sur color-bg, color-surface, color-sidebar et color-danger-soft.",
   "color-danger-soft": "Fond d'une vérification ou d'une ligne de run en échec.",

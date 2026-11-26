@@ -49,6 +49,11 @@ describe("environnements du projet", () => {
     ({ app } = await openProject());
     await click(app, '[aria-label="Environnement de boutique-tests : Local"]');
     expect(app.get(".menu__heading").text()).toBe("Environnements · boutique-tests");
+    // AM17 (1.2-a bis) : « + Nouvel environnement » en couleur de lien.
+    const create = app
+      .findAll('[role="menuitem"]')
+      .find((i) => i.text() === "+ Nouvel environnement");
+    expect(create?.classes()).toContain("menu__item--link");
   });
 
   it("crée un environnement depuis la fenêtre de gestion", async () => {

@@ -129,6 +129,14 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
+/** Rangée d'aide montrée pendant le glisser (1.4-b) : gestes et taille minimale. */
+const help = computed(
+  () =>
+    `Glisser : redimensionner · Double-clic : parts égales · Flèches : au clavier · ${
+      props.axis === "row" ? "Largeur" : "Hauteur"
+    } mini : ${String(Math.max(props.minFirst, props.minSecond))} px`,
+);
+
 const bubble = computed(() => {
   if (!sizes.value) return "";
   const [first, second] = sizes.value;
@@ -162,7 +170,11 @@ const bubble = computed(() => {
       @blur="sizes = null"
     >
       <span class="handle__line" aria-hidden="true" />
-      <span v-if="bubble" class="handle__bubble" aria-hidden="true">{{ bubble }}</span>
+      <!-- Poignée au milieu de la séparation (1.4-b). -->
+      <span class="handle__mark" aria-hidden="true">{{ axis === "row" ? "⇔" : "⇕" }}</span>
+      <span v-if="bubble" class="handle__bubble" aria-hidden="true">
+        {{ bubble }}<span v-if="dragging" class="handle__help">{{ help }}</span>
+      </span>
     </div>
     <slot />
   </div>
@@ -231,6 +243,40 @@ const bubble = computed(() => {
 .handle--column.handle--dragging .handle__line,
 .handle--column .handle__grip:focus-visible .handle__line {
   height: 3px;
+}
+
+.handle__mark {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  height: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-caption);
+  color: var(--color-muted);
+  background: var(--color-surface);
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+
+.handle--column .handle__mark {
+  width: 1.5rem;
+  height: 1rem;
+}
+
+.handle:hover .handle__mark,
+.handle--dragging .handle__mark,
+.handle__grip:focus-visible .handle__mark {
+  opacity: 1;
+}
+
+.handle__help {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: var(--text-caption);
+  opacity: 0.8;
 }
 
 .handle__bubble {

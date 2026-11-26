@@ -8,6 +8,7 @@ import { computed, ref } from "vue";
 
 import SplitHandle from "@/components/zones/SplitHandle.vue";
 import ZoneView from "@/components/zones/ZoneView.vue";
+import { useTabInfo } from "@/composables/useTabInfo";
 import { useWindowsStore } from "@/stores/windows";
 import type { LayoutNode } from "@/types/ipc";
 
@@ -22,6 +23,17 @@ const ratio = computed(() =>
 function commit(next: number): void {
   if (props.node.kind === "split") void windows.resize(props.node.id, next);
 }
+
+/** Nom d'un côté de la séparation : l'onglet actif de sa (première) zone (1.4-b). */
+const info = useTabInfo();
+function nameOf(node: LayoutNode): string {
+  if (node.kind === "split") return nameOf(node.first);
+  const tab = node.tabs.find((t) => t.id === node.activeTab);
+  return tab ? info(tab).name : "zone";
+}
+const names = computed<[string, string] | null>(() =>
+  props.node.kind === "split" ? [nameOf(props.node.first), nameOf(props.node.second)] : null,
+);
 </script>
 
 <template>
@@ -36,6 +48,7 @@ function commit(next: number): void {
       :min-first="node.axis === 'row' ? 280 : 160"
       :min-second="node.axis === 'row' ? 280 : 160"
       :label="node.axis === 'row' ? 'Largeur des zones' : 'Hauteur des zones'"
+      :names="names"
       @preview="preview = $event"
       @commit="commit"
     />
