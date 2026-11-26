@@ -61,7 +61,8 @@ describe("chronologie d'un envoi (5.1-c)", () => {
         ["Réception", "1 ms"],
       ],
       total: "Total42 ms",
-      notes: ["L'assertion de durée (responseTime) porte sur ce total."],
+      // AM12 : l'assertion de durée est citée telle qu'écrite (5.1-c).
+      notes: ["L'assertion « responseTime inférieur à 500 ms » porte sur ce total."],
       bars: 4,
     });
   });

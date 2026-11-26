@@ -9,6 +9,8 @@ import { computed, ref, useId } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
+import { countLabel } from "@/lib/format";
+import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -17,6 +19,7 @@ import type { TreeNode } from "@/types/ipc";
 const props = defineProps<{ editorKey: string; projectName: string }>();
 
 const workbench = useWorkbenchStore();
+const catalog = useCatalogStore();
 const contracts = useContractsStore();
 const toasts = useToastStore();
 const ids = { name: useId(), parent: useId(), error: useId() };
@@ -45,6 +48,21 @@ const places = computed<{ path: string; label: string }[]>(() => {
   return out;
 });
 const checked = computed(() => request.value?.assertions.filter((a) => a.enabled).length ?? 0);
+/** Ce qui part avec la requête, accordé (3.2-c) : « et son assertion », « et ses 3 assertions ». */
+const taken = computed(() => {
+  if (checked.value === 0) return "la requête, sans assertion, devient";
+  if (checked.value === 1) return "la requête et son assertion deviennent";
+  return `la requête et ses ${countLabel(checked.value, "assertion", "assertions")} deviennent`;
+});
+/** Un essai de « Non classés » rejoint le référentiel (2.2-b) ; une requête d'un contrat y devient
+ * l'étape 1 d'un test (3.2-c). */
+const description = computed(() => {
+  const projectId = editor.value?.projectId ?? "";
+  const requestName = request.value?.name ?? "";
+  return catalog.isInbox(projectId)
+    ? `Le test « ${name.value.trim() || requestName} » rejoint le référentiel de tests de « ${props.projectName} ».`
+    : `La requête « ${requestName} » devient l'étape 1 d'un nouveau test du référentiel.`;
+});
 const operation = computed(() => request.value?.contract?.operation ?? "");
 
 function start(): void {
@@ -86,7 +104,7 @@ async function submit(): Promise<void> {
     <BaseDialog
       :open="open"
       title="Transférer au référentiel de tests"
-      :description="`Le test « ${name.trim() || request.name} » rejoint le référentiel de tests de « ${projectName} ».`"
+      :description="description"
       @close="open = false"
     >
       <form class="transfer" novalidate @submit.prevent="submit">
@@ -110,11 +128,7 @@ async function submit(): Promise<void> {
           Un dossier créé pour l'occasion ; un test est un dossier d'étapes.
         </p>
         <div class="transfer__summary">
-          <p>
-            Repris tels quels : la requête et ses
-            <strong>{{ checked }} assertion{{ checked > 1 ? "s" : "" }}</strong>
-            deviennent la première étape du test.
-          </p>
+          <p>Repris tels quels : {{ taken }} la première étape du test.</p>
           <p>
             Une étape n'est pas liée à un contrat : elle quitte l'endpoint
             <code>{{ operation }}</code> et ne sera plus vérifiée contre lui.

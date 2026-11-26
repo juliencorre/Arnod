@@ -42,10 +42,10 @@ const copy = computed(() => {
       };
     case "template":
       return {
-        title: "Nouveau contrat",
+        title: "Nouveau contrat de service",
         label: "Nom du service",
         hint: "Un contrat OpenAPI 3.0 minimal est créé, avec une opération d'exemple à compléter.",
-        submit: "Créer",
+        submit: "Créer le contrat",
       };
     default:
       return {

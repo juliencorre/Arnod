@@ -25,10 +25,14 @@ const FILE = "contracts/api-boutique-dev.yaml";
 const PATH = "api.boutique.dev/essai-3.yml";
 
 /** Ouvre l'essai 3 (`GET /orders/42/tracking`) d'un projet tenu pour « Non classés ». */
-async function openTrial(): Promise<{ app: AppWrapper; core: FakeCore }> {
+/** `inbox` : le projet tient lieu de « Non classés » (2.2-b), sinon la requête est celle d'un
+ * contrat du projet (3.2-c) ; `assertions` : nombre d'assertions actives de la requête. */
+async function openTrial(
+  options: { inbox?: boolean; assertions?: number } = {},
+): Promise<{ app: AppWrapper; core: FakeCore }> {
   const snapshot = boutiqueSnapshot();
   // Le projet ouvert tient lieu de « Non classés » : ses essais montrent « Requête au point ? ».
-  snapshot.inboxProjectId = BOUTIQUE_TESTS;
+  snapshot.inboxProjectId = options.inbox === false ? null : BOUTIQUE_TESTS;
   const opened = await openProject((core) => {
     core.contracts.files.set(FILE, {
       name: "api.boutique.dev",
@@ -53,6 +57,13 @@ async function openTrial(): Promise<{ app: AppWrapper; core: FakeCore }> {
         contract: { file: FILE, operation: "GET /orders/42/tracking" },
       }),
     );
+    const request = core.workbench.requests.get(PATH);
+    if (request && options.assertions !== undefined) {
+      const first = request.assertions[0];
+      request.assertions = first
+        ? Array.from({ length: options.assertions }, (_, i) => ({ ...first, id: `a${String(i)}` }))
+        : [];
+    }
   }, snapshot);
   await useWorkbenchStore().openRequest(BOUTIQUE_TESTS, PATH);
   await flushPromises();
@@ -124,6 +135,34 @@ describe("transfert au référentiel de tests (2.2-b)", () => {
       seq: 1,
       gone: false,
     });
+  });
+
+  it("AM8 : l'essai rejoint le référentiel ; « et son assertion » accordé", async () => {
+    ({ app } = await openTrial());
+    await click(app, ".trial-transfer button", "Transférer au référentiel de tests");
+    expect(app.get("dialog[open] .dialog__description").text()).toBe(
+      "Le test « Essai 3 » rejoint le référentiel de tests de « boutique-tests ».",
+    );
+    expect(app.get(".transfer__summary").text()).toContain(
+      "Repris tels quels : la requête et son assertion deviennent la première étape du test.",
+    );
+  });
+
+  it("AM8 (3.2-c) : la requête d'un contrat devient l'étape 1 ; accord au pluriel et sans assertion", async () => {
+    ({ app } = await openTrial({ inbox: false, assertions: 2 }));
+    await click(app, ".trial-transfer button", "Transférer au référentiel de tests");
+    expect(app.get("dialog[open] .dialog__description").text()).toBe(
+      "La requête « Essai 3 » devient l'étape 1 d'un nouveau test du référentiel.",
+    );
+    expect(app.get(".transfer__summary").text()).toContain(
+      "Repris tels quels : la requête et ses 2 assertions deviennent la première étape du test.",
+    );
+    app.unmount();
+    ({ app } = await openTrial({ inbox: false, assertions: 0 }));
+    await click(app, ".trial-transfer button", "Transférer au référentiel de tests");
+    expect(app.get(".transfer__summary").text()).toContain(
+      "Repris tels quels : la requête, sans assertion, devient la première étape du test.",
+    );
   });
 
   it("un nom déjà pris reste affiché dans la fenêtre, rien n'est déplacé", async () => {

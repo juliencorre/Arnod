@@ -103,7 +103,7 @@ export type CurlImport = { secrets: Array<CurlSecret>, ignored: Array<CurlIgnore
 
 export type CurlSecret = { name: string, value: string, header: string, };
 
-export type Definition = { format: number, id: string, version: string, name: string, title: string, description: string, family: StepFamily, publisher: string, engine: StepEngine, action: string, subject: StepSubject, detect: Array<StepRule>, form: Array<StepField>, };
+export type Definition = { format: number, id: string, version: string, name: string, title: string, noun: string, description: string, family: StepFamily, publisher: string, engine: StepEngine, action: string, subject: StepSubject, detect: Array<StepRule>, form: Array<StepField>, };
 
 export type DetailRow = { label: string, value: string, };
 
@@ -339,7 +339,7 @@ export type StepField = { key: string, label: string, kind: StepFieldKind, defau
 
 export type StepFieldKind = "choice" | "text" | "multiline";
 
-export type StepNature = { origin: StepOrigin, format: number, id: string, version: string, name: string, title: string, description: string, family: StepFamily, publisher: string, engine: StepEngine, action: string, subject: StepSubject, detect: Array<StepRule>, form: Array<StepField>, };
+export type StepNature = { origin: StepOrigin, format: number, id: string, version: string, name: string, title: string, noun: string, description: string, family: StepFamily, publisher: string, engine: StepEngine, action: string, subject: StepSubject, detect: Array<StepRule>, form: Array<StepField>, };
 
 export type StepOrigin = "builtin";
 

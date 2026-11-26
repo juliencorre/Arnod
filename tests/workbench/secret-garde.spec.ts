@@ -31,7 +31,26 @@ function saved(core: FakeCore): RequestDoc[] {
     .map((c) => c.args.request as RequestDoc);
 }
 
-describe("« Laisser dans le test » (4.2-c, IN4)", () => {
+describe("« Laisser dans la requête » (4.2-c, IN4)", () => {
+  it("AM10 : une étape d'un test propose « Laisser dans le test »", async () => {
+    ({ app } = await openProject((c) => {
+      c.workbench.folders.add("Commandes");
+      c.workbench.requests.set(
+        "Commandes/payer.yml",
+        newRequest("Payer", { method: "POST", seq: 1 }),
+      );
+    }));
+    await click(app, '[role="treeitem"]', "Payer");
+    await click(app, ".editor__tab", "Auth");
+    await app.get(".auth select").setValue("bearer");
+    await app.get('.auth input[type="text"]').setValue("eyJhbGciOi.xyz");
+    await settle();
+    expect(app.findAll(".secret button").map((b) => b.text())).toEqual([
+      "Mettre dans une variable locale",
+      "Laisser dans le test",
+    ]);
+  });
+
   it("le choix tient quand on revient sur l'onglet", async () => {
     let core: FakeCore;
     ({ app, core } = await openProject((c) => {
@@ -42,7 +61,8 @@ describe("« Laisser dans le test » (4.2-c, IN4)", () => {
     await app.get(".auth select").setValue("bearer");
     await app.get('.auth input[type="text"]').setValue("eyJhbGciOi.xyz");
     await settle();
-    await click(app, ".secret button", "Laisser dans le test");
+    // AM10 : une requête libre garde le secret « dans la requête ».
+    await click(app, ".secret button", "Laisser dans la requête");
     await settle();
     expect(saved(core).at(-1)?.auth.token).toBe("eyJhbGciOi.xyz");
 

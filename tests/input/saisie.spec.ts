@@ -295,6 +295,11 @@ describe("une commande cURL collée (2.1-a sexies)", () => {
       "https://api.boutique.dev/orders",
     );
     expect(app.get(".try__note").text()).toBe("Reconnu : une commande cURL.");
+    // AM5 (2.1-a sexies) : « REST · requête », repris de la commande.
+    expect(app.get(".nature-form__noun").text()).toBe("· requête");
+    expect(app.get(".nature-form__title").text()).toBe(
+      "repris de la commande, à vérifier avant l'envoi",
+    );
     expect(app.get('[role="radio"][aria-checked="true"]').text()).toBe("POST");
     const areas = app.findAll<HTMLTextAreaElement>("textarea").map((t) => t.element.value);
     expect(areas).toContain("Content-Type: application/json\nAuthorization: Bearer {{token}}");

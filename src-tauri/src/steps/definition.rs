@@ -156,6 +156,8 @@ pub struct Definition {
     pub version: String,
     pub name: String,
     pub title: String,
+    /// Ce que l'étape manipule, en un mot, après le nom : « REST · requête » (2.1-a ter).
+    pub noun: String,
     pub description: String,
     pub family: Family,
     pub publisher: String,
@@ -220,6 +222,9 @@ pub fn validate(definition: &Definition) -> Result<(), String> {
     }
     if definition.name.trim().is_empty() || definition.action.trim().is_empty() {
         return Err("nom ou verbe de l'action vide".to_owned());
+    }
+    if definition.noun.trim().is_empty() {
+        return Err("nom court vide (« requête »)".to_owned());
     }
     match &definition.engine {
         Engine::Builtin { id, abi } => {

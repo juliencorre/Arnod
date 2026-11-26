@@ -179,6 +179,10 @@ describe("reprendre l'existant (2.3-b)", () => {
     expect(dialog(app).text()).toContain(
       "Un nouveau dossier « Boutique API » dans Référentiel de tests.",
     );
+    // AM6 (2.3-b) : « 10 vérifications deviendront des assertions sans code ».
+    expect(dialog(app).text().replace(/\s+/g, " ")).toContain(
+      "10 vérifications deviendront des assertions sans code",
+    );
     await clickButton(app, "dialog[open]", "Importer");
 
     expect(core.calls.find((c) => c.cmd === "import_run")?.args).toEqual({

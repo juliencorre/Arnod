@@ -45,6 +45,12 @@ describe("environnements du projet", () => {
     });
   });
 
+  it("AM9 (3.3-0) : le menu de la pastille s'intitule « Environnements · <projet> »", async () => {
+    ({ app } = await openProject());
+    await click(app, '[aria-label="Environnement de boutique-tests : Local"]');
+    expect(app.get(".menu__heading").text()).toBe("Environnements · boutique-tests");
+  });
+
   it("crée un environnement depuis la fenêtre de gestion", async () => {
     let core;
     ({ app, core } = await openProject());

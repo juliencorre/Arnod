@@ -11,6 +11,7 @@ export const REST: StepNature = {
   version: "1.0.0",
   name: "REST",
   title: "Une requête HTTP",
+  noun: "requête",
   description:
     "Appelle une API par HTTP : méthode, adresse, corps. Les assertions portent sur le statut, les en-têtes, le corps et la durée.",
   family: "calls",

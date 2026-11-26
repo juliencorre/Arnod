@@ -34,8 +34,13 @@ describe("premier lancement (1a, P1, P3, P4, O8)", () => {
     const core = installFakeCore(firstRunSnapshot());
     wrapper = await mountApp();
     expect(folderPreview(wrapper)).toBe(DEFAULT_LOCATION);
+    // AM3 (2.1-a) : indication, rappel du rangement, rien sous le bouton.
     expect(wrapper.text()).toContain(
-      "Un projet est toujours dans « Tous les projets ». Un workspace est facultatif.",
+      "Un workspace est facultatif ; vous pourrez ranger le projet plus tard.",
+    );
+    expect(wrapper.text()).not.toContain("Vous pourrez toujours le ranger");
+    expect(wrapper.get(".first-run__card form input").attributes("placeholder")).toBe(
+      "par exemple boutique-tests",
     );
     expect(wrapper.findAll(".storage__chip").map((c) => c.text().replace(/\s+/g, " "))).toEqual([
       "Tous les projets par défaut",

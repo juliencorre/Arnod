@@ -1086,6 +1086,8 @@ export interface StepNature {
   version: string;
   name: string;
   title: string;
+  /** Ce que l'étape manipule, en un mot, après le nom : « REST · requête » (2.1-a ter). */
+  noun: string;
   description: string;
   family: StepFamily;
   publisher: string;

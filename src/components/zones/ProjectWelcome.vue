@@ -62,13 +62,13 @@ const STARTS: { id: Start; title: string; text: string; action: string }[] = [
   {
     id: "contract",
     title: "Décrire un contrat de service",
-    text: "Ses endpoints, le corps et les réponses attendus. Vous y écrirez vos premières requêtes.",
+    text: "Ses endpoints, le corps et les réponses attendus. Vous y écrirez vos premiers tests.",
     action: "+ Contrat",
   },
   {
     id: "test",
     title: "Écrire un test",
-    text: "Ses étapes dans le référentiel de tests, sans contrat.",
+    text: "Directement dans le référentiel de tests, sans contrat.",
     action: "+ Test",
   },
   {

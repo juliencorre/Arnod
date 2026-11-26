@@ -175,7 +175,7 @@ async function submit(): Promise<void> {
         type="text"
         autocomplete="off"
         spellcheck="false"
-        placeholder="boutique-tests"
+        placeholder="par exemple boutique-tests"
         :aria-invalid="errors.name !== null"
         :aria-describedby="errors.name ? ids.nameError : undefined"
       />
@@ -267,7 +267,7 @@ async function submit(): Promise<void> {
         {{
           creatingWorkspace && !selectedWorkspace
             ? `Il apparaîtra dans le sélecteur, après « ${ALL_PROJECTS} ».`
-            : `Un projet est toujours dans « ${ALL_PROJECTS} ». Un workspace est facultatif.`
+            : "Un workspace est facultatif ; vous pourrez ranger le projet plus tard."
         }}
       </p>
     </div>
@@ -284,9 +284,6 @@ async function submit(): Promise<void> {
       >
         Créer le projet
       </BaseButton>
-      <p v-if="mode === 'firstRun'" class="actions__note">
-        Vous pourrez toujours le ranger ou le déplacer plus tard.
-      </p>
     </div>
   </form>
 </template>
@@ -425,13 +422,6 @@ async function submit(): Promise<void> {
 .storage__create {
   display: flex;
   gap: 0.5rem;
-}
-
-.actions__note {
-  margin: 0;
-  font-size: var(--text-body);
-  text-align: center;
-  color: var(--color-muted);
 }
 
 .actions {
