@@ -494,10 +494,10 @@ function activate(preview = true): void {
   background: var(--color-chip);
 }
 
+/* Couleur du compteur : StatusCount (vert, rouge, sinon neutre) ; ne pas la fixer ici. */
 .row__count {
   margin-left: auto;
   font-size: var(--text-small);
-  color: var(--color-muted);
 }
 
 .row__method {

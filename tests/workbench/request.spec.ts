@@ -266,6 +266,23 @@ describe("éditer et envoyer une requête", () => {
       "Reprend l'authentification du dossier « Paiements » : Bearer, jeton {{token}}.",
     );
   });
+
+  it("auth héritée du projet : « du projet », libellé du cœur (inherit::project_source)", async () => {
+    ({ app } = await openProject((core) => {
+      const request = newRequest("Payer");
+      request.auth = { ...request.auth, type: "inherit" };
+      request.inherited.auth = {
+        source: "projet « boutique-tests »",
+        auth: { ...request.auth, type: "bearer", token: "{{token}}" },
+      };
+      core.workbench.requests.set("payer.yml", request);
+    }));
+    await click(app, '[role="treeitem"]', "Payer");
+    await click(app, ".editor__tab", "Auth");
+    expect(app.get(".note").text()).toBe(
+      "Reprend l'authentification du projet « boutique-tests » : Bearer, jeton {{token}}.",
+    );
+  });
 });
 
 describe("réponses attendues (EP8, EP9)", () => {

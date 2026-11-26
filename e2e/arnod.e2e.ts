@@ -1426,16 +1426,36 @@ describe("Premier usage : assertions, run et statuts", () => {
 
   const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
 
-  /** Ligne de l'arborescence (référentiel de tests) dont le nom est `name`. */
-  async function treeRow(name: string): Promise<{ status: string; count: string } | null> {
+  /**
+   * Ligne de l'arborescence (référentiel de tests) dont le nom est `name`. `countTone` : jeton de
+   * couleur du compteur (`success`, `danger`, `muted`), comparé à la couleur calculée.
+   */
+  async function treeRow(
+    name: string,
+  ): Promise<{ status: string; count: string; countTone: string } | null> {
     return browser.execute((label) => {
       const item = Array.from(document.querySelectorAll('aside [role="treeitem"]')).find(
         (row) => row.querySelector(".row__name")?.textContent.trim() === label,
       );
       if (!item) return null;
+      const count = item.querySelector(".row__count");
+      const tone = (el: Element | null): string => {
+        if (!el) return "";
+        const color = getComputedStyle(el).color;
+        for (const token of ["success", "danger", "muted"]) {
+          const probe = document.createElement("span");
+          probe.style.color = `var(--color-${token})`;
+          document.body.append(probe);
+          const same = getComputedStyle(probe).color === color;
+          probe.remove();
+          if (same) return token;
+        }
+        return color;
+      };
       return {
         status: item.querySelector(".row__status")?.textContent.trim() ?? "",
-        count: item.querySelector(".row__count")?.getAttribute("title") ?? "",
+        count: count?.getAttribute("title") ?? "",
+        countTone: tone(count),
       };
     }, name);
   }
@@ -1644,6 +1664,8 @@ describe("Premier usage : assertions, run et statuts", () => {
     expect(await browser.$(".run__group-count").getText()).toBe("0/2");
     // La barre latérale suit le run (R4, R6) ; l'étape non jouée garde son statut (lot E, R3).
     expect((await treeRow("Commandes"))?.count).toBe("1 réussie sur 2 exécutées (2 requêtes)");
+    // Un échec colore le compteur en rouge, jamais gris (ST2, R6).
+    expect((await treeRow("Commandes"))?.countTone).toBe("danger");
     expect((await treeRow("Créer une commande"))?.status).toBe("✕, en échec");
     await screenshot(browser, "20-run-dossier");
 
@@ -1652,6 +1674,7 @@ describe("Premier usage : assertions, run et statuts", () => {
       timeoutMsg: "échec ignoré attendu",
     });
     expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
+    expect((await treeRow("Commandes"))?.countTone).toBe("success");
   });
 
   it("au redémarrage, les statuts et le dernier run sont relus (ST4)", async () => {

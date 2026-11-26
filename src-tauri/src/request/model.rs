@@ -534,7 +534,7 @@ pub struct Example {
 #[serde(rename_all = "camelCase")]
 pub struct InheritedAuth {
     pub auth: Auth,
-    /// « dossier « Animalerie » » ou « collection ».
+    /// « dossier « Animalerie » » ou « projet « Boutique » » (`inherit::project_source`).
     pub source: String,
 }
 

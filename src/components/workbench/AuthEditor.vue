@@ -58,7 +58,7 @@ const note = computed(() => {
       const inherited = props.inherited.auth;
       return inherited
         ? `Reprend l'authentification du ${inherited.source} : ${summary(inherited.auth)}.`
-        : "Aucune authentification à reprendre d'un dossier ou de la collection : la requête part sans authentification.";
+        : "Aucune authentification à reprendre d'un dossier ou du projet : la requête part sans authentification.";
     }
     case "none":
       return "Aucune authentification : la requête part sans en-tête Authorization.";

@@ -237,3 +237,31 @@ describe("corps de la réponse (5.1-b bis)", () => {
     expect(app.get(".code").attributes("tabindex")).toBe("0");
   });
 });
+
+describe("onglets de la réponse (5.1-b)", () => {
+  it("la liste des assertions ne s'affiche que sous son onglet", async () => {
+    ({ app } = await sent());
+    expect(app.find(".response__checks").exists()).toBe(false);
+    await click(app, ".response__tab", "En-têtes");
+    expect(app.find(".response__checks").exists()).toBe(false);
+    await click(app, ".response__tab", "Envoyé");
+    expect(app.find(".response__checks").exists()).toBe(false);
+    await click(app, ".response__tab", "Assertions");
+    expect(app.find(".response__checks").exists()).toBe(true);
+  });
+
+  it("un cookie reçu ajoute sa note sous les en-têtes, sans la liste des assertions", async () => {
+    ({ app } = await openProject((core) => {
+      respond(core, ORDER, "application/json");
+      const outcome = core.workbench.nextSend;
+      if ("kind" in outcome) throw new Error("envoi réussi attendu");
+      outcome.response.headers.push(["set-cookie", "session=abc; HttpOnly"]);
+    }));
+    await click(app, '[role="treeitem"]', "Créer");
+    await app.get(".editor__line").trigger("submit");
+    await flushPromises();
+    await click(app, ".response__tab", "En-têtes");
+    expect(app.get(".response").text()).toContain("Les cookies reçus rejoignent");
+    expect(app.find(".response__checks").exists()).toBe(false);
+  });
+});
