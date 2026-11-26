@@ -111,14 +111,13 @@ pub fn usage(root: &Path) -> AuthUsage {
     let mut usage = AuthUsage::default();
     let mut folders: BTreeMap<String, AuthOverride> = BTreeMap::new();
     let mut without = 0usize;
-    let collection_source = "collection «";
     for (name, path) in found {
         let Ok(request) = tree::resolve(root, &path).and_then(|p| file::read(&p)) else {
             continue;
         };
         match request.auth.kind {
             AuthKind::Inherit => match inherit::resolve(root, &path).auth {
-                Some(inherited) if inherited.source.starts_with(collection_source) => {
+                Some(inherited) if inherit::is_project_source(&inherited.source) => {
                     usage.inheriting += 1;
                 }
                 Some(inherited) => {

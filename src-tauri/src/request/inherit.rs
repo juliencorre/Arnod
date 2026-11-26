@@ -15,8 +15,22 @@ use crate::request::model::{
     AuthKind, Inherited, InheritedAuth, InheritedHeader, ResolvedSettings,
 };
 
+/// Libellé du niveau projet (`opencollection.yml`) : « projet « Boutique » ».
+/// L'interface l'écrit après « du » (« Reprend l'authentification du projet
+/// « Boutique » ») : c'est le mot de l'interface, comme « Réglages du projet ».
+pub fn project_source(name: &str) -> String {
+    format!("{PROJECT_SOURCE} « {name} »")
+}
+
+/// Vrai si `source` désigne le niveau projet (voir [`project_source`]).
+pub fn is_project_source(source: &str) -> bool {
+    source.starts_with(&format!("{PROJECT_SOURCE} «"))
+}
+
+const PROJECT_SOURCE: &str = "projet";
+
 /// Réglages par défaut d'une requête de la chaîne : `request` d'un dossier ou
-/// de la collection, avec sa source.
+/// du projet, avec sa source.
 struct Level {
     source: String,
     request: Value,
@@ -40,7 +54,7 @@ fn collection_level(root: &Path) -> Option<Level> {
     let value = collection::read(root).ok()?;
     let name = collection::name(&value).unwrap_or_else(|| "projet".to_owned());
     Some(Level {
-        source: format!("collection « {name} »"),
+        source: project_source(&name),
         request: value.get("request")?.clone(),
     })
 }
@@ -218,7 +232,9 @@ mod tests {
         let inherited = resolve(dir.path(), "Commandes/v2/creer.yml");
         let auth = inherited.auth.clone().unwrap();
         assert_eq!(auth.auth.kind, AuthKind::Bearer);
-        assert_eq!(auth.source, "collection « Boutique »");
+        // « du projet « Boutique » » : jamais « du collection » (accord, vocabulaire).
+        assert_eq!(auth.source, "projet « Boutique »");
+        assert!(is_project_source(&auth.source));
         let headers: Vec<(&str, &str, &str)> = inherited
             .headers
             .iter()
@@ -228,7 +244,7 @@ mod tests {
             headers,
             [
                 ("x-client", "commandes", "dossier « Commandes »"),
-                ("Accept", "application/json", "collection « Boutique »"),
+                ("Accept", "application/json", "projet « Boutique »"),
             ]
         );
 

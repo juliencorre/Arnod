@@ -225,19 +225,19 @@ fn r3_authentification_masquee_et_heritee() {
             value: "k".to_owned(),
             ..Auth::default()
         },
-        source: "collection « B »".to_owned(),
+        source: "projet « B »".to_owned(),
     });
     let added = added_headers(&request, &BTreeMap::new());
     assert_eq!(added[0].name, "X-Key");
     assert_eq!(added[0].value, "••••");
-    assert_eq!(added[0].source.as_deref(), Some("collection « B »"));
+    assert_eq!(added[0].source.as_deref(), Some("projet « B »"));
     assert_eq!(
         serde_json::to_value(&added[0]).unwrap(),
         serde_json::json!({
             "name": "X-Key",
             "value": "••••",
             "origin": "auth",
-            "source": "collection « B »"
+            "source": "projet « B »"
         })
     );
 }

@@ -464,7 +464,7 @@ fn r10_authentification_heritee() {
             token: "jeton".to_owned(),
             ..Auth::default()
         },
-        source: "collection « B »".to_owned(),
+        source: "projet « B »".to_owned(),
     });
     let text = render::command(&request, &vars(&[], &[])).unwrap();
     assert!(text.contains("Bearer $TOKEN"));
