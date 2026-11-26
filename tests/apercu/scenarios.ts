@@ -1371,7 +1371,7 @@ Object.assign(SCENARIOS, {
     setup: copierDeplacer,
     play: async (g: Gestes) => {
       await ouvrirCommandes(g);
-      await g.cliquer('[aria-label="Ouvrir POST /orders"]');
+      await g.cliquer('[aria-label="POST /orders"], [aria-label^="POST /orders,"]');
       await g.attendre(150);
       await g.cliquer(".trial-transfer button", "Transférer au référentiel de tests");
       await g.attendre(100);

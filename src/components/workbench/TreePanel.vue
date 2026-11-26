@@ -10,8 +10,11 @@
  * Lot D (docs/plan-mvp-d-barre-laterale.md) : la section se replie, vide elle l'est par défaut
  * (D1, R6) ; un champ en tête filtre l'arborescence par nom, adresse, `#étiquette` ou méthode,
  * dossiers des résultats dépliés et compte affiché (F1 à F5, `lib/treeFilter.ts`).
+ *
+ * Lot H (AC1) : l'arbre est un seul arrêt de tabulation (la dernière ligne qui a eu le focus,
+ * sinon celle de l'onglet actif, sinon la première), parcouru aux flèches (`lib/treeKeyboard.ts`).
  */
-import { computed, nextTick, ref, useTemplateRef } from "vue";
+import { computed, nextTick, provide, ref, useTemplateRef } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
@@ -19,11 +22,14 @@ import SectionHeading from "@/components/ui/SectionHeading.vue";
 import NameDialog from "@/components/workbench/NameDialog.vue";
 import TreeFilter from "@/components/workbench/TreeFilter.vue";
 import TreeRow from "@/components/workbench/TreeRow.vue";
+import { visiblePaths } from "@/lib/tree";
 import { filterTree, parseFilter } from "@/lib/treeFilter";
+import { onTreeKeydown, TREE_TAB_STOP } from "@/lib/treeKeyboard";
 import { useCatalogStore } from "@/stores/catalog";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
 import { useTransferStore } from "@/stores/transfer";
+import { useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
 
@@ -55,6 +61,41 @@ const filterCount = computed(() =>
   filtered.value ? `${String(filtered.value.matched)} sur ${String(filtered.value.total)}` : null,
 );
 const filterFocused = ref(false);
+
+// --- Clavier de l'arbre (AC1) -------------------------------------------------
+
+const windows = useWindowsStore();
+/** Dernière ligne qui a eu le focus. */
+const current = ref<string | null>(null);
+const visible = computed(() =>
+  visiblePaths(
+    shown.value,
+    (folder) =>
+      filter.value !== null ||
+      !(workbench.trees[props.projectId]?.collapsed ?? []).includes(folder.path),
+  ),
+);
+/** Ligne de l'onglet actif, si elle est dans ce projet. */
+const activePath = computed(() => {
+  const content = windows.activeTab?.content;
+  return (content?.kind === "request" || content?.kind === "test") &&
+    content.projectId === props.projectId
+    ? content.path
+    : null;
+});
+const tabStop = computed<string | null>(() => {
+  const shownPaths = visible.value;
+  if (current.value !== null && shownPaths.includes(current.value)) return current.value;
+  if (activePath.value !== null && shownPaths.includes(activePath.value)) return activePath.value;
+  return shownPaths[0] ?? null;
+});
+provide(TREE_TAB_STOP, tabStop);
+
+function onTreeFocus(event: FocusEvent): void {
+  const item =
+    event.target instanceof Element ? event.target.closest<HTMLElement>('[role="treeitem"]') : null;
+  if (item?.dataset.path !== undefined) current.value = item.dataset.path;
+}
 const filterField = useTemplateRef<InstanceType<typeof TreeFilter>>("filterField");
 
 function toggleSection(): void {
@@ -269,6 +310,8 @@ async function submitName(name: string): Promise<void> {
         role="tree"
         class="tree__list"
         :aria-label="`Référentiel de tests de ${projectName}`"
+        @keydown="onTreeKeydown"
+        @focusin="onTreeFocus"
       >
         <TreeRow
           v-for="node in shown"

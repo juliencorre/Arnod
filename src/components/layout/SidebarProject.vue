@@ -20,6 +20,7 @@ import type { MenuItem } from "@/components/ui/menu";
 import EnvironmentChip from "@/components/workbench/EnvironmentChip.vue";
 import TreePanel from "@/components/workbench/TreePanel.vue";
 import { ALL_PROJECTS, useProjectActions } from "@/composables/useProjectActions";
+import { vTitleIfCut } from "@/lib/truncate";
 import { startProjectDrag } from "@/lib/dnd";
 import { countLabel } from "@/lib/format";
 import { useCatalogStore } from "@/stores/catalog";
@@ -215,7 +216,7 @@ defineExpose({
           <TrayIcon v-if="inbox" />
           <template v-else>{{ name.charAt(0).toUpperCase() }}</template>
         </span>
-        <span class="project__name">{{ name }}</span>
+        <span v-title-if-cut class="project__name">{{ name }}</span>
         <span v-if="missing" class="project__missing" title="Dossier introuvable">
           <span aria-hidden="true">!</span>
           <span class="visually-hidden">(dossier introuvable)</span>

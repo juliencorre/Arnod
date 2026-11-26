@@ -189,7 +189,9 @@ describe("accueil (A1 à A5)", () => {
       "/products",
     ]);
     expect(aside.get(".crow--selected").attributes("class")).toContain("crow--operation");
-    expect(aside.find('[aria-label="Ouvrir GET /products"]').exists()).toBe(true);
+    expect(
+      aside.find('[aria-label="GET /products"], [aria-label^="GET /products,"]').exists(),
+    ).toBe(true);
     expect(aside.findAll('[role="treeitem"]')).toHaveLength(0);
   });
 

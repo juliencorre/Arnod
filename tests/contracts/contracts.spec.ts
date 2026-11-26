@@ -169,7 +169,7 @@ describe("onglet du contrat (C5, C6, C10)", () => {
     expect(app?.get('[aria-label="Replier le contrat Petstore"]').attributes("aria-expanded")).toBe(
       "true",
     );
-    expect(app?.find('[aria-label="Ouvrir GET /pets"]').exists()).toBe(true);
+    expect(app?.find('[aria-label="GET /pets"], [aria-label^="GET /pets,"]').exists()).toBe(true);
     expect(app?.findAll('[role="treeitem"]').some((i) => i.text().includes("Petstore"))).toBe(
       false,
     );

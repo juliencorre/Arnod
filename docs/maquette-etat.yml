@@ -22,8 +22,6 @@ transverses:
   - texte: "Espacements : le design system décrit les pas employés (space-2 à space-32), sans variables dans le code ni règle dans la maquette."
     aligner: à décider
     page: "0.5"
-  - texte: "Clavier de l'arbre : l'arbre se parcourt aux flèches (Début, Fin, F2, Suppr, Maj+F10) ; le code n'a pas de flèches dans l'arbre (AC1, lot H du plan-qualite-mvp). Onglets de l'éditeur et de la réponse, cibles de 24 px et focus rendu sont alignés (AC2 à AC4, lot J)."
-    aligner: code
   - texte: "Cases à cocher et boutons radio cochés : noirs (#1d1b18) dans la maquette, à la couleur d'accent dans l'application (accent-color: var(--color-accent), styles.css), dont l'habillage vaut pour toute case (CLAUDE.md) ; vu en 1.6-e, 1.6-g et 2.3-b."
     aligner: maquette
     page: "0.5"
@@ -209,6 +207,7 @@ pages:
       - "2026-11-26 : d : quatre cartes sur toute la largeur, « + Environnement » sur une ligne (plan-qualite-mvp, lot I, DE6)."
       - "2026-11-26 : a bis, e : « + Nouvel environnement » en couleur de lien ; champ de filtre sans bouton natif (plan-alignement-maquette, lot B, AM17, AM18)."
       - "2026-11-26 : Sélection multiple et réponse attendue ouverte en fond accent doux, sans barre sur le côté ; opération sans requête estompée par la couleur (a quater, 3.2-a3, Impeccable DI2, DI4, PR #85)."
+      - "2026-11-26 : a : nom coupé avec son infobulle, ⋯ au survol et au focus, qui rend sa place au nom ; l'arbre se parcourt aux flèches (Début, Fin, F2, Suppr, Maj+F10), un seul arrêt de tabulation ; lignes d'un contrat nommées par leur texte visible (plan-qualite-mvp, lot H, T25 : AC1, AC9, DE5)."
     ecrans:
       "0": { etat: remplacé }
       a:
@@ -216,10 +215,8 @@ pages:
         pr: [33]
         captures: [03-workspace-boutique]
         ecart:
-          - texte: "Nom complet en infobulle quand il est coupé, ⋯ visible au survol et au focus seulement pour rendre sa place au nom ; le code coupe les noms (« Créer l… », « Ch… » à 200 px) sans infobulle et garde la colonne ⋯ (DE5) (plan-qualite-mvp, maquette de référence)."
-            aligner: code
-          - texte: "La maquette dessine encore une rangée d'onglets de workspaces (S8) et des requêtes sans section avant « CONTRATS » ; l'application a le sélecteur et les sections « Contrats de service » puis « Référentiel de tests », avec leurs icônes (RC6, I1) (aussi 1.2-a bis et a ter)."
-            aligner: maquette
+          texte: "La maquette dessine encore une rangée d'onglets de workspaces (S8) et des requêtes sans section avant « CONTRATS » ; l'application a le sélecteur et les sections « Contrats de service » puis « Référentiel de tests », avec leurs icônes (RC6, I1) (aussi 1.2-a bis et a ter)."
+          aligner: maquette
       "a bis":
         etat: livré
         pr: [33]

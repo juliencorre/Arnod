@@ -938,7 +938,9 @@ describe("Contrats de services", () => {
     expect(readFileSync(path.join(project(), "environments", "local.yml"), "utf8")).toContain(url);
 
     // Rangées sous le contrat, qui se déplie (RC7) ; aucune dans le référentiel de tests (RC6).
-    const operation = browser.$('aside [aria-label="Ouvrir GET /pets/{petId}"]');
+    const operation = browser.$(
+      'aside [aria-label="GET /pets/{petId}"], aside [aria-label^="GET /pets/{petId},"]',
+    );
     await operation.waitForExist({
       timeout: 10_000,
       timeoutMsg: "opération absente du contrat déplié",
@@ -1263,7 +1265,9 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
     expect(request).toContain("GET /sante");
 
     // Dans la barre latérale, l'essai est sous le contrat déduit, à son opération (RC8).
-    const operation = browser.$('aside [aria-label="Ouvrir GET /sante"]');
+    const operation = browser.$(
+      'aside [aria-label="GET /sante"], aside [aria-label^="GET /sante,"]',
+    );
     await operation.waitForExist({
       timeout: 10_000,
       timeoutMsg: "essai absent du contrat déduit",
@@ -2957,10 +2961,10 @@ describe("Lot J - Copier et déplacer (4.1-f, 4.1-g, 3.2-c)", () => {
     await browser.waitUntil(
       () =>
         browser.execute(() => {
-          // « Ouvrir POST /orders », ou « Créer la requête de POST /orders » si la requête écrite
+          // « POST /orders… », ou « POST /orders, créer la requête » si la requête écrite
           // n'est pas encore rangée sous l'opération : les deux ouvrent une requête liée.
           const open = document.querySelector<HTMLElement>(
-            '.crow__main[aria-label$=" POST /orders"]',
+            '.crow__main[aria-label="POST /orders"], .crow__main[aria-label^="POST /orders,"]',
           );
           if (open) {
             open.click();

@@ -25,3 +25,19 @@ export function testOf(nodes: TreeNode[], path: string): FolderNode | null {
   const node = findFolder(nodes, folder);
   return node?.test ? node : null;
 }
+
+/**
+ * Chemins des lignes visibles, dans l'ordre affiché : un dossier replié (`open` faux) cache ses
+ * enfants. Sert à garder l'arrêt de tabulation de l'arbre sur une ligne affichée (AC1).
+ */
+export function visiblePaths(nodes: TreeNode[], open: (folder: FolderNode) => boolean): string[] {
+  const paths: string[] = [];
+  const walk = (list: TreeNode[]): void => {
+    for (const node of list) {
+      paths.push(node.path);
+      if (node.kind === "folder" && open(node)) walk(node.children);
+    }
+  };
+  walk(nodes);
+  return paths;
+}

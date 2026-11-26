@@ -251,7 +251,7 @@ C, D, E, F, I. Vague 3, en parallèle : G, H, J, K.
 **Lot H - Barre latérale** (`claude/qualite-h-barre-laterale`)
 
 - [ ] **T24** PI4, PI7 : menu partagé, arbre aplati et virtualisé, filtre différé.
-- [ ] **T25** AC1, AC9, DE5, PI6 : clavier de l'arbre, noms accessibles, infobulles, calque des
+- [x] **T25** AC1, AC9, DE5, PI6 : clavier de l'arbre, noms accessibles, infobulles, calque des
       variables.
 
 **Lot I - Lisibilité** (`claude/qualite-i-lisibilite`)
