@@ -49,6 +49,8 @@ const COLOR_NOTES = {
   "color-toast-bg": "Fond des notifications (sombre en thème clair, relevé en thème sombre).",
   "color-toast-text": "Texte des notifications, 4,5:1 sur color-toast-bg.",
   "color-toast-action": "Action d'une notification (« Annuler »), 4,5:1 sur color-toast-bg.",
+  "color-toast-danger":
+    "Action destructrice posée sur color-toast-bg (« Supprimer » de la barre de sélection), 4,5:1 sur ce fond.",
   backdrop: "Voile derrière une fenêtre modale (::backdrop de BaseDialog).",
   "color-code-string":
     "Corps de réponse : chaînes JSON et valeurs d'attribut, 4,5:1 sur color-surface, color-bg et color-match.",
@@ -378,6 +380,165 @@ icons.set(
   `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="${ink}" stroke-width="1.1" stroke-linejoin="round"><path d="${tray[0] ?? ""}" fill="${light.get("color-surface")?.value ?? "#ffffff"}"/><path d="${tray[1] ?? ""}"/></svg>\n`,
 );
 
+// DESIGN.md (racine du dépôt) : le même design system au format DESIGN.md
+// (https://github.com/google-labs-code/design.md), lu par la skill Impeccable
+// (.claude/skills/impeccable/) et par les outils qui suivent ce format. En-tête YAML : jetons du
+// thème clair ; corps : les deux thèmes et les règles d'emploi. Généré, jamais écrit à la main.
+const short = (name) => name.replace(/^color-/, "");
+const quote = (value) => JSON.stringify(value);
+const pxOf = (name) => controls.find((t) => t.name === name)?.value ?? "";
+const yaml = [
+  "---",
+  "name: Arnod",
+  `description: ${quote("Application de bureau de test d'API (remplaçant de SoapUI et Bruno) : interface dense, en mode Operate.")}`,
+  "colors:",
+  ...colors.map((t) => `  ${short(t.name)}: ${quote(t.value.light)}`),
+  "typography:",
+  ...[
+    ...textStyles.map((s) => ({ ...s, family: sans })),
+    ...monoStyles.map((s) => ({ ...s, family: mono })),
+  ].flatMap((s) => [
+    `  ${s.name}:`,
+    `    fontFamily: ${quote(s.family)}`,
+    `    fontSize: ${quote(s.fontSize)}`,
+    `    fontWeight: ${String(s.fontWeight)}`,
+    `    lineHeight: ${String(s.lineHeight)}`,
+  ]),
+  "rounded:",
+  ...radius.map((t) => `  ${t.name.replace(/^radius-/, "")}: ${quote(t.value)}`),
+  "spacing:",
+  ...tokens.spacing.tokens.map((t) => `  ${t.name}: ${quote(t.value)}`),
+  "components:",
+  "  button-primary:",
+  '    backgroundColor: "{colors.accent}"',
+  '    textColor: "{colors.accent-text}"',
+  '    typography: "{typography.text-body}"',
+  '    rounded: "{rounded.md}"',
+  '    padding: "0 12px"',
+  `    height: ${quote(pxOf("control-md"))}`,
+  "  button-primary-hover:",
+  '    backgroundColor: "{colors.accent-hover}"',
+  "  button-secondary:",
+  '    backgroundColor: "{colors.surface}"',
+  '    textColor: "{colors.text}"',
+  '    rounded: "{rounded.md}"',
+  '    padding: "0 12px"',
+  `    height: ${quote(pxOf("control-md"))}`,
+  "  button-link:",
+  '    textColor: "{colors.link}"',
+  "  input:",
+  '    backgroundColor: "{colors.surface}"',
+  '    textColor: "{colors.text}"',
+  '    typography: "{typography.text-body}"',
+  '    rounded: "{rounded.md}"',
+  '    padding: "0 12px"',
+  `    height: ${quote(pxOf("control-md"))}`,
+  "  address-bar:",
+  '    typography: "{typography.text-body-large}"',
+  `    height: ${quote(pxOf("control-lg"))}`,
+  "  chip:",
+  '    backgroundColor: "{colors.chip}"',
+  '    textColor: "{colors.muted}"',
+  '    typography: "{typography.text-small}"',
+  '    rounded: "{rounded.pill}"',
+  "  row-selected:",
+  '    backgroundColor: "{colors.accent-soft}"',
+  '    textColor: "{colors.text}"',
+  "  toast:",
+  '    backgroundColor: "{colors.toast-bg}"',
+  '    textColor: "{colors.toast-text}"',
+  '    rounded: "{rounded.lg}"',
+  "---",
+];
+const cell = (text) => text.replaceAll("|", "\\|");
+const designMd = [
+  ...yaml,
+  "",
+  "<!-- Généré par scripts/design-system.mjs depuis src/styles.css : ne pas modifier à la main. -->",
+  "",
+  "# Arnod",
+  "",
+  "## Overview",
+  "",
+  "Outil de test d'API utilisé des heures durant, clavier en main : le mode est **Operate**. La",
+  "lisibilité, la constance et la densité priment sur l'expression ; la marque tient dans les",
+  "détails précis (accent orange, statuts ✓ / ✕, grille de la barre latérale). La maquette",
+  "(Claude Design) et `docs/design-system/` sont la référence ; ce fichier les résume pour les",
+  "agents. Thème clair et sombre suivant le système, police système (la CSP interdit toute police",
+  "distante).",
+  "",
+  "## Colors",
+  "",
+  "Une seule couleur d'action, `accent` (bouton principal, interrupteur allumé). Texte à 4,5:1,",
+  "bords de contrôle et focus à 3:1 dans les deux thèmes, vérifiés par `tests/theme.spec.ts`. Un",
+  "statut ne passe jamais par la couleur seule.",
+  "",
+  "| Jeton | Clair | Sombre | Emploi |",
+  "| --- | --- | --- | --- |",
+  ...colors.map(
+    (t) => `| \`--${t.name}\` | \`${t.value.light}\` | \`${t.value.dark}\` | ${cell(t.usage)} |`,
+  ),
+  "",
+  "## Typography",
+  "",
+  `Police système (\`${cell(sans)}\`) ; données, méthodes et chemins en chasse fixe (\`${cell(mono)}\`).`,
+  "Texte courant à 13 px, graisses 400 et 600 seulement.",
+  "",
+  "| Style | Taille | Graisse | Emploi |",
+  "| --- | --- | --- | --- |",
+  ...[...textStyles, ...monoStyles].map(
+    (s) => `| \`${s.name}\` | ${s.fontSize} | ${String(s.fontWeight)} | ${cell(s.usage)} |`,
+  ),
+  "",
+  "## Layout",
+  "",
+  "Barre latérale de projets, zones d'onglets redimensionnables (éditeur et résultat côte à côte",
+  "dès 1280 × 775), fenêtres détachées. Toute ligne de la barre latérale suit la grille",
+  "`--tree-*` : une colonne de tête de largeur fixe, le libellé après.",
+  "",
+  "| Jeton | Valeur | Emploi |",
+  "| --- | --- | --- |",
+  ...tokens.spacing.tokens.map((t) => `| \`${t.name}\` | ${t.value} | ${cell(t.usage)} |`),
+  "",
+  "## Elevation & Depth",
+  "",
+  "À plat ; seules les surfaces posées au-dessus du contenu portent une ombre.",
+  "",
+  "| Jeton | Emploi |",
+  "| --- | --- |",
+  ...shadows.map((t) => `| \`--${t.name}\` | ${cell(t.usage)} |`),
+  "",
+  "## Shapes",
+  "",
+  "| Jeton | Valeur | Emploi |",
+  "| --- | --- | --- |",
+  ...[...radius, ...controls].map((t) => `| \`--${t.name}\` | ${t.value} | ${cell(t.usage)} |`),
+  "",
+  "## Components",
+  "",
+  "Réutiliser les composants de base plutôt que d'en écrire de nouveaux :",
+  "",
+  ...Object.entries(COMPONENTS).map(([name, file]) => `- ${name} : \`${file}\``),
+  "",
+  "## Do's and Don'ts",
+  "",
+  "### Do:",
+  "",
+  "- Prendre tailles de texte, rayons et hauteurs dans `--text-*`, `--radius-*`, `--control-*`.",
+  "- Écrire chaque couleur en `var(--color-*)` ; un nouveau jeton est défini pour les deux thèmes,",
+  "  en `#rrggbb`, avec sa note d'usage dans `scripts/design-system.mjs`.",
+  "- Écrire un même état d'une seule façon : compteur en pastille, sélection en fond `accent-soft`.",
+  "- Donner à toute action glissée son équivalent au clavier ; focus visible en `--color-focus`.",
+  "",
+  "### Don't:",
+  "",
+  "- Plus d'un bouton plein par vue.",
+  "- Une police, une image ou une ressource distante (CSP stricte).",
+  "- `--color-accent-text` hors d'un fond `accent` ; `--color-subtle` pour un texte à lire.",
+  "- Une couleur, une taille ou un rayon écrits en dur dans un composant (sauf les glyphes ▾ ● ×).",
+  "",
+].join("\n");
+
 if (errors.length > 0) {
   console.error(`Design system : ${String(errors.length)} problème(s)`);
   for (const error of errors) console.error(`  - ${error}`);
@@ -385,15 +546,15 @@ if (errors.length > 0) {
 }
 
 const outputs = new Map([
-  ["tokens.json", `${JSON.stringify(tokens, null, 2)}\n`],
-  ["tokens.css", cssOut],
-  ["components/bundle.css", bundle],
-  ...[...icons].map(([name, svg]) => [`assets/Icones/${name}`, svg]),
+  [path.join(OUT, "tokens.json"), `${JSON.stringify(tokens, null, 2)}\n`],
+  [path.join(OUT, "tokens.css"), cssOut],
+  [path.join(OUT, "components/bundle.css"), bundle],
+  ...[...icons].map(([name, svg]) => [path.join(OUT, `assets/Icones/${name}`), svg]),
+  ["DESIGN.md", designMd],
 ]);
 
 const stale = [];
-for (const [rel, content] of outputs) {
-  const file = path.join(OUT, rel);
+for (const [file, content] of outputs) {
   const current = existsSync(file) ? read(file) : null;
   if (current === content) continue;
   if (CHECK) {

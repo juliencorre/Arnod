@@ -141,7 +141,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* Barre sombre centrée en bas de la fenêtre, comme la maquette. */
+/* Barre sombre dans les deux thèmes, comme une notification : jetons color-toast-* (DI1). */
 .selection {
   position: fixed;
   bottom: 3rem;
@@ -152,8 +152,8 @@ onBeforeUnmount(() => {
   gap: 0.25rem;
   padding: 0.375rem 0.5rem 0.375rem 1rem;
   border-radius: var(--radius-lg);
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-toast-bg);
+  color: var(--color-toast-text);
   box-shadow: var(--shadow-popover);
   transform: translateX(-50%);
 }
@@ -177,7 +177,7 @@ onBeforeUnmount(() => {
 
 .selection__action:hover,
 .selection__close:hover {
-  background: color-mix(in srgb, var(--color-bg) 15%, transparent);
+  background: color-mix(in srgb, var(--color-toast-text) 15%, transparent);
 }
 
 .selection__action:focus-visible,
@@ -187,7 +187,7 @@ onBeforeUnmount(() => {
 }
 
 .selection__action--danger {
-  color: var(--color-accent);
+  color: var(--color-toast-danger);
 }
 
 .selection__close {

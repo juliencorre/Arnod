@@ -41,6 +41,7 @@
   --color-toast-bg: #1d1b18;
   --color-toast-text: #fbfaf8;
   --color-toast-action: #f0a54a;
+  --color-toast-danger: #ff8a80; /* Action destructrice d'une barre sombre (« Supprimer ») */
 
   /* Couleurs des workspaces (pastilles) */
   --color-ws-gray: #a39d93;
@@ -159,6 +160,7 @@
     --color-toast-bg: #3a3631;
     --color-toast-text: #ede9e3;
     --color-toast-action: #f0b46a;
+    --color-toast-danger: #ff8a80;
 
     --color-ws-gray: #8f887e;
     --color-ws-orange: #eda24c;
@@ -242,6 +244,15 @@ select {
     0.3125rem 0.3125rem;
   appearance: none;
   cursor: pointer;
+}
+
+/*
+ * Texte indicatif d'un champ : color-subtle partout, opaque (le gris propre au moteur,
+ * #757575, tombait à 3,5:1 en thème sombre ; DI3).
+ */
+::placeholder {
+  color: var(--color-subtle);
+  opacity: 1;
 }
 
 /*

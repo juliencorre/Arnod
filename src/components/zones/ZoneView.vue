@@ -979,7 +979,7 @@ const welcome = computed(
 }
 
 .zone__dirty {
-  font-size: 0.625rem;
+  font-size: 0.625rem; /* impeccable-disable-line design-system-font-size: glyphe ● de modification (exception R1 à R8) */
   color: var(--color-accent);
 }
 
@@ -987,7 +987,7 @@ const welcome = computed(
   padding: 0 0.5rem 0 0.25rem;
   border: none;
   font: inherit;
-  font-size: 1rem;
+  font-size: 1rem; /* impeccable-disable-line design-system-font-size: glyphe × de fermeture (exception R1 à R8) */
   color: var(--color-subtle);
   background: none;
   cursor: pointer;

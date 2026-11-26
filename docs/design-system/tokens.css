@@ -23,6 +23,7 @@
   --color-toast-bg: #1d1b18;
   --color-toast-text: #fbfaf8;
   --color-toast-action: #f0a54a;
+  --color-toast-danger: #ff8a80;
   --color-ws-gray: #a39d93;
   --color-ws-orange: #e8962e;
   --color-ws-blue: #3f7fd6;
@@ -86,6 +87,7 @@
   --color-toast-bg: #3a3631;
   --color-toast-text: #ede9e3;
   --color-toast-action: #f0b46a;
+  --color-toast-danger: #ff8a80;
   --color-ws-gray: #8f887e;
   --color-ws-orange: #eda24c;
   --color-ws-blue: #6b9be6;

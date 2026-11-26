@@ -8,6 +8,7 @@ export default defineConfigWithVueTs(
     // docs/design-system/ : types de documentation du design system, hors projet TypeScript.
     // .maquette/ et .apercu/ : copies locales de la maquette et captures, ignorées par Git.
     // tests/ipc/coeur.ts : généré par le cœur (src-tauri/src/ts_mirror.rs), vérifié par vue-tsc.
+    // .claude/skills/impeccable/ : skill Impeccable installée par `npx impeccable install`.
     ignores: [
       "dist/**",
       "dist-perf/**",
@@ -18,6 +19,7 @@ export default defineConfigWithVueTs(
       ".maquette/**",
       ".apercu/**",
       "tests/ipc/coeur.ts",
+      ".claude/skills/impeccable/**",
     ],
   },
   pluginVue.configs["flat/recommended"],

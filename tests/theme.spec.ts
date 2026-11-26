@@ -77,7 +77,7 @@ const PAIRS: { foreground: string[]; background: string[]; minimum: number }[] =
     minimum: 4.5,
   },
   {
-    foreground: ["--color-toast-text", "--color-toast-action"],
+    foreground: ["--color-toast-text", "--color-toast-action", "--color-toast-danger"],
     background: ["--color-toast-bg"],
     minimum: 4.5,
   },

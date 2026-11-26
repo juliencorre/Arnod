@@ -592,7 +592,7 @@ onBeforeUnmount(() => {
 
 .switcher__caret {
   flex: none;
-  font-size: 0.625rem;
+  font-size: 0.625rem; /* impeccable-disable-line design-system-font-size: glyphe ▾ du menu (exception R1 à R8) */
   color: var(--color-muted);
 }
 

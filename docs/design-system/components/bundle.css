@@ -38,6 +38,15 @@ select {
 }
 
 /*
+ * Texte indicatif d'un champ : color-subtle partout, opaque (le gris propre au moteur,
+ * #757575, tombait à 3,5:1 en thème sombre ; DI3).
+ */
+::placeholder {
+  color: var(--color-subtle);
+  opacity: 1;
+}
+
+/*
  * Case à cocher : la couleur d'accent et une coche foncée (7:1), comme l'interrupteur ; la case
  * native du système tirait sur le bleu.
  */

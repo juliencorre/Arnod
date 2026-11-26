@@ -393,7 +393,7 @@ async function submit(): Promise<void> {
   padding: 0 0.125rem;
   border: none;
   font: inherit;
-  font-size: 1rem;
+  font-size: 1rem; /* impeccable-disable-line design-system-font-size: glyphe × de retrait (exception R1 à R8) */
   line-height: 1;
   color: var(--color-muted);
   background: none;

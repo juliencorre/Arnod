@@ -220,6 +220,7 @@ pages:
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 6 écarts ajoutés, 2 réécrits ou complétés."
       - "2026-11-26 : d : « Directement dans le référentiel de tests, sans contrat. » et « vos premiers tests » (plan-alignement-maquette, lot A, AM2)."
       - "2026-11-26 : d : quatre cartes sur toute la largeur, « + Environnement » sur une ligne (plan-qualite-mvp, lot I, DE6)."
+      - "2026-11-26 : Sélection multiple et réponse attendue ouverte en fond accent doux, sans barre sur le côté ; opération sans requête estompée par la couleur (a quater, 3.2-a3, Impeccable DI2, DI4, PR #84)."
     ecrans:
       "0": { etat: remplacé }
       a:
@@ -790,6 +791,7 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : g : note « après l'étape n » en couleur de texte, sélection en fond accent doux (DE2, DE7) ; cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 7 écarts ajoutés ; a bis passe de « livré » à « en partie », a ter passe de « livré » à « en partie »."
       - "2026-11-26 : g : note « après l'étape n » en couleur de texte (plan-qualite-mvp, lot I, DE2)."
+      - "2026-11-26 : Barre de la sélection multiple lisible en thème sombre (jetons des notifications) ; destination choisie et éléments choisis en fond accent doux, sans barre sur le côté (a quater, g, Impeccable DI1, DI4, PR #84)."
     ecrans:
       a:
         etat: livré
@@ -859,6 +861,8 @@ pages:
             aligner: à décider
           - texte: "Le champ de recherche est un champ de recherche natif : bouton d'effacement natif (bleu sous WebView2, ⌫ sous WebKitGTK) et loupe qui disparaît à la saisie ; la maquette garde la loupe, sans bouton d'effacement (comme le filtre du référentiel, 1.2-e)."
             aligner: code
+          - texte: "La destination choisie est un fond accent doux, sans barre orange sur le côté : la forme unique d'une sélection (DE7, Impeccable DI4)."
+            aligner: maquette
   "4.2":
     nom: "Tests et étapes"
     version: MVP
