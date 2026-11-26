@@ -424,7 +424,7 @@ fn start_empty(catalog: bool, shown: &str) -> StartupOption {
             "Repartir d'un état vide",
             format!(
                 "L'état actuel est mis de côté sous {shown}, sans être modifié. Arnod démarre sans \
-                 projet ; rouvrez les vôtres avec « Ouvrir un projet »."
+                 projet ; rouvrez les vôtres avec «\u{a0}Ouvrir un projet\u{a0}»."
             ),
             "Repartir d'un état vide",
             false,
@@ -756,6 +756,40 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
+
+    /// AM1 (0.3-b) : un guillemet français tient à son texte par une espace insécable, sinon une
+    /// ligne peut finir par « avec « ».
+    #[test]
+    fn am1_guillemets_avec_espaces_insecables() {
+        let causes = [
+            newer().cause,
+            Cause::Corrupt {
+                reason: "JSON invalide".into(),
+            },
+            locked().cause,
+            Cause::Inaccessible {
+                code: Some(13),
+                error: "Permission refusée".into(),
+            },
+        ];
+        for file in [StateFile::Catalog, StateFile::Windows] {
+            for cause in &causes {
+                let failure = Failure {
+                    file,
+                    path: PathBuf::from("/donnees/arnod.json"),
+                    cause: cause.clone(),
+                };
+                for attempts in [0, 3] {
+                    let text =
+                        serde_json::to_string(&describe(&failure, &env(), attempts)).unwrap();
+                    assert!(
+                        !text.contains("« ") && !text.contains(" »"),
+                        "espace ordinaire : {text}"
+                    );
+                }
+            }
+        }
+    }
     use crate::ts_contract::{serialized_name, union_members};
 
     fn env() -> Env {

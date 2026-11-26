@@ -59,9 +59,11 @@ const placeholder = computed(() => {
 const status = computed(() => {
   if (!nature.value) return "";
   if (imported.value) return "Reconnu : une commande cURL.";
+  // « Une requête HTTP » devient « Reconnu : une requête HTTP. » (2.1-a ter).
+  const title = nature.value.title;
   return chosen.value === null
-    ? `Reconnu : ${nature.value.name} (${nature.value.title}).`
-    : `Nature choisie : ${nature.value.name}.`;
+    ? `Reconnu : ${title.charAt(0).toLocaleLowerCase("fr") + title.slice(1)}.`
+    : "Nature choisie : le formulaire s'ouvre en dessous.";
 });
 
 watch(
@@ -183,8 +185,8 @@ async function send(): Promise<void> {
           Essayer une étape
         </component>
         <span class="try__hint">Arnod reconnaît la nature d'étape de ce que vous collez</span>
-        <span class="try__note" :class="{ 'try__note--found': imported }">
-          {{ imported ? status : note }}
+        <span class="try__note" :class="{ 'try__note--found': nature !== null }">
+          {{ nature ? status : note }}
         </span>
       </div>
       <div class="try__row">
@@ -230,6 +232,7 @@ async function send(): Promise<void> {
           :key="item.id"
           type="button"
           class="try__chip"
+          :class="{ 'try__chip--current': nature?.id === item.id }"
           :aria-pressed="chosen === item.id"
           :title="`${item.name} : ${item.title}`"
           @click="choose(item.id)"
@@ -240,7 +243,7 @@ async function send(): Promise<void> {
           Parcourir le catalogue…
         </BaseButton>
       </div>
-      <NatureForm v-if="nature" v-model="values" :nature="nature" />
+      <NatureForm v-if="nature" v-model="values" :nature="nature" :imported="imported !== null" />
       <div v-if="importNote" class="try__import" role="note">
         <p>{{ importNote.taken }}</p>
         <p v-for="line in importNote.secrets" :key="line" class="try__secret">
@@ -394,7 +397,8 @@ async function send(): Promise<void> {
   cursor: pointer;
 }
 
-.try__chip[aria-pressed="true"] {
+/* La nature reconnue ou choisie est cerclée (2.1-a sexies). */
+.try__chip--current {
   box-shadow: 0 0 0 1.5px var(--color-text);
 }
 

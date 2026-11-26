@@ -36,6 +36,9 @@ vagues, règles R1 à R14), d'après l'audit `docs/audit-2026-11-mvp.md` (99 con
 `docs/audit-2026-11-mvp/preuves/`). Lot 0 livré : la maquette redessinée est la référence
 (`docs/maquette-consignes-qualite.md`). Un lot = une branche `claude/qualite-<lot>` et une pull
 request ; chaque constat se corrige avec son test de preuve, qui échoue avant et passe après (R1).
+En parallèle, alignement du code sur la maquette selon `docs/plan-alignement-maquette.md` (écarts
+`aligner: code` de `maquette-etat.yml`, cas AM1 à AM42, lots A à F en `claude/alignement-<lot>`,
+entrelacés avec les lots I, J et T25 du plan de qualité, ordre au § 8).
 
 ## Architecture
 

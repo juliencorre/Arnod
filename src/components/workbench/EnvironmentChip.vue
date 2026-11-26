@@ -84,7 +84,7 @@ defineExpose({ manage });
     v-if="view && active"
     :items="items"
     :label="`Environnements de ${projectName}`"
-    :heading="`Environnement · ${projectName}`"
+    :heading="`Environnements · ${projectName}`"
     :align="compact ? 'end' : 'start'"
     @select="onSelect"
   >

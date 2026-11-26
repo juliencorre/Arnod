@@ -103,7 +103,7 @@ onMounted(() => {
           <template v-if="selected.engine.kind === 'builtin'">{{ selected.engine.id }}</template>
         </p>
         <p class="detail__text">{{ selected.description }}</p>
-        <h3 class="detail__section">Ce qu'elle demande</h3>
+        <h3 class="detail__section">Formulaire de l'étape</h3>
         <dl class="detail__fields">
           <dt>{{ selected.subject.label }}</dt>
           <dd class="catalog__mono">{{ selected.subject.placeholder || "texte" }}</dd>

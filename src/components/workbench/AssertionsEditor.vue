@@ -3,42 +3,12 @@
  * Vérifications d'une requête (V2) : opérateurs d'OpenCollection et de Bruno, activables une
  * à une ; la conformité au contrat lié est rappelée (R8 du format OpenCollection).
  */
+import { OPERATORS } from "@/lib/assertions";
 import type { Assertion, AssertionOperator, AssertionResult, Scalar } from "@/types/ipc";
 
 const props = defineProps<{ linked: boolean; results: AssertionResult[] | null }>();
 const assertions = defineModel<Assertion[]>({ required: true });
 
-/** Opérateurs d'OpenCollection et de Bruno (R4), dans l'ordre du menu. */
-const OPERATORS: { id: AssertionOperator; label: string }[] = [
-  { id: "equals", label: "est égal à" },
-  { id: "notEquals", label: "est différent de" },
-  { id: "contains", label: "contient" },
-  { id: "notContains", label: "ne contient pas" },
-  { id: "startsWith", label: "commence par" },
-  { id: "endsWith", label: "se termine par" },
-  { id: "lessThan", label: "est inférieur à" },
-  { id: "lessOrEqual", label: "est inférieur ou égal à" },
-  { id: "greaterThan", label: "est supérieur à" },
-  { id: "greaterOrEqual", label: "est supérieur ou égal à" },
-  { id: "between", label: "est entre (min, max)" },
-  { id: "in", label: "est parmi (a, b, …)" },
-  { id: "notIn", label: "n'est pas parmi (a, b, …)" },
-  { id: "length", label: "a pour longueur" },
-  { id: "exists", label: "existe" },
-  { id: "isUndefined", label: "n'existe pas" },
-  { id: "isNull", label: "est null" },
-  { id: "isEmpty", label: "est vide" },
-  { id: "isNotEmpty", label: "n'est pas vide" },
-  { id: "isTruthy", label: "est vrai (truthy)" },
-  { id: "isFalsy", label: "est faux (falsy)" },
-  { id: "isNumber", label: "est un nombre" },
-  { id: "isText", label: "est un texte" },
-  { id: "isBoolean", label: "est un booléen" },
-  { id: "isArray", label: "est une liste" },
-  { id: "isJson", label: "est un objet JSON" },
-  { id: "matches", label: "correspond à l'expression (non évaluée)" },
-  { id: "notMatches", label: "ne correspond pas à l'expression (non évaluée)" },
-];
 const NO_VALUE: AssertionOperator[] = [
   "exists",
   "isUndefined",

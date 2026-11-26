@@ -62,7 +62,14 @@ describe("accueil (A1 à A5)", () => {
 
     expect(core.calls.find((c) => c.cmd === "steps_detect")?.args).toEqual({ input: URL_PRODUCTS });
     expect(app.get(".try__nature").text()).toBe("REST");
-    expect(app.get('.try [aria-live="polite"]').text()).toBe("Reconnu : REST (Une requête HTTP).");
+    expect(app.get('.try [aria-live="polite"]').text()).toBe("Reconnu : une requête HTTP.");
+    // AM4, AM5 (2.1-a ter) : la note dit la nature reconnue, le formulaire « REST · requête ».
+    expect(app.get(".try__note").text()).toBe("Reconnu : une requête HTTP.");
+    expect(app.get(".nature-form__noun").text()).toBe("· requête");
+    expect(app.get(".nature-form__title").text()).toBe("ce qu'il faut pour l'exécuter");
+    expect(natureButton(app, "REST").classes()).toContain("try__chip--current");
+    expect(natureButton(app, "REST").attributes("aria-pressed")).toBe("false");
+    expect(app.get(".first-run__compact").text()).toContain("⇩ Importer l'existant…");
     const method = app.get('[role="radiogroup"]');
     expect(method.get('[aria-checked="true"]').text()).toBe("GET");
     // Un GET n'a que ses en-têtes en plusieurs lignes, sans corps.
@@ -100,7 +107,10 @@ describe("accueil (A1 à A5)", () => {
     expect(chip.attributes("aria-pressed")).toBe("true");
     expect(document.activeElement).toBe(tryInput(app).element);
     expect(tryInput(app).attributes("placeholder")).toBe("https://…");
-    expect(app.get('.try [aria-live="polite"]').text()).toBe("Nature choisie : REST.");
+    expect(app.get('.try [aria-live="polite"]').text()).toBe(
+      "Nature choisie : le formulaire s'ouvre en dessous.",
+    );
+    expect(app.get(".try__note").text()).toBe("Nature choisie : le formulaire s'ouvre en dessous.");
     const checked = app.get('[role="radio"][aria-checked="true"]');
     expect(checked.attributes("tabindex")).toBe("0");
     await checked.trigger("keydown", { key: "ArrowRight" });
@@ -229,6 +239,11 @@ describe("catalogue des étapes (K1, K2)", () => {
     ]);
     const detail = app.get(".detail");
     expect(detail.get("h2").text()).toBe("REST");
+    // AM11 (4.4-d) : les champs sont sous « Formulaire de l'étape ».
+    expect(detail.findAll(".detail__section").map((h) => h.text())).toEqual([
+      "Formulaire de l'étape",
+      "Ce qu'Arnod reconnaît",
+    ]);
     expect(detail.text()).toContain("Méthode");
     expect(detail.text()).toContain("GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS");
     expect(detail.text()).toContain(

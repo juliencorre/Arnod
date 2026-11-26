@@ -7,6 +7,7 @@
  */
 import { computed } from "vue";
 
+import { testOf } from "@/lib/tree";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
@@ -19,20 +20,7 @@ const toasts = useToastStore();
 const folder = computed(() => props.path.split("/").slice(0, -1).join("/"));
 
 /** Dossier de la requête, s'il est un test. */
-const test = computed(() => {
-  if (folder.value === "") return null;
-  const find = (nodes: TreeNode[]): TreeNode | null => {
-    for (const node of nodes) {
-      if (node.kind !== "folder") continue;
-      if (node.path === folder.value) return node;
-      const found = find(node.children);
-      if (found) return found;
-    }
-    return null;
-  };
-  const node = find(workbench.trees[props.projectId]?.nodes ?? []);
-  return node?.kind === "folder" && node.test ? node : null;
-});
+const test = computed(() => testOf(workbench.trees[props.projectId]?.nodes ?? [], props.path));
 
 const steps = computed(() =>
   (test.value?.children ?? []).filter(

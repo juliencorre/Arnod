@@ -49,6 +49,14 @@ fn r1_format_plus_recent_refuse() {
     assert!(error.contains("format 2"), "{error}");
 }
 
+/// AM5 (2.1-a sexies) : l'en-tête du formulaire dit « REST · requête ».
+#[test]
+fn am5_nom_court_de_la_nature() {
+    assert_eq!(catalog().natures[0].definition.noun, "requête");
+    let error = with(rest(), |d| d.noun = " ".to_owned()).unwrap_err();
+    assert!(error.contains("nom court"), "{error}");
+}
+
 #[test]
 fn r1_identifiant_et_version_verifies() {
     assert!(with(rest(), |d| d.id = "Rest".to_owned()).is_err());

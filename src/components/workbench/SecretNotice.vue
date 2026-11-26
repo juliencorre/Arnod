@@ -8,16 +8,26 @@
 import { computed, ref } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import { testOf } from "@/lib/tree";
 import { useInputStore } from "@/stores/input";
 import { useToastStore } from "@/stores/toasts";
+import { useWorkbenchStore } from "@/stores/workbench";
 
 const props = defineProps<{ editorKey: string }>();
 
 const inputs = useInputStore();
+const workbench = useWorkbenchStore();
 const toasts = useToastStore();
 const busy = ref(false);
 
 const secret = computed(() => inputs.pendingSecrets(props.editorKey)[0] ?? null);
+/** Une étape reste dans son test ; une requête libre, dans la requête (4.2-c). */
+const keepLabel = computed(() => {
+  const editor = workbench.editors[props.editorKey];
+  if (!editor) return "Laisser dans la requête";
+  const step = testOf(workbench.trees[editor.projectId]?.nodes ?? [], editor.path);
+  return step ? "Laisser dans le test" : "Laisser dans la requête";
+});
 /** Ce que le champ deviendra. */
 const reference = computed(() => (secret.value ? `{{ ${secret.value.suggested} }}` : ""));
 
@@ -48,7 +58,7 @@ async function toLocal(): Promise<void> {
     <div class="secret__actions">
       <BaseButton :disabled="busy" @click="toLocal">Mettre dans une variable locale</BaseButton>
       <BaseButton :disabled="busy" @click="inputs.keepSecrets(editorKey)">
-        Laisser dans le test
+        {{ keepLabel }}
       </BaseButton>
     </div>
     <p class="secret__note">

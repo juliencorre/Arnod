@@ -12,6 +12,7 @@ import ResponseBody from "@/components/workbench/ResponseBody.vue";
 import SentPanel from "@/components/workbench/SentPanel.vue";
 import TimelinePanel from "@/components/workbench/TimelinePanel.vue";
 import NetworkFailurePanel from "@/components/workbench/NetworkFailurePanel.vue";
+import { durationLabel } from "@/lib/assertions";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { AssertionResult } from "@/types/ipc";
@@ -23,6 +24,14 @@ const editor = computed(() => workbench.editors[props.editorKey] ?? null);
 const outcome = computed(() => editor.value?.outcome ?? null);
 // Lot K (5.1-c) : la chronologie remplace la ligne « Attente · Réception ».
 const view = ref<"body" | "headers" | "checks" | "sent" | "timeline">("body");
+
+/** Assertion de durée évaluée, telle qu'écrite, citée sous le total de la chronologie (5.1-c). */
+const durationCheck = computed(() => {
+  const evaluated = outcome.value?.assertions.find((a) => a.target === "responseTime");
+  if (!evaluated) return null;
+  const written = editor.value?.draft?.assertions.find((a) => a.id === evaluated.id);
+  return written ? durationLabel(written) : evaluated.target;
+});
 
 /** Identifiant du résultat de conformité au contrat lié (`CONTRACT_CHECK`, R8). */
 const CONTRACT_CHECK = "contrat";
@@ -134,7 +143,7 @@ function removable(check: AssertionResult): boolean {
       <TimelinePanel
         v-else-if="view === 'timeline'"
         :timeline="outcome.response.timeline"
-        :duration-check="outcome.assertions.some((a) => a.target === 'responseTime')"
+        :duration-check="durationCheck"
       />
       <div v-else>
         <ul class="response__checks">

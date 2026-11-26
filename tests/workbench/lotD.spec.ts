@@ -164,6 +164,10 @@ describe("projet créé (1.2-d) et menu « + » (1.2-a ter)", () => {
         .findAll("main .start__action")
         .map((b) => b.text()),
     ).toEqual(["Importer…", "+ Contrat", "+ Test", "+ Environnement"]);
+    // AM2 (1.2-d) : les textes des cartes « Décrire un contrat » et « Écrire un test ».
+    const start = wrapper().get("main .start").text();
+    expect(start).toContain("Vous y écrirez vos premiers tests.");
+    expect(start).toContain("Directement dans le référentiel de tests, sans contrat.");
 
     // Au clavier : Entrée sur l'en-tête déplie la section et montre sa ligne d'ajout.
     await toggles[1]?.trigger("click");
@@ -173,7 +177,9 @@ describe("projet créé (1.2-d) et menu « + » (1.2-a ter)", () => {
   it("les points de départ créent un contrat, un test, un environnement", async () => {
     const core = await emptyProject();
     await click(wrapper(), "main .start__action", "+ Contrat");
-    expect(wrapper().get("dialog[open] h2").text()).toBe("Nouveau contrat");
+    // AM7 (3.1-f) : « Nouveau contrat de service », « Créer le contrat ».
+    expect(wrapper().get("dialog[open] h2").text()).toBe("Nouveau contrat de service");
+    expect(wrapper().get('dialog[open] button[type="submit"]').text()).toBe("Créer le contrat");
     await click(wrapper(), "dialog[open] button", "Annuler");
 
     await click(wrapper(), "main .start__action", "+ Environnement");
