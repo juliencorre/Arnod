@@ -169,6 +169,9 @@ scripts/                Mesure de taille, concordance des versions, tests de fum
                         manifeste des mises à jour (updater-manifest.mjs), état de
                         la maquette (check-maquette.mjs, maquette-sync.py, maquette-couleurs.py),
                         design system (design-system.mjs), aperçu Playwright (apercu.mjs)
+.claude/skills/impeccable/ Skill de design Impeccable (npx impeccable install) ; .impeccable/ :
+                        exceptions de son détecteur
+PRODUCT.md, DESIGN.md   Contexte produit (à la main) ; design system au format DESIGN.md (généré)
 .github/                Modèles d'issue et de pull request, Dependabot
   workflows/            CI de build Windows et Linux, contrôle des titres de pull request
 ```
@@ -185,6 +188,8 @@ npm test                    # Vitest
 npm run build:e2e           # binaire debug pour les tests e2e (Linux)
 xvfb-run -a npm run test:e2e # e2e sur l'application réelle (voir e2e/README.md)
 node scripts/apercu.mjs requete --maquette 5.1-b  # aperçu Playwright sur le faux cœur, comparé à la maquette
+npm run design:detect       # détecteur Impeccable sur les sources (aussi dans npm run check et la CI)
+node scripts/impeccable-apercu.mjs [scénario…] [--sombre]  # détecteur sur l'aperçu rendu (hors CI)
 npm run lint                # ESLint
 npm run typecheck           # vue-tsc
 npm run format              # Prettier (écriture) ; format:check pour vérifier
@@ -897,3 +902,22 @@ décision Q1).
 - Instance unique (`instance.rs`) : verrou du système sur `arnod.lock` dans le dossier de
   données, tenu jusqu'à la sortie. Une seconde instance attend 5 s (relance après une mise à
   jour), puis ne charge rien, ferme sa fenêtre cachée, le dit par un message natif et s'arrête.
+
+## Impeccable
+
+Référence : `docs/audit-impeccable-2026-11.md` (constats DI1 à DI7) et `docs/plan-qualite-mvp.md`
+(T36, Q12).
+
+- Skill de design du dépôt (`.claude/skills/impeccable/`, version épinglée, installée par
+  `npx impeccable install --providers=claude --project --no-hooks`) : ni crochet ni mode `live`.
+  Elle lit `PRODUCT.md` (écrit à la main, sans choix visuel) et `DESIGN.md` (généré par
+  `scripts/design-system.mjs` depuis `src/styles.css`, jamais modifié à la main). Mode d'Arnod :
+  Operate ; `bolder`, `delight` et `overdrive` ne servent pas.
+- Détecteur : `scripts/impeccable-detect.mjs` dans `npm run check` et la CI. Un constat se corrige,
+  ou son exception se déclare à côté de la valeur (`/* impeccable-disable-line <règle>: raison */`) ;
+  une exception qui ne sert plus fait échouer. Le passage sur l'aperçu rendu
+  (`scripts/impeccable-apercu.mjs`, deux thèmes) se relance à chaque lot qui touche l'interface.
+- Une notification prend les jetons `--color-toast-*` ; la barre de la sélection multiple est
+  inversée (fond `--color-text`, « Supprimer » en `--color-danger-inverse`, Q2 du plan
+  d'alignement) ; une sélection est un fond `--color-accent-soft`, jamais une barre sur le côté ;
+  un texte estompé l'est par sa couleur, jamais par l'opacité.

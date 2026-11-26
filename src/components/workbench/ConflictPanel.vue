@@ -228,6 +228,7 @@ async function restore(): Promise<void> {
 }
 
 .conflict__text {
+  max-width: 72ch; /* Lignes lisibles (DI6) : environ 70 caractères au plus. */
   margin: 0;
   line-height: 1.5;
   color: var(--color-muted);

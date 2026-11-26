@@ -26,3 +26,8 @@ e2e/artifacts
 
 # Captures de scripts/apercu.mjs
 .apercu/
+
+# Impeccable : réglages propres au poste, mode live (non employé) et moteur téléchargé
+.impeccable/config.local.json
+.impeccable/live/
+.claude/skills/impeccable/scripts/bin/
