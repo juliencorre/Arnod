@@ -15,7 +15,6 @@ le mode retenu est **Operate** (lisibilité, constance et densité avant l'expre
 | Sources              | 136 fichiers `.vue`, `.ts`, `.css` de `src/` | `npm run design:detect` (aussi dans `npm run check`, CI) |
 | Aperçu rendu, clair  | 54 scénarios de `tests/apercu/`, 1280 × 775  | `node scripts/impeccable-apercu.mjs`                     |
 | Aperçu rendu, sombre | les mêmes, thème sombre                      | `node scripts/impeccable-apercu.mjs --sombre`            |
-| Constats de l'audit  | DE1 à DE10, AC5, AC6, ER3, ER4 du lot I      | [`audit-2026-11-mvp.md`](audit-2026-11-mvp.md)           |
 
 Le passage sur les sources ne voit que les règles écrites (barre de sélection sur le côté, taille
 hors de l'échelle de `DESIGN.md`…) ; le contraste réel, les titres sautés ou le texte recouvert
@@ -23,22 +22,22 @@ demandent une page rendue, d'où le passage sur l'aperçu, hors CI (il faut Chro
 
 ## 2. Résultat
 
-| Dimension (barème d'Impeccable, 0 à 4, estimé) | Avant | Après | Ce qui a changé                                                                                      |
-| ---------------------------------------------- | ----- | ----- | ---------------------------------------------------------------------------------------------------- |
-| Accessibilité                                  | 2     | 3     | Textes et bords de contrôle à leur seuil, titres sans niveau sauté, pas de contrôle dans un contrôle |
-| Thème (clair et sombre)                        | 2     | 4     | Plus aucun texte sous son seuil en thème sombre ; jetons employés à leur place, vérifiés             |
-| Densité à 1280 × 775                           | 2     | 3     | Onglets et barre des étapes sur une ligne, adresse de 274 à 307 px                                   |
-| Anti-patterns                                  | 3     | 4     | Plus de barre de sélection sur le côté ni de couleur d'erreur pour un message neutre                 |
-| Performance                                    | —     | —     | Hors de ce passage : bancs des lots F et G                                                           |
+Constats bloquants (hors avis) du passage sur l'aperçu, de Develop (avant le lot I) à la fin du
+lot I (constats de l'audit, puis ceux d'Impeccable) :
 
-Passage sur l'aperçu, constats bloquants (hors avis) : 87 avant, 74 après en thème clair ; la
-plupart des restants sont le texte indicatif des champs (DI7, à trancher) et des titres sautés
-dans des scénarios capturés avant leur correction (DI5).
+| Thème  | Avant | Après | Ce qui reste                                                                     |
+| ------ | ----- | ----- | -------------------------------------------------------------------------------- |
+| Clair  | 87    | 50    | 44 : texte indicatif et numéros de ligne sous 4,5:1 (DI7, Q12) ; 6 écartés (§ 4) |
+| Sombre | 39    | 6     | 6 écartés (§ 4)                                                                  |
+
+Disparus : titres sautés (24 par thème), sélection en barre sur le côté (3), texte sous son seuil
+en thème sombre (3), lignes trop longues (1), sept textes à 2,8:1 ou 3,3:1 en thème clair.
 
 ## 3. Constats d'Impeccable
 
-En plus des constats du lot I, le détecteur en a relevé sept. Les six premiers sont corrigés dans le
-lot I, chacun avec son test ; le septième attend une décision.
+Les constats DE1 à DE10, AC5, AC6, ER3 et ER4 de l'[audit du MVP](audit-2026-11-mvp.md) sont
+corrigés par le lot I. Le détecteur en a relevé sept de plus ; les six premiers sont corrigés, chacun
+avec son test (`tests/design/impeccable.spec.ts`), le septième attend une décision.
 
 | ID  | Constat                                                                                                                                    | Règle           | Correction                                                                                  |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------------------------- |
@@ -48,7 +47,7 @@ lot I, chacun avec son test ; le septième attend une décision.
 | DI4 | Sélection dessinée par une barre orange sur le côté (sélection multiple, « Copier ou déplacer ») ; réponse attendue ouverte en fond neutre | side-tab        | Fond `--color-accent-soft`, la forme unique d'une sélection (DE7)                           |
 | DI5 | Niveau de titre sauté (h1 puis h3) dans l'onglet d'une requête : 24 scénarios                                                              | skipped-heading | Titres h2 réservés aux lecteurs d'écran : « Requête … » et « Résultat »                     |
 | DI6 | Explication d'un conflit en lignes de 117 caractères                                                                                       | line-length     | 72 caractères au plus                                                                       |
-| DI7 | Texte indicatif des champs et numéros de ligne en `--color-subtle` : 3,7:1 en clair, 4,3:1 en sombre, sous les 4,5:1 du texte              | low-contrast    | Q12 du plan (lot J) : foncer `--color-subtle` ou passer ces textes en `--color-muted`       |
+| DI7 | Texte indicatif des champs et numéros de ligne en `--color-subtle` : 3,7:1 en clair, 4,3:1 en sombre, sous les 4,5:1 du texte              | low-contrast    | Décision Q12 (lot J) : foncer `--color-subtle`, ou passer ces textes en `--color-muted`     |
 
 ## 4. Écartés, avec leur raison
 
@@ -65,5 +64,4 @@ lot I, chacun avec son test ; le septième attend une décision.
   AC3, AC4, AC7, AC8, lot J.
 - Erreur d'envoi avec son action sous la réponse : ER6, lot J.
 - Texte indicatif à 4,5:1 : DI7, décision Q12.
-- Contraste réel de chaque écran, titres et texte recouvert : relancer
-  `node scripts/impeccable-apercu.mjs` (deux thèmes) à chaque lot qui touche l'interface.
+- Relancer `node scripts/impeccable-apercu.mjs` (deux thèmes) à chaque lot qui touche l'interface.
