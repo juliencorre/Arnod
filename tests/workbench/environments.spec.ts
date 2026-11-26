@@ -63,6 +63,11 @@ describe("environnements du projet", () => {
     await click(app, '[role="menuitem"]', "Gérer les environnements…");
     expect(app.find("dialog[open]").exists()).toBe(true);
     await click(app, "dialog[open] button", "+ Nouvel environnement");
+    // AM34 (3.3-b) : la fenêtre de création s'ouvre au-dessus de la gestion.
+    const form = app.get("#new-environment");
+    await form.get("input[type='text']").setValue("Nouvel environnement");
+    await form.trigger("submit");
+    await flushPromises();
     expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local", "Nouvel environnement"]);
   });
 
@@ -73,6 +78,10 @@ describe("environnements du projet", () => {
     await click(app, '[role="menuitem"]', "+ Nouvel environnement");
     await flushPromises();
     expect(app.find("dialog[open]").exists()).toBe(true);
+    const form = app.get("#new-environment");
+    await form.get("input[type='text']").setValue("Nouvel environnement");
+    await form.trigger("submit");
+    await flushPromises();
     expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local", "Nouvel environnement"]);
   });
 

@@ -650,6 +650,7 @@ pages:
       - "2026-11-26 : 0 : « Environnements · <projet> » (plan-alignement-maquette, lot A, AM9)."
       - "2026-11-26 : a : environnement enregistré seul (« ✓ Enregistré »), Échap ne jette rien, × et « + Variable » ; une suppression se rattrape par « Annuler » (plan-qualite-mvp, lot J, ER1, ER2, ER8)."
       - "2026-11-26 : c : « Envoyer vers <env> ? » avec le cadenas, la requête et l'hôte visés, bouton plein ; cadenas sur la pastille d'un environnement protégé (plan-alignement-maquette, lot C, AM31)."
+      - "2026-11-26 : a, b : liste numérotée avec l'adresse de base, « Couleur ▾ » à droite du nom, « Demander une confirmation avant POST, PUT, PATCH et DELETE », « Supprimer l'environnement » ; « + Nouvel environnement » ouvre sa fenêtre (URL de base, variables reprises sans les secrets, place dans la chaîne, protection) ; b passe à « livré » (plan-alignement-maquette, lot D, AM33, AM34)."
     ecrans:
       "0":
         etat: livré
@@ -663,16 +664,12 @@ pages:
         pr: [27]
         captures: [08c-environnements]
         ecart:
-          - texte: "Environnements dans un tableau unique avec la portée de chaque variable, l'utilisation et « Copier depuis un autre projet… » ; le code garde un dialogue modal (enregistré seul depuis le lot J, ER2) et deux listes ordonnées par ↑ ↓."
-            aligner: code
-          - texte: "« Couleur » en liste sous le nom (maquette : « Couleur ▾ » à droite du nom) ; « Environnement protégé (confirmation… modifie des données) » au lieu de « Demander une confirmation avant POST, PUT, PATCH et DELETE » ; « Supprimer » au lieu de « Supprimer l'environnement » ; la liste n'a ni numéro ni adresse."
-            aligner: code
-      b:
-        etat: en partie
-        pr: [27]
-        ecart:
-          texte: "« + Nouvel environnement » crée tout de suite « Nouvel environnement N » dans la fenêtre des environnements : ni URL de base, ni « Reprendre les variables de… » (N3 du plan du premier usage), ni place dans la chaîne, ni bouton « Créer »."
+          texte: "Environnements dans un tableau unique avec la portée de chaque variable, l'utilisation et « Copier depuis un autre projet… » ; le code garde un dialogue modal (enregistré seul depuis le lot J, ER2) et deux listes ordonnées par ↑ ↓."
           aligner: code
+      b:
+        etat: livré
+        pr: [27]
+        captures: [08d-nouvel-environnement]
       c:
         etat: livré
         pr: [27]
@@ -694,6 +691,7 @@ pages:
       - "2026-11-26 : g : la note des cookies reçus en texte secondaire (plan-qualite-mvp, lot I, DE1)."
       - "2026-11-26 : a : libellés au-dessus des champs de l'authentification (plan-alignement-maquette, lot B, AM26)."
       - "2026-11-26 : a : réglages du projet enregistrés seuls, Échap ne jette rien (plan-qualite-mvp, lot J, ER2)."
+      - "2026-11-26 : b : « Type » et « Hériter » ; carte de l'authentification héritée (nature, réglée sur le projet, « Ouvrir », jeton, Envoyé dans, Valeurs) ; section « Jeton OAuth 2 » de l'onglet Envoyé (plan-alignement-maquette, lot D, AM35)."
     ecrans:
       a:
         etat: livré
@@ -708,9 +706,6 @@ pages:
       b:
         etat: livré
         pr: [27, 32]
-        ecart:
-          texte: "Libellé « Mode » avec « Héritée » au lieu de « Type » et « Hériter » ; l'héritage tient en une phrase (« Reprend l'authentification du projet « … » : … ») au lieu de la carte (réglée sur le projet, « Ouvrir », jeton, Envoyé dans, Valeurs) ; l'onglet Envoyé n'a pas de section « Jeton OAuth 2 »."
-          aligner: code
       c: { etat: à faire, version: V5 }
       d: { etat: à faire, version: V3 }
       g:

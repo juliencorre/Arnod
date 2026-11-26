@@ -1135,3 +1135,51 @@ fn lot_e_unites_et_verdicts() {
     assert_eq!(tests[1].status, ItemStatus::Pending);
     assert_eq!(tests[0].failed_step, None);
 }
+
+/// AM35 (3.4-b) : un envoi par OAuth 2 dit, dans « Envoyé », le serveur de jetons et quand le
+/// jeton gardé a été obtenu ; jamais la valeur du jeton.
+#[tokio::test]
+async fn am35_envoye_dit_le_jeton_oauth2_sans_sa_valeur() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/oauth/token"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"{"access_token":"jeton-secret","expires_in":3600}"#),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/orders"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&server)
+        .await;
+    let f = fixture();
+    set_base_url(&f, &server.uri());
+    let path = add_request(&f, "", "Commandes", "{{baseUrl}}/orders", Method::Get);
+    let full = tree::resolve(&f.ctx.root, &path).unwrap();
+    let mut request = file::read(&full).unwrap();
+    request.auth.kind = crate::request::model::AuthKind::OAuth2;
+    request.auth.oauth2.access_token_url = "{{baseUrl}}/oauth/token".into();
+    request.auth.oauth2.client_id = "boutique".into();
+    request.auth.oauth2.client_secret = "s3cr3t".into();
+    let outcome = f
+        .bench
+        .send(&f.ctx, Uuid::new_v4(), "Local", request, false)
+        .await
+        .unwrap();
+    let sent = outcome.sent.unwrap();
+    let token = sent.oauth2.as_ref().unwrap();
+    assert_eq!(token.token_url, format!("{}/oauth/token", server.uri()));
+    assert!(
+        token
+            .status
+            .as_ref()
+            .is_some_and(|s| s.expires_at.is_some())
+    );
+    assert!(
+        !serde_json::to_string(&sent)
+            .unwrap()
+            .contains("jeton-secret")
+    );
+}

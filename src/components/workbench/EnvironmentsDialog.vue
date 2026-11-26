@@ -4,14 +4,22 @@
  * variables locales (hors du dépôt) dont les secrets vont dans le coffre du système.
  * L'environnement s'enregistre seul, comme une requête (ER2) : changer d'environnement, fermer ou
  * Échap enregistre d'abord ce qui attend, et un échec garde la fenêtre ouverte.
+ *
+ * AM33 (3.3-a) : liste numérotée avec l'adresse de base, « Couleur ▾ » à droite du nom,
+ * protection « Demander une confirmation avant POST, PUT, PATCH et DELETE », « Supprimer
+ * l'environnement ». AM34 (3.3-b) : « + Nouvel environnement » ouvre sa fenêtre de création.
  */
 import { computed, ref, useId, watch } from "vue";
 
 import RowRemoveButton from "@/components/ui/RowRemoveButton.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
+import BaseMenu from "@/components/ui/BaseMenu.vue";
+import type { MenuItem } from "@/components/ui/menu";
 import SaveState from "@/components/ui/SaveState.vue";
+import NewEnvironmentDialog from "@/components/workbench/NewEnvironmentDialog.vue";
 import { useAutosave } from "@/composables/useAutosave";
+import { ENVIRONMENT_COLORS, envHost, envSwatch } from "@/lib/environments";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { EnvironmentDoc, EnvironmentView } from "@/types/ipc";
@@ -25,16 +33,25 @@ const emit = defineEmits<{ close: [] }>();
 const workbench = useWorkbenchStore();
 const toasts = useToastStore();
 const nameId = useId();
-const colorId = useId();
+const protectionId = useId();
 
-const COLORS = [
-  ["gray", "Gris"],
-  ["blue", "Bleu"],
-  ["green", "Vert"],
-  ["orange", "Orange"],
-  ["red", "Rouge"],
-  ["purple", "Violet"],
-] as const;
+/** « Couleur ▾ » à droite du nom (AM33). */
+const colorItems = computed<MenuItem[]>(() =>
+  ENVIRONMENT_COLORS.map(([id, label]) => ({
+    id,
+    label,
+    radio: true,
+    checked: draft.value?.color === id,
+    swatch: envSwatch(id),
+  })),
+);
+
+function setColor(color: string): void {
+  if (draft.value) draft.value.color = color;
+}
+
+/** Fenêtre « Nouvel environnement » ouverte (AM34). */
+const creating = ref(false);
 
 const editing = ref<string | null>(null);
 const draft = ref<EnvironmentDoc | null>(null);
@@ -120,19 +137,15 @@ async function close(): Promise<void> {
   emit("close");
 }
 
+/** « + Nouvel environnement » : ce qui attend est enregistré, puis la fenêtre de création s'ouvre. */
 async function create(): Promise<void> {
-  if (!(await autosave.flush())) return;
-  await guard(async () => {
-    let name = "Nouvel environnement";
-    for (let n = 2; list.value.some((e) => e.name === name); n++)
-      name = `Nouvel environnement ${n}`;
-    await workbench.saveEnvironment(
-      props.projectId,
-      { name, color: "gray", protected: false, variables: [], locals: [] },
-      null,
-    );
-    load(view.value?.environments.find((e) => e.name === name));
-  });
+  if (await autosave.flush()) creating.value = true;
+}
+
+/** L'environnement créé est ouvert dans la gestion. */
+function onCreated(name: string): void {
+  creating.value = false;
+  load(list.value.find((e) => e.name.toLowerCase() === name.toLowerCase()));
 }
 
 async function remove(): Promise<void> {
@@ -198,14 +211,19 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
   >
     <div class="envs">
       <ul class="envs__list" aria-label="Environnements du projet">
-        <li v-for="env in list" :key="env.name">
+        <li v-for="(env, index) in list" :key="env.name">
           <button
             type="button"
             class="envs__item"
             :aria-current="env.name === editing"
             @click="select(env)"
           >
-            {{ env.name }}
+            <span class="envs__number" aria-hidden="true">{{ index + 1 }}</span>
+            <span class="envs__swatch" :style="{ background: envSwatch(env.color) }" />
+            <span class="envs__item-text">
+              <span class="envs__item-name">{{ env.name }}</span>
+              <span v-if="envHost(env)" class="envs__item-host">{{ envHost(env) }}</span>
+            </span>
           </button>
         </li>
         <li><BaseButton variant="link" @click="create">+ Nouvel environnement</BaseButton></li>
@@ -213,15 +231,22 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
 
       <form v-if="draft" class="envs__form" novalidate @submit.prevent="autosave.flush()">
         <label :for="nameId" class="envs__label">Nom</label>
-        <input :id="nameId" v-model="draft.name" type="text" autocomplete="off" />
-        <label :for="colorId" class="envs__label">Couleur</label>
-        <select :id="colorId" v-model="draft.color">
-          <option v-for="[id, label] in COLORS" :key="id" :value="id">{{ label }}</option>
-        </select>
-        <label class="envs__check">
-          <input v-model="draft.protected" type="checkbox" />
-          Environnement protégé (confirmation avant d'envoyer une requête qui modifie des données)
-        </label>
+        <div class="envs__name-row">
+          <input :id="nameId" v-model="draft.name" type="text" autocomplete="off" />
+          <BaseMenu
+            :items="colorItems"
+            label="Couleur de l'environnement"
+            align="end"
+            @select="setColor"
+          >
+            <template #trigger="{ attrs }">
+              <button v-bind="attrs" type="button" class="envs__color">
+                <span class="envs__swatch" :style="{ background: envSwatch(draft.color) }" />
+                Couleur ▾
+              </button>
+            </template>
+          </BaseMenu>
+        </div>
 
         <h3 class="envs__title">Variables partagées</h3>
         <div v-for="(variable, index) in draft.variables" :key="index" class="envs__var">
@@ -275,9 +300,18 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
           <BaseButton @click="addLocal">Déclarer</BaseButton>
         </div>
 
+        <h3 :id="protectionId" class="envs__title">Protection</h3>
+        <label class="envs__check">
+          <input v-model="draft.protected" type="checkbox" :aria-describedby="protectionId" />
+          Demander une confirmation avant POST, PUT, PATCH et DELETE
+        </label>
+        <p class="envs__hint">
+          Pour la pré-production ou tout environnement partagé. Les GET partent directement.
+        </p>
+
         <p v-if="error ?? saveError" class="envs__error" role="alert">{{ error ?? saveError }}</p>
         <div class="envs__actions">
-          <BaseButton variant="danger" @click="remove">Supprimer</BaseButton>
+          <BaseButton variant="danger" @click="remove">Supprimer l'environnement</BaseButton>
           <BaseButton aria-label="Monter l'environnement" @click="move(-1)">↑</BaseButton>
           <BaseButton aria-label="Descendre l'environnement" @click="move(1)">↓</BaseButton>
           <span class="envs__spacer" />
@@ -287,6 +321,13 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
       </form>
     </div>
   </BaseDialog>
+  <NewEnvironmentDialog
+    v-if="creating"
+    :open="creating"
+    :project-id="projectId"
+    @close="creating = false"
+    @created="onCreated"
+  />
 </template>
 
 <style scoped>
@@ -314,6 +355,9 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
 }
 
 .envs__item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
   width: 100%;
   padding: 0.375rem 0.5rem;
   border: 0;
@@ -441,5 +485,75 @@ async function saveLocal(name: string, secret: boolean): Promise<void> {
 /* La flèche de la liste déroulante garde sa place (styles.css). */
 .envs__form select {
   padding-right: 1.75rem;
+}
+
+.envs__name-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.envs__name-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.envs__color {
+  display: inline-flex;
+  flex: none;
+  gap: 0.375rem;
+  align-items: center;
+  min-height: var(--control-md);
+  padding: 0 0.625rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.envs__color:hover,
+.envs__color[aria-expanded="true"] {
+  border-color: var(--color-border);
+}
+
+.envs__color:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.envs__number {
+  flex: none;
+  width: 1rem;
+  font: var(--text-small) var(--font-mono);
+  color: var(--color-muted);
+}
+
+.envs__swatch {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.envs__item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.envs__item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.envs__item-host {
+  overflow: hidden;
+  font: var(--text-small) var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-muted);
 }
 </style>

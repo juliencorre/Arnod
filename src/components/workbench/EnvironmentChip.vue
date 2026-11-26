@@ -11,6 +11,7 @@ import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import LockIcon from "@/components/ui/LockIcon.vue";
 import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
+import { envHost, envSwatch } from "@/lib/environments";
 import { useCatalogStore } from "@/stores/catalog";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -36,14 +37,10 @@ const CREATE = "::nouveau";
 
 /** Couleur d'un environnement, en jeton du thème. */
 function swatch(env: EnvironmentView | null): string {
-  return `var(--color-ws-${env?.color ?? "gray"})`;
+  return envSwatch(env?.color);
 }
 
-/** Adresse de base, sans le schéma : de quoi reconnaître l'environnement. */
-function host(env: EnvironmentView): string | undefined {
-  const base = env.variables.find((v) => v.name === "baseUrl")?.value.trim() ?? "";
-  return base === "" ? undefined : base.replace(/^[a-z]+:\/\//i, "").replace(/\/$/, "");
-}
+const host = envHost;
 
 const items = computed<MenuItem[]>(() => [
   ...(view.value?.environments ?? []).map((env) => ({

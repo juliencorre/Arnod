@@ -291,13 +291,16 @@ describe("« Annuler » des suppressions (ER1)", () => {
     }));
     await menu("Plus d'actions sur boutique-tests", "Gérer les environnements…");
     await click(app, "dialog[open] .envs__item", "Recette");
+    expect(app.get("dialog[open] .envs__item[aria-current='true'] .envs__item-name").text()).toBe(
+      "Recette",
+    );
     await click(app, "dialog[open] button", "Supprimer");
     expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local"]);
     expect(app.get(".toast").text()).toContain("Environnement « Recette » supprimé.");
     await click(app, ".toast button", "Annuler");
     await flushPromises();
     expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local", "Recette"]);
-    expect(app.findAll("dialog[open] .envs__item").map((b) => b.text())).toContain("Recette");
+    expect(app.findAll("dialog[open] .envs__item-name").map((b) => b.text())).toContain("Recette");
   });
 });
 

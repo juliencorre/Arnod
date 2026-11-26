@@ -581,7 +581,11 @@ watch(
       </div>
 
       <div v-else-if="tab === 'auth'" class="stack">
-        <AuthEditor v-model="request.auth" :inherited="request.inherited" />
+        <AuthEditor
+          v-model="request.auth"
+          :inherited="request.inherited"
+          :project-id="editor?.projectId"
+        />
         <!-- Lot K (4.2-c) : secret saisi en clair, proposé en variable locale. -->
         <SecretNotice :editor-key="editorKey" />
       </div>

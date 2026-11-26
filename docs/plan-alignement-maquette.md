@@ -233,8 +233,8 @@ pull request dit après laquelle la fusionner. Ordre, avec les lots de `plan-qua
 
 **Lot D - Environnements et authentification** (`claude/alignement-d-environnements`)
 
-- [ ] **T10** AM33, AM34 : page des environnements, fenêtre de création.
-- [ ] **T11** AM35 : carte de l'authentification héritée, jeton OAuth 2 dans l'envoyé.
+- [x] **T10** AM33, AM34 : page des environnements, fenêtre de création.
+- [x] **T11** AM35 : carte de l'authentification héritée, jeton OAuth 2 dans l'envoyé.
 
 **Lot E - Dossiers** (`claude/alignement-e-dossiers`)
 

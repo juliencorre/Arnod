@@ -795,6 +795,12 @@ describe("Fenêtres et zones", () => {
     });
     expect(fits).toBe(true);
     await screenshot(browser, "08c-environnements");
+    // 3.3-b (AM34) : « + Nouvel environnement » ouvre sa fenêtre de création.
+    await clickText("dialog[open] button", "+ Nouvel environnement");
+    await browser.$("#new-environment").waitForExist({ timeout: 5_000 });
+    await screenshot(browser, "08d-nouvel-environnement");
+    await clickText("dialog[open] button", "Annuler");
+    await browser.$("#new-environment").waitForExist({ reverse: true, timeout: 5_000 });
     await browser.keys("Escape");
     await browser.$("dialog[open]").waitForExist({ reverse: true });
   });

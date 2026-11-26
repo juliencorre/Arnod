@@ -215,6 +215,8 @@ export type NetworkPrefsInput = { proxy: ProxyPrefs, proxyPassword: string | nul
 
 export type NetworkView = { proxy: ProxyPrefs, hasProxyPassword: boolean, system: SystemProxy, connectTimeoutMs: number, systemAuthorities: number, authorities: Array<AuthorityView>, };
 
+export type NewEnvironment = { name: string, baseUrl: string, copyFrom: string | null, after: string | null, protected: boolean, };
+
 export type OAuth2 = { accessTokenUrl: string, clientId: string, clientSecret: string, scope: string, credentials: CredentialsPlacement, tokenPlacement: TokenPlacement, tokenName: string, };
 
 export type OperationNode = { key: string, method: string, path: string, summary: string | null, supported: boolean, requests: Array<LinkedView>, };
@@ -311,7 +313,9 @@ export type Scalar = boolean | number | number | string;
 
 export type SendOutcome = { response: HttpResponse, assertions: Array<AssertionResult>, passed: boolean, slow: boolean, sent: Sent | null, };
 
-export type Sent = { environment: string, method: string, url: string, headers: Array<[string, string]>, body: string | null, drawn: Array<DrawnValue>, used: Array<UsedVariable>, extracted: Array<ExtractedValue>, };
+export type Sent = { environment: string, method: string, url: string, headers: Array<[string, string]>, body: string | null, drawn: Array<DrawnValue>, used: Array<UsedVariable>, extracted: Array<ExtractedValue>, oauth2: SentToken | null, };
+
+export type SentToken = { tokenUrl: string, status: TokenStatus | null, };
 
 export type Side = "right" | "bottom";
 
@@ -497,6 +501,7 @@ export type CheckEnvironmentDoc = Check<Same<Ipc.EnvironmentDoc, EnvironmentDoc>
 export type CheckLocalVarView = Check<Same<Ipc.LocalVarView, LocalVarView>>;
 export type CheckEnvironmentView = Check<Same<Ipc.EnvironmentView, EnvironmentView>>;
 export type CheckEnvironmentsView = Check<Same<Ipc.EnvironmentsView, EnvironmentsView>>;
+export type CheckNewEnvironment = Check<Same<Ipc.NewEnvironment, NewEnvironment>>;
 export type CheckEnvironmentDeleted = Check<Same<Ipc.EnvironmentDeleted, EnvironmentDeleted>>;
 export type CheckRunItemStatus = Check<Same<Ipc.RunItemStatus, RunItemStatus>>;
 export type CheckRunItem = Check<Same<Ipc.RunItem, RunItem>>;
@@ -586,6 +591,7 @@ export type CheckDrawnValue = Check<Same<Ipc.DrawnValue, DrawnValue>>;
 export type CheckUsedSource = Check<Same<Ipc.UsedSource, UsedSource>>;
 export type CheckUsedVariable = Check<Same<Ipc.UsedVariable, UsedVariable>>;
 export type CheckSent = Check<Same<Ipc.Sent, Sent>>;
+export type CheckSentToken = Check<Same<Ipc.SentToken, SentToken>>;
 export type CheckRunTest = Check<Same<Ipc.RunTest, RunTest>>;
 export type CheckStepView = Check<Same<Ipc.StepView, StepView>>;
 export type CheckTestView = Check<Same<Ipc.TestView, TestView>>;

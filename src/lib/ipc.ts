@@ -33,6 +33,7 @@ import type {
   EnvironmentDeleted,
   EnvironmentDoc,
   EnvironmentsView,
+  NewEnvironment,
   HelloResponse,
   Assertion,
   Example,
@@ -332,6 +333,10 @@ export const ipc = {
   /** « Annuler » la suppression : fichiers, place, valeurs locales et secrets reviennent. */
   environmentDeleteUndo: (undoToken: string): Promise<EnvironmentsView> =>
     call<EnvironmentsView>("environment_delete_undo", { undoToken }),
+
+  /** Crée un environnement (3.3-b, AM34) : variables reprises, place dans la chaîne. */
+  environmentCreate: (project: string, environment: NewEnvironment): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environment_create", { project, environment }),
 
   environmentsReorder: (project: string, names: string[]): Promise<EnvironmentsView> =>
     call<EnvironmentsView>("environments_reorder", { project, names }),

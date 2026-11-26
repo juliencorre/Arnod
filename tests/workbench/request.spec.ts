@@ -262,9 +262,15 @@ describe("éditer et envoyer une requête", () => {
     }));
     await click(app, '[role="treeitem"]', "Payer");
     await click(app, ".editor__tab", "Auth");
-    expect(app.get(".note").text()).toBe(
-      "Reprend l'authentification du dossier « Paiements » : Bearer, jeton {{token}}.",
-    );
+    // AM35 (3.4-b) : une carte dit la nature, la source, où elle part et les valeurs lues.
+    const card = app.get(".inherited");
+    expect(card.get(".inherited__kind").text()).toBe("Bearer");
+    expect(card.get(".inherited__source").text()).toBe("réglée sur le dossier « Paiements »");
+    expect(card.findAll(".inherited__facts dd").map((d) => d.text())).toEqual([
+      "Authorization: Bearer ••••••••",
+      "token",
+    ]);
+    expect(card.find(".inherited__open").exists()).toBe(false);
   });
 
   it("auth héritée du projet : « du projet », libellé du cœur (inherit::project_source)", async () => {
@@ -279,9 +285,10 @@ describe("éditer et envoyer une requête", () => {
     }));
     await click(app, '[role="treeitem"]', "Payer");
     await click(app, ".editor__tab", "Auth");
-    expect(app.get(".note").text()).toBe(
-      "Reprend l'authentification du projet « boutique-tests » : Bearer, jeton {{token}}.",
+    expect(app.get(".inherited__source").text()).toContain(
+      "réglée sur le projet « boutique-tests »",
     );
+    expect(app.get(".inherited__open").text()).toBe("Ouvrir");
   });
 });
 

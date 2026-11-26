@@ -328,6 +328,83 @@ pub fn save(
     })
 }
 
+/// Nouvel environnement (3.3-b, AM34) : nom, adresse de base, variables reprises d'un autre
+/// environnement, place dans la chaîne et protection.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct NewEnvironment {
+    pub name: String,
+    /// Adresse de base, qui devient la variable `baseUrl` ; vide : aucune.
+    #[serde(default)]
+    pub base_url: String,
+    /// Environnement dont les variables partagées et les noms des variables locales sont
+    /// repris ; jamais les valeurs locales ni les secrets, qui restent sur le poste.
+    #[serde(default)]
+    pub copy_from: Option<String>,
+    /// Environnement après lequel il prend place dans la chaîne ; `None` : en tête.
+    #[serde(default)]
+    pub after: Option<String>,
+    #[serde(default)]
+    pub protected: bool,
+}
+
+/// Crée l'environnement `new` (AM34) et le place dans la chaîne.
+pub fn create(root: &Path, new: &NewEnvironment) -> Result<(), CommandError> {
+    let all = list(root);
+    let source = match new.copy_from.as_deref() {
+        Some(from) => Some(
+            all.iter()
+                .find(|env| same_name(&env.name, from))
+                .cloned()
+                .ok_or_else(|| invalid(format!("L'environnement « {from} » n'existe plus.")))?,
+        ),
+        None => None,
+    };
+    let mut variables = source
+        .as_ref()
+        .map(|env| env.variables.clone())
+        .unwrap_or_default();
+    let base_url = new.base_url.trim();
+    if !base_url.is_empty() {
+        match variables.iter_mut().find(|v| v.name == BASE_URL) {
+            Some(variable) => base_url.clone_into(&mut variable.value),
+            None => variables.insert(
+                0,
+                Variable {
+                    name: BASE_URL.to_owned(),
+                    value: base_url.to_owned(),
+                },
+            ),
+        }
+    }
+    let environment = Environment {
+        name: new.name.trim().to_owned(),
+        color: default_color(),
+        protected: new.protected,
+        variables,
+        locals: source.map(|env| env.locals).unwrap_or_default(),
+    };
+    save(root, &environment, None)?;
+    let name = item_name(&environment.name)?;
+    let mut names: Vec<String> = list(root)
+        .into_iter()
+        .map(|env| env.name)
+        .filter(|other| !same_name(other, &name))
+        .collect();
+    let at = new.after.as_deref().map_or(0, |after| {
+        names
+            .iter()
+            .position(|other| same_name(other, after))
+            .map_or(names.len(), |index| index + 1)
+    });
+    names.insert(at, name);
+    reorder(root, &names)
+}
+
+/// Nom de la variable d'adresse de base d'un environnement.
+const BASE_URL: &str = "baseUrl";
+
 /// Ce que la suppression d'un environnement retire du projet, pour « Annuler » (ER1) : le texte
 /// de ses fichiers, sa place dans la chaîne et sa protection (`extensions.arnod`).
 #[derive(Debug, Clone)]
@@ -475,6 +552,65 @@ mod tests {
             CommandErrorKind::InvalidRequest
         );
         assert!(!list(dir.path()).iter().any(|e| e.protected));
+    }
+
+    /// AM34 : un nouvel environnement reprend les variables partagées et les noms des variables
+    /// locales d'un autre, reçoit son adresse de base et prend sa place dans la chaîne.
+    #[test]
+    fn am34_creation_reprend_les_variables_et_prend_sa_place() {
+        let dir = tempfile::tempdir().unwrap();
+        init(dir.path()).unwrap();
+        save(dir.path(), &env("Recette"), None).unwrap();
+        save(dir.path(), &env("Production"), None).unwrap();
+        create(
+            dir.path(),
+            &NewEnvironment {
+                name: "Recette client".into(),
+                base_url: "https://client.test".into(),
+                copy_from: Some("recette".into()),
+                after: Some("Recette".into()),
+                protected: true,
+            },
+        )
+        .unwrap();
+        let all = list(dir.path());
+        let names: Vec<&str> = all.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, ["Local", "Recette", "Recette client", "Production"]);
+        let created = &all[2];
+        assert!(created.protected);
+        assert_eq!(created.locals, ["token"]);
+        assert_eq!(
+            created.variables,
+            [Variable {
+                name: "baseUrl".into(),
+                value: "https://client.test".into()
+            }]
+        );
+        // Sans position : en tête ; un nom pris est refusé, rien n'est écrit.
+        create(
+            dir.path(),
+            &NewEnvironment {
+                name: "Démo".into(),
+                base_url: String::new(),
+                copy_from: None,
+                after: None,
+                protected: false,
+            },
+        )
+        .unwrap();
+        assert_eq!(list(dir.path())[0].name, "Démo");
+        let taken = create(
+            dir.path(),
+            &NewEnvironment {
+                name: "production".into(),
+                base_url: String::new(),
+                copy_from: None,
+                after: None,
+                protected: false,
+            },
+        );
+        assert_eq!(taken.unwrap_err().kind, CommandErrorKind::NameTaken);
+        assert_eq!(list(dir.path()).len(), 5);
     }
 
     /// ES1 : un environnement illisible (marqueurs de fusion Git) n'est jamais remplacé par un

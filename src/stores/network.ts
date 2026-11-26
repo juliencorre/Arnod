@@ -9,6 +9,7 @@ import type {
   NetworkPrefsInput,
   NetworkView,
   ProjectAuthView,
+  TokenStatus,
 } from "@/types/ipc";
 
 /** Sections des préférences ; les suivantes viendront (Apparence, Raccourcis, Mises à jour). */
@@ -104,6 +105,11 @@ export const useNetworkStore = defineStore("network", () => {
     projectAuth.value = await ipc.projectAuthSave(projectId, environment, auth, clientSecret);
   }
 
+  /** Jeton OAuth 2 du projet dans `environment`, pour la carte de l'authentification héritée. */
+  async function tokenStatus(projectId: string, environment: string): Promise<TokenStatus | null> {
+    return (await ipc.projectAuthLoad(projectId, environment)).token;
+  }
+
   async function renewToken(projectId: string, environment: string): Promise<void> {
     projectAuth.value = await ipc.oauth2TokenRenew(projectId, environment);
   }
@@ -180,6 +186,7 @@ export const useNetworkStore = defineStore("network", () => {
     openProjectSettings,
     closeProjectSettings,
     loadProjectAuth,
+    tokenStatus,
     saveProjectAuth,
     renewToken,
     forgetToken,
