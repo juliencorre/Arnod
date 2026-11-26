@@ -111,20 +111,24 @@ function removable(check: AssertionResult): boolean {
       <div v-if="view === 'body'">
         <ResponseBody :editor-key="editorKey" />
       </div>
-      <dl v-else-if="view === 'headers'" class="response__headers">
-        <template v-for="[name, value] in outcome.response.headers" :key="name + value">
-          <dt>{{ name }}</dt>
-          <dd>
-            {{ value }}
-            <!-- Lot H (3.4-g) : le cookie reçu est gardé pour l'environnement. -->
-            <span v-if="name.toLowerCase() === 'set-cookie'" class="response__kept">gardé</span>
-          </dd>
-        </template>
-      </dl>
-      <p v-if="view === 'headers' && setsCookie" class="response__info">
-        Les cookies reçus rejoignent ceux de l'environnement : ils seront renvoyés aux requêtes
-        suivantes vers ce domaine.
-      </p>
+      <!-- La note des cookies reste dans la branche des en-têtes : un `v-if` à part couperait la
+           chaîne et ferait paraître la liste des assertions sous Corps et En-têtes. -->
+      <template v-else-if="view === 'headers'">
+        <dl class="response__headers">
+          <template v-for="[name, value] in outcome.response.headers" :key="name + value">
+            <dt>{{ name }}</dt>
+            <dd>
+              {{ value }}
+              <!-- Lot H (3.4-g) : le cookie reçu est gardé pour l'environnement. -->
+              <span v-if="name.toLowerCase() === 'set-cookie'" class="response__kept">gardé</span>
+            </dd>
+          </template>
+        </dl>
+        <p v-if="setsCookie" class="response__info">
+          Les cookies reçus rejoignent ceux de l'environnement : ils seront renvoyés aux requêtes
+          suivantes vers ce domaine.
+        </p>
+      </template>
       <!-- Lot E (5.1-h) : ce qui est parti, valeurs tirées et extraites. -->
       <SentPanel v-else-if="view === 'sent'" :editor-key="editorKey" />
       <TimelinePanel
