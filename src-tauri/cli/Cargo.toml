@@ -1,6 +1,6 @@
 [package]
 name = "arnod-cli"
-version = "0.0.4"
+version = "0.1.0"
 description = "Arnod - ligne de commande : arnod run"
 authors = ["Julien Corre"]
 license = "MIT"
