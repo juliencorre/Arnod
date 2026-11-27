@@ -2248,6 +2248,8 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
   it("« Accepter sans ce script » retire le script du fichier (2.3-f, AM42)", async () => {
     const file = path.join(project(), "Commandes", "creer-une-commande.yml");
     expect(readFileSync(file, "utf8")).toContain("type: tests");
+    // Le rapport montre 5 éléments, puis « … N autres » : le script peut être plus loin.
+    if (await browser.$(".report__more").isExisting()) await clickText(".report__more", "autre");
     await clickText(".report__item", "TESTS");
     await browser.waitUntil(async () => await browser.$(".report__actions").isExisting(), {
       timeout: 5_000,
