@@ -1,6 +1,6 @@
 # Plan - Version 2 : travailler en équipe, jouer les tests hors de l'application
 
-**Version** 0.1 · **Date** 2026-11-27 · **Statut** En cours (lots A et B livrés ; questions du § 11 à trancher par lot) ·
+**Version** 0.1 · **Date** 2026-11-27 · **Statut** En cours (lots A, B et C livrés ; questions du § 11 à trancher par lot) ·
 **Base** version 0.0.4 (Develop @46f5d44)
 
 Plan d'implémentation de la **V2** de la maquette : « Les projets sont déjà des fichiers dans Git :
@@ -180,13 +180,14 @@ commande appelle le même cœur, sans Tauri.
 ### 6.2 Cœur Rust
 
 - **Espace de travail Cargo** (lot C) : `src-tauri/` devient l'application ; le cœur passe dans
-  une bibliothèque sans Tauri (`crates/arnod-core`) : modèle et fichiers (`request`, `tree`,
+  une bibliothèque sans Tauri (`src-tauri/core`, crate `arnod-core` : la cible `src-tauri/target`
+  et les scripts qui la lisent ne changent pas) : modèle et fichiers (`request`, `tree`,
   `opencollection`, `manifest`, `environment`, `local`, `contract`), envoi (`http`, `network`,
   `secrets`), établi (`workbench`, `statuses`, `history`, `results`), recherche, rapports,
   synchronisation. Le seul lien de l'établi à Tauri (`tauri::async_runtime::spawn` d'un run)
   passe par un trait `Spawner`. Les tests qui lisent des fichiers du dépôt (`ts_contract`,
   `ts_mirror`, `interface/tests.rs`) gardent leurs chemins par `CARGO_MANIFEST_DIR`.
-- **`crates/arnod-cli`** : le binaire `arnod` ; lecture des arguments écrite à la main ou par
+- **`src-tauri/cli`** (crate `arnod-cli`) : le binaire `arnod` ; lecture des arguments écrite à la main ou par
   `lexopt` (sans dépendance lourde), sortie en français, un `Notifier` qui écrit l'avancement,
   un `SecretStore` qui lit `ARNOD_VAR_*` puis, s'il existe, le coffre (R6). Exécutable autonome
   (R16) : sous Linux, lié statiquement (cible `x86_64-unknown-linux-musl`), sans le coffre (pas de
@@ -252,9 +253,9 @@ de chaque fenêtre suit.
 
 | Fichier                               | Changement                                                                                                    |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `CLAUDE.md`                           | Sections « Recherche », « Ligne de commande », « Synchronisation » ; arborescence (crates)                    |
+| `CLAUDE.md`                           | Sections « Recherche », « Ligne de commande », « Synchronisation » ; arborescence (cœur, ligne de commande)   |
 | `README.md`                           | Fonctions, `arnod run`, « Publier une version »                                                               |
-| `src-tauri/`, `Cargo.toml`            | Espace de travail Cargo, cœur déplacé dans `crates/arnod-core` (lot C)                                        |
+| `src-tauri/`, `Cargo.toml`            | Espace de travail Cargo, cœur déplacé dans `src-tauri/core` (`arnod-core`, lot C)                             |
 | `src-tauri/capabilities/default.json` | Inchangé : Git, forge et navigateur appelés depuis Rust                                                       |
 | `.github/workflows/build.yml`         | Exécutable `arnod` : Windows (livré avec l'application), Linux (joint à la release)                           |
 | Installeur                            | Mesuré avec la ligne de commande et la bibliothèque Git : reste < 15 Mo (`bundle-size.mjs`)                   |
@@ -283,12 +284,12 @@ d'abord (courts, visibles), puis C, D, puis E, F.
 
 **Lot C - Cœur sans Tauri**
 
-- [ ] **T6** Espace de travail Cargo, `crates/arnod-core`, trait `Spawner` ; aucune différence
+- [x] **T6** Espace de travail Cargo, `src-tauri/core` (`arnod-core`), trait `Spawner` ; aucune différence
       visible ; `cargo test`, `npm run check`, e2e verts ; installeur mesuré.
 
 **Lot D - Ligne de commande (5.3-a, 5.3-c, 4.9-d)**
 
-- [ ] **T7** `crates/arnod-cli` : `arnod run` (cibles, `--env`, `--etiquette`, `--parallele`),
+- [ ] **T7** `src-tauri/cli` (`arnod-cli`) : `arnod run` (cibles, `--env`, `--etiquette`, `--parallele`),
       sortie, codes de sortie (R5 à R7) ; tests contre un serveur local.
 - [ ] **T8** `report/` : JUnit, Allure, HTML (R8), validés contre leurs schémas.
 - [ ] **T9** « Copier la commande » (`cli_command`, LC6) ; `arnod.exe` livré avec l'application

@@ -1,52 +1,36 @@
-//! Cœur natif d'Arnod.
+//! Application Arnod (Tauri).
 //!
 //! L'interface (WebView) ne contient aucune logique métier : elle appelle
 //! les commandes typées définies dans [`commands`]. Les commandes faillibles
-//! renvoient une [`error::CommandError`]. Les règles des projets et workspaces
-//! vivent dans [`catalog`], leur persistance dans [`storage`] et [`manifest`],
-//! l'état partagé dans [`state`].
+//! renvoient une [`error::CommandError`]. Le travail se fait dans le cœur
+//! (`arnod-core`, sans Tauri) : règles des projets et workspaces dans [`catalog`],
+//! persistance dans [`storage`] et [`manifest`], état partagé dans [`state`].
 
-pub mod bruno;
-pub mod catalog;
+// Le cœur sans Tauri (`core/`, crate `arnod-core`, V2 lot C) : modèle, fichiers, envoi, établi,
+// recherche. Ses modules sont repris ici sous leur nom pour que `crate::tree`, `crate::workbench`…
+// restent valables dans l'application.
+#[cfg(test)]
+pub(crate) use arnod_core::ts_contract;
+pub use arnod_core::{
+    bruno, catalog, contract, curl, environment, error, history, http, import, input, layout,
+    local, manifest, network, opencollection, request, response, results, search, secrets, startup,
+    state, statuses, steps, storage, tree, trial, workbench,
+};
+
 pub mod commands;
-pub mod contract;
-pub mod curl;
-pub mod environment;
-pub mod error;
-pub mod history;
-pub mod http;
-pub mod import;
-pub mod input;
 pub mod instance;
 pub mod interface;
-pub mod layout;
-pub mod local;
-pub mod manifest;
-// Lot H - Réseau et authentification.
 mod menu;
-pub mod network;
-pub mod opencollection;
 pub mod quit;
-pub mod request;
-pub mod response;
-pub mod results;
-pub mod search;
-pub mod secrets;
-pub mod startup;
-pub mod state;
-pub mod statuses;
-pub mod steps;
-pub mod storage;
-pub mod tree;
-pub mod trial;
-#[cfg(test)]
-mod ts_contract;
 #[cfg(test)]
 mod ts_mirror;
 pub mod updates;
-pub mod watch;
+/// Surveillance des projets : règles dans le cœur, branchement aux fenêtres ici (`app`).
+pub mod watch {
+    pub use arnod_core::watch::*;
+    pub mod app;
+}
 pub mod windows;
-pub mod workbench;
 
 use std::sync::{Arc, Mutex};
 
@@ -61,6 +45,15 @@ use crate::windows::WindowsState;
 use crate::workbench::Workbench;
 
 /// Point d'entrée de l'application, appelé par `main.rs`.
+/// Lance les runs de l'établi sur le runtime de Tauri ([`workbench::Spawner`]).
+struct TauriSpawner;
+
+impl workbench::Spawner for TauriSpawner {
+    fn spawn(&self, task: workbench::Task) {
+        tauri::async_runtime::spawn(task);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -108,6 +101,8 @@ pub fn run() {
             bench.network().attach(&data_dir);
             // Avancement des runs et statuts des requêtes diffusés aux fenêtres (R3, R4).
             bench.set_notifier(Arc::new(windows::EventNotifier::new(app.handle().clone())));
+            // Les runs tournent sur le runtime de Tauri (lot C : le cœur ne le connaît pas).
+            bench.set_spawner(Arc::new(TauriSpawner));
             app.manage(bench);
             app.manage(WindowsState::load(data_dir));
             app.manage(Mutex::new(ResultBook::default()));

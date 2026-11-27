@@ -31,8 +31,7 @@ use crate::workbench::{Notifier, RunView};
 /// Étiquette de la fenêtre principale.
 pub const MAIN_LABEL: &str = MAIN;
 
-/// Fichier des fenêtres, dans les données locales (Z8).
-pub const WINDOWS_FILE: &str = "windows.json";
+pub use crate::layout::windows::WINDOWS_FILE;
 
 /// Événements diffusés aux fenêtres (F11).
 pub mod events {
@@ -617,6 +616,45 @@ pub fn paths_changed<R: Runtime>(
 mod tests {
     use super::*;
     use crate::layout::Content;
+
+    /// Portées de `arnod://projet` : union miroir de `ProjectScope` (`src/types/ipc.ts`).
+    #[test]
+    fn portees_du_projet_concordantes() {
+        use crate::ts_contract::{serialized_name, union_members};
+        use std::collections::BTreeSet;
+        let names: BTreeSet<String> = [
+            ProjectScope::Tree,
+            ProjectScope::Request,
+            ProjectScope::Environments,
+            ProjectScope::Contracts,
+        ]
+        .into_iter()
+        .map(serialized_name)
+        .collect();
+        assert_eq!(union_members("ProjectScope"), names);
+    }
+
+    /// Forme JSON de `arnod://statuts` (diffusé à chaque envoi et run).
+    #[test]
+    fn changement_des_statuts_forme_json() {
+        let change = StatusesChange {
+            project_id: Uuid::nil(),
+            statuses: crate::statuses::Statuses::from([(
+                "D/a.yml".to_owned(),
+                crate::statuses::RequestStatus {
+                    passed: false,
+                    at: 7,
+                },
+            )]),
+        };
+        assert_eq!(
+            serde_json::to_value(change).unwrap(),
+            serde_json::json!({
+                "projectId": Uuid::nil().to_string(),
+                "statuses": { "D/a.yml": { "passed": false, "at": 7 } }
+            })
+        );
+    }
 
     /// AC7 : la fenêtre principale accepte le zoom au clavier ; les fenêtres détachées le
     /// reçoivent de leur constructeur (`zoom_hotkeys_enabled`).

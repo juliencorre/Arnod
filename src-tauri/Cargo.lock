@@ -68,6 +68,25 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 name = "arnod"
 version = "0.0.4"
 dependencies = [
+ "arnod-core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-updater",
+ "tempfile",
+ "tokio",
+ "ts-rs",
+ "uuid",
+ "wiremock",
+]
+
+[[package]]
+name = "arnod-core"
+version = "0.0.4"
+dependencies = [
  "base64 0.23.1",
  "cookie",
  "dunce",
@@ -82,10 +101,6 @@ dependencies = [
  "serde-saphyr",
  "serde_json",
  "serde_json_path",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-updater",
  "tempfile",
  "tokio",
  "tower-layer",

@@ -1826,12 +1826,15 @@ describe("Lot A - Réponse : format, aperçu, filtre JSONPath (5.1-b bis)", () =
     await browser.waitUntil(async () => (await browser.$(".code").getText()).includes("MUG-NOIR"));
 
     await browser.$(".filter__input").setValue("$.items[*].sku");
+    // « $.items[*] », tapé en chemin, donne aussi deux résultats : on attend ceux de « .sku ».
+    const marks = async () => browser.$$(".tok--match").map((m) => m.getText());
     await browser.waitUntil(
-      async () => (await browser.$(".filter__count").getText()) === "2 résultats",
+      async () =>
+        (await browser.$(".filter__count").getText()) === "2 résultats" &&
+        (await marks()).join() === '"TSH-BLU-M","MUG-NOIR"',
       { timeoutMsg: "deux résultats attendus" },
     );
-    const marks = await browser.$$(".tok--match").map((m) => m.getText());
-    expect(marks).toEqual(['"TSH-BLU-M"', '"MUG-NOIR"']);
+    expect(await marks()).toEqual(['"TSH-BLU-M"', '"MUG-NOIR"']);
     await screenshot(browser, "a1-reponse-filtre");
 
     await browser.$(".filter__input").setValue("$.items[0");
@@ -2209,7 +2212,16 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
 
   beforeAll(() => {
     cpSync(
-      path.join(import.meta.dirname, "..", "src-tauri", "src", "bruno", "fixtures", "boutique"),
+      path.join(
+        import.meta.dirname,
+        "..",
+        "src-tauri",
+        "core",
+        "src",
+        "bruno",
+        "fixtures",
+        "boutique",
+      ),
       source(),
       {
         recursive: true,

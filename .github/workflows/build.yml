@@ -61,7 +61,7 @@ jobs:
       - run: npm run typecheck
       - name: cargo fmt
         working-directory: src-tauri
-        run: cargo fmt --check
+        run: cargo fmt --all --check
       # Audits des dépendances : vulnérabilités connues des paquets livrés (npm) et des crates.
       - name: npm audit
         run: npm audit --omit=dev --audit-level=high

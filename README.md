@@ -260,9 +260,10 @@ Les versions suivent [SemVer](https://semver.org/lang/fr/). `Develop` reçoit le
 
 1. **Passer à la nouvelle version** par une pull request vers `Develop` (`chore: version X.Y.Z`) :
    `npm version X.Y.Z --no-git-tag-version` (`package.json` et `package-lock.json`), puis
-   `version` dans `src-tauri/Cargo.toml` et `src-tauri/tauri.conf.json`, puis
-   `cargo update -p arnod --offline` dans `src-tauri/` (`Cargo.lock`).
-   `node scripts/check-version.mjs` vérifie que les six sources concordent ; `npm run check` et
+   `version` dans `src-tauri/Cargo.toml`, `src-tauri/core/Cargo.toml` et
+   `src-tauri/tauri.conf.json`, puis `cargo update -p arnod -p arnod-core --offline` dans
+   `src-tauri/` (`Cargo.lock`).
+   `node scripts/check-version.mjs` vérifie que les huit sources concordent ; `npm run check` et
    la CI le lancent aussi.
 2. **Fusionner `Develop` dans `main`** avec un commit de merge.
 3. **Poser le tag sur `main`** et le pousser :
