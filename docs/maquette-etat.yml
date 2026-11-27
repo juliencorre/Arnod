@@ -382,6 +382,7 @@ pages:
       f:
         etat: livré
         version: V1
+        pr: [94]
         captures: [v1-apparence]
         ecart:
           texte: "La colonne des préférences garde ses quatre sections (Apparence, Réseau et certificats, Raccourcis, Mises à jour), sans « Rechercher un réglage » ni « Général » ; le thème se choisit par trois boutons radio en pastilles plutôt qu'un sélecteur segmenté ; un aperçu de la police des éditeurs s'affiche sous ses listes."
@@ -389,6 +390,7 @@ pages:
       "f bis":
         etat: livré
         version: V1
+        pr: [94]
         captures: [v1-raccourcis]
         ecart:
           texte: "« Rechercher Ctrl+K » n'est pas listé (recherche en V2, 1.5) : l'exemple de conflit de l'écran ne se produit pas, celui de l'application est « Ctrl+J est déjà pris par « Résultat dessous ou à côté » » ; l'application liste aussi « Filtrer le référentiel », « Enregistrer le contrat » et « Gérer les workspaces », et marque « fixe » Ctrl+Tab et Ctrl+0…9."
@@ -1070,6 +1072,7 @@ pages:
       "c bis":
         etat: livré
         version: V1
+        pr: [94]
         captures: [v1-historique]
         ecart:
           texte: "Seuls les envois depuis l'éditeur sont gardés (pas les lignes d'un run) ; l'horloge est à droite de la ligne d'état, après l'environnement ; « Voir les différences » déplie les lignes retirées et ajoutées sous la comparaison."
