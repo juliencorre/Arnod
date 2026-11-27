@@ -43,6 +43,7 @@ const NODES: TreeNode[] = [
     requestCount: 3,
     test: false,
     tags: [],
+    template: null,
     children: [
       request("b", ["Non-régression", "nominal"]),
       request("c", ["non-régression", "paiement"]),

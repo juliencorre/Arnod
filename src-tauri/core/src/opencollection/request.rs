@@ -534,6 +534,26 @@ fn examples_from(value: Option<&Value>) -> Vec<Example> {
         .collect()
 }
 
+/// Scripts d'une liste `scripts` du schéma (R10 du plan V4).
+pub fn scripts_from(
+    value: Option<&Value>,
+    source: &str,
+) -> Vec<crate::request::model::ScriptSource> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            Some(crate::request::model::ScriptSource {
+                phase: item.get("type")?.as_str()?.to_owned(),
+                code: item.get("code")?.as_str()?.to_owned(),
+                source: source.to_owned(),
+            })
+        })
+        .filter(|s| !s.code.trim().is_empty())
+        .collect()
+}
+
 /// Étiquettes de l'utilisateur, sans celle du lien au contrat (R9).
 fn tags_from(tags: Option<&Value>) -> Vec<String> {
     tags.and_then(Value::as_array)
@@ -808,6 +828,7 @@ pub fn from_value(value: &Value, fallback: &str) -> Result<Request, String> {
         data: data_from(value.pointer("/info/tags")),
         preserved: preserved(value),
         inherited: crate::request::model::Inherited::default(),
+        scripts: scripts_from(value.pointer("/runtime/scripts"), ""),
     })
 }
 

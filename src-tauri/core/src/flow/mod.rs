@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::request::model::{Operator, Scalar};
 
 pub mod check;
+pub mod edit;
 pub mod engine;
 pub mod reconcile;
 pub mod store;
@@ -142,7 +143,53 @@ pub enum Action {
     },
 }
 
+/// Nature d'une étape, sans ce qu'elle porte (lignes d'un run, palette).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum StepKind {
+    #[default]
+    Request,
+    Condition,
+    Loop,
+    Wait,
+    Variable,
+    Script,
+    Test,
+    Template,
+}
+
+impl StepKind {
+    /// Libellé de la nature, en français.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Request => "Requête",
+            Self::Condition => "Condition",
+            Self::Loop => "Boucle",
+            Self::Wait => "Attente",
+            Self::Variable => "Variable",
+            Self::Script => "Script",
+            Self::Test => "Test existant",
+            Self::Template => "Template",
+        }
+    }
+}
+
 impl Action {
+    /// Nature de l'étape.
+    pub fn step_kind(&self) -> StepKind {
+        match self {
+            Self::Request { .. } => StepKind::Request,
+            Self::Condition { .. } => StepKind::Condition,
+            Self::Loop { .. } => StepKind::Loop,
+            Self::Wait { .. } => StepKind::Wait,
+            Self::Variable { .. } => StepKind::Variable,
+            Self::Script { .. } => StepKind::Script,
+            Self::Test { .. } => StepKind::Test,
+            Self::Template { .. } => StepKind::Template,
+        }
+    }
+
     /// Nom de la nature, tel qu'écrit dans le fichier (`request`, `condition`…).
     pub fn kind(&self) -> &'static str {
         match self {

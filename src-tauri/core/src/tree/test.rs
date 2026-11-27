@@ -14,8 +14,11 @@ use super::{
     request_name_taken, requests_in, resolve, slug,
 };
 use crate::error::{CommandError, CommandErrorKind};
+use crate::flow::edit::{FlowStepInfo, info as flow_info, test_flow};
+use crate::flow::store::Extensions;
+use crate::flow::{Action, Flow};
 use crate::request::file;
-use crate::request::model::{BodyKind, Method, Request};
+use crate::request::model::{Assertion, BodyKind, Extraction, Method, Request};
 use crate::request::resolve::variable_names;
 
 /// Nom d'un test créé par « Nouveau test » (R11).
@@ -48,17 +51,22 @@ pub struct CreatedTest {
 #[serde(rename_all = "camelCase")]
 pub struct StepView {
     pub path: String,
+    /// Nom du fichier dans le dossier du test : l'étape requête du schéma qui le joue (V4).
+    pub file: String,
     pub name: String,
     pub method: Option<Method>,
     pub url: String,
     pub assertion_count: usize,
     /// Noms des variables extraites par l'étape.
     pub extractions: Vec<String>,
+    /// Assertions actives et extractions, pour le panneau de l'étape (4.3-c).
+    pub assertions: Vec<Assertion>,
+    pub extracts: Vec<Extraction>,
     /// Fichier illisible.
     pub invalid: bool,
 }
 
-/// Test ouvert dans un onglet (4.2-a).
+/// Test ouvert dans un onglet (4.2-a, 4.3-a).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
@@ -67,7 +75,12 @@ pub struct TestView {
     pub name: String,
     /// Le dossier est un test ; sinon il range des dossiers.
     pub test: bool,
+    /// Requêtes du test, celles de ses attentes comprises.
     pub steps: Vec<StepView>,
+    /// Schéma réconcilié (`docs/plan-v4.md`, R2) ; vide pour un dossier qui n'est pas un test.
+    pub flow: Flow,
+    /// Ce que chaque étape du schéma lit et extrait (4.3-a, 4.3-c).
+    pub info: Vec<FlowStepInfo>,
 }
 
 /// Requête qui lit une variable (onglet « Variables », EX5).
@@ -100,7 +113,49 @@ fn find<'a>(nodes: &'a [TreeNode], folder: &str) -> Option<&'a TreeNode> {
     })
 }
 
-/// Onglet du test `path` : ses étapes dans l'ordre (R1).
+/// Étape d'un fichier de requête.
+pub fn step_view(root: &Path, path: &str, fallback: &str) -> StepView {
+    let request = resolve(root, path).and_then(|p| file::read(&p)).ok();
+    let file = path.rsplit('/').next().unwrap_or(path).to_owned();
+    match request {
+        Some(request) => StepView {
+            path: path.to_owned(),
+            file,
+            name: request.name.clone(),
+            method: Some(request.method),
+            url: request.url.clone(),
+            assertion_count: request.assertions.len(),
+            extractions: request
+                .extractions
+                .iter()
+                .filter(|e| e.enabled)
+                .map(|e| e.name.clone())
+                .collect(),
+            assertions: request
+                .assertions
+                .iter()
+                .filter(|a| a.enabled)
+                .cloned()
+                .collect(),
+            extracts: request.extractions.clone(),
+            invalid: false,
+        },
+        None => StepView {
+            path: path.to_owned(),
+            file,
+            name: fallback.to_owned(),
+            method: None,
+            url: String::new(),
+            assertion_count: 0,
+            extractions: Vec::new(),
+            assertions: Vec::new(),
+            extracts: Vec::new(),
+            invalid: true,
+        },
+    }
+}
+
+/// Onglet du test `path` : ses étapes dans l'ordre (R1), son schéma (V4).
 pub fn test_view(root: &Path, path: &str) -> Result<TestView, CommandError> {
     let tree = read(root)?;
     let Some(TreeNode::Folder {
@@ -112,44 +167,38 @@ pub fn test_view(root: &Path, path: &str) -> Result<TestView, CommandError> {
     else {
         return Err(not_found("Ce test n'existe plus."));
     };
-    let steps = children
+    let mut steps: Vec<StepView> = children
         .iter()
         .filter_map(|node| match node {
-            TreeNode::Request {
-                name,
-                path,
-                method,
-                assertion_count,
-                invalid,
-                ..
-            } => {
-                let request = resolve(root, path).and_then(|p| file::read(&p)).ok();
-                Some(StepView {
-                    path: path.clone(),
-                    name: name.clone(),
-                    method: *method,
-                    url: request.as_ref().map(|r| r.url.clone()).unwrap_or_default(),
-                    assertion_count: *assertion_count,
-                    extractions: request
-                        .map(|r| {
-                            r.extractions
-                                .into_iter()
-                                .filter(|e| e.enabled)
-                                .map(|e| e.name)
-                                .collect()
-                        })
-                        .unwrap_or_default(),
-                    invalid: *invalid,
-                })
-            }
+            TreeNode::Request { name, path, .. } => Some(step_view(root, path, name)),
             TreeNode::Folder { .. } => None,
         })
         .collect();
+    let (flow, info) = if *test || children.is_empty() {
+        let ext = Extensions::read(root);
+        let flow = test_flow(root, &ext, path, children);
+        // Requêtes des attentes : absentes de l'arborescence (R14), montrées dans le test.
+        for step in &flow.steps {
+            if let Action::Wait {
+                file: Some(file), ..
+            } = &step.action
+                && !steps.iter().any(|s| &s.file == file)
+            {
+                steps.push(step_view(root, &format!("{path}/{file}"), file));
+            }
+        }
+        let info = flow_info(root, path, &flow);
+        (flow, info)
+    } else {
+        (Flow::default(), Vec::new())
+    };
     Ok(TestView {
         path: path.to_owned(),
         name: name.clone(),
         test: *test,
         steps,
+        flow,
+        info,
     })
 }
 

@@ -79,6 +79,7 @@ const NO_INHERIT: Inherited = {
   auth: null,
   headers: [],
   settings: { timeoutMs: 30000, followRedirects: true, maxRedirects: 5, encodeUrl: true },
+  variables: [],
 };
 
 const token = computed(() => view.value?.token ?? null);

@@ -660,3 +660,97 @@ fn r7_renvois_sans_fin_et_profondeur() {
     ));
     assert!(!done.passed);
 }
+
+// ---------------------------------------------------------------- édition (R3)
+
+#[test]
+fn r3_inserer_sur_un_lien_reconnecte_le_lien() {
+    use super::edit::{Placement, insert, new_step, remove};
+    let mut flow = branching();
+    // Sur « sinon » de la condition : la condition renvoie vers la nouvelle, qui renvoie au refus.
+    let step = new_step(&flow, StepKind::Script, None);
+    let id = step.id.clone();
+    insert(
+        &mut flow,
+        step,
+        &Placement::Link {
+            after: "c".into(),
+            otherwise: true,
+        },
+    );
+    let at = flow.position("c").unwrap();
+    assert_eq!(flow.steps[at + 1].id, id);
+    assert_eq!(
+        flow.steps[at].next.as_deref(),
+        Some("s2"),
+        "« si oui » garde sa suite"
+    );
+    assert!(
+        matches!(&flow.steps[at].action, Action::Condition { otherwise: Some(o), .. } if *o == id)
+    );
+    assert_eq!(flow.steps[at + 1].next.as_deref(), Some("s3"));
+    // Sur « puis » de la première requête : elle passe par la nouvelle étape.
+    let step = new_step(&flow, StepKind::Variable, None);
+    let second = step.id.clone();
+    insert(
+        &mut flow,
+        step,
+        &Placement::Link {
+            after: "s1".into(),
+            otherwise: false,
+        },
+    );
+    assert_eq!(flow.steps[1].id, second);
+    assert_eq!(flow.steps[0].next, None);
+    assert_eq!(flow.steps[1].next, None, "la suite vaut l'étape suivante");
+    // Retirer l'étape : les renvois vers elle passent à sa suite.
+    remove(&mut flow, &id);
+    let at = flow.position("c").unwrap();
+    assert!(
+        matches!(&flow.steps[at].action, Action::Condition { otherwise: Some(o), .. } if o == "s3")
+    );
+}
+
+#[test]
+fn r1_r3_ajouter_une_etape_cree_sa_requete_et_garde_l_ordre() {
+    use super::edit::{Placement, add};
+    let dir = project();
+    let folder = crate::tree::create_folder(dir.path(), "", "parcours").unwrap();
+    crate::tree::create_request(dir.path(), &folder, Some("Créer un client")).unwrap();
+    crate::tree::create_request(dir.path(), &folder, Some("Créer une commande")).unwrap();
+    // Linéaire : rien n'est écrit (R1).
+    let added = add(
+        dir.path(),
+        &folder,
+        StepKind::Request,
+        &Placement::End,
+        Some("Payer"),
+    )
+    .unwrap();
+    assert!(added.request.is_some());
+    assert!(Extensions::read(dir.path()).flow(&folder).is_none());
+    // Une condition rend le schéma non linéaire : il est écrit, les requêtes rangées.
+    let condition = add(
+        dir.path(),
+        &folder,
+        StepKind::Condition,
+        &Placement::Link {
+            after: "r:creer-un-client.yml".into(),
+            otherwise: false,
+        },
+        None,
+    )
+    .unwrap();
+    let flow = Extensions::read(dir.path()).flow(&folder).unwrap();
+    assert_eq!(flow.steps[1].id, condition.step);
+    let view = crate::tree::test_view(dir.path(), &folder).unwrap();
+    assert_eq!(view.flow.steps.len(), 4);
+    assert_eq!(view.info.len(), 4);
+    // Une attente reçoit sa requête, absente de l'arborescence (R14).
+    let wait = add(dir.path(), &folder, StepKind::Wait, &Placement::End, None).unwrap();
+    let request = wait.request.unwrap();
+    let nodes = crate::tree::read(dir.path()).unwrap();
+    assert!(crate::template::find(&nodes, &request).is_none());
+    let view = crate::tree::test_view(dir.path(), &folder).unwrap();
+    assert!(view.steps.iter().any(|s| s.path == request));
+}

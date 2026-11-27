@@ -298,6 +298,39 @@ fn locate_drawn(
     }
 }
 
+/// Remplace les `{{…}}` d'un texte (étape variable d'un schéma, `docs/plan-v4.md`) ; une
+/// variable inconnue est nommée dans l'erreur.
+pub fn substitute(text: &str, variables: &Variables) -> Result<String, CommandError> {
+    let mut dice = Dice::new();
+    let mut resolver = Resolver {
+        variables,
+        dice: &mut dice,
+        unknown: BTreeSet::new(),
+        drawn: Vec::new(),
+        used: Vec::new(),
+    };
+    let out = resolver.sub(text);
+    if resolver.unknown.is_empty() {
+        return Ok(out);
+    }
+    let names: Vec<String> = resolver
+        .unknown
+        .iter()
+        .map(|name| format!("« {name} »"))
+        .collect();
+    Err(CommandError::new(
+        CommandErrorKind::UnknownVariable,
+        format!(
+            "{} sans valeur.",
+            if names.len() == 1 {
+                format!("Variable {}", names[0])
+            } else {
+                format!("Variables {}", names.join(", "))
+            }
+        ),
+    ))
+}
+
 /// Noms des variables `{{…}}` d'un texte (B6).
 pub fn variable_names(text: &str) -> Vec<String> {
     let mut names = Vec::new();

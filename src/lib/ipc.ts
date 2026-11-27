@@ -10,6 +10,24 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
   Appearance,
+  CasePreview,
+  CasesOutcome,
+  DataSet,
+  DataTable,
+  Flow,
+  FolderHooks,
+  FolderProperty,
+  HookPhase,
+  HooksView,
+  InstanceView,
+  Literal,
+  StepAdded,
+  StepKind,
+  StepPlacement,
+  TemplateCandidate,
+  TemplateParam,
+  TemplateSummary,
+  TemplateView,
   HistoryDiff,
   HistoryEntry,
   HistoryView,
@@ -645,6 +663,149 @@ export const ipc = {
   /** « + Étape » : étape suivante du test ; renvoie son chemin (NT2). */
   treeAddStep: (project: string, test: string): Promise<string> =>
     call<string>("tree_add_step", { project, test }),
+
+  // --- Version 4 (docs/plan-v4.md) : tests en schéma, données, templates ---------------
+  /** Enregistre le schéma d'un test (R1, R3) ; rend l'onglet du test. */
+  flowSave: (project: string, path: string, flow: Flow): Promise<TestView> =>
+    call<TestView>("flow_save", { project, path, flow }),
+  /** Ajoute une étape sur un lien ou en fin de liste (4.3-e, 4.3-b bis). */
+  flowAddStep: (
+    project: string,
+    path: string,
+    kind: StepKind,
+    placement: StepPlacement,
+    name: string | null = null,
+  ): Promise<StepAdded> =>
+    call<StepAdded>("flow_add_step", { project, path, kind, placement, name }),
+  /** Retire une étape (« Supprimer l'étape », « Annuler l'insertion ») ; rend le test. */
+  flowRemoveStep: (project: string, path: string, step: string): Promise<TestView> =>
+    call<TestView>("flow_remove_step", { project, path, step }),
+  hooksRemoveStep: (
+    project: string,
+    path: string,
+    phase: HookPhase,
+    step: string,
+  ): Promise<HooksView> => call<HooksView>("hooks_remove_step", { project, path, phase, step }),
+  /** Avant / Après d'un dossier (4.7-c). */
+  hooksRead: (project: string, path: string): Promise<HooksView> =>
+    call<HooksView>("hooks_read", { project, path }),
+  hooksSave: (project: string, path: string, hooks: FolderHooks): Promise<HooksView> =>
+    call<HooksView>("hooks_save", { project, path, hooks }),
+  hooksAddStep: (
+    project: string,
+    path: string,
+    phase: HookPhase,
+    kind: StepKind,
+    name: string | null = null,
+  ): Promise<HooksView> => call<HooksView>("hooks_add_step", { project, path, phase, kind, name }),
+  /** Propriétés d'un dossier et leur origine (4.8-a). */
+  folderProperties: (
+    project: string,
+    path: string,
+    environment: string,
+  ): Promise<FolderProperty[]> =>
+    call<FolderProperty[]>("folder_properties", { project, path, environment }),
+  folderSetProperties: (
+    project: string,
+    path: string,
+    properties: { name: string; value: string }[],
+    environment: string,
+  ): Promise<FolderProperty[]> =>
+    call<FolderProperty[]>("folder_set_properties", { project, path, properties, environment }),
+  /** Jeu de données d'une requête (4.7-a). */
+  dataRead: (project: string, path: string): Promise<DataSet | null> =>
+    call<DataSet | null>("data_read", { project, path }),
+  dataSave: (project: string, path: string, table: DataTable): Promise<DataSet> =>
+    call<DataSet>("data_save", { project, path, table }),
+  /** « Fichier CSV… » : sélecteur natif (4.7-a bis) ; `null` si l'utilisateur annule. */
+  dataImport: (project: string, path: string): Promise<DataSet | null> =>
+    call<DataSet | null>("data_import", { project, path }),
+  dataRemove: (project: string, path: string): Promise<void> =>
+    call<undefined>("data_remove", { project, path }),
+  /** Lignes d'un texte collé depuis un tableur (JD2). */
+  dataParse: (text: string): Promise<string[][]> => call<string[][]>("data_parse", { text }),
+  dataOpen: (project: string, path: string): Promise<void> =>
+    call<undefined>("data_open", { project, path }),
+  /** Requête d'un cas, résolue et masquée (4.7-a). */
+  dataCase: (
+    project: string,
+    path: string,
+    request: RequestDoc,
+    environment: string,
+    caseNumber: number,
+  ): Promise<CasePreview> =>
+    call<CasePreview>("data_case", { project, path, request, environment, case: caseNumber }),
+  /** Envoie les cas d'un jeu de données (4.7-b, R12). */
+  requestSendCases: (
+    project: string,
+    execId: string,
+    environment: string,
+    path: string,
+    request: RequestDoc,
+    confirmed: boolean,
+    cases: number[] | null = null,
+  ): Promise<CasesOutcome> =>
+    call<CasesOutcome>("request_send_cases", {
+      project,
+      execId,
+      environment,
+      path,
+      request,
+      confirmed,
+      cases,
+    }),
+  /** Templates du projet (R16). */
+  templateList: (project: string): Promise<TemplateSummary[]> =>
+    call<TemplateSummary[]>("template_list", { project }),
+  templateCategories: (project: string): Promise<string[]> =>
+    call<string[]>("template_categories", { project }),
+  templateRead: (project: string, path: string): Promise<TemplateView> =>
+    call<TemplateView>("template_read", { project, path }),
+  templateSaveParams: (
+    project: string,
+    path: string,
+    params: TemplateParam[],
+  ): Promise<TemplateView> => call<TemplateView>("template_save_params", { project, path, params }),
+  /** Paramètres proposés à la création d'un template (4.8-b, R18). */
+  templateCandidates: (
+    project: string,
+    folder: string,
+    environment: string,
+  ): Promise<TemplateCandidate[]> =>
+    call<TemplateCandidate[]>("template_candidates", { project, folder, environment }),
+  templateCreate: (
+    project: string,
+    folder: string,
+    name: string,
+    category: string,
+    params: TemplateParam[],
+    replace: boolean,
+  ): Promise<TemplateView> =>
+    call<TemplateView>("template_create", { project, folder, name, category, params, replace }),
+  /** « Utiliser dans un dossier… » (4.8-d) : chemin de l'utilisation. */
+  templateUse: (project: string, template: string, folder: string, name: string): Promise<string> =>
+    call<string>("template_use", { project, template, folder, name }),
+  templateInstance: (project: string, path: string): Promise<InstanceView> =>
+    call<InstanceView>("template_instance", { project, path }),
+  templateSetValues: (
+    project: string,
+    path: string,
+    values: Record<string, string>,
+  ): Promise<InstanceView> => call<InstanceView>("template_set_values", { project, path, values }),
+  /** Valeurs écrites d'un endpoint (3.2-d, R19). */
+  templateLiterals: (project: string, path: string): Promise<Literal[]> =>
+    call<Literal[]>("template_literals", { project, path }),
+  templateFromRequest: (
+    project: string,
+    path: string,
+    name: string,
+    category: string,
+    params: string[],
+  ): Promise<TemplateView> =>
+    call<TemplateView>("template_from_request", { project, path, name, category, params }),
+  /** « Afficher » une section depuis « Plus » (1.2-d bis, R21). */
+  sectionsShow: (project: string, section: string, shown: boolean): Promise<string[]> =>
+    call<string[]>("sections_show", { project, section, shown }),
 
   /** Requêtes du projet, hors `path`, qui lisent l'une des variables `names` (EX5). */
   requestVariableUsers: (project: string, path: string, names: string[]): Promise<VariableUser[]> =>

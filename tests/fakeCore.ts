@@ -20,6 +20,7 @@ import { handleInput } from "./fakeInput";
 import { handleTrials } from "./fakeTrials";
 import { handleTransfer } from "./fakeTransfer";
 import { handleBatch } from "./fakeBatch";
+import { handleV4 } from "./fakeV4";
 import {
   createFakeInterface,
   type FakeInterface,
@@ -424,6 +425,9 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
             const env = args.environment;
             return `arnod run "${path}"${typeof env === "string" ? ` --env "${env}"` : ""}`;
           }
+          // Version 4 : schémas, Avant / Après, jeux de données, templates, « Plus ».
+          const v4 = handleV4(core.workbench, cmd, args);
+          if (v4 !== undefined) return v4;
           // Sélection multiple (4.1-a quater).
           const batched = handleBatch(core.workbench, cmd, args);
           if (batched !== undefined) {

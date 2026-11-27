@@ -229,6 +229,147 @@ pub fn set_folder_tags(root: &Path, path: &str, tags: &[String]) -> Result<(), C
     yaml::write(&file, &value)
 }
 
+/// Modifie le `folder.yml` du dossier `path` (créé conforme au besoin) : `edit` reçoit son
+/// contenu ; un contenu non conforme n'est jamais écrit (format OpenCollection strict, V4).
+pub fn edit_folder(
+    root: &Path,
+    path: &str,
+    edit: impl FnOnce(&mut serde_json::Map<String, serde_json::Value>),
+) -> Result<(), CommandError> {
+    let dir = resolve(root, path)?;
+    if !dir.is_dir() || dir == root {
+        return Err(invalid_request("Ce dossier n'existe plus."));
+    }
+    let file = dir.join(FOLDER_FILE);
+    let mut value = if file.exists() {
+        yaml::read(&file)?
+    } else {
+        let name = dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        serde_json::json!({ "info": { "name": name, "type": "folder" } })
+    };
+    let Some(map) = value.as_object_mut() else {
+        return Err(invalid_request(
+            "Le fichier folder.yml de ce dossier est illisible.",
+        ));
+    };
+    edit(map);
+    schema::check(Part::Folder, &value).map_err(|error| {
+        invalid_request(format!(
+            "Contenu non conforme au format OpenCollection : {error}"
+        ))
+    })?;
+    yaml::write(&file, &value)
+}
+
+/// Variables (`request.variables`) écrites dans le `folder.yml` du dossier `dir`, actives ou non :
+/// nom, valeur, description.
+pub fn folder_variables_raw(dir: &Path) -> Vec<(String, String, String)> {
+    yaml::read(&dir.join(FOLDER_FILE))
+        .ok()
+        .and_then(|value| value.pointer("/request/variables").cloned())
+        .and_then(|v| v.as_array().cloned())
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|item| {
+            let name = item.get("name")?.as_str()?.trim().to_owned();
+            let description = match item.get("description") {
+                Some(serde_json::Value::String(text)) => text.clone(),
+                Some(other) => other
+                    .get("content")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("")
+                    .to_owned(),
+                None => String::new(),
+            };
+            (!name.is_empty()).then(|| {
+                (
+                    name,
+                    crate::request::inherit::variable_value(item),
+                    description,
+                )
+            })
+        })
+        .collect()
+}
+
+/// Écrit les variables d'un dossier dans `request.variables` de son `folder.yml` ; une liste vide
+/// retire la clé (et `request` s'il ne reste rien).
+pub fn set_folder_variables(
+    root: &Path,
+    path: &str,
+    variables: &[(String, String, String)],
+) -> Result<(), CommandError> {
+    let mut seen: Vec<String> = Vec::new();
+    for (name, _, _) in variables {
+        let name = name.trim();
+        if name.is_empty() || name.contains(['{', '}', ' ']) {
+            return Err(invalid_request(format!(
+                "« {name} » n'est pas un nom de variable : ni espace, ni accolade."
+            )));
+        }
+        if seen.iter().any(|n| n == name) {
+            return Err(invalid_request(format!(
+                "La variable « {name} » est en double."
+            )));
+        }
+        seen.push(name.to_owned());
+    }
+    edit_folder(root, path, |map| {
+        let list: Vec<serde_json::Value> = variables
+            .iter()
+            .map(|(name, value, description)| {
+                let mut item = serde_json::Map::new();
+                item.insert("name".to_owned(), serde_json::Value::from(name.trim()));
+                item.insert("value".to_owned(), serde_json::Value::from(value.as_str()));
+                if !description.trim().is_empty() {
+                    item.insert(
+                        "description".to_owned(),
+                        serde_json::Value::from(description.trim()),
+                    );
+                }
+                serde_json::Value::Object(item)
+            })
+            .collect();
+        let request = map
+            .entry("request")
+            .or_insert_with(|| serde_json::json!({}));
+        if !request.is_object() {
+            *request = serde_json::json!({});
+        }
+        if let Some(request) = request.as_object_mut() {
+            if list.is_empty() {
+                request.remove("variables");
+            } else {
+                request.insert("variables".to_owned(), serde_json::Value::Array(list));
+            }
+        }
+        if map
+            .get("request")
+            .and_then(serde_json::Value::as_object)
+            .is_some_and(serde_json::Map::is_empty)
+        {
+            map.remove("request");
+        }
+    })
+}
+
+/// Écrit les étiquettes d'un dossier telles quelles, internes comprises (V4 : template).
+pub fn set_folder_tags_raw(root: &Path, path: &str, tags: &[String]) -> Result<(), CommandError> {
+    edit_folder(root, path, |map| {
+        let info = map.entry("info").or_insert_with(|| serde_json::json!({}));
+        if let Some(info) = info.as_object_mut() {
+            if tags.is_empty() {
+                info.remove("tags");
+            } else {
+                info.insert("tags".to_owned(), serde_json::json!(tags));
+            }
+        }
+    })
+}
+
 /// Chemin réel d'un dossier, liens suivis ; tel quel s'il ne se résout pas.
 fn canonical(path: &Path) -> PathBuf {
     dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
@@ -886,7 +1027,7 @@ pub mod undo;
 mod test;
 pub use test::{
     CreatedTest, StepView, TestView, VariableUser, add_step, create_test, create_test_named,
-    extracted_before, is_test, test_view, variable_users,
+    extracted_before, is_test, step_view, test_view, variable_users,
 };
 
 #[cfg(test)]

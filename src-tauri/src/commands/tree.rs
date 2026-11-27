@@ -31,6 +31,11 @@ pub struct TreeView {
     /// contrat (docs/plan-requetes-dans-contrats.md, R1, R5).
     pub tests: Vec<TreeNode>,
     pub collapsed: Vec<String>,
+    /// Templates du projet (`docs/plan-v4.md`, lot F) : la section « Templates » s'affiche dès
+    /// qu'il y en a un (R21).
+    pub templates: Vec<crate::template::TemplateSummary>,
+    /// Sections affichées depuis « Plus » (R21).
+    pub sections: Vec<String>,
 }
 
 #[tauri::command]
@@ -45,10 +50,13 @@ pub fn tree_load(
     let _ = watchers.watch(project, &ctx.root);
     let nodes = tree::read(&ctx.root)?;
     let tests = tree::tests_view(&nodes, &contract::file::paths(&ctx.root));
+    let data = local::load(&ctx.data_dir, ctx.id);
     Ok(TreeView {
         nodes,
         tests,
-        collapsed: local::load(&ctx.data_dir, ctx.id).collapsed,
+        collapsed: data.collapsed,
+        templates: crate::template::list(&ctx.root),
+        sections: data.sections,
     })
 }
 
@@ -98,6 +106,8 @@ pub(crate) fn follow_path(window: &WebviewWindow, project: Uuid, from: &str, to:
             .app_handle()
             .state::<Arc<Workbench>>()
             .rename_status(&ctx, from, to);
+        // Schémas des tests, Avant / Après et renvois vers un test (`docs/plan-v4.md`, R4).
+        let _ = crate::flow::store::follow(&ctx.root, from, to);
     }
 }
 
@@ -206,9 +216,11 @@ pub fn tree_duplicate(
     project: Uuid,
     path: String,
 ) -> Result<String, CommandError> {
-    let result = state
-        .project_ctx(project)
-        .and_then(|ctx| tree::duplicate(&ctx.root, &path));
+    let result = state.project_ctx(project).and_then(|ctx| {
+        let copy = tree::duplicate(&ctx.root, &path)?;
+        let _ = crate::flow::store::copy(&ctx.root, &path, &copy);
+        Ok(copy)
+    });
     tree_changed(&window, project, result)
 }
 

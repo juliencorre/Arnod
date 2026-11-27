@@ -75,3 +75,7 @@ mod tests {
         assert_eq!(registered, union_members("CommandName"));
     }
 }
+// Version 4 (docs/plan-v4.md) : tests en schéma, jeux de données, templates.
+pub mod datasets;
+pub mod flows;
+pub mod templates;

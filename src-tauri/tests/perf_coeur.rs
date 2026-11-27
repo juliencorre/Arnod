@@ -871,6 +871,7 @@ fn finished_run(paths: &[String]) -> RunView {
             test: None,
             step: None,
             extracted: Vec::new(),
+            flow: Default::default(),
         })
         .collect();
     RunView {
@@ -885,6 +886,7 @@ fn finished_run(paths: &[String]) -> RunView {
         cancelled: false,
         groups: run_groups("", &items),
         tests: run_tests(&items),
+        ends: Vec::new(),
         items,
         contract: None,
         revision: 1,

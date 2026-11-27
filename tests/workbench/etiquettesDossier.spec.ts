@@ -65,6 +65,7 @@ describe("étiquettes effectives (pur)", () => {
     requestCount: children.length,
     test: true,
     tags: [],
+    template: null,
   });
 
   it("un test compte s'il a une étape étiquetée ; une requête libre pour elle-même", () => {
@@ -75,6 +76,7 @@ describe("étiquettes effectives (pur)", () => {
       requestCount: 4,
       test: false,
       tags: [],
+      template: null,
       children: [
         test([request(["smoke"]), request([])]),
         test([request([])]),

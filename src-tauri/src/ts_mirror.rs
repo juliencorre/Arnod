@@ -188,6 +188,25 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::network::proxy::ProxySource>();
     v.visit::<crate::network::proxy::SystemProxy>();
     v.visit::<crate::network::tls::CertificateProblem>();
+    // Version 4 (docs/plan-v4.md).
+    v.visit::<crate::flow::Flow>();
+    v.visit::<crate::flow::FolderHooks>();
+    v.visit::<crate::flow::StepKind>();
+    v.visit::<crate::flow::HookPhase>();
+    v.visit::<crate::flow::edit::Placement>();
+    v.visit::<crate::flow::edit::FlowStepInfo>();
+    v.visit::<crate::flow::edit::StepAdded>();
+    v.visit::<crate::flow::edit::HooksView>();
+    v.visit::<crate::flow::edit::FolderProperty>();
+    v.visit::<crate::dataset::DataTable>();
+    v.visit::<crate::dataset::DataSet>();
+    v.visit::<crate::workbench::CasesOutcome>();
+    v.visit::<crate::template::TemplateSummary>();
+    v.visit::<crate::template::TemplateView>();
+    v.visit::<crate::template::InstanceView>();
+    v.visit::<crate::template::TemplateCandidate>();
+    v.visit::<crate::template::Literal>();
+    v.visit::<crate::commands::datasets::CasePreview>();
     v.visit::<crate::request::assertions::AssertionResult>();
     v.visit::<crate::request::dynamic::DynamicValue>();
     v.visit::<crate::request::extract::ExtractedValue>();
@@ -431,6 +450,8 @@ fn samples() -> String {
         nodes,
         tests,
         collapsed: Vec::new(),
+        templates: Vec::new(),
+        sections: Vec::new(),
     };
     let mut request = file::read(&root.join("Clients/lister.yml")).unwrap();
     request.inherited = inherit::resolve(root, "Clients/lister.yml");

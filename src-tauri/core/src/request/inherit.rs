@@ -153,6 +153,17 @@ pub fn resolve(root: &Path, request_path: &str) -> Inherited {
         headers,
         settings,
         variables: variables_of(&levels),
+        // Avant la requête : la racine d'abord, puis les dossiers vers la requête (R10).
+        scripts: levels
+            .iter()
+            .rev()
+            .flat_map(|level| {
+                crate::opencollection::request::scripts_from(
+                    level.request.get("scripts"),
+                    &level.source,
+                )
+            })
+            .collect(),
     }
 }
 

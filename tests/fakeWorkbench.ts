@@ -5,7 +5,14 @@
 import { emptyOAuth2 } from "@/lib/auth";
 import type {
   Assertion,
+  DataTable,
   Example,
+  Flow,
+  FlowStep,
+  FlowStepInfo,
+  FolderHooks,
+  TemplateSummary,
+  TemplateView,
   CommandError,
   EnvironmentDoc,
   EnvironmentView,
@@ -66,6 +73,7 @@ export function newRequest(name: string, overrides: Partial<RequestDoc> = {}): R
       auth: null,
       headers: [],
       settings: { timeoutMs: 30000, followRedirects: true, maxRedirects: 5, encodeUrl: true },
+      variables: [],
     },
     ...overrides,
   };
@@ -139,6 +147,21 @@ export interface FakeWorkbench {
   runNumber: number;
   /** Heure des statuts écrits par un run (aperçu : l'heure réelle), sinon 1. */
   now?: number;
+  // V4 (docs/plan-v4.md) : schémas, Avant / Après, propriétés, jeux de données, templates.
+  /** Schéma écrit de chaque test (`extensions.arnod.tests`). */
+  flows: Map<string, Flow>;
+  /** Avant / Après de chaque dossier (`extensions.arnod.folders`). */
+  hooks: Map<string, FolderHooks>;
+  /** Propriétés de chaque dossier (`request.variables` de son `folder.yml`). */
+  folderVars: Map<string, [string, string][]>;
+  /** Tableau du jeu de données de chaque requête. */
+  datasets: Map<string, DataTable>;
+  /** Templates (`templates/…`) : leur vue. */
+  templates: TemplateView[];
+  /** Utilisations : dossier → template. */
+  instances: Map<string, string>;
+  /** Sections affichées depuis « Plus ». */
+  sections: string[];
 }
 
 export function createFakeWorkbench(): FakeWorkbench {
@@ -167,6 +190,13 @@ export function createFakeWorkbench(): FakeWorkbench {
     statuses: {},
     runChecks: new Map(),
     runNumber: 0,
+    flows: new Map(),
+    hooks: new Map(),
+    folderVars: new Map(),
+    datasets: new Map(),
+    templates: [],
+    instances: new Map(),
+    sections: [],
   };
 }
 
@@ -211,6 +241,7 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
           children.some((c) => c.kind === "request" && c.contract === null) &&
           !children.some((c) => c.kind === "folder"),
         tags: wb.folderTags.get(path) ?? [],
+        template: wb.instances.get(path) ?? null,
       };
     });
     // Rang (`seq`) d'abord, puis le nom sans casse, comme `tree::read` (lot E, R1) ; un fichier
@@ -218,8 +249,9 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
     const here = (path: string): boolean =>
       path.startsWith(prefix) && !path.slice(prefix.length).includes("/");
     const requests: { seq: number; node: TreeNode }[] = [];
+    const owned = ownedFiles(wb);
     for (const [path, request] of wb.requests) {
-      if (!here(path)) continue;
+      if (!here(path) || owned.has(path)) continue;
       requests.push({
         seq: request.seq ?? Number.POSITIVE_INFINITY,
         node: {
@@ -272,6 +304,27 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
     return all.map((entry) => entry.node);
   };
   return build("");
+}
+
+/** Requêtes propres à une étape (Avant / Après, attente) : absentes de l'arborescence (R14). */
+export function ownedFiles(wb: FakeWorkbench): Set<string> {
+  const owned = new Set<string>();
+  for (const [folder, hooks] of wb.hooks) {
+    for (const step of [
+      ...hooks.beforeAll,
+      ...hooks.beforeEach,
+      ...hooks.afterEach,
+      ...hooks.afterAll,
+    ]) {
+      if ("file" in step && step.file) owned.add(`${folder}/${step.file}`);
+    }
+  }
+  for (const [test, flow] of wb.flows) {
+    for (const step of flow.steps) {
+      if (step.kind === "wait" && step.file) owned.add(`${test}/${step.file}`);
+    }
+  }
+  return owned;
 }
 
 /** Référentiel de tests : sans les requêtes liées à un contrat présent (R1, R5). */
@@ -394,6 +447,8 @@ export function runOf(wb: FakeWorkbench, folder: string, only?: string[]): RunVi
       test,
       step: test === null ? null : step,
       extracted: [],
+      ...runItemFlow(),
+      stepId: test === null ? null : stepIdOf(wb, test, path),
     };
   });
   for (const item of items) {
@@ -415,11 +470,36 @@ export function runOf(wb: FakeWorkbench, folder: string, only?: string[]): RunVi
     revision: 1,
     groups: groupsOf(folder, items),
     tests: testsOf(items),
+    ends: [],
+  };
+}
+
+/** Identifiant de l'étape requête d'un fichier dans le schéma de son test (R2). */
+function stepIdOf(wb: FakeWorkbench, test: string, path: string): string {
+  const file = path.split("/").at(-1) ?? path;
+  const stored = wb.flows.get(test)?.steps.find((s) => s.kind === "request" && s.file === file);
+  return stored?.id ?? `r:${file}`;
+}
+
+/** Champs V4 d'une ligne de run : une requête, sans schéma. */
+export function runItemFlow(): Pick<
+  RunItem,
+  "kind" | "stepId" | "detail" | "branch" | "passes" | "hook" | "folder" | "cases"
+> {
+  return {
+    kind: "request",
+    stepId: null,
+    detail: null,
+    branch: null,
+    passes: 1,
+    hook: null,
+    folder: null,
+    cases: [],
   };
 }
 
 /** Onglet d'un test, comme `test_read` du cœur (lot E, TE2). */
-function testView(wb: FakeWorkbench, path: string): TestView {
+export function testView(wb: FakeWorkbench, path: string): TestView {
   const find = (nodes: TreeNode[]): TreeNode | null => {
     for (const node of nodes) {
       if (node.kind !== "folder") continue;
@@ -434,19 +514,60 @@ function testView(wb: FakeWorkbench, path: string): TestView {
   const steps: StepView[] = folder.children.flatMap((node) => {
     if (node.kind !== "request") return [];
     const request = wb.requests.get(node.path) as RequestDoc;
-    return [
-      {
-        path: node.path,
-        name: node.name,
-        method: node.method,
-        url: request.url,
-        assertionCount: request.assertions.length,
-        extractions: request.extractions.filter((e) => e.enabled).map((e) => e.name),
-        invalid: false,
-      },
-    ];
+    return [stepViewOf(node.path, request)];
   });
-  return { path, name: folder.name, test: folder.test, steps };
+  const flow = folder.test ? flowOf(wb, path, steps) : { onFailure: "stop" as const, steps: [] };
+  // Requêtes des attentes : absentes de l'arborescence (R14), montrées dans le test.
+  for (const step of flow.steps) {
+    if (step.kind !== "wait" || step.file === undefined) continue;
+    const file = `${path}/${step.file}`;
+    const request = wb.requests.get(file);
+    if (request && !steps.some((s) => s.path === file)) steps.push(stepViewOf(file, request));
+  }
+  return { path, name: folder.name, test: folder.test, steps, flow, info: infoOf(flow, steps) };
+}
+
+/** Étape d'un fichier de requête, comme `tree::step_view`. */
+export function stepViewOf(path: string, request: RequestDoc): StepView {
+  return {
+    path,
+    file: path.split("/").at(-1) ?? path,
+    name: request.name,
+    method: request.method,
+    url: request.url,
+    assertionCount: request.assertions.length,
+    extractions: request.extractions.filter((e) => e.enabled).map((e) => e.name),
+    assertions: request.assertions.filter((a) => a.enabled),
+    extracts: request.extractions,
+    invalid: false,
+  };
+}
+
+/** Schéma d'un test : celui écrit, sinon la liste de ses requêtes (R2, sans les retraits). */
+export function flowOf(wb: FakeWorkbench, path: string, steps: StepView[]): Flow {
+  const stored = wb.flows.get(path);
+  if (stored) {
+    const known = new Set(
+      stored.steps.map((s) => (s.kind === "request" || s.kind === "wait" ? s.file : null)),
+    );
+    const added = steps
+      .filter((s) => !known.has(s.file))
+      .map((s): FlowStep => ({ id: `r:${s.file}`, name: "", kind: "request", file: s.file }));
+    return { ...structuredClone(stored), steps: [...structuredClone(stored.steps), ...added] };
+  }
+  return {
+    onFailure: "stop",
+    steps: steps.map((s) => ({ id: `r:${s.file}`, name: "", kind: "request", file: s.file })),
+  };
+}
+
+/** Ce que lit et extrait chaque étape, comme `flow::edit::info` (sans les entrées lues). */
+export function infoOf(flow: Flow, steps: StepView[]): FlowStepInfo[] {
+  return flow.steps.map((step) => {
+    const request = "file" in step ? steps.find((s) => s.file === step.file) : undefined;
+    const extracts = request?.extractions ?? (step.kind === "variable" ? [step.variable] : []);
+    return { id: step.id, inputs: [], extracts };
+  });
 }
 
 /** Écrit une étape « name » de rang `seq` dans le dossier `folder`. */
@@ -474,7 +595,13 @@ export function handleWorkbench(
     case "tree_load": {
       // Sans contrat (le faux cœur des contrats répond quand il y en a) : tout est au référentiel.
       const nodes = buildTree(wb);
-      return { nodes, tests: nodes, collapsed: wb.collapsed };
+      return {
+        nodes,
+        tests: nodes,
+        collapsed: wb.collapsed,
+        templates: wb.templates.map(summaryOf),
+        sections: [...wb.sections],
+      };
     }
     case "tree_set_collapsed":
       wb.collapsed = args.collapsed as string[];
@@ -782,4 +909,18 @@ export function handleWorkbench(
     default:
       return undefined;
   }
+}
+
+/** Résumé d'un template, comme `template::list`. */
+export function summaryOf(view: TemplateView): TemplateSummary {
+  return {
+    path: view.path,
+    name: view.name,
+    kind: view.kind,
+    category: view.category,
+    params: view.parameters.length,
+    folders: view.folders,
+    tests: view.tests,
+    assertions: view.assertions,
+  };
 }

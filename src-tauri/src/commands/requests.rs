@@ -90,6 +90,13 @@ pub async fn request_send(
         .as_deref()
         .map(|path| inherit::resolve(&ctx.root, path))
         .unwrap_or_default();
+    // Scripts gardés dans le fichier, exécutés à l'envoi (`docs/plan-v4.md`, R10).
+    request.scripts = path
+        .as_deref()
+        .and_then(|path| crate::tree::resolve(&ctx.root, path).ok())
+        .and_then(|full| crate::request::file::read(&full).ok())
+        .map(|saved| saved.scripts)
+        .unwrap_or_default();
     bench.precheck(&ctx, &environment, &request, confirmed)?;
     if let Some(path) = path.as_deref() {
         let started = results.lock().map(|mut book| book.start(project, path));

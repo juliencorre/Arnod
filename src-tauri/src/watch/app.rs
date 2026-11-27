@@ -52,6 +52,8 @@ impl<R: Runtime> Sink for AppSink<R> {
             if let Some(ctx) = &ctx {
                 app.state::<Arc<Workbench>>()
                     .rename_status(ctx, &renamed.from, &renamed.to);
+                // Un test renommé hors d'Arnod garde son schéma (`docs/plan-v4.md`, R4).
+                let _ = crate::flow::store::follow(&ctx.root, &renamed.from, &renamed.to);
             }
         }
         if let Some(ctx) = &ctx {

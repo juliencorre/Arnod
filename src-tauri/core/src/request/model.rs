@@ -45,6 +45,20 @@ impl Method {
     pub fn is_safe(self) -> bool {
         matches!(self, Self::Get | Self::Head | Self::Options)
     }
+
+    /// Méthode d'un nom HTTP, sans tenir compte de la casse.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.trim().to_ascii_uppercase().as_str() {
+            "GET" => Some(Self::Get),
+            "POST" => Some(Self::Post),
+            "PUT" => Some(Self::Put),
+            "PATCH" => Some(Self::Patch),
+            "DELETE" => Some(Self::Delete),
+            "HEAD" => Some(Self::Head),
+            "OPTIONS" => Some(Self::Options),
+            _ => None,
+        }
+    }
 }
 
 fn yes() -> bool {
@@ -603,6 +617,17 @@ pub struct InheritedHeader {
     pub source: String,
 }
 
+/// Script gardé dans un fichier (`runtime.scripts` d'une requête, `request.scripts` d'un dossier
+/// ou de la racine) : exécuté à l'envoi (`docs/plan-v4.md`, R10). Jamais échangé avec l'interface.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ScriptSource {
+    /// `before-request`, `after-response`, `tests` (ou `hooks`, non exécuté).
+    pub phase: String,
+    pub code: String,
+    /// « dossier « v2 » », « projet « Boutique » », ou vide pour la requête.
+    pub source: String,
+}
+
 /// Propriété d'un dossier ou variable de la collection (`request.variables`), reprise par une
 /// requête (`docs/plan-v4.md`, R15).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -633,6 +658,9 @@ pub struct Inherited {
     /// lointaine (`docs/plan-v4.md`, R15).
     #[serde(default)]
     pub variables: Vec<InheritedVariable>,
+    /// Scripts de la racine puis des dossiers, du plus lointain au plus proche (R10).
+    #[serde(skip)]
+    pub scripts: Vec<ScriptSource>,
 }
 
 /// Requête éditée : un endpoint (docs/plan-configuration-endpoint.md).
@@ -691,6 +719,9 @@ pub struct Request {
     /// l'enregistrement.
     #[serde(default)]
     pub inherited: Inherited,
+    /// Scripts de la requête (`runtime.scripts`), relus du fichier à l'envoi (R10).
+    #[serde(skip)]
+    pub scripts: Vec<ScriptSource>,
 }
 
 impl Request {
@@ -723,6 +754,7 @@ impl Request {
             data: None,
             preserved: Vec::new(),
             inherited: Inherited::default(),
+            scripts: Vec::new(),
         }
     }
 }
