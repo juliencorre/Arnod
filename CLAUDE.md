@@ -34,9 +34,9 @@ version 1 de la maquette selon `docs/plan-v1.md` (apparence, raccourcis modifiab
 envois ; section « Apparence, raccourcis et historique »).
 
 **Prochain** : version 2 selon `docs/plan-v2.md` (recherche Ctrl+K, étiquettes partagées, ligne de
-commande `arnod run`, synchronisation Git ; lots A à F en `claude/v2-<lot>`). Lots A à D livrés
-(sections « Recherche », « Étiquettes partagées », « Ligne de commande ») ; les questions Q1, Q2,
-Q6 à Q11 se tranchent avant la première tâche du lot concerné.
+commande `arnod run`, synchronisation Git ; lots A à F en `claude/v2-<lot>`). Lots A à F livrés
+(sections « Recherche », « Étiquettes partagées », « Ligne de commande », « Synchronisation ») ;
+reste Q2 : enregistrer les applications OAuth d'Arnod pour la connexion par le navigateur.
 
 **Travail en cours** : qualité du MVP selon `docs/plan-qualite-mvp.md` (lots 0 et A à K en trois
 vagues, règles R1 à R14), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
@@ -119,7 +119,8 @@ src/                    Frontend Vue
                         réponse),
                         contracts (contrats par projet, contrats ouverts), steps (catalogue des
                         étapes, reconnaissance, essai), interface (apparence, raccourcis),
-                        history (historique des envois), search (recherche Ctrl+K)
+                        history (historique des envois), search (recherche Ctrl+K), sync
+                        (synchronisation Git)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions),
                         brouillons avant fermeture ou sortie (useDrafts)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification,
@@ -191,6 +192,8 @@ src-tauri/              Application Tauri (espace de travail Cargo : l'applicati
     src/manifest.rs     Dossier d'un projet et sa racine opencollection.yml
     src/watch/          Fichiers modifiés hors d'Arnod : registre, surveillant, conflits
     src/report/         Rapports d'un run : JUnit, Allure, HTML (pur)
+    src/sync/           Synchronisation Git (feature sync) : dépôt (git.rs), transport HTTP sur le
+                        réseau du poste, forges, fusion, descriptions en clair, sync.json
     src/command/        Commande `arnod run` d'un test ou d'un dossier, citée pour le terminal (pur)
     src/network/, input/, curl/, bruno/, import.rs, response/, startup.rs : voir leurs sections
   cli/                  Ligne de commande (crate arnod-cli, binaire arnod-cli livré sous le nom
@@ -1089,3 +1092,35 @@ Référence : `docs/plan-v2.md`, lot D (cas LC1 à LC6, règles R5 à R8, R16 ; 
   à la release. `scripts/smoke-windows.ps1` vérifie `arnod --version` et le PATH.
 - « Copier la commande » (LC6) : menu ⋯ d'un test ou d'un dossier, `cli_command` (règle dans
   `core/src/command/`, valeurs citées pour PowerShell ou sh), environnement actif.
+
+## Synchronisation
+
+Référence : `docs/plan-v2.md`, lots E et F (cas SY1 à SY8, CF1 à CF5, règles R9 à R15 ; décisions
+Q1, Q2, Q6, Q8, Q10, Q11), écrans 7.1-a à 7.1-e.
+
+- `src-tauri/core/src/sync/` (feature `sync` du cœur, absente de la ligne de commande) : libgit2
+  par `git2` (`vendored-libgit2`, sans HTTPS ni SSH propres). Le transport « smart HTTP »
+  (`transport.rs`) passe par `Network::raw` (proxy, autorités internes) sur le runtime du cœur ;
+  le jeton du compte, au coffre (`arnod-git:<hôte>:<compte>`), part en en-tête `Authorization`,
+  jamais dans `.git/config` (R9). Les opérations sont synchrones : une commande les lance sur un
+  fil sans runtime (`commands::sync::detached`).
+- Récupérer (`sync::pull`) : la fusion se calcule en mémoire, fichier par fichier, sur la version
+  commune, la mienne (dossier de travail) et celle de l'équipe (`merge.rs`, bâtie sur
+  `watch::conflict` : une requête élément par élément, « garder les deux » pour une ligne de
+  liste ; tout autre fichier en entier, Q8). Un conflit attend dans `SyncBook` sans rien écrire
+  (R13) ; réglé, les fichiers sont écrits comme toute écriture d'Arnod puis diffusés comme des
+  fichiers modifiés (les onglets se rechargent), la branche avance (avance rapide, ou commit de
+  fusion s'il y avait des envois en attente).
+- Envoyer (`sync::send`) : les éléments choisis, avec un message, au nom du compte relié (Q11) ;
+  un envoi refusé parce que l'équipe a avancé récupère puis renvoie, jamais de force (R11).
+  « Mes modifications » se comparent à la version commune, jamais à celle de l'équipe.
+- `describe.rs` (pur) décrit un fichier changé en élément partagé, en clair (R14) ; l'interface
+  n'affiche jamais un chemin ni un commit. `sync.json` (poste, R10) garde compte, branche,
+  dernière vérification, changements reçus (pastilles) et secrets remis « à plus tard » (R15).
+- Interface : store `sync` (vérification au démarrage, toutes les 5 minutes et au retour sur la
+  fenêtre, Q6 ; `arnod://synchro`), `components/sync/` : `StatusBar` (montée par `AppShell`),
+  `SyncPanel` (7.1-b), `LinkDialog` (7.1-a), `ConflictDialog` (7.1-c), `MissingSecrets` (7.1-e),
+  `TeamHistory` (onglet « Équipe » de l'éditeur, 7.1-d) ; pastilles dans `TreeRow` et `FolderTab`.
+  Une récupération enregistre d'abord les brouillons (`useDrafts`).
+- Connexion par le navigateur (flux « device ») seulement si `ARNOD_GITHUB_CLIENT_ID` ou
+  `ARNOD_GITLAB_CLIENT_ID` sont fournis à la construction (Q2) ; sinon, jeton personnel.

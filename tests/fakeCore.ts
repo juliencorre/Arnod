@@ -27,6 +27,7 @@ import {
   recordSend,
 } from "./fakeInterface";
 import { fakeSearch } from "./fakeSearch";
+import { createFakeSync, handleSync, type FakeSync } from "./fakeSync";
 import { createFakeUpdates, type FakeUpdates, handleUpdates } from "./fakeUpdates";
 import { STEP_CATALOG, detect } from "./fakeSteps";
 // Lot C - Import Bruno.
@@ -82,6 +83,8 @@ export interface FakeCore {
   updates: FakeUpdates;
   /** Version 1 : apparence, raccourcis (1.6-f, 1.6-f bis), historique des envois (5.1-c bis). */
   interface: FakeInterface;
+  /** Version 2, lots E et F : synchronisation Git. */
+  sync: FakeSync;
 }
 
 const COLORS: WorkspaceColor[] = [
@@ -124,6 +127,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     startup: createFakeStartup(),
     updates: createFakeUpdates(),
     interface: createFakeInterface(),
+    sync: createFakeSync(),
   };
 
   const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -412,6 +416,9 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           if (iface !== undefined) return iface;
           // Version 2, lot A : recherche Ctrl+K.
           if (cmd === "search_query") return fakeSearch(core.workbench, String(args.text));
+          // Version 2, lots E et F : synchronisation Git.
+          const synced = handleSync(core.sync, cmd, args);
+          if (synced !== undefined) return synced;
           if (cmd === "cli_command") {
             const path = String(args.path);
             const env = args.environment;

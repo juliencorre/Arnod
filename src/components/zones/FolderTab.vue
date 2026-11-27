@@ -20,12 +20,15 @@ import TagsEditor from "@/components/workbench/TagsEditor.vue";
 import { useGuard } from "@/composables/useGuard";
 import { countLabel } from "@/lib/format";
 import { countStatuses, requestPaths } from "@/lib/status";
+import { initial } from "@/lib/sync";
 import { foldTag, hasTags, tagCounts, taggedTests } from "@/lib/tags";
 import { findFolder, folderSummary, testCount, type FolderNode } from "@/lib/tree";
+import { useSyncStore } from "@/stores/sync";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
 
 const props = defineProps<{ projectId: string; path: string }>();
+const sync = useSyncStore();
 
 const workbench = useWorkbenchStore();
 const guard = useGuard();
@@ -377,6 +380,17 @@ function cancelCreate(): void {
           <td>
             <button type="button" class="folder__name" @click="open(node)">{{ node.name }}</button>
             <span v-for="tag in rowTags(node)" :key="tag" class="folder__row-tag">{{ tag }}</span>
+            <span
+              v-if="node.kind === 'request' && sync.receivedBy(projectId, node.path)"
+              class="folder__author"
+              :title="`Modifiée par ${sync.receivedBy(projectId, node.path)} à la dernière récupération`"
+              ><span aria-hidden="true">{{
+                initial(sync.receivedBy(projectId, node.path) ?? "")
+              }}</span
+              ><span class="visually-hidden"
+                >modifiée par {{ sync.receivedBy(projectId, node.path) }}</span
+              ></span
+            >
           </td>
           <td class="folder__muted">{{ content(node) }}</td>
           <td :class="`folder__result folder__result--${result(node).tone}`">
@@ -474,6 +488,19 @@ function cancelCreate(): void {
 .folder__filter-summary {
   font-size: var(--text-small);
   color: var(--color-muted);
+}
+
+/* Pastille de l'auteur d'un changement récupéré (7.1-d) : une initiale. */
+.folder__author {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1rem;
+  height: 1rem;
+  margin-left: 0.375rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
+  font-weight: 600;
+  background: var(--color-accent-soft);
 }
 
 /* Estompée par la couleur, jamais par l'opacité (Impeccable). */

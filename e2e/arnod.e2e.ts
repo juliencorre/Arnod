@@ -15,7 +15,7 @@
  * le premier usage jusqu'au run d'un dossier : vérifications en échec, résultat par dossier et
  * statuts de la barre latérale gardés au redémarrage (docs/plan-fin-premier-usage.md).
  */
-import type { ChildProcess } from "node:child_process";
+import { type ChildProcess, execFileSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -3301,6 +3301,139 @@ describe("Version 2 - Copier la commande (5.3-c)", () => {
         message.includes('arnod run "Etiquettes V2" --env'),
     ).toBe(true);
     await screenshot(browser, "v2-copier-commande");
+  });
+});
+
+describe("Version 2 - Synchronisation (7.1-a, 7.1-b, 7.1-c, 7.1-d)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const bare = () => path.join(sandbox.home, "depots", "boutique-tests.git");
+  const smoke = "Etiquettes V2/smoke.yml";
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=Marc",
+        "-c",
+        "user.email=marc@exemple.fr",
+        "-c",
+        "init.defaultBranch=main",
+        ...args,
+      ],
+      { cwd, stdio: "pipe" },
+    ).toString();
+
+  /** Un collègue : un clone du dépôt où il change l'adresse de la requête smoke, puis envoie. */
+  function colleague(url: string): void {
+    const dir = path.join(sandbox.home, "collegue");
+    rmSync(dir, { recursive: true, force: true });
+    git(sandbox.home, "clone", "-q", "-b", "main", bare(), dir);
+    const file = path.join(dir, smoke);
+    writeFileSync(file, readFileSync(file, "utf8").replace(/url: .*\/smoke[^\n]*/, `url: ${url}`));
+    git(dir, "commit", "-q", "-am", "Adresse de la requête smoke");
+    git(dir, "push", "-q", "origin", "main");
+  }
+
+  async function statusIs(text: string): Promise<void> {
+    await browser.waitUntil(
+      async () => (await browser.$(".statusbar [role='status']").getText()) === text,
+      { timeout: 20_000, timeoutMsg: `barre d'état « ${text} » attendue` },
+    );
+  }
+
+  /** Ouvre le panneau et attend que la vérification voie `count` éléments à récupérer. */
+  async function openPanel(count: number): Promise<void> {
+    await clickHidden(".statusbar__sync");
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          (n) =>
+            document.querySelector("dialog[open] #sync-incoming")?.textContent.trim() ===
+            `À récupérer · ${String(n)}`,
+          count,
+        ),
+      { timeout: 20_000, timeoutMsg: `${String(count)} élément(s) à récupérer attendu(s)` },
+    );
+  }
+
+  beforeAll(() => {
+    mkdirSync(path.dirname(bare()), { recursive: true });
+    git(sandbox.home, "init", "-q", "--bare", "-b", "main", bare());
+  });
+
+  it("relie le projet à un dépôt, récupère la modification d'un collègue, règle un conflit", async () => {
+    await statusIs("Pas encore partagé");
+    await clickHidden(".statusbar__sync");
+    await browser.$("dialog[open] .link__forges").waitForDisplayed({ timeout: 10_000 });
+    await clickText("dialog[open] [role='radio']", "Autre URL Git");
+    await browser.execute((url) => {
+      const input = document.querySelector<HTMLInputElement>(
+        'dialog[open] input[aria-label="Adresse du dépôt"]',
+      );
+      if (!input) throw new Error("adresse du dépôt introuvable");
+      input.value = url;
+      input.dispatchEvent(new Event("input"));
+    }, bare());
+    await screenshot(browser, "v2-relier");
+    await clickText("dialog[open] button", "Relier et envoyer");
+    await statusIs("À jour avec l'équipe");
+    expect(git(bare(), "log", "--format=%s", "main")).toContain("Partage du projet");
+
+    // 7.1-b : la modification d'un collègue arrive, décrite en clair.
+    colleague("http://127.0.0.1:1/smoke-v2");
+    await openPanel(1);
+    const panel = await browser.$("dialog[open]").getText();
+    expect(panel).toContain("Requête smoke");
+    expect(panel).toContain("adresse modifiée");
+    expect(panel).toContain("Marc");
+    // Ce que seul le collègue a changé n'est pas « à envoyer ».
+    expect(panel).toContain("Mes modifications · 0");
+    await screenshot(browser, "v2-synchroniser");
+    await clickText("dialog[open] button", "Récupérer");
+    await statusIs("À jour avec l'équipe");
+    expect(readFileSync(path.join(project(), smoke), "utf8")).toContain("smoke-v2");
+    await clickHidden("dialog[open] .dialog__close");
+    // 7.1-d : la pastille du collègue dans la barre latérale.
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll("aside .row__author")).some((a) =>
+            a.textContent.includes("Marc"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "pastille de Marc attendue" },
+    );
+    await screenshot(browser, "v2-pastille");
+
+    // 7.1-c : la même adresse changée des deux côtés.
+    const file = path.join(project(), smoke);
+    writeFileSync(file, readFileSync(file, "utf8").replace("smoke-v2", "smoke-local"));
+    colleague("http://127.0.0.1:1/smoke-marc");
+    await openPanel(1);
+    await clickText("dialog[open] button", "Récupérer");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          document.querySelector("dialog[open] .dialog__title")?.textContent.includes("conflit"),
+        ),
+      { timeout: 20_000, timeoutMsg: "conflit attendu" },
+    );
+    // Rien n'est écrit avant de valider (R13).
+    expect(readFileSync(file, "utf8")).toContain("smoke-local");
+    expect(await browser.$("dialog[open]").getText()).toContain("Adresse");
+    await screenshot(browser, "v2-conflit");
+    await browser.execute(() => {
+      const radios = document.querySelectorAll<HTMLInputElement>(
+        'dialog[open] input[type="radio"]',
+      );
+      radios[1]?.click();
+    });
+    await clickText("dialog[open] button", "Valider la résolution");
+    await browser.waitUntil(() => readFileSync(file, "utf8").includes("smoke-marc"), {
+      timeout: 20_000,
+      timeoutMsg: "version de Marc écrite attendue",
+    });
+    await statusIs("À jour avec l'équipe");
   });
 });
 

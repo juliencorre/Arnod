@@ -43,6 +43,8 @@ pub mod interface;
 pub mod search;
 // Version 2, lot D : « Copier la commande ».
 pub mod cli;
+// Version 2, lots E et F : synchronisation Git.
+pub mod sync;
 
 #[cfg(test)]
 mod tests {

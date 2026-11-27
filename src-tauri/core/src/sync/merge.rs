@@ -201,6 +201,15 @@ pub fn merge_file(
             auto,
         };
     };
+    // Identique à une version (tout pris d'un côté) : ses octets, sans mise en forme nouvelle,
+    // pour qu'elle ne paraisse pas modifiée.
+    let same = |other: &Request| conflict::compare(&merged, &merged, other).is_empty();
+    if same(&theirs_req) {
+        return Merged::Clean(theirs.map(<[u8]>::to_vec));
+    }
+    if same(&ours_req) {
+        return Merged::Clean(ours.map(<[u8]>::to_vec));
+    }
     match yaml::render(&into_value(&merged, Some(&ours_value))) {
         Ok(text) => Merged::Clean(Some(text.into_bytes())),
         Err(_) => Merged::Conflict {

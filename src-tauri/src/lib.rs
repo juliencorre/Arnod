@@ -14,7 +14,7 @@ pub(crate) use arnod_core::ts_contract;
 pub use arnod_core::{
     bruno, catalog, command, contract, curl, environment, error, history, http, import, input,
     layout, local, manifest, network, opencollection, request, response, results, search, secrets,
-    startup, state, statuses, steps, storage, tree, trial, workbench,
+    startup, state, statuses, steps, storage, sync, tree, trial, workbench,
 };
 
 pub mod commands;
@@ -104,6 +104,9 @@ pub fn run() {
             // Les runs tournent sur le runtime de Tauri (lot C : le cœur ne le connaît pas).
             bench.set_spawner(Arc::new(TauriSpawner));
             app.manage(bench);
+            // V2, lots E et F : récupérations en attente d'un choix, connexions aux forges.
+            app.manage(Arc::new(sync::SyncBook::default()));
+            app.manage(commands::sync::SyncLogins::default());
             app.manage(WindowsState::load(data_dir));
             app.manage(Mutex::new(ResultBook::default()));
             app.manage(Mutex::new(quit::QuitGate::default()));
@@ -312,6 +315,24 @@ pub fn run() {
             commands::tree::tree_set_folder_tags,
             // Version 2 (lot D) : « Copier la commande ».
             commands::cli::cli_command,
+            // Version 2 (lots E et F) : synchronisation Git.
+            commands::sync::sync_status,
+            commands::sync::sync_check,
+            commands::sync::sync_login_options,
+            commands::sync::sync_connect_start,
+            commands::sync::sync_connect_wait,
+            commands::sync::sync_connect_cancel,
+            commands::sync::sync_token,
+            commands::sync::sync_repositories,
+            commands::sync::sync_create_repository,
+            commands::sync::sync_link,
+            commands::sync::sync_pull_push,
+            commands::sync::sync_conflicts,
+            commands::sync::sync_resolve,
+            commands::sync::sync_abandon,
+            commands::sync::sync_journal,
+            commands::sync::sync_missing_secrets,
+            commands::sync::sync_secrets_later,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

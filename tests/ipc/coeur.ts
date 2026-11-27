@@ -151,6 +151,8 @@ export type ExtractionScope = "runtime" | "environment" | "request" | "folder" |
 
 export type FailureCause = "certificate" | "proxy" | "proxyAuth" | "dns" | "unreachable" | "timeout" | "tls" | "other";
 
+export type FileConflict = { item: SharedItem, author: string, at: number, elements: Array<SyncConflictElement>, merged: Array<SyncMergedElement>, ours: string | null, theirs: string | null, };
+
 export type Filed = { moved: Array<[string, string]>, left: Array<string>, contract: string, contractName: string, };
 
 export type FiledTrials = { undoToken: string, moved: Array<[string, string]>, left: Array<string>, contract: string, contractName: string, };
@@ -221,6 +223,8 @@ export type InterfaceView = { appearance: Appearance, zooms: Array<number>, font
 
 export type Jar = { cookies: Array<StoredCookie>, disabledDomains: Array<string>, };
 
+export type JournalEntry = { author: string, at: number, detail: string, message: string, before: string | null, after: string | null, };
+
 export type LayoutNode = { "kind": "zone" } & ZoneView | { "kind": "split", id: string, axis: Axis, ratio: number, first: LayoutNode, second: LayoutNode, };
 
 export type LayoutPreset = "one" | "twoColumns" | "twoRows" | "three" | "four";
@@ -236,6 +240,8 @@ export type LocalVarView = { name: string, secret: boolean, value: string | null
 export type ManualProxy = { url: string, noProxy: string, username: string, };
 
 export type MenuShortcut = "placement" | "sidebar";
+
+export type MissingSecrets = { environment: string, names: Array<string>, };
 
 export type NetworkFailure = { cause: FailureCause, title: string, explanation: string, notSent: boolean, host: string, port: number, proxy: string | null, connectTimeoutMs: number, elapsedMs: number, certificate: CertificateFailure | null, };
 
@@ -359,6 +365,10 @@ export type Sent = { environment: string, method: string, url: string, headers: 
 
 export type SentToken = { tokenUrl: string, status: TokenStatus | null, };
 
+export type SharedItem = { key: string, kind: SharedItemKind, label: string, place: string, detail: string, author: string | null, at: number | null, };
+
+export type SharedItemKind = "step" | "request" | "endpoint" | "folder" | "contract" | "environment" | "project" | "other";
+
 export type ShortcutChange = { view: InterfaceView, conflict: ShortcutConflict | null, };
 
 export type ShortcutConflict = { keys: string, action: string, label: string, };
@@ -414,6 +424,28 @@ export type StepVisibleWhen = { key: string, in: Array<string>, };
 export type StoredAuthority = { pem: string, addedAt: number, };
 
 export type StoredCookie = { name: string, value: string, domain: string, hostOnly: boolean, path: string, expiresAt: number | null, secure: boolean, httpOnly: boolean, receivedFrom: string, receivedAt: number, };
+
+export type SyncAccount = { forge: SyncForge, host: string, login: string, name: string, email: string, };
+
+export type SyncChoice = "ours" | "theirs" | "both";
+
+export type SyncConflictElement = { key: string, label: string, ours: string | null, theirs: string | null, both: boolean, };
+
+export type SyncConflicts = { projectId: string, conflicts: Array<FileConflict>, };
+
+export type SyncDeviceCode = { userCode: string, verificationUri: string, intervalSecs: number, expiresInSecs: number, };
+
+export type SyncForge = "github" | "gitlab" | "other";
+
+export type SyncLoginOptions = { githubBrowser: boolean, gitlabBrowser: boolean, };
+
+export type SyncMergedElement = { label: string, theirs: boolean, };
+
+export type SyncRemote = { url: string, forge: SyncForge, host: string, name: string, branch: string, };
+
+export type SyncRepository = { name: string, url: string, private: boolean, empty: boolean, };
+
+export type SyncView = { projectId: string, repository: boolean, remote: SyncRemote | null, account: SyncAccount | null, incoming: Array<SharedItem>, outgoing: Array<SharedItem>, conflicts: number, checkedAt: number | null, error: string | null, members: Array<string>, received: { [key in string]: string }, };
 
 export type SystemProxy = { http: string | null, https: string | null, noProxy: string, source: ProxySource | null, autoConfig: string | null, };
 
@@ -732,6 +764,22 @@ export type CheckSearchHit = Check<Same<Ipc.SearchHit, SearchHit>>;
 export type CheckSearchGroup = Check<Same<Ipc.SearchGroup, SearchGroup>>;
 export type CheckSearchResults = Check<Same<Ipc.SearchResults, SearchResults>>;
 export type CheckCliShell = Check<Same<Ipc.CliShell, CliShell>>;
+export type CheckSyncForge = Check<Same<Ipc.SyncForge, SyncForge>>;
+export type CheckSyncAccount = Check<Same<Ipc.SyncAccount, SyncAccount>>;
+export type CheckSyncRemote = Check<Same<Ipc.SyncRemote, SyncRemote>>;
+export type CheckSharedItemKind = Check<Same<Ipc.SharedItemKind, SharedItemKind>>;
+export type CheckSharedItem = Check<Same<Ipc.SharedItem, SharedItem>>;
+export type CheckSyncView = Check<Same<Ipc.SyncView, SyncView>>;
+export type CheckSyncChoice = Check<Same<Ipc.SyncChoice, SyncChoice>>;
+export type CheckSyncConflictElement = Check<Same<Ipc.SyncConflictElement, SyncConflictElement>>;
+export type CheckSyncMergedElement = Check<Same<Ipc.SyncMergedElement, SyncMergedElement>>;
+export type CheckFileConflict = Check<Same<Ipc.FileConflict, FileConflict>>;
+export type CheckSyncConflicts = Check<Same<Ipc.SyncConflicts, SyncConflicts>>;
+export type CheckJournalEntry = Check<Same<Ipc.JournalEntry, JournalEntry>>;
+export type CheckSyncRepository = Check<Same<Ipc.SyncRepository, SyncRepository>>;
+export type CheckSyncDeviceCode = Check<Same<Ipc.SyncDeviceCode, SyncDeviceCode>>;
+export type CheckMissingSecrets = Check<Same<Ipc.MissingSecrets, MissingSecrets>>;
+export type CheckSyncLoginOptions = Check<Same<Ipc.SyncLoginOptions, SyncLoginOptions>>;
 
 // Sans homologue généré (écrits seulement côté interface) :
 // - CommandName

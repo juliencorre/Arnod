@@ -1,6 +1,6 @@
 # Plan - Version 2 : travailler en équipe, jouer les tests hors de l'application
 
-**Version** 0.1 · **Date** 2026-11-27 · **Statut** En cours (lots A à D livrés ; questions du § 11 à trancher par lot) ·
+**Version** 0.1 · **Date** 2026-11-27 · **Statut** Livré (lots A à F ; Q2 : applications OAuth à enregistrer) ·
 **Base** version 0.0.4 (Develop @46f5d44)
 
 Plan d'implémentation de la **V2** de la maquette : « Les projets sont déjà des fichiers dans Git :
@@ -297,28 +297,28 @@ d'abord (courts, visibles), puis C, D, puis E, F.
 
 **Lot E - Synchronisation (7.1-a, 7.1-b, 7.1-e)**
 
-- [ ] **T10** `sync/git.rs` et `sync/transport.rs` (R9) ; tests contre un serveur Git HTTP local.
-- [ ] **T11** `sync/forge.rs` : connexion GitHub et GitLab (Q2), dépôts, création ; jeton au coffre.
-- [ ] **T12** Relier (7.1-a), `sync.json`, barre d'état et vérification périodique (Q6).
-- [ ] **T13** Récupérer puis envoyer (7.1-b, R10, R11), éléments partagés (`describe.rs`),
+- [x] **T10** `sync/git.rs` et `sync/transport.rs` (R9) ; tests contre un serveur Git HTTP local.
+- [x] **T11** `sync/forge.rs` : connexion GitHub et GitLab (Q2), dépôts, création ; jeton au coffre.
+- [x] **T12** Relier (7.1-a), `sync.json`, barre d'état et vérification périodique (Q6).
+- [x] **T13** Récupérer puis envoyer (7.1-b, R10, R11), éléments partagés (`describe.rs`),
       brouillons (`useDrafts`), secrets manquants (7.1-e, R15) ; e2e sur un dépôt local.
 
 **Lot F - Conflits et équipe (7.1-c, 7.1-d)**
 
-- [ ] **T14** `sync/merge.rs` (R12, R13), `ConflictTab.vue` (7.1-c).
-- [ ] **T15** Pastilles et historique en clair (7.1-d, R14).
+- [x] **T14** `sync/merge.rs` (R12, R13), conflit (7.1-c) : `ConflictDialog.vue`, en fenêtre modale.
+- [x] **T15** Pastilles et historique en clair (7.1-d, R14).
 
 ## 9. Critères d'acceptation
 
-- [ ] `cargo test` : règles R1 à R16, dont fusion et transport Git contre un serveur local.
-- [ ] Vitest : recherche au clavier, étiquettes d'un dossier, barre d'état, synchronisation,
+- [x] `cargo test` : règles R1 à R16, dont fusion et transport Git contre un serveur local.
+- [x] Vitest : recherche au clavier, étiquettes d'un dossier, barre d'état, synchronisation,
       conflit, secrets manquants, sur le faux cœur.
-- [ ] e2e : Ctrl+K ouvre et trouve un test par nom et par adresse ; une étiquette de dossier filtre
+- [x] e2e : Ctrl+K ouvre et trouve un test par nom et par adresse ; une étiquette de dossier filtre
       sa vue ; un projet se relie à un dépôt local, envoie, récupère la modification d'un « collègue »
       (second clone), règle un conflit.
-- [ ] `arnod run`, sous Windows et sous Linux, sans installation à part, joue un dossier contre
+- [x] `arnod run`, sous Windows et sous Linux, sans installation à part, joue un dossier contre
       un serveur local, écrit JUnit et Allure, rend 1 sur un échec.
-- [ ] Installeur Windows < 15 Mo ; `npm run check` passe.
+- [x] Installeur Windows < 15 Mo (mesuré par la CI) ; `npm run check` passe.
 
 ## 10. Risques
 
@@ -338,14 +338,14 @@ Questions ouvertes, à trancher avant la première tâche du lot concerné.
 
 | ID  | Question                                                                                        | Décision                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | --- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Quelle bibliothèque Git ? (lot E)                                                               | À trancher. Recommandé : `git2` (libgit2) sans HTTPS ni SSH propres, avec un transport HTTPS enregistré qui passe par `network::Network` (proxy, autorités internes, R9). Autres : `git` du système (rien à embarquer, mais Git requis et proxy à part) ; `gix` (pur Rust, envoi encore incomplet).                                                                                                                                |
-| Q2  | Connexion « par le navigateur » : qui enregistre les applications OAuth d'Arnod ? (lot E)       | À trancher. Recommandé : une application OAuth GitHub (flux « device ») et une GitLab.com (PKCE) au nom du projet Arnod ; pour un GitLab auto-hébergé ou une autre URL, un jeton personnel saisi, rangé au coffre.                                                                                                                                                                                                                 |
+| Q1  | Quelle bibliothèque Git ? (lot E)                                                               | Retenu le 2026-11-27 (lot E) : `git2` (libgit2) sans HTTPS ni SSH propres, avec un transport HTTPS enregistré qui passe par `network::Network` (proxy, autorités internes, R9). Autres : `git` du système (rien à embarquer, mais Git requis et proxy à part) ; `gix` (pur Rust, envoi encore incomplet).                                                                                                                          |
+| Q2  | Connexion « par le navigateur » : qui enregistre les applications OAuth d'Arnod ? (lot E)       | En partie (lot E) : le flux « device » (RFC 8628) est écrit pour GitHub et GitLab, et ne s'offre que si l'identifiant de l'application OAuth est fourni à la construction (`ARNOD_GITHUB_CLIENT_ID`, `ARNOD_GITLAB_CLIENT_ID`) ; reste à enregistrer ces applications au nom du projet. En attendant, et pour toute autre adresse, un jeton personnel saisi, vérifié par la forge et rangé au coffre.                              |
 | Q3  | Comment livrer `arnod` ? (lot D)                                                                | Retenu le 2026-11-27 (recommandation, avec le lot D) : un exécutable autonome (R16). Sous Windows, `arnod.exe` livré avec l'application, dans un dossier `bin` ajouté au `PATH` de l'utilisateur par l'installeur `currentUser` ; l'application garde son binaire sans console, qui s'appelle déjà `arnod.exe` (`mainBinaryName`) mais n'est pas sur le `PATH`. Sous Linux, l'exécutable joint à la release, à côté de l'AppImage. |
 | Q4  | Intégration continue (5.3-d : image Docker `arnod/arnod`, exemples GitHub Actions et Jenkins) ? | Décidé le 2026-11-27 : retirée de la V2 (ancien lot E). Pas d'image Docker, qui demande une installation sur le poste ; ni archives pour les agents, ni exemples, ni « Intégration continue… ». L'écran 5.3-d est à redécider.                                                                                                                                                                                                     |
 | Q5  | Ce que `arnod run` écrit sur le poste                                                           | Retenu le 2026-11-27 (avec le lot D) : rien hors des rapports (R5), pour des runs reproductibles d'un poste à l'autre.                                                                                                                                                                                                                                                                                                             |
-| Q6  | Fréquence de la vérification de synchronisation                                                 | Proposé : au démarrage, puis toutes les 5 minutes et au retour sur la fenêtre ; « vérifié il y a … » dans le panneau.                                                                                                                                                                                                                                                                                                              |
+| Q6  | Fréquence de la vérification de synchronisation                                                 | Retenu (lot E) : au démarrage, puis toutes les 5 minutes et au retour sur la fenêtre ; « vérifié il y a … » dans le panneau.                                                                                                                                                                                                                                                                                                       |
 | Q7  | « Étiquettes communes au projet » : simple réunion des étiquettes des fichiers, ou registre ?   | Proposé : réunion des étiquettes des requêtes et des dossiers (rien dans `extensions.arnod`) ; un registre décrit viendrait avec les campagnes (V7).                                                                                                                                                                                                                                                                               |
-| Q8  | Conflit sur un fichier qui n'est pas une requête (contrat, `opencollection.yml`)                | Proposé : environnements variable par variable ; contrat et racine : garder une version entière, avec la comparaison des deux.                                                                                                                                                                                                                                                                                                     |
+| Q8  | Conflit sur un fichier qui n'est pas une requête (contrat, `opencollection.yml`)                | Retenu en partie (lot F) : une requête élément par élément ; tout autre fichier (environnement compris) se garde en entier, avec la comparaison des deux ; environnements variable par variable plus tard.                                                                                                                                                                                                                         |
 | Q9  | macOS et Linux (question de la page 0.1-a)                                                      | Proposé : l'application reste Windows et Linux (AppImage, déjà construite) ; `arnod` en V2 pour Windows et Linux (exécutable autonome) ; macOS hors V2.                                                                                                                                                                                                                                                                            |
-| Q10 | Levée de « Arnod n'initialise pas Git »                                                         | Proposé : seulement pour « Relier » (7.1-a), sur un projet qui n'est pas déjà un dépôt.                                                                                                                                                                                                                                                                                                                                            |
-| Q11 | Auteur des modifications envoyées                                                               | Proposé : nom et adresse du compte relié (adresse privée « noreply » de la forge si l'adresse n'est pas publique).                                                                                                                                                                                                                                                                                                                 |
+| Q10 | Levée de « Arnod n'initialise pas Git »                                                         | Retenu (lot E) : seulement pour « Relier » (7.1-a), sur un projet qui n'est pas déjà un dépôt ; un `.gitignore` des rapports d'`arnod run` est ajouté.                                                                                                                                                                                                                                                                             |
+| Q11 | Auteur des modifications envoyées                                                               | Retenu (lot E) : nom et adresse du compte relié (adresse privée « noreply » de la forge si l'adresse n'est pas publique), sinon l'identité Git du dépôt.                                                                                                                                                                                                                                                                           |

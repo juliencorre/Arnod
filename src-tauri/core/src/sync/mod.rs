@@ -89,6 +89,9 @@ pub struct SyncView {
     pub error: Option<String>,
     /// Auteurs de l'historique du dépôt (pastilles du panneau).
     pub members: Vec<String>,
+    /// Éléments changés par un collègue à la dernière récupération, avec son nom (pastilles de
+    /// la barre latérale, CF4) : chemin de la requête ou du dossier → auteur.
+    pub received: BTreeMap<String, String>,
 }
 
 /// Récupération en attente d'un choix (R13) : rien n'est écrit tant qu'elle n'est pas réglée.
@@ -238,16 +241,26 @@ fn remote_of(repo: &Repository, state: &SyncState) -> Option<SyncRemote> {
     })
 }
 
-/// Mes modifications : chemins qui diffèrent de la version de l'équipe (envoyée ou non
-/// encore partagée), avec la version de l'équipe.
+/// Version commune avec l'équipe : l'ancêtre commun de `HEAD` et de la version de l'équipe,
+/// sinon celle de l'équipe (rien d'envoyé encore), sinon rien (jamais partagé).
+fn common_tree<'r>(repo: &'r Repository, branch: &str) -> Option<git2::Tree<'r>> {
+    let head = git::head_commit(repo);
+    let upstream = git::upstream_commit(repo, branch)?;
+    let base = match &head {
+        Some(head) => repo.merge_base(head.id(), upstream.id()).ok()?,
+        None => upstream.id(),
+    };
+    repo.find_commit(base).ok()?.tree().ok()
+}
+
+/// Mes modifications : fichiers changés depuis la version commune avec l'équipe (envoyés ou
+/// non), jamais ceux que seule l'équipe a changés.
 fn outgoing_paths(repo: &Repository, branch: &str) -> Result<Vec<String>, CommandError> {
     let mut paths = git::workdir_changes(repo)?;
-    let head = git::head_commit(repo);
-    let upstream = git::upstream_commit(repo, branch);
-    let head_tree = head.as_ref().and_then(|c| c.tree().ok());
-    let upstream_tree = upstream.as_ref().and_then(|c| c.tree().ok());
+    let head_tree = git::head_commit(repo).and_then(|c| c.tree().ok());
     if head_tree.is_some() {
-        for path in git::changed_paths(repo, upstream_tree.as_ref(), head_tree.as_ref())? {
+        let base = common_tree(repo, branch);
+        for path in git::changed_paths(repo, base.as_ref(), head_tree.as_ref())? {
             if !paths.contains(&path) {
                 paths.push(path);
             }
@@ -277,6 +290,11 @@ pub fn view(ctx: &SyncCtx<'_>, book: &SyncBook) -> SyncView {
         checked_at: state.checked_at,
         error: state.error.clone(),
         members: Vec::new(),
+        received: state
+            .received
+            .iter()
+            .map(|(path, r)| (path.clone(), r.author.clone()))
+            .collect(),
     };
     let Some(repo) = git::open(ctx.root) else {
         return view;
@@ -290,9 +308,10 @@ pub fn view(ctx: &SyncCtx<'_>, book: &SyncBook) -> SyncView {
     let tests = test_folders(ctx.root);
     let upstream = git::upstream_commit(&repo, &branch);
     let upstream_tree = upstream.as_ref().and_then(|c| c.tree().ok());
+    let common = common_tree(&repo, &branch);
     if let Ok(paths) = outgoing_paths(&repo, &branch) {
         for path in paths {
-            let old = git::blob_at(&repo, upstream_tree.as_ref(), &path);
+            let old = git::blob_at(&repo, common.as_ref(), &path);
             let new = ctx.workdir(&path);
             if old != new {
                 view.outgoing

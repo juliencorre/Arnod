@@ -351,6 +351,15 @@ donne par `ARNOD_VAR_<nom>`, sinon la valeur du poste est prise ; rien n'est éc
 des rapports. Dans Arnod, « Copier la commande » du menu ⋯ d'un test ou d'un dossier donne la
 commande avec l'environnement actif.
 
+### Travailler en équipe (Git)
+
+Un projet se relie à un dépôt GitHub, GitLab ou à une adresse Git depuis la barre d'état, en bas
+de la fenêtre ([`docs/plan-v2.md`](docs/plan-v2.md), lots E et F). Arnod récupère toujours avant
+d'envoyer, fusionne élément par élément ce qui ne se chevauche pas et ne demande un choix que pour
+un élément changé des deux côtés. Les secrets et l'état du poste ne voyagent jamais ; le jeton du
+compte est rangé dans le coffre du système. Les échanges passent par le proxy et les autorités
+configurés dans Arnod.
+
 ## Vérifications
 
 La CI (`.github/workflows/build.yml`, Windows et Linux) exécute lint, format, typecheck,

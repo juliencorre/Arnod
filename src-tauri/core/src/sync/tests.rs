@@ -196,6 +196,8 @@ fn sy5_r14_ce_qui_arrive_en_clair_puis_recupere() {
     let checked = check(&f.ctx(), &f.book);
     assert!(checked.error.is_none(), "{:?}", checked.error);
     assert_eq!(checked.incoming.len(), 1);
+    // Ce que seul le collègue a changé n'est pas « à envoyer ».
+    assert!(checked.outgoing.is_empty(), "{:?}", checked.outgoing);
     let item = &checked.incoming[0];
     assert_eq!(
         (
@@ -305,6 +307,11 @@ fn r13_un_conflit_n_ecrit_rien_puis_se_regle_element_par_element() {
     assert_eq!(
         std::fs::read_to_string(f.root().join(LISTER)).unwrap(),
         mine
+    );
+
+    assert!(
+        f.book.pending.lock().unwrap().get(&f.id).is_none(),
+        "abandonnée"
     );
 
     // Recommencer, puis garder les deux assertions.
@@ -788,4 +795,36 @@ mod forges {
                 .unwrap();
         assert_eq!(token.as_deref(), Some("gho_x"));
     }
+}
+
+#[test]
+fn r12_une_fusion_identique_a_un_cote_garde_ses_octets() {
+    let render = |status: i64, docs: &str| {
+        let mut r = crate::request::model::Request::new("Lister");
+        r.url = "https://api.test/lister".to_owned();
+        r.docs = docs.to_owned();
+        r.assertions = vec![equals("status", json!(status))];
+        file::render(&r).unwrap().into_bytes()
+    };
+    let base = render(200, "");
+    let ours = render(202, "");
+    // Le collègue : même requête, autre mise en forme (commentaire YAML ajouté).
+    let mut theirs = render(204, "");
+    theirs.extend_from_slice(b"# relu par Marc\n");
+    let choices = BTreeMap::from([("assertions:status#0".to_owned(), Choice::Theirs)]);
+    assert_eq!(
+        merge_file(
+            "lister.yml",
+            Some(&base),
+            Some(&ours),
+            Some(&theirs),
+            &choices
+        ),
+        Merged::Clean(Some(theirs.clone()))
+    );
+    let mine = BTreeMap::from([("assertions:status#0".to_owned(), Choice::Ours)]);
+    assert_eq!(
+        merge_file("lister.yml", Some(&base), Some(&ours), Some(&theirs), &mine),
+        Merged::Clean(Some(ours))
+    );
 }

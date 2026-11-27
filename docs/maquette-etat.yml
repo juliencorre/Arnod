@@ -1281,12 +1281,43 @@ pages:
     plans:
       - "plan-v2 (SY1–SY8, CF1–CF5, lots E et F)"
     liees: ["3.3"]
+    journal:
+      - "2026-11-27 : Synchronisation (plan-v2, lots E et F) : barre d'état, relier à GitHub, GitLab ou une adresse Git (jeton au coffre, transport par le réseau du poste), récupérer puis envoyer les éléments choisis avec un message, fusion élément par élément, conflit réglé assertion par assertion sans rien écrire avant de valider, secrets manquants après une récupération, pastilles et historique en clair."
     ecrans:
-      a: { etat: à faire }
-      b: { etat: à faire }
-      c: { etat: à faire }
-      d: { etat: à faire }
-      e: { etat: à faire }
+      a:
+        etat: livré
+        pr: [96]
+        captures: [v2-relier]
+        ecart:
+          texte: "La connexion par le navigateur n'est offerte que si l'application OAuth d'Arnod est fournie à la construction (Q2) ; sinon, un jeton personnel, vérifié par la forge et rangé au coffre. Les dépôts n'affichent pas leurs contributeurs. « Relier » crée le dépôt Git local s'il n'existe pas (Q10), alors que la maquette dit le contraire ; il ajoute un .gitignore pour les rapports d'arnod run."
+          aligner: maquette
+      b:
+        etat: livré
+        pr: [96]
+        captures: [v2-synchroniser]
+        ecart:
+          texte: "Le panneau s'ouvre en fenêtre modale depuis la barre d'état ; « Récupérer » seul reste offert à côté de « Récupérer puis envoyer » ; les éléments sont des étapes, requêtes, endpoints, dossiers, contrats, environnements ou réglages (exigences et anomalies en V7) ; les entrées « mocks » et « catalogue » de la barre d'état viennent en V5 et V6."
+          aligner: maquette
+      c:
+        etat: livré
+        pr: [96]
+        captures: [v2-conflit]
+        ecart:
+          texte: "Le conflit s'ouvre en fenêtre modale, pas dans la zone principale ; un fichier qui n'est pas une requête (environnement, contrat, réglages) se garde en entier, d'un côté ou de l'autre (Q8) ; « Abandonner la récupération » laisse le projet tel quel."
+          aligner: maquette
+      d:
+        etat: livré
+        pr: [96]
+        captures: [v2-pastille]
+        ecart:
+          texte: "Les pastilles marquent les requêtes (barre latérale, vue d'un dossier) changées à la dernière récupération ; l'historique est l'onglet « Équipe » de l'éditeur d'une requête, montré quand le projet est relié ; pas de lien « Couvre EX-… » (exigences en V7)."
+          aligner: maquette
+      e:
+        etat: livré
+        pr: [96]
+        ecart:
+          texte: "Bandeau en haut de la zone principale après une récupération (sans capture e2e : vérifié par Vitest) ; « Renseigner » ouvre la page des environnements, « Plus tard » ferme jusqu'à un nouveau secret manquant ; le coffre est « celui du système »."
+          aligner: maquette
 
 # Feuille de route (écran 0.1-a), générée par scripts/maquette-sync.py. L'état d'une fonction se
 # déduit des écrans qu'elle cite (« ecrans ») : un code de page prend les écrans de la page de la
@@ -1387,7 +1418,7 @@ feuille_de_route:
           ecrans: ["1.5"]
         - nom: "Barre d'état"
           texte: "Elle arrive avec les modifications à envoyer ; mocks (V5) et catalogue (V6) s'y ajoutent ensuite."
-          etat: à faire
+          etat: livré
           note: "toutes les pages"
     - code: V3
       titre: "Couvrir tous les appels HTTP"
