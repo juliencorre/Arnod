@@ -34,8 +34,7 @@ version 1 de la maquette selon `docs/plan-v1.md` (apparence, raccourcis modifiab
 envois ; section « Apparence, raccourcis et historique »).
 
 **Prochain** : version 2 selon `docs/plan-v2.md` (recherche Ctrl+K, étiquettes partagées, ligne de
-commande `arnod run` et intégration continue, synchronisation Git ; lots A à G en
-`claude/v2-<lot>`). Brouillon : les questions Q1 à Q11 se tranchent avant la première tâche du
+commande `arnod run`, synchronisation Git ; lots A à F en `claude/v2-<lot>`). Brouillon : les questions Q1 à Q11 se tranchent avant la première tâche du
 lot concerné.
 
 **Travail en cours** : qualité du MVP selon `docs/plan-qualite-mvp.md` (lots 0 et A à K en trois

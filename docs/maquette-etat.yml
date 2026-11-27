@@ -1136,16 +1136,16 @@ pages:
     nom: "Ligne de commande"
     version: [V2, V7]
     plans:
-      - "plan-v2 (LC1–LC6, IC1–IC3, lots D et E)"
+      - "plan-v2 (LC1–LC6, lot D)"
     liees: ["5.2", "4.9"]
     ecrans:
       a: { etat: à faire }
       b: { etat: à faire }
       c: { etat: à faire }
       d:
-        etat: à faire
+        etat: à décider
         ecart:
-          texte: "L'écran montre l'image Docker arnod/arnod ; décision du plan V2 (Q4) : pas de Docker, qui demande une installation sur le poste ou l'agent. arnod est un exécutable autonome téléchargé depuis la release : les exemples GitHub Actions et Jenkins décompressent son archive, puis lancent arnod run."
+          texte: "L'écran montre l'image Docker arnod/arnod et des exemples GitHub Actions et Jenkins : l'intégration continue est retirée de la V2 (plan-v2, Q4) et Docker refusé, parce qu'il demande une installation sur le poste ; l'écran est à redécider."
           aligner: maquette
   "6.1":
     nom: "Produits et versions"
@@ -1235,7 +1235,7 @@ pages:
     nom: "Synchronisation"
     version: V2
     plans:
-      - "plan-v2 (SY1–SY8, CF1–CF5, lots F et G)"
+      - "plan-v2 (SY1–SY8, CF1–CF5, lots E et F)"
     liees: ["3.3"]
     ecrans:
       a: { etat: à faire }
@@ -1326,15 +1326,15 @@ feuille_de_route:
           texte: "Préférences → Apparence : forcer le thème clair ou sombre, zoom, police des éditeurs."
           ecrans: ["1.6-f"]
     - code: V2
-      titre: "Travailler en équipe et en intégration continue"
+      titre: "Travailler en équipe, jouer les tests hors de l'application"
       sous_titre: "Les projets sont déjà des fichiers dans Git : on les partage, et on les joue hors de l'application."
       fonctions:
         - nom: "Synchronisation"
           texte: "Relier le projet à GitHub ou GitLab ; envoyer, récupérer, régler un conflit assertion par assertion ; les secrets ne voyagent pas."
           ecrans: ["7.1"]
         - nom: "Ligne de commande arnod"
-          texte: "Lancer un test, un dossier ou une étiquette hors de l'application ; rapports JUnit, Allure, HTML ; exécutable autonome, sans installation ni Docker ; exemples GitHub Actions et Jenkins."
-          ecrans: ["5.3-a", "5.3-c", "5.3-d"]
+          texte: "Lancer un test, un dossier ou une étiquette hors de l'application ; rapports JUnit, Allure, HTML ; exécutable autonome, sans installation à part ni Docker."
+          ecrans: ["5.3-a", "5.3-c"]
         - nom: "Étiquettes partagées"
           texte: "Étiquettes communes au projet, visibles dans le référentiel et choisies à la ligne de commande."
           ecrans: ["4.9-b", "4.9-d"]
@@ -1465,7 +1465,7 @@ feuille_de_route:
           note: "à décider · sans écran"
   suite:
     titre: "Remplacer Bruno partout, puis SoapUI, puis piloter la recette"
-    progression: "Chaque version s'appuie sur les précédentes. L'équipe et la CI (V2) puis tous les appels HTTP (V3) achèvent de remplacer Bruno. Les scénarios et les jeux de données (V4) rendent possibles SoapUI (V5) et les autres natures de test (V6). La recette (V7, V8) s'appuie sur des tests complets ; l'assistance (V9), sur leur historique."
+    progression: "Chaque version s'appuie sur les précédentes. L'équipe et la ligne de commande (V2) puis tous les appels HTTP (V3) achèvent de remplacer Bruno. Les scénarios et les jeux de données (V4) rendent possibles SoapUI (V5) et les autres natures de test (V6). La recette (V7, V8) s'appuie sur des tests complets ; l'assistance (V9), sur leur historique."
   a_decider:
     - sujet: "macOS et Linux"
       texte: "l'application est annoncée pour Windows seulement ; Bruno et SoapUI tournent sur les trois systèmes. La commande arnod tourne sous Linux dès la V2 (exécutable autonome, sans Docker). L'application : pour quelle version ?"
