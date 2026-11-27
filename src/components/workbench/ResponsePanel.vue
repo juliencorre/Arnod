@@ -8,6 +8,7 @@
 import { computed, ref, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import CasesBar from "@/components/workbench/CasesBar.vue";
 import HistoryPanel from "@/components/workbench/HistoryPanel.vue";
 import ResponseBody from "@/components/workbench/ResponseBody.vue";
 import SentPanel from "@/components/workbench/SentPanel.vue";
@@ -113,6 +114,8 @@ async function declareUnknown(): Promise<void> {
 <template>
   <section class="response" aria-label="Réponse" aria-live="polite">
     <slot name="tools" />
+    <!-- V4 (4.7-b) : une requête à jeu de données montre ses cas, puis la réponse du cas choisi. -->
+    <CasesBar v-if="!editor?.sending" :editor-key="editorKey" />
     <p v-if="editor?.sending" class="response__info">Envoi en cours…</p>
     <!-- Lot H (5.1-i) : échec réseau expliqué, avec l'action qui règle le poste. -->
     <NetworkFailurePanel

@@ -447,7 +447,7 @@ pub(super) fn layered(variables: &Variables, request: &Request) -> Variables {
 
 /// Scripts d'une phase dans l'ordre de Bruno (R10) : avant la requête, la racine puis les dossiers
 /// puis la requête ; après, la requête puis les dossiers puis la racine.
-fn scripts_of<'a>(request: &'a Request, phase: Phase) -> Vec<&'a ScriptSource> {
+fn scripts_of(request: &Request, phase: Phase) -> Vec<&ScriptSource> {
     let inherited: Vec<&ScriptSource> = request
         .inherited
         .scripts
@@ -934,6 +934,18 @@ impl Workbench {
                 let runner = StepRunner::new(self, ctx, handle, variables, path, Some(items));
                 let done = engine::run(flow, &runner, vars, 0).await;
                 let cancelled = done.cancelled || handle.cancel.is_cancelled();
+                // La fin d'abord : les lignes « non jouées » qui suivent la diffusent avec elles.
+                if !cancelled {
+                    let passed = done.passed;
+                    self.end_test(
+                        ctx,
+                        handle,
+                        path,
+                        passed,
+                        done.reason.clone(),
+                        done.failed_step.clone(),
+                    );
+                }
                 let indexes: Vec<usize> = handle
                     .view
                     .lock()
@@ -960,16 +972,6 @@ impl Workbench {
                             };
                         }
                     });
-                }
-                if !cancelled {
-                    self.end_test(
-                        ctx,
-                        handle,
-                        path,
-                        done.passed,
-                        done.reason,
-                        done.failed_step,
-                    );
                 }
                 done.passed
             }

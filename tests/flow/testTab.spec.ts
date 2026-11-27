@@ -16,6 +16,12 @@ import { click, openProject } from "../workbench/helpers";
 
 let app: AppWrapper | undefined;
 
+/** Application montée par le test en cours. */
+function page(): AppWrapper {
+  if (!app) throw new Error("application non montée");
+  return app;
+}
+
 afterEach(() => {
   app?.unmount();
   app = undefined;
@@ -57,7 +63,7 @@ function wait(ms: number): Promise<void> {
 describe("test en liste (4.3-a)", () => {
   it("numérote les étapes, nomme leur nature et dit où l'on va ensuite", async () => {
     await openTest();
-    const tab = app!.get(".test");
+    const tab = page().get(".test");
     expect(tab.get(".test__counts").text()).toBe("3 étapes · 1 condition");
     const rows = tab.findAll(".step").map((s) => s.text().replace(/\s+/g, " "));
     expect(rows[0]).toContain("1POSTCréer");
@@ -70,7 +76,7 @@ describe("test en liste (4.3-a)", () => {
 
   it("⋮⋮ se déplace au clavier ; le brouillon s'enregistre seul (R3)", async () => {
     const core = await openTest();
-    const handle = app!.get('[data-step-handle="r:lister.yml"]');
+    const handle = page().get('[data-step-handle="r:lister.yml"]');
     await handle.trigger("keydown", { key: "ArrowUp" });
     await wait(AUTOSAVE_MS + 50);
     await flushPromises();
@@ -82,8 +88,8 @@ describe("test en liste (4.3-a)", () => {
 describe("ajouter une étape (4.3-e) et la configurer (4.3-c)", () => {
   it("« + Étape ▾ » cherche une nature au clavier, l'ajoute et ouvre son panneau", async () => {
     const core = await openTest();
-    await click(app!, ".test button", "+ Étape ▾");
-    const input = app!.get(".picker__input");
+    await click(page(), ".test button", "+ Étape ▾");
+    const input = page().get(".picker__input");
     expect(document.activeElement).toBe(input.element);
     await input.setValue("scri");
     await input.trigger("keydown", { key: "Enter" });
@@ -93,7 +99,7 @@ describe("ajouter une étape (4.3-e) et la configurer (4.3-c)", () => {
       kind: "script",
       placement: { kind: "end" },
     });
-    const panel = app!.get(".panel");
+    const panel = page().get(".panel");
     expect(panel.text()).toContain("Étape · Script");
     expect(panel.text()).toContain("à configurer");
     expect(panel.text()).toContain("vars — variables du test");
@@ -108,13 +114,13 @@ describe("ajouter une étape (4.3-e) et la configurer (4.3-c)", () => {
 
   it("une condition se règle : cible, valeur, si oui et sinon", async () => {
     const core = await openTest();
-    await click(app!, ".step__name", "Client créé ?");
-    const panel = app!.get(".panel");
+    await click(page(), ".step__name", "Client créé ?");
+    const panel = page().get(".panel");
     await panel.get('[aria-label="Valeur"]').setValue("200");
     const selects = panel.findAll("select");
     // Dernier « sinon » : Fin ✓.
     const otherwise = selects.find((s) =>
-      s.element.closest("label")?.textContent?.includes("sinon"),
+      s.element.closest("label")?.textContent.includes("sinon"),
     );
     await otherwise?.setValue("end");
     await wait(AUTOSAVE_MS + 50);
@@ -127,31 +133,33 @@ describe("ajouter une étape (4.3-e) et la configurer (4.3-c)", () => {
 
   it("« Supprimer l'étape » passe par le cœur, qui reconnecte les liens", async () => {
     const core = await openTest();
-    await click(app!, ".step__name", "Client créé ?");
-    await click(app!, ".panel button", "Supprimer l'étape");
+    await click(page(), ".step__name", "Client créé ?");
+    await click(page(), ".panel button", "Supprimer l'étape");
     expect(core.calls.find((c) => c.cmd === "flow_remove_step")?.args).toMatchObject({
       path: "Clients",
       step: "c",
     });
-    expect(app!.findAll(".step")).toHaveLength(2);
+    expect(page().findAll(".step")).toHaveLength(2);
   });
 });
 
 describe("test en schéma (4.3-b, 4.3-b bis, 4.3-d)", () => {
   it("montre Départ, les nœuds et les fins, et insère sur un lien au clavier", async () => {
     const core = await openTest();
-    const tabs = app!.findAll(".test__mode");
+    const tabs = page().findAll(".test__mode");
     await tabs[0]?.trigger("keydown", { key: "ArrowRight" });
     await tabs[1]?.trigger("click");
     await flushPromises();
-    const nodes = app!.findAll(".node").map((n) => n.attributes("aria-label"));
+    const nodes = page()
+      .findAll(".node")
+      .map((n) => n.attributes("aria-label"));
     expect(nodes).toEqual(["Étape 1 : Créer", "Étape 2 : Client créé ?", "Étape 3 : Lister"]);
-    expect(app!.findAll(".cap").map((c) => c.text())).toEqual([
-      "▶ Départ",
-      "✓ Fin",
-      "✕ Fin en échec",
-    ]);
-    const plus = app!
+    expect(
+      page()
+        .findAll(".cap")
+        .map((c) => c.text()),
+    ).toEqual(["▶ Départ", "✓ Fin", "✕ Fin en échec"]);
+    const plus = page()
       .findAll(".edge__plus")
       .find(
         (b) =>
@@ -159,7 +167,7 @@ describe("test en schéma (4.3-b, 4.3-b bis, 4.3-d)", () => {
       );
     expect(plus).toBeDefined();
     await plus?.trigger("click");
-    const input = app!.get(".board__picker .picker__input");
+    const input = page().get(".board__picker .picker__input");
     await input.setValue("vari");
     await input.trigger("keydown", { key: "Enter" });
     await flushPromises();
@@ -167,17 +175,19 @@ describe("test en schéma (4.3-b, 4.3-b bis, 4.3-d)", () => {
       kind: "variable",
       placement: { kind: "link", after: "r:creer.yml", otherwise: false },
     });
-    expect(app!.findAll(".node")).toHaveLength(4);
+    expect(page().findAll(".node")).toHaveLength(4);
   });
 
   it("après exécution, marque chaque étape et suit le chemin", async () => {
     await openTest();
-    await click(app!, ".test button", "Exécuter le test");
-    await click(app!, ".zone__tab-button", "Clients");
-    await app!.findAll(".test__mode")[1]?.trigger("click");
+    await click(page(), ".test button", "Exécuter le test");
+    await click(page(), ".zone__tab-button", "Clients");
+    await page().findAll(".test__mode")[1]?.trigger("click");
     await flushPromises();
-    const marks = app!.findAll(".node__mark").map((m) => m.text());
+    const marks = page()
+      .findAll(".node__mark")
+      .map((m) => m.text());
     expect(marks[0]).toMatch(/^✓/);
-    expect(app!.findAll(".links__path--taken").length).toBeGreaterThan(0);
+    expect(page().findAll(".links__path--taken").length).toBeGreaterThan(0);
   });
 });

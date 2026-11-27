@@ -14,6 +14,8 @@ import { computed, nextTick, useTemplateRef, watch } from "vue";
 
 import { CONTRACT_ADD_ITEMS } from "@/components/contracts/addItems";
 import ContractsSection from "@/components/contracts/ContractsSection.vue";
+import MoreSections from "@/components/templates/MoreSections.vue";
+import TemplatesSection from "@/components/templates/TemplatesSection.vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import TrayIcon from "@/components/ui/TrayIcon.vue";
 import type { MenuItem } from "@/components/ui/menu";
@@ -29,6 +31,7 @@ import { useNavigationStore } from "@/stores/navigation";
 import { useNetworkStore } from "@/stores/network";
 import { useToastStore } from "@/stores/toasts";
 import { useWindowsStore } from "@/stores/windows";
+import { useTemplatesStore } from "@/stores/templates";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { ProjectView, TreeNode } from "@/types/ipc";
 
@@ -37,6 +40,7 @@ const props = defineProps<{ project: ProjectView; workspaceId: string | null; cu
 const catalog = useCatalogStore();
 const navigation = useNavigationStore();
 const workbench = useWorkbenchStore();
+const templates = useTemplatesStore();
 const windows = useWindowsStore();
 const toasts = useToastStore();
 const actions = useProjectActions();
@@ -302,7 +306,10 @@ defineExpose({
         <EnvironmentChip ref="environment" :project-id="id" />
       </div>
       <ContractsSection ref="contracts" :project-id="id" />
+      <!-- V4 (4.8, R21) : « Templates » dès le premier template, ou depuis « Plus ». -->
+      <TemplatesSection v-if="templates.sectionShown(id, 'templates')" :project-id="id" />
       <TreePanel ref="tree" :project-id="id" />
+      <MoreSections :project-id="id" :name="name" />
     </div>
   </li>
 </template>

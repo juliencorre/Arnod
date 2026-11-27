@@ -21,6 +21,7 @@ import {
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import AssertionsEditor from "@/components/workbench/AssertionsEditor.vue";
+import DataEditor from "@/components/workbench/DataEditor.vue";
 import CookiesSection from "@/components/workbench/CookiesSection.vue";
 import AuthEditor from "@/components/workbench/AuthEditor.vue";
 import SecretNotice from "@/components/workbench/SecretNotice.vue";
@@ -42,6 +43,7 @@ import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
 import { useInputStore } from "@/stores/input";
 import { useInterfaceStore } from "@/stores/interface";
+import { useDatasetsStore } from "@/stores/datasets";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
 import { useSyncStore } from "@/stores/sync";
@@ -58,6 +60,7 @@ const contracts = useContractsStore();
 const catalog = useCatalogStore();
 const inputs = useInputStore();
 const sidebar = useSidebarStore();
+const datasets = useDatasetsStore();
 const toasts = useToastStore();
 const guard = useGuard();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
@@ -308,6 +311,7 @@ type Tab =
   | "settings"
   | "variables"
   | "assertions"
+  | "data"
   | "team";
 const tab = ref<Tab>("params");
 /** Un nombre pour une liste, un point pour un onglet rempli d'une seule valeur. */
@@ -324,6 +328,8 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
     { id: "settings", label: "Réglages" },
     { id: "variables", label: "Variables", count: r?.extractions.length },
     { id: "assertions", label: "Assertions", count: r?.assertions.length },
+    // V4 (4.7-a) : jeu de données, une ligne par cas.
+    { id: "data", label: "Données", count: datasets.sets[props.editorKey]?.rows.length },
     // V2, lot F (7.1-d) : l'historique de l'équipe, quand le projet est relié.
     ...(linked.value ? [{ id: "team" as const, label: "Équipe" }] : []),
   ];
@@ -665,6 +671,8 @@ watch(
         :project-id="editor.projectId"
         :path="editor.path"
       />
+
+      <DataEditor v-else-if="tab === 'data'" :editor-key="editorKey" />
 
       <AssertionsEditor
         v-else

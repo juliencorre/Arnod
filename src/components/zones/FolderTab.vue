@@ -15,20 +15,69 @@
  */
 import { computed, nextTick, ref, useId, useTemplateRef, watch } from "vue";
 
+import CreateTemplateDialog from "@/components/templates/CreateTemplateDialog.vue";
+import InstanceTab from "@/components/templates/InstanceTab.vue";
+import TemplateTab from "@/components/templates/TemplateTab.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import TagsEditor from "@/components/workbench/TagsEditor.vue";
+import FolderHooks from "@/components/zones/FolderHooks.vue";
+import FolderProperties from "@/components/zones/FolderProperties.vue";
 import { useGuard } from "@/composables/useGuard";
 import { countLabel } from "@/lib/format";
 import { countStatuses, requestPaths } from "@/lib/status";
 import { initial } from "@/lib/sync";
 import { foldTag, hasTags, tagCounts, taggedTests } from "@/lib/tags";
 import { findFolder, folderSummary, testCount, type FolderNode } from "@/lib/tree";
+import { onTablistKeydown } from "@/lib/tablist";
+import { useFlowsStore } from "@/stores/flows";
 import { useSyncStore } from "@/stores/sync";
+import { isTemplatePath } from "@/stores/templates";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
 
 const props = defineProps<{ projectId: string; path: string }>();
 const sync = useSyncStore();
+const flows = useFlowsStore();
+
+// --- V4 (docs/plan-v4.md) : Avant / Après, propriétés, template ----------------------------
+
+/** Onglet de la vue : contenu (et Avant / Après, 4.7-c) ou propriétés (4.8-a). */
+const view = ref<"content" | "properties">("content");
+const hooks = computed(() => flows.hooks[flows.folderKey(props.projectId, props.path)] ?? null);
+const hasHooks = computed(() => {
+  const found = hooks.value?.hooks;
+  return (
+    found !== undefined &&
+    found.beforeAll.length +
+      found.beforeEach.length +
+      found.afterEach.length +
+      found.afterAll.length >
+      0
+  );
+});
+/** Avant / Après montrés : il y en a, ou « + Avant / Après » les a ouverts. */
+const showHooks = ref(false);
+const propertyCount = computed(
+  () =>
+    (flows.properties[flows.folderKey(props.projectId, props.path)] ?? []).filter(
+      (p) => p.origin.kind === "here",
+    ).length,
+);
+watch(
+  () => [props.projectId, props.path] as const,
+  () => {
+    void flows.loadProperties(props.projectId, props.path).catch(() => undefined);
+  },
+  { immediate: true },
+);
+/** Tests directs du dossier : ses tests, ses requêtes libres et ses utilisations (R13). */
+const directTests = computed(
+  () =>
+    (folder.value?.children ?? []).filter(
+      (c) => c.kind === "request" || c.test || c.template !== null,
+    ).length,
+);
+const creatingTemplate = ref(false);
 
 const workbench = useWorkbenchStore();
 const guard = useGuard();
@@ -272,7 +321,9 @@ function cancelCreate(): void {
 </script>
 
 <template>
-  <section v-if="folder" class="folder" :aria-labelledby="titleId">
+  <TemplateTab v-if="isTemplatePath(path)" :project-id="projectId" :path="path" />
+  <InstanceTab v-else-if="folder?.template" :project-id="projectId" :path="path" />
+  <section v-else-if="folder" class="folder" :aria-labelledby="titleId">
     <header class="folder__head">
       <nav class="folder__crumbs" aria-label="Fil d'Ariane">
         <template v-for="(crumb, index) in crumbs" :key="index"
@@ -283,6 +334,9 @@ function cancelCreate(): void {
       <div class="folder__title-row">
         <h2 :id="titleId" class="folder__title">{{ name }}</h2>
         <span class="folder__spacer" />
+        <BaseButton variant="link" @click="creatingTemplate = true">
+          ◇ Créer un template de ce dossier
+        </BaseButton>
         <BaseButton @click="startCreate('test')">+ Test</BaseButton>
         <BaseButton @click="startCreate('folder')">+ Sous-dossier</BaseButton>
         <BaseButton @click="guard(() => workbench.runFolder(projectId, path))">
@@ -322,11 +376,47 @@ function cancelCreate(): void {
       </div>
     </header>
 
+    <div
+      class="folder__views"
+      role="tablist"
+      aria-label="Vue du dossier"
+      @keydown="onTablistKeydown"
+    >
+      <button
+        type="button"
+        role="tab"
+        class="folder__view"
+        :aria-selected="view === 'content'"
+        :tabindex="view === 'content' ? 0 : -1"
+        @click="view = 'content'"
+      >
+        Contenu
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="folder__view"
+        :aria-selected="view === 'properties'"
+        :tabindex="view === 'properties' ? 0 : -1"
+        @click="view = 'properties'"
+      >
+        Propriétés<span v-if="propertyCount > 0" class="folder__count"> {{ propertyCount }}</span>
+      </button>
+    </div>
+    <FolderProperties v-if="view === 'properties'" :project-id="projectId" :path="path" />
+    <FolderHooks
+      v-if="view === 'content'"
+      v-show="hasHooks || showHooks"
+      :project-id="projectId"
+      :path="path"
+      side="before"
+      :tests="directTests"
+    />
     <p :id="handleHintId" class="visually-hidden">
       Flèches haut et bas pour déplacer la ligne ; glisser pour réordonner, ou déposer sur un
       sous-dossier pour l'y ranger.
     </p>
-    <table ref="table" class="folder__table">
+    <table v-show="view === 'content'" ref="table" class="folder__table">
       <thead>
         <tr>
           <th scope="col" class="folder__grip"><span class="visually-hidden">Ordre</span></th>
@@ -424,18 +514,67 @@ function cancelCreate(): void {
         </tr>
       </tbody>
     </table>
+    <FolderHooks
+      v-if="view === 'content' && (hasHooks || showHooks)"
+      :project-id="projectId"
+      :path="path"
+      side="after"
+      :tests="directTests"
+    />
     <p v-if="folder.children.length === 0 && !creating" class="folder__empty">
       Dossier vide : « + Test » y crée un test, « + Sous-dossier » un dossier.
     </p>
     <p class="folder__note">
-      L'ordre de la liste est l'ordre d'exécution. Glissez ⋮⋮ pour réordonner, ou déposez un élément
-      sur un sous-dossier pour l'y ranger.
+      L'ordre de la liste est l'ordre d'exécution : « Avant » en tête, « Après » à la fin. Glissez
+      ⋮⋮ pour réordonner, ou déposez un élément sur un sous-dossier pour l'y ranger.
+      <BaseButton v-if="!hasHooks && !showHooks" variant="link" @click="showHooks = true"
+        >+ Avant / Après</BaseButton
+      >
     </p>
+    <CreateTemplateDialog
+      :open="creatingTemplate"
+      :project-id="projectId"
+      :folder="path"
+      :summary="summary"
+      @close="creatingTemplate = false"
+    />
   </section>
   <p v-else class="folder__empty">Ce dossier n'existe plus.</p>
 </template>
 
 <style scoped>
+.folder__views {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.folder__view {
+  min-height: var(--control-md);
+  padding: 0 0.75rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font: inherit;
+  color: var(--color-muted);
+  background: none;
+  cursor: pointer;
+}
+
+.folder__view[aria-selected="true"] {
+  border-bottom-color: var(--color-accent);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.folder__view:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.folder__count {
+  color: var(--color-muted);
+}
+
 .folder__tags,
 .folder__filter {
   display: flex;

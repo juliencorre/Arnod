@@ -17,9 +17,15 @@ import { useContractsStore } from "@/stores/contracts";
 import { useImportStore } from "@/stores/imports";
 import { useNavigationStore } from "@/stores/navigation";
 import { useToastStore } from "@/stores/toasts";
+import { MORE_SECTIONS, useTemplatesStore } from "@/stores/templates";
 import { useWorkbenchStore } from "@/stores/workbench";
 
 const props = defineProps<{ projectId: string }>();
+const templates = useTemplatesStore();
+/** Sections disponibles et masquées (1.2-d bis). */
+const hiddenSections = computed(() =>
+  MORE_SECTIONS.filter((s) => !templates.sectionShown(props.projectId, s.id)),
+);
 
 const catalog = useCatalogStore();
 const workbench = useWorkbenchStore();
@@ -105,6 +111,20 @@ function onEnvironmentCreated(name: string): void {
         <BaseButton class="start__action" @click="start(item.id)">{{ item.action }}</BaseButton>
       </li>
     </ul>
+    <!-- V4 (1.2-d bis, R21) : les autres sections, chacune avec sa raison d'être. -->
+    <section v-if="hiddenSections.length > 0" class="start__more" aria-label="Autres sections">
+      <h2 class="start__more-title">Autres sections · {{ hiddenSections.length }}</h2>
+      <ul class="start__more-list">
+        <li v-for="section in hiddenSections" :key="section.id" class="start__more-item">
+          <b>{{ section.title }}</b>
+          <span class="start__more-hint">{{ section.hint }}</span>
+          <BaseButton variant="link" @click="templates.showSection(projectId, section.id, true)"
+            >Afficher</BaseButton
+          >
+        </li>
+      </ul>
+      <p class="start__more-hint">Une section s'affiche seule à sa première utilisation.</p>
+    </section>
     <ContractDialog
       :mode="mode"
       :error="error"
@@ -135,6 +155,39 @@ function onEnvironmentCreated(name: string): void {
 </template>
 
 <style scoped>
+.start__more {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 1rem;
+}
+
+.start__more-title {
+  margin: 0;
+  font: 600 var(--text-caption) var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.start__more-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.start__more-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.start__more-hint {
+  flex: 1;
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
 .welcome {
   display: flex;
   flex-direction: column;

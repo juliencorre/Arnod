@@ -36,7 +36,8 @@
             set[String(name)] = text(value);
           };
         if (key === "get") return (name) => store[String(name)];
-        if (key === "has") return (name) => Object.prototype.hasOwnProperty.call(store, String(name));
+        if (key === "has")
+          return (name) => Object.prototype.hasOwnProperty.call(store, String(name));
         if (typeof key !== "string") return undefined;
         if (Object.prototype.hasOwnProperty.call(store, key)) return store[key];
         return tree()[key];

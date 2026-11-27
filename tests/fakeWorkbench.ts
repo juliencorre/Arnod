@@ -449,6 +449,8 @@ export function runOf(wb: FakeWorkbench, folder: string, only?: string[]): RunVi
       extracted: [],
       ...runItemFlow(),
       stepId: test === null ? null : stepIdOf(wb, test, path),
+      // Une requête à jeu de données compte une fois, avec son détail par cas (R12).
+      cases: casesOf(wb, path, status),
     };
   });
   for (const item of items) {
@@ -472,6 +474,35 @@ export function runOf(wb: FakeWorkbench, folder: string, only?: string[]): RunVi
     tests: testsOf(items),
     ends: [],
   };
+}
+
+/** Cas d'une requête à jeu de données dans un run : réussis, sauf le premier si elle échoue. */
+function casesOf(wb: FakeWorkbench, path: string, status: RunItem["status"]): RunItem["cases"] {
+  const table = wb.datasets.get(path);
+  if (!table) return [];
+  return table.rows.map((row, index) => {
+    const failed = index === 0 && (status === "failed" || status === "error");
+    return {
+      number: index + 1,
+      values: table.columns.map((name, i): [string, string] => [name, row[i] ?? ""]),
+      status: failed ? "failed" : "passed",
+      httpStatus: failed ? 400 : 200,
+      durationMs: 12,
+      assertions: failed
+        ? [
+            {
+              id: "s",
+              target: "status",
+              passed: false,
+              message: "attendu 200, reçu 400",
+              actual: "400",
+              ignored: false,
+            },
+          ]
+        : [],
+      error: null,
+    };
+  });
 }
 
 /** Identifiant de l'étape requête d'un fichier dans le schéma de son test (R2). */

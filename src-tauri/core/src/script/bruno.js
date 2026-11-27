@@ -19,7 +19,7 @@
     },
     hasVar: (name) => Object.prototype.hasOwnProperty.call(store, String(name)),
     deleteVar: (name) => {
-      delete store[String(name)];
+      Reflect.deleteProperty(store, String(name));
     },
     getRequestVar: (name) => store[String(name)],
     getCollectionVar: (name) => store[String(name)],
@@ -43,7 +43,7 @@
       if (request.body === null || request.body === undefined) return undefined;
       try {
         return JSON.parse(request.body);
-      } catch (_) {
+      } catch {
         return request.body;
       }
     };
@@ -112,8 +112,10 @@
   // expect : sous-ensemble de Chai, messages en français.
   const show = (value) => {
     try {
-      return typeof value === "string" ? JSON.stringify(value) : JSON.stringify(value) ?? String(value);
-    } catch (_) {
+      return typeof value === "string"
+        ? JSON.stringify(value)
+        : (JSON.stringify(value) ?? String(value));
+    } catch {
       return String(value);
     }
   };
@@ -173,16 +175,25 @@
         return api;
       },
       a(type) {
-        check(typeOf(actual) === String(type).toLowerCase(), `attendu un ${type}, reçu ${show(actual)}`);
+        check(
+          typeOf(actual) === String(type).toLowerCase(),
+          `attendu un ${type}, reçu ${show(actual)}`,
+        );
         return api;
       },
       an(type) {
         return api.a(type);
       },
       property(name, value) {
-        const has = actual !== null && actual !== undefined && Object.prototype.hasOwnProperty.call(Object(actual), name);
+        const has =
+          actual !== null &&
+          actual !== undefined &&
+          Object.prototype.hasOwnProperty.call(Object(actual), name);
         if (arguments.length > 1) {
-          check(has && deepEqual(actual[name], value), `attendu ${name} = ${show(value)}, reçu ${show(has ? actual[name] : undefined)}`);
+          check(
+            has && deepEqual(actual[name], value),
+            `attendu ${name} = ${show(value)}, reçu ${show(has ? actual[name] : undefined)}`,
+          );
         } else {
           check(has, `propriété « ${name} » absente`);
         }
@@ -237,11 +248,17 @@
         return api;
       },
       oneOf(list) {
-        check((list || []).some((x) => deepEqual(x, actual)), `${show(actual)} devait être parmi ${show(list)}`);
+        check(
+          (list || []).some((x) => deepEqual(x, actual)),
+          `${show(actual)} devait être parmi ${show(list)}`,
+        );
         return api;
       },
       match(pattern) {
-        check(new RegExp(pattern).test(String(actual)), `${show(actual)} ne correspond pas à ${pattern}`);
+        check(
+          new RegExp(pattern).test(String(actual)),
+          `${show(actual)} ne correspond pas à ${pattern}`,
+        );
         return api;
       },
       get true() {

@@ -930,10 +930,13 @@ fn tree_load(project: &Project, watchers: &Watchers) -> TreeView {
     let _ = watchers.watch(ctx.id, &ctx.root);
     let nodes = tree::read(&ctx.root).expect("arborescence");
     let tests = tree::tests_view(&nodes, &contract::file::paths(&ctx.root));
+    let data = local::load(&ctx.data_dir, ctx.id);
     TreeView {
         nodes,
         tests,
-        collapsed: local::load(&ctx.data_dir, ctx.id).collapsed,
+        collapsed: data.collapsed,
+        templates: arnod_lib::template::list(&ctx.root),
+        sections: data.sections,
     }
 }
 

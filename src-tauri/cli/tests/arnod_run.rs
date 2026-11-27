@@ -456,3 +456,104 @@ async fn lc5_r7_erreurs_de_commande() {
         .unwrap();
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
 }
+
+/// V4 (`docs/plan-v4.md`, critères d'acceptation) : un test en schéma (une condition, une étape
+/// script, « Fin ✓ ») et une requête à jeu de données se jouent hors de l'application, sans rien
+/// écrire dans le projet (R5).
+#[tokio::test(flavor = "multi_thread")]
+async fn v4_schema_et_jeu_de_donnees() {
+    use arnod_core::dataset::{self, DataTable};
+    use arnod_core::flow::{Action, Check, END, Flow, OnFailure, Step, store};
+    use arnod_core::request::model::{Operator, Scalar};
+
+    let f = fixture().await;
+    let root = f.root();
+    // Le test « parcours » : la commande créée (201) mène au script, puis à la fin ; la lecture
+    // n'est pas empruntée.
+    let mut condition = Step {
+        id: "c".to_owned(),
+        name: "Commande créée ?".to_owned(),
+        action: Action::Condition {
+            check: Check {
+                target: "status".to_owned(),
+                operator: Operator::Equals,
+                value: Some(Scalar::Int(201)),
+            },
+            otherwise: Some(END.to_owned()),
+        },
+        next: Some("js".to_owned()),
+        on_failure: None,
+    };
+    condition.next = Some("js".to_owned());
+    let script = Step {
+        id: "js".to_owned(),
+        name: "Contrôler l'identifiant".to_owned(),
+        action: Action::Script {
+            code: "assert(response.body.id === 7, 'identifiant 7');".to_owned(),
+        },
+        next: Some(END.to_owned()),
+        on_failure: None,
+    };
+    let first = tree::resolve(root, "commandes/parcours").unwrap();
+    let mut created = file::read(&first.join("etape-1.yml")).unwrap();
+    created.assertions = vec![check("status", "equals", json!(201))];
+    file::write(&first.join("etape-1.yml"), &created).unwrap();
+    let flow = Flow {
+        on_failure: OnFailure::Stop,
+        steps: vec![
+            Step::request("etape-1.yml"),
+            condition,
+            script,
+            Step::request("etape-2.yml"),
+        ],
+    };
+    store::save_flow(root, "commandes/parcours", Some(&flow)).unwrap();
+    // « Lister les commandes » joué deux fois : un cas par ligne.
+    dataset::save(
+        root,
+        "commandes/lister-les-commandes.yml",
+        &DataTable {
+            columns: vec!["page".to_owned()],
+            rows: vec![vec!["1".to_owned()], vec!["2".to_owned()]],
+        },
+    )
+    .unwrap();
+    let before = snapshot(root);
+    let output = f
+        .arnod(&["run", "commandes", "--env", "Recette fonctionnelle"], &[])
+        .await;
+    let text = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "{text}\n{}", stderr(&output));
+    assert!(text.contains("✓ parcours"), "{text}");
+    assert!(text.contains("✓ Lister les commandes"), "{text}");
+    // Le test lancé seul montre ses étapes : la condition, le script, la lecture non jouée.
+    let alone = f
+        .arnod(
+            &[
+                "run",
+                "commandes/parcours",
+                "--env",
+                "Recette fonctionnelle",
+            ],
+            &[],
+        )
+        .await;
+    let steps = stdout(&alone);
+    assert_eq!(alone.status.code(), Some(0), "{steps}");
+    assert!(steps.contains("Commande créée ?"), "{steps}");
+    assert!(steps.contains("Contrôler l'identifiant"), "{steps}");
+    assert_eq!(
+        snapshot(root),
+        before,
+        "rien n'est écrit dans le projet (R5)"
+    );
+    let received = f.server.received_requests().await.unwrap_or_default();
+    let listed = received
+        .iter()
+        .filter(|r| r.method.as_str() == "GET" && r.url.path() == "/commandes")
+        .count();
+    assert_eq!(
+        listed, 2,
+        "une requête par cas, la lecture jamais empruntée"
+    );
+}

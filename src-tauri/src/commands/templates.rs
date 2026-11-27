@@ -99,6 +99,7 @@ pub fn template_candidates(
 
 /// « Créer un template » depuis un dossier (4.8-b, R18).
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn template_create(
     window: WebviewWindow,
     state: State<'_, AppState>,

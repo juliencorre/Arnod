@@ -61,11 +61,18 @@ const FLOW: Flow = {
   ],
 };
 
+/** Étape `index` du parcours. */
+function stepAt(index: number): Flow["steps"][number] {
+  const step = FLOW.steps[index];
+  if (!step) throw new Error(`étape ${String(index)} absente`);
+  return step;
+}
+
 describe("libellés d'un schéma (4.3-a)", () => {
   it("résume chaque étape comme la colonne « Données »", () => {
-    expect(stepSummary(FLOW.steps[0]!, requests)).toBe("POST /customers");
+    expect(stepSummary(stepAt(0), requests)).toBe("POST /customers");
     expect(checkLabel({ target: "status", operator: "equals", value: 201 })).toBe("status = 201");
-    expect(stepSummary(FLOW.steps[2]!, requests)).toBe("body.status = paid · 2 s × 5 max");
+    expect(stepSummary(stepAt(2), requests)).toBe("body.status = paid · 2 s × 5 max");
     expect(flowCounts(FLOW)).toBe("4 étapes · 1 condition");
   });
 

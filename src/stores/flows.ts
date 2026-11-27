@@ -9,7 +9,17 @@ import { ref } from "vue";
 import { ipc } from "@/lib/ipc";
 import { contentKey } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
-import type { Flow, FlowStep, StepKind, StepPlacement, TestView } from "@/types/ipc";
+import type {
+  Flow,
+  FlowStep,
+  FolderHooks,
+  FolderProperty,
+  HookPhase,
+  HooksView,
+  StepKind,
+  StepPlacement,
+  TestView,
+} from "@/types/ipc";
 
 export type FlowMode = "list" | "diagram";
 
@@ -132,7 +142,77 @@ export const useFlowsStore = defineStore("flows", () => {
     modes.value[key(projectId, path)] = value;
   }
 
+  // --- Avant / Après et propriétés d'un dossier (4.7-c, 4.8-a) ---------------------------
+
+  /** Avant / Après de chaque dossier ouvert, par projet puis chemin. */
+  const hooks = ref<Record<string, HooksView>>({});
+  /** Propriétés de chaque dossier ouvert (4.8-a). */
+  const properties = ref<Record<string, FolderProperty[]>>({});
+  const folderKey = (projectId: string, path: string): string => `${projectId}:${path}`;
+
+  async function loadHooks(projectId: string, path: string): Promise<HooksView> {
+    const view = await ipc.hooksRead(projectId, path);
+    hooks.value[folderKey(projectId, path)] = view;
+    return view;
+  }
+
+  async function saveHooks(projectId: string, path: string, value: FolderHooks): Promise<void> {
+    hooks.value[folderKey(projectId, path)] = await ipc.hooksSave(projectId, path, clone(value));
+    await workbench.refreshTree(projectId);
+  }
+
+  async function addHook(
+    projectId: string,
+    path: string,
+    phase: HookPhase,
+    kind: StepKind,
+  ): Promise<void> {
+    hooks.value[folderKey(projectId, path)] = await ipc.hooksAddStep(projectId, path, phase, kind);
+    await workbench.refreshTree(projectId);
+  }
+
+  async function removeHook(
+    projectId: string,
+    path: string,
+    phase: HookPhase,
+    id: string,
+  ): Promise<void> {
+    hooks.value[folderKey(projectId, path)] = await ipc.hooksRemoveStep(projectId, path, phase, id);
+    await workbench.refreshTree(projectId);
+  }
+
+  async function loadProperties(projectId: string, path: string): Promise<FolderProperty[]> {
+    const environment = workbench.activeEnvironment(projectId) ?? "";
+    const found = await ipc.folderProperties(projectId, path, environment);
+    properties.value[folderKey(projectId, path)] = found;
+    return found;
+  }
+
+  /** Enregistre les propriétés définies dans le dossier (`request.variables` de `folder.yml`). */
+  async function saveProperties(
+    projectId: string,
+    path: string,
+    list: { name: string; value: string }[],
+  ): Promise<void> {
+    const environment = workbench.activeEnvironment(projectId) ?? "";
+    properties.value[folderKey(projectId, path)] = await ipc.folderSetProperties(
+      projectId,
+      path,
+      list,
+      environment,
+    );
+  }
+
   return {
+    hooks,
+    properties,
+    folderKey,
+    loadHooks,
+    saveHooks,
+    addHook,
+    removeHook,
+    loadProperties,
+    saveProperties,
     drafts,
     selected,
     inserted,
