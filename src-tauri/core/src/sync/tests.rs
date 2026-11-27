@@ -4,10 +4,8 @@
 //! (R9), historique d'un élément (CF5).
 
 use std::collections::BTreeMap;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpListener;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::path::Path;
+use std::sync::Arc;
 
 use git2::{Repository, Signature};
 use serde_json::json;
@@ -520,152 +518,161 @@ fn r9_adresse_sans_identifiant_et_forge_reconnue() {
     assert_eq!(Forge::Gitlab.git_user("julien"), "oauth2");
 }
 
-/// Serveur Git HTTP local : `git http-backend` (CGI), avec les en-têtes `Authorization` reçus.
+/// Transport HTTP contre `git http-backend` (CGI) : seulement là où Git le fournit (Unix).
 #[cfg(unix)]
-fn git_http_server(root: PathBuf) -> (String, Arc<Mutex<Vec<String>>>) {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = listener.local_addr().unwrap().port();
-    let seen = Arc::new(Mutex::new(Vec::new()));
-    let log = seen.clone();
-    std::thread::spawn(move || {
-        for stream in listener.incoming().flatten() {
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            let mut line = String::new();
-            if reader.read_line(&mut line).unwrap_or(0) == 0 {
-                continue;
-            }
-            let mut parts = line.split_whitespace();
-            let method = parts.next().unwrap_or_default().to_owned();
-            let target = parts.next().unwrap_or_default().to_owned();
-            let mut headers = Vec::new();
-            loop {
-                let mut header = String::new();
-                reader.read_line(&mut header).unwrap();
-                let header = header.trim_end().to_owned();
-                if header.is_empty() {
-                    break;
-                }
-                headers.push(header);
-            }
-            let value = |name: &str| {
-                headers.iter().find_map(|h| {
-                    h.split_once(':')
-                        .filter(|(n, _)| n.eq_ignore_ascii_case(name))
-                        .map(|(_, v)| v.trim().to_owned())
-                })
-            };
-            log.lock()
-                .unwrap()
-                .push(value("authorization").unwrap_or_default());
-            let length: usize = value("content-length")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0);
-            let mut body = vec![0; length];
-            reader.read_exact(&mut body).unwrap();
-            let (path, query) = target.split_once('?').unwrap_or((&target, ""));
-            let mut child = std::process::Command::new("git")
-                .arg("http-backend")
-                .env("GIT_PROJECT_ROOT", &root)
-                .env("GIT_HTTP_EXPORT_ALL", "1")
-                .env("REQUEST_METHOD", &method)
-                .env("PATH_INFO", path)
-                .env("QUERY_STRING", query)
-                .env("CONTENT_TYPE", value("content-type").unwrap_or_default())
-                .env("CONTENT_LENGTH", length.to_string())
-                .env("REMOTE_USER", "julien")
-                .env("REMOTE_ADDR", "127.0.0.1")
-                .stdin(std::process::Stdio::piped())
-                .stdout(std::process::Stdio::piped())
-                .spawn()
-                .unwrap();
-            child.stdin.take().unwrap().write_all(&body).unwrap();
-            let output = child.wait_with_output().unwrap();
-            let split = output
-                .stdout
-                .windows(4)
-                .position(|w| w == b"\r\n\r\n")
-                .map(|i| (i, 4))
-                .or_else(|| {
-                    output
-                        .stdout
-                        .windows(2)
-                        .position(|w| w == b"\n\n")
-                        .map(|i| (i, 2))
-                })
-                .unwrap();
-            let head = String::from_utf8_lossy(&output.stdout[..split.0]).into_owned();
-            let content = &output.stdout[split.0 + split.1..];
-            let mut status = "200 OK".to_owned();
-            let mut response = Vec::new();
-            for header in head.lines() {
-                if let Some(s) = header.strip_prefix("Status:") {
-                    status = s.trim().to_owned();
-                } else {
-                    response.push(header.to_owned());
-                }
-            }
-            let mut stream = stream;
-            let _ = write!(stream, "HTTP/1.1 {status}\r\n");
-            for header in response {
-                let _ = write!(stream, "{header}\r\n");
-            }
-            let _ = write!(
-                stream,
-                "Content-Length: {}\r\nConnection: close\r\n\r\n",
-                content.len()
-            );
-            let _ = stream.write_all(content);
-        }
-    });
-    (format!("http://127.0.0.1:{port}"), seen)
-}
+mod http {
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::net::TcpListener;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
 
-#[cfg(unix)]
-#[test]
-fn r9_transport_http_par_le_reseau_du_poste_jeton_en_en_tete() {
-    let f = Fixture::new();
-    // Dépôt servi par HTTP ; envois acceptés par git http-backend.
-    std::process::Command::new("git")
-        .args(["config", "http.receivepack", "true"])
-        .current_dir(f.remote.path())
-        .status()
-        .unwrap();
-    let parent = f.remote.path().parent().unwrap().to_path_buf();
-    let name = f
-        .remote
-        .path()
-        .file_name()
-        .unwrap()
-        .to_string_lossy()
-        .into_owned();
-    let (base, seen) = git_http_server(parent);
-    let account = Account {
-        forge: Forge::Other,
-        host: "127.0.0.1".to_owned(),
-        login: "julien".to_owned(),
-        name: "Julien".to_owned(),
-        email: "julien@exemple.fr".to_owned(),
-    };
-    f.secrets
-        .set(&state::token_key("127.0.0.1", "julien"), "jeton-secret")
-        .unwrap();
-    let url = format!("{base}/{name}");
-    let linked = link(&f.ctx(), &f.book, &url, "main", Some(account)).unwrap();
-    assert_eq!(linked.remote.as_ref().unwrap().url, url);
-    assert!(f.remote_file(LISTER).is_some(), "envoyé par HTTP");
-    let expected = transport::basic("julien", "jeton-secret");
-    let headers = seen.lock().unwrap().clone();
-    assert!(!headers.is_empty());
-    assert!(headers.iter().all(|h| h == &expected), "{headers:?}");
-    // Le jeton n'est jamais écrit dans la configuration du dépôt (R9).
-    let config = std::fs::read_to_string(f.root().join(".git/config")).unwrap();
-    assert!(!config.contains("jeton-secret") && config.contains(&url));
-    // Une modification d'un collègue arrive par le même transport.
-    f.colleague(|dir| edit(dir, LISTER, |r| r.description = "Par Marc".to_owned()));
-    let checked = check(&f.ctx(), &f.book);
-    assert!(checked.error.is_none(), "{:?}", checked.error);
-    assert_eq!(checked.incoming.len(), 1);
-    assert_eq!(checked.incoming[0].detail, "description modifiée");
+    use super::*;
+
+    /// Serveur Git HTTP local : `git http-backend` (CGI), avec les en-têtes `Authorization` reçus.
+    fn git_http_server(root: PathBuf) -> (String, Arc<Mutex<Vec<String>>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let log = seen.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                    continue;
+                }
+                let mut parts = line.split_whitespace();
+                let method = parts.next().unwrap_or_default().to_owned();
+                let target = parts.next().unwrap_or_default().to_owned();
+                let mut headers = Vec::new();
+                loop {
+                    let mut header = String::new();
+                    reader.read_line(&mut header).unwrap();
+                    let header = header.trim_end().to_owned();
+                    if header.is_empty() {
+                        break;
+                    }
+                    headers.push(header);
+                }
+                let value = |name: &str| {
+                    headers.iter().find_map(|h| {
+                        h.split_once(':')
+                            .filter(|(n, _)| n.eq_ignore_ascii_case(name))
+                            .map(|(_, v)| v.trim().to_owned())
+                    })
+                };
+                log.lock()
+                    .unwrap()
+                    .push(value("authorization").unwrap_or_default());
+                let length: usize = value("content-length")
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0);
+                let mut body = vec![0; length];
+                reader.read_exact(&mut body).unwrap();
+                let (path, query) = target.split_once('?').unwrap_or((&target, ""));
+                let mut child = std::process::Command::new("git")
+                    .arg("http-backend")
+                    .env("GIT_PROJECT_ROOT", &root)
+                    .env("GIT_HTTP_EXPORT_ALL", "1")
+                    .env("REQUEST_METHOD", &method)
+                    .env("PATH_INFO", path)
+                    .env("QUERY_STRING", query)
+                    .env("CONTENT_TYPE", value("content-type").unwrap_or_default())
+                    .env("CONTENT_LENGTH", length.to_string())
+                    .env("REMOTE_USER", "julien")
+                    .env("REMOTE_ADDR", "127.0.0.1")
+                    .stdin(std::process::Stdio::piped())
+                    .stdout(std::process::Stdio::piped())
+                    .spawn()
+                    .unwrap();
+                child.stdin.take().unwrap().write_all(&body).unwrap();
+                let output = child.wait_with_output().unwrap();
+                let split = output
+                    .stdout
+                    .windows(4)
+                    .position(|w| w == b"\r\n\r\n")
+                    .map(|i| (i, 4))
+                    .or_else(|| {
+                        output
+                            .stdout
+                            .windows(2)
+                            .position(|w| w == b"\n\n")
+                            .map(|i| (i, 2))
+                    })
+                    .unwrap();
+                let head = String::from_utf8_lossy(&output.stdout[..split.0]).into_owned();
+                let content = &output.stdout[split.0 + split.1..];
+                let mut status = "200 OK".to_owned();
+                let mut response = Vec::new();
+                for header in head.lines() {
+                    if let Some(s) = header.strip_prefix("Status:") {
+                        status = s.trim().to_owned();
+                    } else {
+                        response.push(header.to_owned());
+                    }
+                }
+                let mut stream = stream;
+                let _ = write!(stream, "HTTP/1.1 {status}\r\n");
+                for header in response {
+                    let _ = write!(stream, "{header}\r\n");
+                }
+                let _ = write!(
+                    stream,
+                    "Content-Length: {}\r\nConnection: close\r\n\r\n",
+                    content.len()
+                );
+                let _ = stream.write_all(content);
+            }
+        });
+        (format!("http://127.0.0.1:{port}"), seen)
+    }
+
+    #[test]
+    fn r9_transport_http_par_le_reseau_du_poste_jeton_en_en_tete() {
+        let f = Fixture::new();
+        // Dépôt servi par HTTP ; envois acceptés par git http-backend.
+        std::process::Command::new("git")
+            .args(["config", "http.receivepack", "true"])
+            .current_dir(f.remote.path())
+            .status()
+            .unwrap();
+        let parent = f.remote.path().parent().unwrap().to_path_buf();
+        let name = f
+            .remote
+            .path()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let (base, seen) = git_http_server(parent);
+        let account = Account {
+            forge: Forge::Other,
+            host: "127.0.0.1".to_owned(),
+            login: "julien".to_owned(),
+            name: "Julien".to_owned(),
+            email: "julien@exemple.fr".to_owned(),
+        };
+        f.secrets
+            .set(&state::token_key("127.0.0.1", "julien"), "jeton-secret")
+            .unwrap();
+        let url = format!("{base}/{name}");
+        let linked = link(&f.ctx(), &f.book, &url, "main", Some(account)).unwrap();
+        assert_eq!(linked.remote.as_ref().unwrap().url, url);
+        assert!(f.remote_file(LISTER).is_some(), "envoyé par HTTP");
+        let expected = transport::basic("julien", "jeton-secret");
+        let headers = seen.lock().unwrap().clone();
+        assert!(!headers.is_empty());
+        assert!(headers.iter().all(|h| h == &expected), "{headers:?}");
+        // Le jeton n'est jamais écrit dans la configuration du dépôt (R9).
+        let config = std::fs::read_to_string(f.root().join(".git/config")).unwrap();
+        assert!(!config.contains("jeton-secret") && config.contains(&url));
+        // Une modification d'un collègue arrive par le même transport.
+        f.colleague(|dir| edit(dir, LISTER, |r| r.description = "Par Marc".to_owned()));
+        let checked = check(&f.ctx(), &f.book);
+        assert!(checked.error.is_none(), "{:?}", checked.error);
+        assert_eq!(checked.incoming.len(), 1);
+        assert_eq!(checked.incoming[0].detail, "description modifiée");
+    }
 }
 
 mod forges {
