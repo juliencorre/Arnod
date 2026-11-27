@@ -23,30 +23,32 @@ Source : maquette, page 0.1-a (feuille de route, section `feuille_de_route` de
 - étiquette aussi un dossier (l'étiquette vaut pour tous ses tests), montre les étiquettes sur
   chaque ligne de la vue d'un dossier et filtre cette vue par étiquette ;
 - joue un dossier, un test ou une étiquette hors de l'application par la commande `arnod run`,
-  avec un résumé, des rapports JUnit, Allure et HTML et un code de sortie, sous Windows, sous Linux
-  et dans une image Docker ; l'application copie la commande d'un test ou d'un dossier et donne
-  des exemples prêts à copier pour GitHub Actions et Jenkins ;
+  avec un résumé, des rapports JUnit, Allure et HTML et un code de sortie, sous Windows et sous
+  Linux, par un exécutable autonome qui se lance sans installation, sans droits administrateur et
+  sans Docker, sur un poste comme sur un agent d'intégration continue ; l'application copie la
+  commande d'un test ou d'un dossier et donne des exemples prêts à copier pour GitHub Actions et
+  Jenkins ;
 - relie un projet à un dépôt GitHub, GitLab ou à une URL Git, récupère et envoie les
   modifications depuis une barre d'état, règle un conflit assertion par assertion, montre ce que
   les collègues ont changé, en langage clair, sans jamais faire voyager un secret.
 
 ## 2. Maquettes
 
-| Repère     | Écran                                                                  | Lot | Cas           |
-| ---------- | ---------------------------------------------------------------------- | --- | ------------- |
-| `1.5-a`    | Recherche par nom : résultats groupés, Entrée ouvre le premier         | A   | RH1 à RH4     |
-| `1.5-b`    | Recherche par adresse ou identifiant, URL complète collée              | A   | RH5, RH6      |
-| `4.9-b`    | Vue d'un dossier filtrée par étiquette, étiquettes sur chaque ligne    | B   | ET1 à ET4     |
-| `4.9-d`    | `arnod run --etiquette smoke`                                          | D   | LC3           |
-| `5.3-a`    | `arnod run` d'un dossier : résultats, résumé, rapports, code de sortie | D   | LC1, LC2, LC4 |
-| `5.3-c`    | « Copier la commande » du menu ⋯ (test, dossier ; campagne en V7)      | D   | LC6           |
-| `5.3-d`    | Image Docker, exemples GitHub Actions et Jenkins                       | E   | IC1 à IC3     |
-| `7.1-a`    | Relier le projet : GitHub, GitLab, URL Git ; compte, dépôt, branche    | F   | SY1 à SY3     |
-| `7.1-b`    | Synchroniser depuis la barre d'état : à récupérer, mes modifications   | F   | SY4 à SY7     |
-| `7.1-e`    | Après une récupération : secrets manquants à renseigner                | F   | SY8           |
-| `7.1-c`    | Conflit : choisir assertion par assertion, le reste fusionné           | G   | CF1 à CF3     |
-| `7.1-d`    | Travail en équipe : pastilles, historique d'un test en clair           | G   | CF4, CF5      |
-| transverse | Barre d'état (fonction « Barre d'état » de 0.1-a, sans écran propre)   | F   | SY4           |
+| Repère     | Écran                                                                                   | Lot | Cas           |
+| ---------- | --------------------------------------------------------------------------------------- | --- | ------------- |
+| `1.5-a`    | Recherche par nom : résultats groupés, Entrée ouvre le premier                          | A   | RH1 à RH4     |
+| `1.5-b`    | Recherche par adresse ou identifiant, URL complète collée                               | A   | RH5, RH6      |
+| `4.9-b`    | Vue d'un dossier filtrée par étiquette, étiquettes sur chaque ligne                     | B   | ET1 à ET4     |
+| `4.9-d`    | `arnod run --etiquette smoke`                                                           | D   | LC3           |
+| `5.3-a`    | `arnod run` d'un dossier : résultats, résumé, rapports, code de sortie                  | D   | LC1, LC2, LC4 |
+| `5.3-c`    | « Copier la commande » du menu ⋯ (test, dossier ; campagne en V7)                       | D   | LC6           |
+| `5.3-d`    | Exemples GitHub Actions et Jenkins ; exécutable autonome au lieu de l'image Docker (Q4) | E   | IC1 à IC3     |
+| `7.1-a`    | Relier le projet : GitHub, GitLab, URL Git ; compte, dépôt, branche                     | F   | SY1 à SY3     |
+| `7.1-b`    | Synchroniser depuis la barre d'état : à récupérer, mes modifications                    | F   | SY4 à SY7     |
+| `7.1-e`    | Après une récupération : secrets manquants à renseigner                                 | F   | SY8           |
+| `7.1-c`    | Conflit : choisir assertion par assertion, le reste fusionné                            | G   | CF1 à CF3     |
+| `7.1-d`    | Travail en équipe : pastilles, historique d'un test en clair                            | G   | CF4, CF5      |
+| transverse | Barre d'état (fonction « Barre d'état » de 0.1-a, sans écran propre)                    | F   | SY4           |
 
 Hors V2 dans ces pages : `5.3-b` (étape manuelle dans un terminal, V7), `4.9-c` (campagne par
 étiquettes, V7) ; les groupes « Exigences », « Mocks et anomalies » de la recherche et les entrées
@@ -82,6 +84,7 @@ Les règles vivent dans le cœur Rust, modules purs testés règle par règle.
 | R13 | Un conflit non réglé bloque l'envoi ; rien n'est écrit dans le projet tant que la résolution n'est pas validée, et le dépôt reste dans l'état d'avant la récupération si l'utilisateur abandonne.                             |
 | R14 | Le journal d'un élément et les pastilles se décrivent en langage clair (auteur, date, ce qui a changé), d'après les versions successives du fichier ; jamais un hash ni un chemin.                                            |
 | R15 | Après une récupération, une variable locale déclarée par un environnement et sans valeur sur ce poste est signalée, jamais inventée.                                                                                          |
+| R16 | `arnod` est un exécutable autonome : décompressé, il se lance sans installation, sans droits administrateur, sans Docker ni bibliothèque du système à ajouter (Linux : lié statiquement).                                     |
 
 ## 4. Cas d'usage
 
@@ -121,11 +124,11 @@ permet).
 
 ### Lot E - Intégration continue (5.3-d)
 
-| ID  | Cas d'usage             | Écrans  | Comportement attendu                                                                                                                                                           | Priorité |
-| --- | ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| IC1 | Image Docker            | `5.3-d` | Une image publiée à chaque version contient `arnod` ; `docker run … arnod run …` fonctionne sans coffre ni interface.                                                          | Must     |
-| IC2 | Exemples prêts à copier | `5.3-d` | « Intégration continue… » (menu ⋯ d'un dossier ou d'un test) génère le workflow GitHub Actions et le Jenkinsfile, avec un `ARNOD_VAR_` par variable locale de l'environnement. | Must     |
-| IC3 | Rapports publiés        | `5.3-d` | Les exemples publient JUnit et Allure et échouent sur le code de sortie 1.                                                                                                     | Must     |
+| ID  | Cas d'usage             | Écrans  | Comportement attendu                                                                                                                                                                                                                                                              | Priorité |
+| --- | ----------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| IC1 | Exécutable autonome     | `5.3-d` | À chaque version, une archive par système (`arnod-windows-x64.zip`, `arnod-linux-x64.tar.gz`) est jointe à la release ; décompressée sur un poste ou un agent, elle joue `arnod run` sans rien installer (R16).                                                                   | Must     |
+| IC2 | Exemples prêts à copier | `5.3-d` | « Intégration continue… » (menu ⋯ d'un dossier ou d'un test) génère le workflow GitHub Actions et le Jenkinsfile : téléchargement de l'archive de la version (ou copie depuis un partage interne), puis `arnod run`, avec un `ARNOD_VAR_` par variable locale de l'environnement. | Must     |
+| IC3 | Rapports publiés        | `5.3-d` | Les exemples publient JUnit et Allure et échouent sur le code de sortie 1.                                                                                                                                                                                                        | Must     |
 
 ### Lot F - Synchronisation (7.1-a, 7.1-b, 7.1-e)
 
@@ -158,6 +161,8 @@ permet).
 - Étape manuelle dans un terminal (`5.3-b`) et campagnes (`4.9-c`, campagne de `5.3-c`) : V7.
 - Résultats « Exigences », « Mocks », « Anomalies » de la recherche : V5 à V7. Entrées « mocks »
   et « catalogue » de la barre d'état : V5 et V6.
+- Image Docker (Q4) : elle demande Docker sur le poste ou l'agent ; `arnod` est un exécutable
+  autonome (R16).
 - macOS (Q9).
 - Synchronisation de « Non classés » : ce projet reste propre au poste.
 
@@ -192,7 +197,9 @@ commande appelle le même cœur, sans Tauri.
   `ts_mirror`, `interface/tests.rs`) gardent leurs chemins par `CARGO_MANIFEST_DIR`.
 - **`crates/arnod-cli`** : le binaire `arnod` ; lecture des arguments écrite à la main ou par
   `lexopt` (sans dépendance lourde), sortie en français, un `Notifier` qui écrit l'avancement,
-  un `SecretStore` qui lit `ARNOD_VAR_*` puis, s'il existe, le coffre (R6).
+  un `SecretStore` qui lit `ARNOD_VAR_*` puis, s'il existe, le coffre (R6). Exécutable autonome
+  (R16) : sous Linux, lié statiquement (cible `x86_64-unknown-linux-musl`), sans le coffre (pas de
+  D-Bus sur un agent : les variables passent par `ARNOD_VAR_*`) ; sous Windows, coffre compris.
 - **`search/`** (pur) : index d'un projet (`tree::read`, contrats, environnements), normalisation,
   correspondance d'adresse (réutilise `contract::deduce::path_matches`), tri et groupes (R1 à R3).
 - **`tree`** : étiquettes effectives (`TreeNode.inheritedTags`, R4) ; `tree_set_folder_tags`.
@@ -257,10 +264,10 @@ de chaque fenêtre suit.
 | Fichier                               | Changement                                                                                  |
 | ------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `CLAUDE.md`                           | Sections « Recherche », « Ligne de commande », « Synchronisation » ; arborescence (crates)  |
-| `README.md`                           | Fonctions, `arnod run`, image Docker, « Publier une version »                               |
+| `README.md`                           | Fonctions, `arnod run`, archives autonomes, « Publier une version »                         |
 | `src-tauri/`, `Cargo.toml`            | Espace de travail Cargo, cœur déplacé dans `crates/arnod-core` (lot C)                      |
 | `src-tauri/capabilities/default.json` | Inchangé : Git, forge et navigateur appelés depuis Rust                                     |
-| `.github/workflows/build.yml`         | Binaire `arnod` (Windows, Linux), image Docker publiée sur un tag (Q4)                      |
+| `.github/workflows/build.yml`         | Archives autonomes `arnod` (Windows, Linux) jointes à la release d'un tag                   |
 | Installeur                            | Mesuré avec la ligne de commande et la bibliothèque Git : reste < 15 Mo (`bundle-size.mjs`) |
 | `e2e/`                                | Recherche, étiquette d'un dossier, synchronisation contre un dépôt Git local de test        |
 | `docs/maquette-etat.yml`              | 1.5-a, b ; 4.9-b, d ; 5.3-a, c, d ; 7.1-a à e ; écart de 1.6-f bis (« Rechercher » listé)   |
@@ -295,12 +302,13 @@ d'abord (courts, visibles), puis C, D, E, puis F, G.
 - [ ] **T7** `crates/arnod-cli` : `arnod run` (cibles, `--env`, `--etiquette`, `--parallele`),
       sortie, codes de sortie (R5 à R7) ; tests contre un serveur local.
 - [ ] **T8** `report/` : JUnit, Allure, HTML (R8), validés contre leurs schémas.
-- [ ] **T9** « Copier la commande » (`cli_command`, LC6) ; binaire `arnod` dans l'installeur
-      Windows et l'archive Linux (Q3).
+- [ ] **T9** « Copier la commande » (`cli_command`, LC6) ; `arnod.exe` livré aussi avec
+      l'application Windows (Q3).
 
 **Lot E - Intégration continue (5.3-d)**
 
-- [ ] **T10** Image Docker publiée par la CI sur un tag (Q4) ; test de fumée de l'image.
+- [ ] **T10** Archives autonomes jointes à la release par la CI (R16) ; test de fumée : l'archive
+      Linux décompressée sur une image minimale, sans rien installer, joue un dossier.
 - [ ] **T11** `ci_examples` et « Intégration continue… » (IC2, IC3).
 
 **Lot F - Synchronisation (7.1-a, 7.1-b, 7.1-e)**
@@ -318,14 +326,15 @@ d'abord (courts, visibles), puis C, D, E, puis F, G.
 
 ## 9. Critères d'acceptation
 
-- [ ] `cargo test` : règles R1 à R15, dont fusion et transport Git contre un serveur local.
+- [ ] `cargo test` : règles R1 à R16, dont fusion et transport Git contre un serveur local.
 - [ ] Vitest : recherche au clavier, étiquettes d'un dossier, barre d'état, synchronisation,
       conflit, secrets manquants, sur le faux cœur.
 - [ ] e2e : Ctrl+K ouvre et trouve un test par nom et par adresse ; une étiquette de dossier filtre
       sa vue ; un projet se relie à un dépôt local, envoie, récupère la modification d'un « collègue »
       (second clone), règle un conflit.
-- [ ] `arnod run` dans l'image Docker joue un dossier contre un serveur local, écrit JUnit et
-      Allure, rend 1 sur un échec.
+- [ ] `arnod run`, décompressé d'une archive de release sur un agent Linux vierge (ni Docker, ni
+      installation), joue un dossier contre un serveur local, écrit JUnit et Allure, rend 1 sur un
+      échec.
 - [ ] Installeur Windows < 15 Mo ; `npm run check` passe.
 
 ## 10. Risques
@@ -338,21 +347,22 @@ d'abord (courts, visibles), puis C, D, E, puis F, G.
 | Fusion qui perd une modification                  | Perte de données de l'équipe        | Fusion élément par élément (R12), testée sur des cas réels ; abandon possible (R13) |
 | Extraction du cœur (lot C) qui casse un parcours  | Régression                          | Lot sans changement visible, suites complètes (Rust, Vitest, e2e) avant et après    |
 | Binaire Windows de l'application sans console     | `arnod run` muet sous Windows       | Binaire de ligne de commande séparé (Q3)                                            |
+| Exécutable Linux qui dépend du système            | Ne démarre pas sur un agent         | Liaison statique (musl, R16), testée sur une image minimale                         |
 
 ## 11. Décisions
 
 Questions ouvertes, à trancher avant la première tâche du lot concerné.
 
-| ID  | Question                                                                                      | Décision                                                                                                                                                                                                                                                                                             |
-| --- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Quelle bibliothèque Git ? (lot F)                                                             | À trancher. Recommandé : `git2` (libgit2) sans HTTPS ni SSH propres, avec un transport HTTPS enregistré qui passe par `network::Network` (proxy, autorités internes, R9). Autres : `git` du système (rien à embarquer, mais Git requis et proxy à part) ; `gix` (pur Rust, envoi encore incomplet).  |
-| Q2  | Connexion « par le navigateur » : qui enregistre les applications OAuth d'Arnod ? (lot F)     | À trancher. Recommandé : une application OAuth GitHub (flux « device ») et une GitLab.com (PKCE) au nom du projet Arnod ; pour un GitLab auto-hébergé ou une autre URL, un jeton personnel saisi, rangé au coffre.                                                                                   |
-| Q3  | Comment livrer `arnod` sous Windows ? (lot D)                                                 | À trancher. Recommandé : un binaire de ligne de commande séparé (`arnod.exe` dans un dossier `bin` ajouté au `PATH` de l'utilisateur par l'installeur `currentUser`) ; l'application garde son binaire sans console, qui s'appelle déjà `arnod.exe` (`mainBinaryName`) mais n'est pas sur le `PATH`. |
-| Q4  | Où publier l'image Docker ? (lot E)                                                           | À trancher. La maquette dit `arnod/arnod` (Docker Hub : un compte et des secrets de CI). Recommandé pour commencer : `ghcr.io/juliencorre/arnod`, publié avec le jeton de la CI.                                                                                                                     |
-| Q5  | Ce que `arnod run` écrit sur le poste                                                         | Proposé : rien hors des rapports (R5), pour des runs reproductibles en CI comme au poste.                                                                                                                                                                                                            |
-| Q6  | Fréquence de la vérification de synchronisation                                               | Proposé : au démarrage, puis toutes les 5 minutes et au retour sur la fenêtre ; « vérifié il y a … » dans le panneau.                                                                                                                                                                                |
-| Q7  | « Étiquettes communes au projet » : simple réunion des étiquettes des fichiers, ou registre ? | Proposé : réunion des étiquettes des requêtes et des dossiers (rien dans `extensions.arnod`) ; un registre décrit viendrait avec les campagnes (V7).                                                                                                                                                 |
-| Q8  | Conflit sur un fichier qui n'est pas une requête (contrat, `opencollection.yml`)              | Proposé : environnements variable par variable ; contrat et racine : garder une version entière, avec la comparaison des deux.                                                                                                                                                                       |
-| Q9  | macOS et Linux (question de la page 0.1-a)                                                    | Proposé : l'application reste Windows et Linux (AppImage, déjà construite) ; `arnod` en V2 pour Windows, Linux et Docker ; macOS hors V2.                                                                                                                                                            |
-| Q10 | Levée de « Arnod n'initialise pas Git »                                                       | Proposé : seulement pour « Relier » (7.1-a), sur un projet qui n'est pas déjà un dépôt.                                                                                                                                                                                                              |
-| Q11 | Auteur des modifications envoyées                                                             | Proposé : nom et adresse du compte relié (adresse privée « noreply » de la forge si l'adresse n'est pas publique).                                                                                                                                                                                   |
+| ID  | Question                                                                                      | Décision                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Q1  | Quelle bibliothèque Git ? (lot F)                                                             | À trancher. Recommandé : `git2` (libgit2) sans HTTPS ni SSH propres, avec un transport HTTPS enregistré qui passe par `network::Network` (proxy, autorités internes, R9). Autres : `git` du système (rien à embarquer, mais Git requis et proxy à part) ; `gix` (pur Rust, envoi encore incomplet).                                                                                                                                                                |
+| Q2  | Connexion « par le navigateur » : qui enregistre les applications OAuth d'Arnod ? (lot F)     | À trancher. Recommandé : une application OAuth GitHub (flux « device ») et une GitLab.com (PKCE) au nom du projet Arnod ; pour un GitLab auto-hébergé ou une autre URL, un jeton personnel saisi, rangé au coffre.                                                                                                                                                                                                                                                 |
+| Q3  | Comment livrer `arnod` ? (lot D)                                                              | À trancher. Recommandé : un exécutable autonome (R16), publié en archive pour Windows et Linux à chaque release, à décompresser où l'on veut (poste, agent, partage interne) ; sous Windows, `arnod.exe` est aussi livré avec l'application, dans un dossier `bin` ajouté au `PATH` de l'utilisateur par l'installeur `currentUser`. L'application garde son binaire sans console, qui s'appelle déjà `arnod.exe` (`mainBinaryName`) mais n'est pas sur le `PATH`. |
+| Q4  | Image Docker (maquette 5.3-d : `arnod/arnod`) ?                                               | Décidé le 2026-11-27 : non. Docker demande une installation sur le poste ou l'agent ; `arnod` est un exécutable autonome (R16), et la maquette 5.3-d est à aligner.                                                                                                                                                                                                                                                                                                |
+| Q5  | Ce que `arnod run` écrit sur le poste                                                         | Proposé : rien hors des rapports (R5), pour des runs reproductibles en CI comme au poste.                                                                                                                                                                                                                                                                                                                                                                          |
+| Q6  | Fréquence de la vérification de synchronisation                                               | Proposé : au démarrage, puis toutes les 5 minutes et au retour sur la fenêtre ; « vérifié il y a … » dans le panneau.                                                                                                                                                                                                                                                                                                                                              |
+| Q7  | « Étiquettes communes au projet » : simple réunion des étiquettes des fichiers, ou registre ? | Proposé : réunion des étiquettes des requêtes et des dossiers (rien dans `extensions.arnod`) ; un registre décrit viendrait avec les campagnes (V7).                                                                                                                                                                                                                                                                                                               |
+| Q8  | Conflit sur un fichier qui n'est pas une requête (contrat, `opencollection.yml`)              | Proposé : environnements variable par variable ; contrat et racine : garder une version entière, avec la comparaison des deux.                                                                                                                                                                                                                                                                                                                                     |
+| Q9  | macOS et Linux (question de la page 0.1-a)                                                    | Proposé : l'application reste Windows et Linux (AppImage, déjà construite) ; `arnod` en V2 pour Windows et Linux (exécutable autonome) ; macOS hors V2.                                                                                                                                                                                                                                                                                                            |
+| Q10 | Levée de « Arnod n'initialise pas Git »                                                       | Proposé : seulement pour « Relier » (7.1-a), sur un projet qui n'est pas déjà un dépôt.                                                                                                                                                                                                                                                                                                                                                                            |
+| Q11 | Auteur des modifications envoyées                                                             | Proposé : nom et adresse du compte relié (adresse privée « noreply » de la forge si l'adresse n'est pas publique).                                                                                                                                                                                                                                                                                                                                                 |
