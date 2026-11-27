@@ -3092,6 +3092,84 @@ describe("Lot L allégé - Mises à jour (1.6-g)", () => {
   });
 });
 
+describe("Version 1 - Apparence et raccourcis (1.6-f, 1.6-f bis)", () => {
+  async function openSection(label: string): Promise<void> {
+    await browser.execute(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ctrlKey: true }));
+    });
+    await browser.$(".preferences").waitForDisplayed({ timeoutMsg: "préférences attendues" });
+    await clickText(".preferences__section", label);
+  }
+
+  it("le thème se force en sombre, puis revient au système (1.6-f)", async () => {
+    await openSection("Apparence");
+    await browser.$(".appearance").waitForDisplayed({ timeoutMsg: "section Apparence attendue" });
+    await clickText(".appearance__theme", "Sombre");
+    await browser.waitUntil(
+      () => browser.execute(() => document.documentElement.dataset.theme === "dark"),
+      { timeoutMsg: "thème sombre forcé attendu" },
+    );
+    await clickText(".appearance__theme", "Comme le système");
+    await browser.waitUntil(
+      () => browser.execute(() => document.documentElement.dataset.theme === undefined),
+      { timeoutMsg: "thème du système attendu" },
+    );
+    await screenshot(browser, "v1-apparence");
+  });
+
+  it("le thème forcé et le zoom reviennent au redémarrage (1.6-f)", async () => {
+    await clickText(".appearance__theme", "Sombre");
+    await browser.execute(() => {
+      const zoom = document.querySelector<HTMLSelectElement>(".appearance select");
+      if (!zoom) throw new Error("liste du zoom introuvable");
+      zoom.value = "110";
+      zoom.dispatchEvent(new Event("change"));
+    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          document.querySelector(".appearance__theme--on")?.textContent.includes("Sombre"),
+        ),
+      { timeoutMsg: "« Sombre » choisi attendu" },
+    );
+    await browser.keys("Escape");
+    await restart();
+    await browser.waitUntil(
+      () => browser.execute(() => document.documentElement.dataset.theme === "dark"),
+      { timeoutMsg: "thème sombre attendu après le redémarrage" },
+    );
+    // Retour aux réglages du système pour la suite des parcours.
+    await openSection("Apparence");
+    await clickText(".appearance__theme", "Comme le système");
+    await browser.execute(() => {
+      const zoom = document.querySelector<HTMLSelectElement>(".appearance select");
+      if (!zoom) throw new Error("liste du zoom introuvable");
+      zoom.value = "100";
+      zoom.dispatchEvent(new Event("change"));
+    });
+    await browser.waitUntil(
+      () => browser.execute(() => document.documentElement.dataset.theme === undefined),
+      { timeoutMsg: "thème du système attendu" },
+    );
+    await browser.keys("Escape");
+    await browser.$("dialog[open]").waitForExist({ reverse: true, timeout: 5_000 });
+    await openSection("Raccourcis");
+  });
+
+  it("les raccourcis sont listés par usage, les fixes signalés (1.6-f bis)", async () => {
+    await browser.$(".shortcuts").waitForDisplayed({ timeoutMsg: "section Raccourcis attendue" });
+    const text = await browser.execute(
+      () => document.querySelector(".shortcuts")?.textContent.replace(/\s+/g, " ") ?? "",
+    );
+    expect(text).toContain("Requête et réponse");
+    expect(text).toContain("Ctrl+Entrée");
+    expect(text).toContain("fixe");
+    await screenshot(browser, "v1-raccourcis");
+    await browser.keys("Escape");
+    await browser.$("dialog[open]").waitForExist({ reverse: true, timeout: 5_000 });
+  });
+});
+
 describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
   const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
   const file = () => path.join(project(), "chrono-k.yml");
@@ -3132,6 +3210,31 @@ describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
     expect(labels).toContain("Attente du serveur");
     expect(labels).toContain("Réception");
     await screenshot(browser, "34-chronologie");
+  });
+
+  it("chaque envoi rejoint l'historique de la requête, comparé au précédent (5.1-c bis)", async () => {
+    await clickText(".request-tab button", "Envoyer");
+    // Pendant l'envoi, les onglets de la réponse laissent la place à « Envoi en cours… ».
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll('[role="tab"]')).some(
+            (t) => t.textContent.replace(/\s+/g, " ").trim() === "Historique 2",
+          ),
+        ),
+      { timeout: 15_000, timeoutMsg: "onglet « Historique 2 » attendu" },
+    );
+    await clickText('[role="tab"]', "Historique");
+    await browser.waitUntil(
+      () => browser.execute(() => document.querySelectorAll(".history__row").length >= 2),
+      { timeout: 15_000, timeoutMsg: "deux envois attendus dans l'historique" },
+    );
+    const compare = await browser.execute(
+      () => document.querySelector(".history__compare")?.textContent ?? "",
+    );
+    expect(compare).toContain("Comparé à");
+    await screenshot(browser, "v1-historique");
+    await clickText('[role="tab"]', "Corps");
   });
 
   it("un jeton saisi en clair est proposé en variable locale, rien n'est écrit avant (4.2-c)", async () => {

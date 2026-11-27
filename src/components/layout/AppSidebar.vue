@@ -16,6 +16,7 @@ import SidebarProject from "@/components/layout/SidebarProject.vue";
 import { useProjectActions } from "@/composables/useProjectActions";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
+import { useInterfaceStore } from "@/stores/interface";
 import { useNavigationStore } from "@/stores/navigation";
 import { contentProject, useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -24,6 +25,7 @@ const catalog = useCatalogStore();
 const dialogs = useDialogStore();
 const navigation = useNavigationStore();
 const workbench = useWorkbenchStore();
+const shortcuts = useInterfaceStore();
 const windows = useWindowsStore();
 const { addExistingProject } = useProjectActions();
 const projectsLabelId = useId();
@@ -80,20 +82,20 @@ const aside = useTemplateRef<HTMLElement>("aside");
 
 type Shortcut = "test" | "folder" | "env" | "filter";
 
-/** Raccourci voulu ; le code de la touche sert pour la disposition AZERTY. */
+/** Raccourci voulu, d'après les préférences du poste (1.6-f bis). */
 function shortcutOf(event: KeyboardEvent): Shortcut | null {
-  const key = event.key.toLowerCase();
-  const is = (letter: string): boolean =>
-    key === letter || event.code === `Key${letter.toUpperCase()}`;
-  if (is("n")) return event.shiftKey ? "folder" : "test";
-  if (is("e") && event.shiftKey) return "env";
-  // Ctrl+F ne vaut que dans la barre latérale : ailleurs, il reste au navigateur ou à l'éditeur.
-  if (is("f") && !event.shiftKey && aside.value?.contains(document.activeElement)) return "filter";
+  if (shortcuts.matches(event, "newTest")) return "test";
+  if (shortcuts.matches(event, "newFolder")) return "folder";
+  if (shortcuts.matches(event, "environments")) return "env";
+  // Le filtre ne vaut que dans la barre latérale : ailleurs, la touche reste au navigateur ou à
+  // l'éditeur (portée « sidebar »).
+  if (shortcuts.matches(event, "filterTree") && aside.value?.contains(document.activeElement))
+    return "filter";
   return null;
 }
 
 function onKeydown(event: KeyboardEvent): void {
-  if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+  if (event.defaultPrevented) return;
   const wanted = shortcutOf(event);
   if (wanted === null) return;
   const projectId = selectedProject();

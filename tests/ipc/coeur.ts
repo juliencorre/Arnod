@@ -11,6 +11,8 @@ export type AddedOrigin = "auth" | "body" | "client";
 
 export type ApiKeyLocation = "header" | "query";
 
+export type Appearance = { theme: InterfaceTheme, zoom: number, editorFont: string | null, editorFontSize: number, };
+
 export type Assertion = { id: string, target: string, operator: AssertionOperator, value?: Scalar | null, origin: AssertionOrigin, enabled: boolean, };
 
 export type AssertionOperator = "equals" | "notEquals" | "exists" | "contains" | "notContains" | "lessThan" | "lessOrEqual" | "greaterThan" | "greaterOrEqual" | "in" | "notIn" | "between" | "startsWith" | "endsWith" | "length" | "matches" | "notMatches" | "isNull" | "isUndefined" | "isEmpty" | "isNotEmpty" | "isTruthy" | "isFalsy" | "isJson" | "isNumber" | "isText" | "isBoolean" | "isArray";
@@ -109,6 +111,10 @@ export type DetailRow = { label: string, value: string, };
 
 export type Detection = { nature: string, subject: string, values: { [key in string]: string }, curl?: CurlImport, };
 
+export type DiffLine = { part: DiffPart, added: boolean, text: string, };
+
+export type DiffPart = "status" | "header" | "body" | "assertion";
+
 export type DrawnValue = { name: string, value: string, source: string | null, };
 
 export type DynamicValue = { name: string, description: string, example: string, };
@@ -163,6 +169,16 @@ export type GhRelease = { tag_name: string, name: string | null, body: string | 
 
 export type HelloResponse = { message: string, timestampMs: number, };
 
+export type HistoryDiff = { previousId: string, lines: Array<DiffLine>, truncated: boolean, };
+
+export type HistoryEntry = { id: string, at: number, environment: string | null, status: number, statusText: string, totalMs: number, sizeBytes: number, passed: boolean, assertions: Array<AssertionResult>, headers: Array<[string, string]>, body: string, truncated: boolean, sent: HistorySent | null, };
+
+export type HistoryItem = { entry: HistoryEntry, previousAt: number | null, changes: Array<string>, };
+
+export type HistorySent = { method: string, url: string, headers: Array<[string, string]>, body: string | null, };
+
+export type HistoryView = { path: string, items: Array<HistoryItem>, max: number, };
+
 export type HtmlNode = { "kind": "text", text: string, } | { "kind": "element", tag: string, children: Array<HtmlNode>, };
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
@@ -196,6 +212,10 @@ export type InheritedAuth = { auth: Auth, source: string, };
 export type InheritedHeader = { name: string, value: string, source: string, };
 
 export type InstallState = { "state": "idle" } | { "state": "downloading", received: number, total: number | null, } | { "state": "ready", version: string, onExit: boolean, } | { "state": "failed", message: string, };
+
+export type InterfaceTheme = "system" | "light" | "dark";
+
+export type InterfaceView = { appearance: Appearance, zooms: Array<number>, fonts: Array<string>, sizes: Array<number>, shortcuts: Array<ShortcutView>, };
 
 export type Jar = { cookies: Array<StoredCookie>, disabledDomains: Array<string>, };
 
@@ -328,6 +348,16 @@ export type SendOutcome = { response: HttpResponse, assertions: Array<AssertionR
 export type Sent = { environment: string, method: string, url: string, headers: Array<[string, string]>, body: string | null, drawn: Array<DrawnValue>, used: Array<UsedVariable>, extracted: Array<ExtractedValue>, oauth2: SentToken | null, };
 
 export type SentToken = { tokenUrl: string, status: TokenStatus | null, };
+
+export type ShortcutChange = { view: InterfaceView, conflict: ShortcutConflict | null, };
+
+export type ShortcutConflict = { keys: string, action: string, label: string, };
+
+export type ShortcutGroup = "request" | "window" | "project";
+
+export type ShortcutScope = "global" | "editor" | "response" | "sidebar" | "contract";
+
+export type ShortcutView = { id: string, label: string, group: ShortcutGroup, scope: ShortcutScope, keys: Array<string>, defaults: Array<string>, editable: boolean, };
 
 export type Side = "right" | "bottom";
 
@@ -672,6 +702,21 @@ export type CheckClearSecret = Check<Same<Ipc.ClearSecret, ClearSecret>>;
 export type CheckBatchAction = Check<Same<Ipc.BatchAction, BatchAction>>;
 export type CheckBatchResult = Check<Same<Ipc.BatchResult, BatchResult>>;
 export type CheckInstallState = Check<Same<Ipc.InstallState, InstallState>>;
+export type CheckInterfaceTheme = Check<Same<Ipc.InterfaceTheme, InterfaceTheme>>;
+export type CheckAppearance = Check<Same<Ipc.Appearance, Appearance>>;
+export type CheckShortcutGroup = Check<Same<Ipc.ShortcutGroup, ShortcutGroup>>;
+export type CheckShortcutScope = Check<Same<Ipc.ShortcutScope, ShortcutScope>>;
+export type CheckShortcutView = Check<Same<Ipc.ShortcutView, ShortcutView>>;
+export type CheckInterfaceView = Check<Same<Ipc.InterfaceView, InterfaceView>>;
+export type CheckShortcutConflict = Check<Same<Ipc.ShortcutConflict, ShortcutConflict>>;
+export type CheckShortcutChange = Check<Same<Ipc.ShortcutChange, ShortcutChange>>;
+export type CheckHistorySent = Check<Same<Ipc.HistorySent, HistorySent>>;
+export type CheckHistoryEntry = Check<Same<Ipc.HistoryEntry, HistoryEntry>>;
+export type CheckHistoryItem = Check<Same<Ipc.HistoryItem, HistoryItem>>;
+export type CheckHistoryView = Check<Same<Ipc.HistoryView, HistoryView>>;
+export type CheckDiffPart = Check<Same<Ipc.DiffPart, DiffPart>>;
+export type CheckDiffLine = Check<Same<Ipc.DiffLine, DiffLine>>;
+export type CheckHistoryDiff = Check<Same<Ipc.HistoryDiff, HistoryDiff>>;
 
 // Sans homologue généré (écrits seulement côté interface) :
 // - CommandName

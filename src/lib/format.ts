@@ -92,3 +92,17 @@ export function formatAgo(timestampMs: number, nowMs: number = Date.now()): stri
   if (hours < 24) return `il y a ${String(hours)} h`;
   return `il y a ${String(Math.floor(hours / 24))} j`;
 }
+
+const shortDayFormatter = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
+
+/** Envoi de l'historique (5.1-c bis) : « auj. 09:14 », « hier 17:20 », « 4 nov. 11:40 ». */
+export function formatSentAt(timestampMs: number, nowMs: number = Date.now()): string {
+  const day = new Date(timestampMs);
+  const today = new Date(nowMs);
+  const yesterday = new Date(nowMs);
+  yesterday.setDate(today.getDate() - 1);
+  const clock = clockFormatter.format(day);
+  if (day.toDateString() === today.toDateString()) return `auj. ${clock}`;
+  if (day.toDateString() === yesterday.toDateString()) return `hier ${clock}`;
+  return `${shortDayFormatter.format(day)} ${clock}`;
+}

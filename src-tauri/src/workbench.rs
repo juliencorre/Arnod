@@ -624,11 +624,14 @@ impl Workbench {
 
     /// Requête ou dossier renommé ou déplacé (R5).
     pub fn rename_status(&self, ctx: &ProjectCtx, from: &str, to: &str) {
+        // L'historique des envois suit aussi (5.1-c bis, H6).
+        crate::history::rename(&ctx.data_dir, ctx.id, from, to);
         self.with_statuses(ctx, |book| book.rename(from, to));
     }
 
     /// Requête ou dossier supprimé (R5).
     pub fn remove_status(&self, ctx: &ProjectCtx, path: &str) {
+        crate::history::remove(&ctx.data_dir, ctx.id, path);
         self.with_statuses(ctx, |book| book.remove(path));
     }
 

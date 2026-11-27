@@ -6,7 +6,7 @@
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 
-import type { CatalogSnapshot, CommandError, WorkspaceColor } from "@/types/ipc";
+import type { CatalogSnapshot, CommandError, SendOutcome, WorkspaceColor } from "@/types/ipc";
 
 import { createFakeContracts, handleContracts, type FakeContracts } from "./fakeContracts";
 import {
@@ -20,6 +20,12 @@ import { handleInput } from "./fakeInput";
 import { handleTrials } from "./fakeTrials";
 import { handleTransfer } from "./fakeTransfer";
 import { handleBatch } from "./fakeBatch";
+import {
+  createFakeInterface,
+  type FakeInterface,
+  handleInterface,
+  recordSend,
+} from "./fakeInterface";
 import { createFakeUpdates, type FakeUpdates, handleUpdates } from "./fakeUpdates";
 import { STEP_CATALOG, detect } from "./fakeSteps";
 // Lot C - Import Bruno.
@@ -73,6 +79,8 @@ export interface FakeCore {
   startup: FakeStartup;
   /** Lot L allégé - Mises à jour : préférences, version trouvée. */
   updates: FakeUpdates;
+  /** Version 1 : apparence, raccourcis (1.6-f, 1.6-f bis), historique des envois (5.1-c bis). */
+  interface: FakeInterface;
 }
 
 const COLORS: WorkspaceColor[] = [
@@ -114,6 +122,7 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
     network: createFakeNetwork(),
     startup: createFakeStartup(),
     updates: createFakeUpdates(),
+    interface: createFakeInterface(),
   };
 
   const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -397,6 +406,9 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           // Lot L allégé - Mises à jour.
           const updated = handleUpdates(core.updates, cmd, args);
           if (updated !== undefined) return updated;
+          // Version 1 : apparence, raccourcis, historique des envois.
+          const iface = handleInterface(core.interface, cmd, args);
+          if (iface !== undefined) return iface;
           // Sélection multiple (4.1-a quater).
           const batched = handleBatch(core.workbench, cmd, args);
           if (batched !== undefined) {
@@ -417,6 +429,13 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
             void core.emit("arnod://statuts", {
               projectId: String(args.project),
               statuses: structuredClone(core.workbench.statuses),
+            });
+          }
+          if (cmd === "request_send") {
+            // 5.1-c bis : la réponse reçue rejoint l'historique avant d'être rendue (H1).
+            return Promise.resolve(handled).then((outcome) => {
+              recordSend(core.interface, args, outcome as SendOutcome);
+              return outcome;
             });
           }
           if (cmd === "contract_delete") {

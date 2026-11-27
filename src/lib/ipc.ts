@@ -9,6 +9,12 @@ import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
+  Appearance,
+  HistoryDiff,
+  HistoryEntry,
+  HistoryView,
+  InterfaceView,
+  ShortcutChange,
   ConflictSide,
   FilesChange,
   RequestConflict,
@@ -829,6 +835,40 @@ export const ipc = {
   /** Réponse à `arnod://quitter` : `saved` faux abandonne la sortie d'Arnod. */
   windowQuitReady: (saved: boolean): Promise<void> =>
     call<null>("window_quit_ready", { saved }).then(() => undefined),
+
+  // --- Version 1 (docs/plan-v1.md) : apparence, raccourcis (1.6-f, 1.6-f bis) ---
+  /** Préférences d'interface ; la fenêtre prend son thème et son zoom. */
+  interfaceLoad: (): Promise<InterfaceView> => call<InterfaceView>("interface_load"),
+  /** Thème, zoom et police des éditeurs ; appliqués et diffusés à toutes les fenêtres. */
+  interfaceSaveAppearance: (appearance: Appearance): Promise<InterfaceView> =>
+    call<InterfaceView>("interface_save_appearance", { appearance }),
+  /**
+   * Donne `keys` à l'action (`null` : retire son raccourci). Un conflit revient sans rien
+   * changer, sauf `replace`.
+   */
+  interfaceSetShortcut: (
+    action: string,
+    keys: string | null,
+    replace: boolean,
+  ): Promise<ShortcutChange> =>
+    call<ShortcutChange>("interface_set_shortcut", { action, keys, replace }),
+  /** « Rétablir les raccourcis par défaut ». */
+  interfaceResetShortcuts: (): Promise<InterfaceView> =>
+    call<InterfaceView>("interface_reset_shortcuts"),
+
+  // --- Version 1 : historique des envois (5.1-c bis) ---
+  /** Envois gardés de la requête, chacun comparé au précédent. */
+  historyLoad: (project: string, path: string): Promise<HistoryView> =>
+    call<HistoryView>("history_load", { project, path }),
+  /** Différences d'un envoi avec le précédent. */
+  historyDiff: (project: string, path: string, id: string): Promise<HistoryDiff> =>
+    call<HistoryDiff>("history_diff", { project, path, id }),
+  /** « Effacer » l'historique de la requête. */
+  historyClear: (project: string, path: string): Promise<HistoryView> =>
+    call<HistoryView>("history_clear", { project, path }),
+  /** « Annuler » après « Effacer » : les envois effacés reviennent. */
+  historyRestore: (project: string, path: string, entries: HistoryEntry[]): Promise<HistoryView> =>
+    call<HistoryView>("history_restore", { project, path, entries }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
@@ -851,6 +891,8 @@ export const EVENTS = {
   updates: "arnod://mise-a-jour",
   // Plan qualité, lot C : sortie demandée, chaque fenêtre enregistre puis répond (R6).
   quit: "arnod://quitter",
+  // Version 1 : préférences d'interface du poste (thème, police, raccourcis).
+  interface: "arnod://interface",
 } as const;
 
 /** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
@@ -929,6 +971,12 @@ export const events = {
   /** Lot L : version trouvée et installation, à chaque étape du téléchargement (R8). */
   onUpdates: (handler: (view: UpdatesView) => void): Promise<UnlistenFn> =>
     listen<UpdatesView>(EVENTS.updates, (event) => {
+      handler(event.payload);
+    }),
+
+  /** Version 1 : préférences d'interface changées dans n'importe quelle fenêtre. */
+  onInterface: (handler: (view: InterfaceView) => void): Promise<UnlistenFn> =>
+    listen<InterfaceView>(EVENTS.interface, (event) => {
       handler(event.payload);
     }),
 };

@@ -242,8 +242,16 @@ describe("onglets de la réponse (5.1-b)", () => {
   it("DE7 : les compteurs des onglets sont en pastille, sans parenthèses", async () => {
     ({ app } = await sent());
     const tabs = app.findAll(".response__tab").map((t) => t.text().replace(/\s+/g, " "));
-    expect(tabs).toEqual(["Corps", "En-têtes 1", "Assertions 1", "Envoyé", "Chronologie"]);
-    expect(app.findAll(".response__badge").map((b) => b.text())).toEqual(["1", "1"]);
+    // 5.1-c bis : l'historique compte l'envoi qui vient d'être reçu.
+    expect(tabs).toEqual([
+      "Corps",
+      "En-têtes 1",
+      "Assertions 1",
+      "Envoyé",
+      "Chronologie",
+      "Historique 1",
+    ]);
+    expect(app.findAll(".response__badge").map((b) => b.text())).toEqual(["1", "1", "1"]);
   });
 
   it("la liste des assertions ne s'affiche que sous son onglet", async () => {
