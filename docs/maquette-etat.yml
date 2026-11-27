@@ -352,6 +352,8 @@ pages:
   "1.5":
     nom: "Recherche"
     version: V2
+    plans:
+      - "plan-v2 (RH1–RH6, lot A)"
     ecrans:
       a: { etat: à faire }
       b: { etat: à faire }
@@ -965,6 +967,7 @@ pages:
     version: [MVP, V2, V7]
     plans:
       - "plan-configuration-endpoint (étiquettes)"
+      - "plan-v2 (ET1–ET4, LC3, lots B et D)"
     liees: ["4.1", "6.3", "5.3"]
     reste: "filtrer, composer une campagne, ligne de commande (b, c, d)."
     journal:
@@ -1132,6 +1135,8 @@ pages:
   "5.3":
     nom: "Ligne de commande"
     version: [V2, V7]
+    plans:
+      - "plan-v2 (LC1–LC6, IC1–IC3, lots D et E)"
     liees: ["5.2", "4.9"]
     ecrans:
       a: { etat: à faire }
@@ -1225,6 +1230,8 @@ pages:
   "7.1":
     nom: "Synchronisation"
     version: V2
+    plans:
+      - "plan-v2 (SY1–SY8, CF1–CF5, lots F et G)"
     liees: ["3.3"]
     ecrans:
       a: { etat: à faire }
