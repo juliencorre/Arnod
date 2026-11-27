@@ -14,11 +14,12 @@ rust-version = "1.90"
 name = "arnod_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-# Espace de travail (V2, lot C) : l'application et son cœur sans Tauri (`core/`, `arnod-core`).
-# `cargo test`, `cargo clippy` et `cargo build` lancés ici couvrent les deux.
+# Espace de travail (V2, lots C et D) : l'application, son cœur sans Tauri (`core/`,
+# `arnod-core`) et la ligne de commande (`cli/`, `arnod-cli`). `cargo test`, `cargo clippy` et
+# `cargo build` lancés ici couvrent les trois.
 [workspace]
-members = ["core"]
-default-members = [".", "core"]
+members = ["core", "cli"]
+default-members = [".", "core", "cli"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

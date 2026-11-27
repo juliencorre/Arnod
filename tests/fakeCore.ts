@@ -412,6 +412,11 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           if (iface !== undefined) return iface;
           // Version 2, lot A : recherche Ctrl+K.
           if (cmd === "search_query") return fakeSearch(core.workbench, String(args.text));
+          if (cmd === "cli_command") {
+            const path = String(args.path);
+            const env = args.environment;
+            return `arnod run "${path}"${typeof env === "string" ? ` --env "${env}"` : ""}`;
+          }
           // Sélection multiple (4.1-a quater).
           const batched = handleBatch(core.workbench, cmd, args);
           if (batched !== undefined) {

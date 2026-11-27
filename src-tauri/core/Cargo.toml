@@ -13,6 +13,10 @@ publish = false
 name = "arnod_core"
 
 [features]
+default = ["coffre"]
+# Coffre du système (keyring). Retiré de l'exécutable `arnod` lié statiquement sous Linux (V2,
+# lot D, R16 : pas de D-Bus sur un agent ; les variables passent par `ARNOD_VAR_<nom>`).
+coffre = ["dep:keyring"]
 # Miroir IPC (MA1) : dérivation ts-rs des types sérialisés, activée par les tests de l'application
 # (`ts_mirror.rs`) ; rien n'entre dans l'application ni dans la ligne de commande.
 ts = ["dep:ts-rs"]
@@ -31,7 +35,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 # Tâches, annulation et concurrence des envois et des runs.
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 # Coffre du système pour les secrets (Windows : gestionnaire d'identification).
-keyring = { version = "3", default-features = false, features = ["windows-native", "apple-native", "sync-secret-service"] }
+keyring = { version = "3", default-features = false, features = ["windows-native", "apple-native", "sync-secret-service"], optional = true }
 # Corbeille du système pour la suppression des dossiers et requêtes.
 trash = "5"
 # En-tête Authorization Basic.

@@ -12,9 +12,9 @@
 #[cfg(test)]
 pub(crate) use arnod_core::ts_contract;
 pub use arnod_core::{
-    bruno, catalog, contract, curl, environment, error, history, http, import, input, layout,
-    local, manifest, network, opencollection, request, response, results, search, secrets, startup,
-    state, statuses, steps, storage, tree, trial, workbench,
+    bruno, catalog, command, contract, curl, environment, error, history, http, import, input,
+    layout, local, manifest, network, opencollection, request, response, results, search, secrets,
+    startup, state, statuses, steps, storage, tree, trial, workbench,
 };
 
 pub mod commands;
@@ -310,6 +310,8 @@ pub fn run() {
             commands::search::search_query,
             // Version 2 (lot B) : étiquettes partagées.
             commands::tree::tree_set_folder_tags,
+            // Version 2 (lot D) : « Copier la commande ».
+            commands::cli::cli_command,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

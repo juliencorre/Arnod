@@ -157,6 +157,16 @@ impl Network {
         self.invalidate();
     }
 
+    /// Ligne de commande (V2, lot D, R5) : préférences du poste lues (proxy, autorités
+    /// internes), sans rien écrire ensuite (ni préférences ni cookies : ceux du run restent en
+    /// mémoire).
+    pub fn read_prefs(&self, data_dir: &Path) {
+        if let Ok(mut current) = self.prefs.write() {
+            *current = prefs::load(data_dir);
+        }
+        self.invalidate();
+    }
+
     fn invalidate(&self) {
         if let Ok(mut built) = self.built.lock() {
             *built = None;

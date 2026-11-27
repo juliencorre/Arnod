@@ -183,7 +183,9 @@ export type CommandName =
   // Version 2, lot A : recherche Ctrl+K.
   | "search_query"
   // Version 2, lot B : étiquettes partagées.
-  | "tree_set_folder_tags";
+  | "tree_set_folder_tags"
+  // Version 2, lot D : « Copier la commande ».
+  | "cli_command";
 
 /**
  * Nature d'une erreur de commande.
@@ -2237,3 +2239,11 @@ export interface SearchResults {
   address: boolean;
   groups: SearchGroup[];
 }
+
+// --- Version 2, lot D : ligne de commande (docs/plan-v2.md, LC6) ---
+
+/**
+ * Terminal pour lequel « Copier la commande » cite les valeurs (`command::Shell`) ; absent, le
+ * cœur prend celui du système (PowerShell sous Windows, sh ailleurs).
+ */
+export type CliShell = "powerShell" | "sh";

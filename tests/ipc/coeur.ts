@@ -65,6 +65,8 @@ export type CertificateProblem = "unknownIssuer" | "expired" | "notYetValid" | "
 
 export type ClearSecret = { field: string, label: string, suggested: string, };
 
+export type CliShell = "powerShell" | "sh";
+
 export type CommandError = { kind: CommandErrorKind, message: string, failure?: NetworkFailure, };
 
 export type CommandErrorKind = "invalidName" | "nameTaken" | "folderNotEmpty" | "alreadyRegistered" | "notAProject" | "notFound" | "undoExpired" | "io" | "corruptState" | "newerVersion" | "unknownVariable" | "invalidRequest" | "network" | "timeout" | "cancelled" | "secretStore" | "protectedEnvironment" | "changedOnDisk";
@@ -729,6 +731,7 @@ export type CheckSearchKind = Check<Same<Ipc.SearchKind, SearchKind>>;
 export type CheckSearchHit = Check<Same<Ipc.SearchHit, SearchHit>>;
 export type CheckSearchGroup = Check<Same<Ipc.SearchGroup, SearchGroup>>;
 export type CheckSearchResults = Check<Same<Ipc.SearchResults, SearchResults>>;
+export type CheckCliShell = Check<Same<Ipc.CliShell, CliShell>>;
 
 // Sans homologue généré (écrits seulement côté interface) :
 // - CommandName

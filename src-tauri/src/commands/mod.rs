@@ -41,6 +41,8 @@ pub mod history;
 pub mod interface;
 // Version 2, lot A : recherche Ctrl+K.
 pub mod search;
+// Version 2, lot D : « Copier la commande ».
+pub mod cli;
 
 #[cfg(test)]
 mod tests {

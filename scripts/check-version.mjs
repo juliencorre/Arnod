@@ -41,6 +41,9 @@ const sources = [
     "src-tauri/Cargo.lock (arnod-core)",
     cargoLockVersion(read("src-tauri/Cargo.lock"), "arnod-core"),
   ],
+  // Ligne de commande (V2, lot D) : `arnod --version`.
+  ["src-tauri/cli/Cargo.toml", cargoPackageVersion(read("src-tauri/cli/Cargo.toml"))],
+  ["src-tauri/Cargo.lock (arnod-cli)", cargoLockVersion(read("src-tauri/Cargo.lock"), "arnod-cli")],
   ["src-tauri/tauri.conf.json", json("src-tauri/tauri.conf.json").version],
 ];
 

@@ -84,6 +84,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "arnod-cli"
+version = "0.0.4"
+dependencies = [
+ "arnod-core",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "uuid",
+ "wiremock",
+]
+
+[[package]]
 name = "arnod-core"
 version = "0.0.4"
 dependencies = [

@@ -121,6 +121,8 @@ const items = computed<MenuItem[]>(() => {
       // Une requête nommée s'ajoute aussi, comme dans un dossier (R4 : libellés gardés).
       { id: "new-request", label: "Nouvelle requête" },
       { id: "run", label: "Exécuter le test", separatorBefore: true },
+      // V2, lot D (5.3-c) : la même exécution dans un terminal ou une chaîne d'intégration.
+      { id: "copy-command", label: "Copier la commande" },
       { id: "rename", label: "Renommer", separatorBefore: true },
       move,
       remove,
@@ -143,6 +145,7 @@ const items = computed<MenuItem[]>(() => {
       { id: "rename", label: "Renommer", shortcut: "F2", separatorBefore: true },
       { id: "move-to", label: "Déplacer vers…" },
       { id: "run", label: "Exécuter les tests du dossier", separatorBefore: true },
+      { id: "copy-command", label: "Copier la commande" },
       { id: "delete", label: "Supprimer le dossier", tone: "danger", separatorBefore: true },
     ];
   }

@@ -8,6 +8,7 @@
 
 pub mod bruno;
 pub mod catalog;
+pub mod command;
 pub mod contract;
 pub mod curl;
 pub mod environment;
@@ -21,6 +22,7 @@ pub mod local;
 pub mod manifest;
 pub mod network;
 pub mod opencollection;
+pub mod report;
 pub mod request;
 pub mod response;
 pub mod results;

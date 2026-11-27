@@ -1,0 +1,63 @@
+{
+  "$comment": "Modèle « TestResult » d'Allure 2 (allure-results/*-result.json), restreint à ce qu'Arnod écrit ; sert aux tests du rapport (R8).",
+  "type": "object",
+  "required": [
+    "uuid",
+    "historyId",
+    "name",
+    "fullName",
+    "status",
+    "stage",
+    "start",
+    "stop",
+    "labels",
+    "steps"
+  ],
+  "properties": {
+    "uuid": { "type": "string", "minLength": 36 },
+    "historyId": { "type": "string", "minLength": 1 },
+    "testCaseId": { "type": "string" },
+    "name": { "type": "string", "minLength": 1 },
+    "fullName": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["passed", "failed", "broken", "skipped", "unknown"] },
+    "stage": { "enum": ["scheduled", "running", "finished", "pending", "interrupted"] },
+    "start": { "type": "integer", "minimum": 0 },
+    "stop": { "type": "integer", "minimum": 0 },
+    "statusDetails": { "$ref": "#/$defs/statusDetails" },
+    "labels": { "type": "array", "items": { "$ref": "#/$defs/pair" } },
+    "parameters": { "type": "array", "items": { "$ref": "#/$defs/pair" } },
+    "links": { "type": "array" },
+    "attachments": { "type": "array" },
+    "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "pair": {
+      "type": "object",
+      "required": ["name", "value"],
+      "properties": { "name": { "type": "string" }, "value": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "statusDetails": {
+      "type": "object",
+      "properties": { "message": { "type": "string" }, "trace": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "step": {
+      "type": "object",
+      "required": ["name", "status", "stage", "start", "stop", "steps"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["passed", "failed", "broken", "skipped", "unknown"] },
+        "stage": { "enum": ["scheduled", "running", "finished", "pending", "interrupted"] },
+        "start": { "type": "integer", "minimum": 0 },
+        "stop": { "type": "integer", "minimum": 0 },
+        "statusDetails": { "$ref": "#/$defs/statusDetails" },
+        "parameters": { "type": "array", "items": { "$ref": "#/$defs/pair" } },
+        "attachments": { "type": "array" },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}

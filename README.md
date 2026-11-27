@@ -260,10 +260,10 @@ Les versions suivent [SemVer](https://semver.org/lang/fr/). `Develop` reçoit le
 
 1. **Passer à la nouvelle version** par une pull request vers `Develop` (`chore: version X.Y.Z`) :
    `npm version X.Y.Z --no-git-tag-version` (`package.json` et `package-lock.json`), puis
-   `version` dans `src-tauri/Cargo.toml`, `src-tauri/core/Cargo.toml` et
-   `src-tauri/tauri.conf.json`, puis `cargo update -p arnod -p arnod-core --offline` dans
-   `src-tauri/` (`Cargo.lock`).
-   `node scripts/check-version.mjs` vérifie que les huit sources concordent ; `npm run check` et
+   `version` dans `src-tauri/Cargo.toml`, `src-tauri/core/Cargo.toml`, `src-tauri/cli/Cargo.toml`
+   et `src-tauri/tauri.conf.json`, puis dans `src-tauri/` (`Cargo.lock`) :
+   `cargo update -p arnod -p arnod-core -p arnod-cli --offline`.
+   `node scripts/check-version.mjs` vérifie que les dix sources concordent ; `npm run check` et
    la CI le lancent aussi.
 2. **Fusionner `Develop` dans `main`** avec un commit de merge.
 3. **Poser le tag sur `main`** et le pousser :
@@ -323,6 +323,33 @@ chmod +x Arnod_<version>_amd64.AppImage
 
 Aucun droit root n'est nécessaire. Sans FUSE (conteneurs, certaines distributions),
 lancer avec `APPIMAGE_EXTRACT_AND_RUN=1`.
+
+### Ligne de commande `arnod run`
+
+`arnod` joue les tests d'un projet hors de l'application, avec le même moteur
+([`docs/plan-v2.md`](docs/plan-v2.md), lot D). C'est un exécutable autonome : ni installation à
+part, ni droits administrateur, ni Docker.
+
+- **Windows** : livré avec l'application dans `%LOCALAPPDATA%\Arnod\bin\arnod.exe` ; l'installeur
+  ajoute ce dossier au `PATH` de l'utilisateur (un nouveau terminal le voit).
+- **Linux** : `arnod-linux-x86_64.tar.gz` de la release, un exécutable lié statiquement (aucune
+  bibliothèque du système, sans coffre) : `tar -xzf arnod-linux-x86_64.tar.gz && ./arnod --version`.
+
+Depuis le dossier du projet (celui qui contient `opencollection.yml`) :
+
+```sh
+arnod run "commandes/v2" --env "Recette fonctionnelle" --rapport junit,allure,html
+arnod run --etiquette smoke --env "Recette fonctionnelle"
+ARNOD_VAR_token=… arnod run "paiements"
+arnod run --help
+```
+
+Une ligne par test, un résumé, les rapports dans `rapports/` (`--rapports <dossier>` pour un autre)
+et un code de sortie : 0 tout a réussi, 1 au moins un test en échec, 2 commande invalide (projet,
+cible ou environnement introuvable, variable manquante). Une variable locale ou un secret se
+donne par `ARNOD_VAR_<nom>`, sinon la valeur du poste est prise ; rien n'est écrit hors du dossier
+des rapports. Dans Arnod, « Copier la commande » du menu ⋯ d'un test ou d'un dossier donne la
+commande avec l'environnement actif.
 
 ## Vérifications
 

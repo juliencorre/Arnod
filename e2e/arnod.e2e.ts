@@ -3278,6 +3278,32 @@ describe("Version 2 - Étiquettes partagées (4.9-b)", () => {
   });
 });
 
+describe("Version 2 - Copier la commande (5.3-c)", () => {
+  it("le menu ⋯ d'un dossier copie arnod run avec l'environnement actif", async () => {
+    // « Etiquettes V2 » (écrit par le parcours précédent) : un dossier ordinaire du projet.
+    await browser.execute(() => {
+      const row = Array.from(document.querySelectorAll('aside li[role="presentation"]')).find(
+        (li) => li.querySelector(".row__name")?.textContent.trim() === "Etiquettes V2",
+      );
+      const more = row?.querySelector<HTMLElement>(".row__more");
+      if (!more) throw new Error("ligne « Etiquettes V2 » introuvable");
+      more.click();
+    });
+    await browser.$('[role="menuitem"]=Copier la commande').waitForExist({ timeout: 5_000 });
+    await screenshot(browser, "v2-copier-commande-menu");
+    await clickText('[role="menuitem"]', "Copier la commande");
+    const toast = browser.$(".toast__message");
+    await toast.waitForExist({ timeout: 10_000 });
+    // Presse-papiers accepté ou refusé par la WebView : la commande est donnée dans les deux cas.
+    const message = await toast.getText();
+    expect(
+      message.startsWith("✓ Commande copiée · elle utilise l'environnement") ||
+        message.includes('arnod run "Etiquettes V2" --env'),
+    ).toBe(true);
+    await screenshot(browser, "v2-copier-commande");
+  });
+});
+
 describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
   const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
   const file = () => path.join(project(), "chrono-k.yml");

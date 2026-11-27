@@ -1,7 +1,9 @@
 //! Coffre des secrets (R9) : variables locales marquées secrètes.
 //!
 //! Sous Windows, gestionnaire d'identification ; sous Linux, Secret Service.
-//! Le trait permet de tester sans toucher au coffre du poste.
+//! Le trait permet de tester sans toucher au coffre du poste. Sans la feature `coffre`
+//! (exécutable `arnod` lié statiquement sous Linux, V2 lot D, R16), le coffre n'existe pas :
+//! aucun secret ne s'y lit, les variables passent par `ARNOD_VAR_<nom>`.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -9,6 +11,7 @@ use std::sync::Mutex;
 use crate::error::{CommandError, CommandErrorKind};
 
 /// Service sous lequel Arnod range ses secrets.
+#[cfg(feature = "coffre")]
 const SERVICE: &str = "io.github.juliencorre.arnod";
 
 /// Lieu de stockage des secrets, par clé (`arnod/<projet>/<environnement>/<nom>`).
@@ -31,6 +34,7 @@ fn unavailable(error: impl std::fmt::Display) -> CommandError {
 #[derive(Debug, Default)]
 pub struct SystemSecretStore;
 
+#[cfg(feature = "coffre")]
 impl SecretStore for SystemSecretStore {
     fn get(&self, key: &str) -> Result<Option<String>, CommandError> {
         let entry = keyring::Entry::new(SERVICE, key).map_err(unavailable)?;
@@ -53,6 +57,22 @@ impl SecretStore for SystemSecretStore {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(error) => Err(unavailable(error)),
         }
+    }
+}
+
+/// Sans coffre : rien ne s'y lit, rien ne s'y range.
+#[cfg(not(feature = "coffre"))]
+impl SecretStore for SystemSecretStore {
+    fn get(&self, _key: &str) -> Result<Option<String>, CommandError> {
+        Ok(None)
+    }
+
+    fn set(&self, _key: &str, _value: &str) -> Result<(), CommandError> {
+        Err(unavailable("absent de cet exécutable"))
+    }
+
+    fn delete(&self, _key: &str) -> Result<(), CommandError> {
+        Ok(())
     }
 }
 

@@ -14,6 +14,7 @@ import type {
   HistoryEntry,
   HistoryView,
   SearchResults,
+  CliShell,
   InterfaceView,
   ShortcutChange,
   ConflictSide,
@@ -883,6 +884,18 @@ export const ipc = {
   /** Étiquettes d'un dossier : elles valent pour tout ce qu'il contient. */
   treeSetFolderTags: (project: string, path: string, tags: string[]): Promise<void> =>
     call<null>("tree_set_folder_tags", { project, path, tags }).then(() => undefined),
+
+  // --- Version 2, lot D : ligne de commande (5.3-c) ---
+  /**
+   * Commande `arnod run` d'un test ou d'un dossier (`path`), avec l'environnement donné, citée
+   * pour le terminal du poste (`shell` absent) ; refusée (`notFound`) si le dossier n'existe plus.
+   */
+  cliCommand: (
+    project: string,
+    path: string,
+    environment: string | null,
+    shell: CliShell | null = null,
+  ): Promise<string> => call<string>("cli_command", { project, path, environment, shell }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

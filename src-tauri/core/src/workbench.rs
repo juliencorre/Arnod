@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -552,6 +553,14 @@ pub struct Workbench {
     notifier: Mutex<Option<Arc<dyn Notifier>>>,
     /// Lance les runs ([`Spawner`]) : runtime de Tauri dans l'application.
     spawner: Mutex<Arc<dyn Spawner>>,
+    /// Lignes de commande (V2, lot D) : rien n'est écrit sur le poste ni dans le projet (R5) ;
+    /// statuts, dernier run et valeurs gardées dans l'environnement restent en mémoire.
+    read_only: AtomicBool,
+    /// Requêtes envoyées en même temps pendant un run (`--parallele`).
+    concurrency: AtomicUsize,
+    /// Valeurs fournies par l'appelant (`ARNOD_VAR_<nom>`, R6) : elles priment sur
+    /// l'environnement, le coffre et `local.json` ; masquées comme des secrets.
+    overrides: Mutex<BTreeMap<String, String>>,
     /// Variables d'exécution de chaque projet pour la session (R6) : jamais écrites.
     runtime: Mutex<HashMap<Uuid, BTreeMap<String, String>>>,
     /// Lot H : client HTTP du poste (proxy, autorités), jetons OAuth 2 et cookies.
@@ -602,6 +611,9 @@ impl Workbench {
             statuses: Mutex::new(HashMap::new()),
             notifier: Mutex::new(None),
             spawner: Mutex::new(Arc::new(TokioSpawner)),
+            read_only: AtomicBool::new(false),
+            concurrency: AtomicUsize::new(RUN_CONCURRENCY),
+            overrides: Mutex::new(BTreeMap::new()),
             runtime: Mutex::new(HashMap::new()),
             network,
         }
@@ -630,6 +642,32 @@ impl Workbench {
         }
     }
 
+    /// Ligne de commande (R5) : plus aucune écriture, ni sur le poste ni dans le projet.
+    pub fn set_read_only(&self) {
+        self.read_only.store(true, Ordering::Relaxed);
+    }
+
+    fn read_only(&self) -> bool {
+        self.read_only.load(Ordering::Relaxed)
+    }
+
+    /// Requêtes envoyées en même temps pendant un run (au moins une).
+    pub fn set_run_concurrency(&self, concurrency: usize) {
+        self.concurrency
+            .store(concurrency.max(1), Ordering::Relaxed);
+    }
+
+    pub fn run_concurrency(&self) -> usize {
+        self.concurrency.load(Ordering::Relaxed).max(1)
+    }
+
+    /// Valeurs de variables fournies par l'appelant (`ARNOD_VAR_<nom>`, R6).
+    pub fn set_overrides(&self, values: BTreeMap<String, String>) {
+        if let Ok(mut current) = self.overrides.lock() {
+            *current = values;
+        }
+    }
+
     fn spawner(&self) -> Arc<dyn Spawner> {
         self.spawner.lock().map_or_else(
             |_| Arc::new(TokioSpawner) as Arc<dyn Spawner>,
@@ -649,7 +687,9 @@ impl Workbench {
                 .entry(ctx.id)
                 .or_insert_with(|| statuses::load(&ctx.data_dir, ctx.id));
             if change(book) {
-                let _ = statuses::save(&ctx.data_dir, ctx.id, book);
+                if !self.read_only() {
+                    let _ = statuses::save(&ctx.data_dir, ctx.id, book);
+                }
                 Some(book.requests.clone())
             } else {
                 None
@@ -911,6 +951,15 @@ impl Workbench {
                 values.insert(var.name.clone(), value.clone());
             }
         }
+        // Valeurs de l'appelant (R6) : elles priment, masquées sauf pour une variable partagée.
+        if let Ok(overrides) = self.overrides.lock() {
+            for (name, value) in overrides.iter() {
+                if !environment.variables.iter().any(|v| &v.name == name) {
+                    secret_names.insert(name.clone());
+                }
+                values.insert(name.clone(), value.clone());
+            }
+        }
         Ok((
             Variables {
                 values,
@@ -954,7 +1003,8 @@ impl Workbench {
             })
             .filter_map(|value| value.value.as_deref().map(|v| (value.name.as_str(), v)))
             .collect();
-        if wanted.is_empty() {
+        // Ligne de commande (R5) : la valeur reste une variable d'exécution.
+        if wanted.is_empty() || self.read_only() {
             return;
         }
         let Ok(mut environment) = Self::find_environment(ctx, env) else {
@@ -1214,7 +1264,10 @@ impl Workbench {
             })
     }
 
-    fn save_last_run(ctx: &ProjectCtx, view: &RunView) {
+    fn save_last_run(&self, ctx: &ProjectCtx, view: &RunView) {
+        if self.read_only() {
+            return;
+        }
         let dir = local::project_dir(&ctx.data_dir, ctx.id);
         if std::fs::create_dir_all(&dir).is_ok()
             && let Ok(text) = serde_json::to_string(view)
@@ -1304,7 +1357,7 @@ impl Workbench {
             number: 0,
             folder: folder.to_owned(),
             environment: environment.name.clone(),
-            concurrency: RUN_CONCURRENCY,
+            concurrency: self.run_concurrency(),
             started_at,
             finished_at: items.is_empty().then_some(started_at),
             finished: items.is_empty(),
@@ -1338,7 +1391,7 @@ impl Workbench {
             handle
         };
         if view.finished {
-            Self::save_last_run(ctx, &view);
+            self.save_last_run(ctx, &view);
             return Ok(view);
         }
         // Runtime de l'application (Tauri) ou du cœur : la commande qui lance le run n'est pas
@@ -1375,7 +1428,7 @@ impl Workbench {
         handle: Arc<RunHandle>,
         variables: Variables,
     ) {
-        let semaphore = Arc::new(Semaphore::new(RUN_CONCURRENCY));
+        let semaphore = Arc::new(Semaphore::new(self.run_concurrency()));
         let units = handle
             .view
             .lock()
@@ -1405,7 +1458,7 @@ impl Workbench {
             view.finished_at = Some(now_ms());
             view.cancelled = handle.cancel.is_cancelled();
             view.touch();
-            Self::save_last_run(&ctx, &view);
+            self.save_last_run(&ctx, &view);
             view.clone()
         });
         if let (Some(view), Some(notifier)) = (finished, self.notifier()) {
@@ -1626,7 +1679,7 @@ impl Workbench {
                 let mut view = handle.view.lock().map_err(|_| busy())?;
                 let passed = apply(&mut view)?;
                 if view.finished && Self::last_run(ctx).is_some_and(|last| last.id == run_id) {
-                    Self::save_last_run(ctx, &view);
+                    self.save_last_run(ctx, &view);
                 }
                 (view.clone(), passed)
             }
@@ -1636,7 +1689,7 @@ impl Workbench {
                     .filter(|run| run.id == run_id)
                     .ok_or(error)?;
                 let passed = apply(&mut view)?;
-                Self::save_last_run(ctx, &view);
+                self.save_last_run(ctx, &view);
                 (view, passed)
             }
         };

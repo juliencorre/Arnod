@@ -34,8 +34,9 @@ version 1 de la maquette selon `docs/plan-v1.md` (apparence, raccourcis modifiab
 envois ; section « Apparence, raccourcis et historique »).
 
 **Prochain** : version 2 selon `docs/plan-v2.md` (recherche Ctrl+K, étiquettes partagées, ligne de
-commande `arnod run`, synchronisation Git ; lots A à F en `claude/v2-<lot>`). Brouillon : les questions Q1 à Q11 se tranchent avant la première tâche du
-lot concerné.
+commande `arnod run`, synchronisation Git ; lots A à F en `claude/v2-<lot>`). Lots A à D livrés
+(sections « Recherche », « Étiquettes partagées », « Ligne de commande ») ; les questions Q1, Q2,
+Q6 à Q11 se tranchent avant la première tâche du lot concerné.
 
 **Travail en cours** : qualité du MVP selon `docs/plan-qualite-mvp.md` (lots 0 et A à K en trois
 vagues, règles R1 à R14), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
@@ -189,7 +190,14 @@ src-tauri/              Application Tauri (espace de travail Cargo : l'applicati
                         (opencollection.yml, extensions.arnod), conversion de l'ancien format
     src/manifest.rs     Dossier d'un projet et sa racine opencollection.yml
     src/watch/          Fichiers modifiés hors d'Arnod : registre, surveillant, conflits
+    src/report/         Rapports d'un run : JUnit, Allure, HTML (pur)
+    src/command/        Commande `arnod run` d'un test ou d'un dossier, citée pour le terminal (pur)
     src/network/, input/, curl/, bruno/, import.rs, response/, startup.rs : voir leurs sections
+  cli/                  Ligne de commande (crate arnod-cli, binaire arnod-cli livré sous le nom
+                        arnod) : arguments, cible, sortie, run en lecture seule ; tests/ de bout
+                        en bout contre un serveur local
+  windows/              Crochets de l'installeur NSIS (bin dans le PATH de l'utilisateur)
+  tauri.cli.conf.json   Configuration ajoutée au build Windows de la CI : bin\arnod.exe, crochets
 docs/                   Plans, modèle de plan, maquettes, captures du README, schéma
                         OpenCollection 1.0.0 (docs/opencollection/), design system
                         (docs/design-system/)
@@ -210,6 +218,7 @@ PRODUCT.md, DESIGN.md   Contexte produit (à la main) ; design system au format 
 npm ci                      # dépendances frontend (Node 22.23.4+, 24.22.1+ ou 26.12.1+)
 npm run tauri dev           # application en développement (Vite sur le port 1420)
 npm run tauri build         # build release : NSIS sous Windows, AppImage sous Linux
+cd src-tauri && cargo run -p arnod-cli -- run "Clients" --projet <dossier>  # arnod run (lot D)
 
 npm run check               # avant chaque commit : tout ce que vérifie la CI hors build
 npm test                    # Vitest
@@ -256,8 +265,9 @@ Linux : installer d'abord les dépendances système
   sections de `.github/pull_request_template.md`.
 - Chaque tâche est relue avant commit ; `npm run check` passe avant chaque commit.
 - Une version se publie par un tag `vX.Y.Z` sur `main` (README, « Publier une version ») : la CI
-  crée la release. Jamais de release créée à la main ; `scripts/check-version.mjs` garde les huit
-  sources de version concordantes (dont le cœur, `src-tauri/core/Cargo.toml`).
+  crée la release. Jamais de release créée à la main ; `scripts/check-version.mjs` garde les dix
+  sources de version concordantes (dont le cœur et la ligne de commande, `src-tauri/core/` et
+  `src-tauri/cli/`).
 - Tests : règles dans `cargo test` (vrais dossiers temporaires pour le stockage), parcours
   d'interface dans Vitest avec le faux cœur `tests/fakeCore.ts`, parcours complets sur
   l'application réelle dans `e2e/` (à étendre à chaque nouvelle fonctionnalité visible).
@@ -1050,3 +1060,32 @@ Référence : `docs/plan-v2.md`, lot B (cas ET1 à ET4, règle R4), écran 4.9-b
 - Vue d'un dossier (`FolderTab.vue`) : « Étiquettes du dossier » (`TagsEditor`), étiquettes de
   chaque ligne, filtre par étiquettes (`lib/tags.ts` : `hasTags`, `taggedTests`, comptages
   d'affichage) ; une ligne hors filtre est estompée par sa couleur (`--color-subtle`).
+
+## Ligne de commande
+
+Référence : `docs/plan-v2.md`, lot D (cas LC1 à LC6, règles R5 à R8, R16 ; décisions Q3, Q5),
+écrans 5.3-a, 5.3-c et 4.9-d.
+
+- `src-tauri/cli/` (crate `arnod-cli`) : `arnod run [CIBLE]` et ses options (`--env`,
+  `--etiquette`, `--parallele`, `--rapport`, `--rapports`, `--projet`, `--confirmer`), arguments
+  lus à la main (`args.rs`, aide et erreurs en français), cible (`select.rs` : dossier, test, requête, étiquettes effectives ; la plus proche
+  proposée), sortie (`output.rs`), run (`run.rs`). Même moteur que l'application : l'établi du
+  cœur, en lecture seule (`Workbench::set_read_only` : ni statuts, ni dernier run, ni valeur
+  gardée dans l'environnement ; `Network::read_prefs` sans cookies écrits) ; rien n'est écrit hors
+  du dossier des rapports (R5). Le projet se lit sans écriture (`project.rs` : identifiant de
+  `extensions.arnod`, un projet au format précédent est refusé).
+- Variables (R6) : `ARNOD_VAR_<nom>` (`Workbench::set_overrides`, masquées sauf une variable
+  partagée), puis `local.json` et le coffre du poste (`ARNOD_DONNEES` ou le dossier de données de
+  l'application) ; une variable locale de l'environnement utilisée sans valeur arrête la commande
+  avant tout envoi. Codes de sortie (R7) : 0, 1 (échec ou erreur), 2 (commande invalide).
+- Rapports (`core/src/report/`, pur, R8) : un cas par test ou requête jouée seule
+  (`report::cases`), JUnit au schéma d'Ant, Allure au modèle « TestResult » (schéma dans
+  `report/allure-result.schema.json`, validé en test), HTML autonome sans script.
+- Livraison (Q3, R16) : le binaire s'appelle `arnod-cli` dans `target/` (l'application y a déjà
+  `arnod`). Windows : `bin\arnod.exe` de l'installeur (`tauri.cli.conf.json`, ajoutée au build
+  de la CI ; crochet `windows/installer-hooks.nsh` : `bin` ajouté au PATH de l'utilisateur, retiré
+  à la désinstallation, jamais un PATH tronqué). Linux : lié statiquement (cible
+  `x86_64-unknown-linux-musl`, cœur sans la feature `coffre`), `arnod-linux-x86_64.tar.gz` joint
+  à la release. `scripts/smoke-windows.ps1` vérifie `arnod --version` et le PATH.
+- « Copier la commande » (LC6) : menu ⋯ d'un test ou d'un dossier, `cli_command` (règle dans
+  `core/src/command/`, valeurs citées pour PowerShell ou sh), environnement actif.

@@ -982,13 +982,14 @@ pages:
       - "plan-configuration-endpoint (étiquettes)"
       - "plan-v2 (ET1–ET4, LC3, lots B et D)"
     liees: ["4.1", "6.3", "5.3"]
-    reste: "composer une campagne (c, V7), ligne de commande (d, lot D du plan V2)."
+    reste: "composer une campagne (c, V7)."
     journal:
       - "2026-11-09 : Étiquettes libres d'une requête (PR #32)."
       - "2026-11-13 : Étiquettes du projet proposées avec leur nombre de requêtes à la saisie, puis « + Créer » (a, PR #56)."
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 1 réécrit ou complété."
       - "2026-11-27 : Étiquettes partagées (plan-v2, lot B) : un dossier reçoit des étiquettes (folder.yml), qui valent pour tout ce qu'il contient ; la vue d'un dossier montre les étiquettes de chaque ligne et se filtre par étiquettes, « N tests sur T · les autres sont estompés » ; le filtre du référentiel et la recherche prennent les étiquettes héritées."
+      - "2026-11-27 : arnod run --etiquette (plan-v2, lot D) : les tests qui portent l'étiquette, héritée des dossiers comprise, « N tests dans M dossiers » ; plusieurs --etiquette se cumulent (d)."
     ecrans:
       a:
         etat: livré
@@ -1007,7 +1008,13 @@ pages:
           texte: "Le filtre s'ajoute par une liste « + Étiquette » et ses pastilles se retirent par × ; les étiquettes du dossier ont leur propre ligne (« Étiquettes du dossier ») sous le résumé ; un sous-dossier dit « N tests · M smoke » pendant un filtre ; les lignes estompées le sont par la couleur du texte."
           aligner: maquette
       c: { etat: à faire, version: V7 }
-      d: { etat: à faire, version: V2 }
+      d:
+        etat: livré
+        version: V2
+        pr: [96]
+        ecart:
+          texte: "Écran de terminal, sans capture de l'application (tests de bout en bout de la commande : src-tauri/cli/tests/). Chaque test a sa ligne (pas « … 2 autres ») ; 8 en parallèle par défaut, comme l'application (--parallele pour changer) ; un dossier qui ne range que des requêtes est un test, nommé par son dossier ; la cible d'une assertion d'en-tête est écrite en minuscules (headers.location)."
+          aligner: maquette
   "5.1":
     nom: "Envoi et réponse"
     version: [MVP, V1]
@@ -1159,10 +1166,26 @@ pages:
     plans:
       - "plan-v2 (LC1–LC6, lot D)"
     liees: ["5.2", "4.9"]
+    reste: "étape manuelle dans un terminal (b, V7) ; intégration continue (d, à décider)."
+    journal:
+      - "2026-11-27 : Ligne de commande (plan-v2, lot D) : arnod run d'un dossier, d'un test, d'une requête ou d'une étiquette, en lecture seule, variables ARNOD_VAR_<nom>, rapports JUnit, Allure et HTML, codes de sortie 0, 1 et 2 ; exécutable autonome (Windows : bin/arnod.exe de l'installeur, dans le PATH de l'utilisateur ; Linux : lié statiquement) ; « Copier la commande » du menu ⋯ d'un test ou d'un dossier."
     ecrans:
-      a: { etat: à faire }
-      b: { etat: à faire }
-      c: { etat: à faire }
+      a:
+        etat: livré
+        version: V2
+        pr: [96]
+        ecart:
+          texte: "Écran de terminal, sans capture de l'application (tests de bout en bout de la commande : src-tauri/cli/tests/). Chaque test a sa ligne (pas « … 24 autres ») ; 8 en parallèle par défaut, comme l'application (--parallele pour changer) ; sans --env, le premier environnement du projet ; le texte de l'écran parle d'une image Docker, retirée (Q4)."
+          aligner: maquette
+      b: { etat: à faire, version: V7 }
+      c:
+        etat: livré
+        version: V2
+        pr: [96]
+        captures: [v2-copier-commande-menu, v2-copier-commande]
+        ecart:
+          texte: "L'entrée est dans le menu ⋯ d'un test et d'un dossier du référentiel (les campagnes viennent en V7) ; la notification nomme l'environnement actif : « ✓ Commande copiée · elle utilise l'environnement « … » »."
+          aligner: maquette
       d:
         etat: à décider
         ecart:
