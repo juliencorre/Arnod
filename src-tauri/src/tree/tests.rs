@@ -510,6 +510,7 @@ fn lot_e_variables_extraites_par_les_etapes_precedentes() {
     first.extractions.push(crate::request::model::Extraction {
         name: "client.id".into(),
         source: "body.id".into(),
+        scope: crate::request::model::ExtractionScope::Runtime,
         enabled: true,
     });
     file::write(&path, &first).unwrap();

@@ -38,6 +38,7 @@ fn names(layout: &Layout) -> Vec<Vec<String>> {
                     Content::Contract { path, .. } => format!("contrat:{path}"),
                     Content::Result => "résultat".to_owned(),
                     Content::ImportReport { .. } => "rapport".to_owned(),
+                    Content::Environments { .. } => "environnements".to_owned(),
                     Content::Test { path, .. } => format!("test:{path}"),
                     Content::Folder { path, .. } => format!("dossier:{path}"),
                 })

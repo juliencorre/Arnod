@@ -111,7 +111,8 @@ describe("barre latérale du projet", () => {
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "E", ctrlKey: true, shiftKey: true }));
     await flushPromises();
-    expect(app.get("dialog[open]").text()).toContain("Environnements");
+    // 3.3-a (AM43) : la page des environnements, dans un onglet.
+    expect(app.get(".envs h1").text()).toBe("Environnements");
   });
 
   it("⋯ ouvre le projet ou ses environnements, et le retire du workspace (B5)", async () => {
@@ -125,10 +126,10 @@ describe("barre latérale du projet", () => {
       "Retirer de « Boutique »Le projet reste dans « Tous les projets ».",
     ]);
     await click(app, '[role="menuitem"]', "Gérer les environnements…");
-    expect(app.get("dialog[open]").text()).toContain("Environnements");
+    expect(app.get(".envs h1").text()).toBe("Environnements");
   });
 
-  it("menu ouvert, la pastille perd son infobulle ; la gestion s'ouvre en fenêtre large", async () => {
+  it("menu ouvert, la pastille perd son infobulle ; la gestion s'ouvre dans un onglet", async () => {
     ({ app } = await openProject());
     const chip = app.get('.project__env [aria-label="Environnement de boutique-tests : Local"]');
     expect(chip.attributes("title")).toBe("Environnement du projet : Local");
@@ -139,7 +140,9 @@ describe("barre latérale du projet", () => {
     expect(chip.attributes("title")).toBeUndefined();
 
     await click(app, '[role="menuitem"]', "Gérer les environnements…");
-    expect(app.get("dialog[open]").classes()).toContain("dialog--wide");
+    // 3.3-a (AM43, Q7) : un onglet « Environnements », plus une fenêtre modale.
+    expect(app.find("dialog[open]").exists()).toBe(false);
+    expect(app.get(".zone__tab--active").text()).toContain("Environnements");
     expect(chip.attributes("title")).toBe("Environnement du projet : Local");
   });
 });

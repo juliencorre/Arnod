@@ -12,6 +12,7 @@ import type {
   DrawnValue,
   EnvironmentDoc,
   EnvironmentsView,
+  EnvironmentUsage,
   ProjectChange,
   RequestDoc,
   RequestResult,
@@ -151,6 +152,8 @@ export const useWorkbenchStore = defineStore("workbench", () => {
   const windows = useWindowsStore();
   const trees = ref<Record<string, TreeView>>({});
   const environments = ref<Record<string, EnvironmentsView>>({});
+  /** Environnement à montrer à la prochaine ouverture de la page des environnements (AM43). */
+  const environmentFocus = ref<{ projectId: string; name: string } | null>(null);
   const runs = ref<Record<string, RunView | null>>({});
   /** Dernière exécution de chaque requête, par projet (`docs/plan-fin-premier-usage.md`, R5). */
   const statuses = ref<Record<string, RequestStatuses>>({});
@@ -681,7 +684,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     for (let n = 2; draft.extractions.some((e) => e.name === name); n += 1) {
       name = `${base}${String(n)}`;
     }
-    draft.extractions.push({ name, source, enabled: true });
+    draft.extractions.push({ name, source, enabled: true, scope: "runtime" });
     return name;
   }
 
@@ -845,6 +848,29 @@ export const useWorkbenchStore = defineStore("workbench", () => {
 
   async function reorderEnvironments(projectId: string, names: string[]): Promise<void> {
     environments.value[projectId] = await ipc.environmentsReorder(projectId, names);
+  }
+
+  /**
+   * Ouvre la page des environnements du projet (3.3-a, AM43, Q7), sur l'environnement `focus`
+   * s'il est donné (sinon l'actif).
+   */
+  async function openEnvironments(projectId: string, focus: string | null = null): Promise<void> {
+    environmentFocus.value = focus === null ? null : { projectId, name: focus };
+    await windows.openSelection({ kind: "environments", projectId });
+  }
+
+  /** Dernier run de chaque environnement du projet (« Utilisation », AM43, Q8). */
+  function environmentUsage(projectId: string): Promise<EnvironmentUsage[]> {
+    return ipc.environmentUsage(projectId);
+  }
+
+  /** « Copier depuis un autre projet… » (AM43) : les environnements choisis sont ajoutés. */
+  async function copyEnvironments(
+    projectId: string,
+    fromProject: string,
+    names: string[],
+  ): Promise<void> {
+    environments.value[projectId] = await ipc.environmentCopy(projectId, fromProject, names);
   }
 
   async function setLocal(
@@ -1404,6 +1430,10 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     deleteEnvironment,
     createEnvironment,
     reorderEnvironments,
+    openEnvironments,
+    copyEnvironments,
+    environmentUsage,
+    environmentFocus,
     setLocal,
     runFolder,
     runContract,

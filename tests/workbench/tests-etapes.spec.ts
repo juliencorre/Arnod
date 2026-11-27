@@ -33,7 +33,10 @@ describe("test = dossier d'étapes (4.2-a)", () => {
     let core;
     ({ app, core } = await openProject((c) => {
       const creer = c.workbench.requests.get("Clients/creer.yml");
-      if (creer) creer.extractions = [{ name: "client.id", source: "body.id", enabled: true }];
+      if (creer)
+        creer.extractions = [
+          { name: "client.id", source: "body.id", enabled: true, scope: "runtime" },
+        ];
       c.workbench.runStatus.set("Clients/creer.yml", "failed");
     }));
     // La fiole remplace le dossier dans la barre latérale.
@@ -139,7 +142,9 @@ describe("extractions (4.2-b bis)", () => {
     await app.findAll(".vars__input")[1]?.setValue("body.id");
     await waitAutosave();
     const saved = core.workbench.requests.get("Clients/creer.yml");
-    expect(saved?.extractions).toEqual([{ name: "client.id", source: "body.id", enabled: true }]);
+    expect(saved?.extractions).toEqual([
+      { name: "client.id", source: "body.id", enabled: true, scope: "runtime" },
+    ]);
     expect(app.get(".editor__tab[aria-selected='true']").text()).toBe("Variables 1");
     // « Utilisée par » liste les requêtes qui lisent la variable.
     await flushPromises();
@@ -149,7 +154,10 @@ describe("extractions (4.2-b bis)", () => {
   it("montre la dernière valeur extraite et ce qui est parti dans « Envoyé »", async () => {
     ({ app } = await openProject((c) => {
       const creer = c.workbench.requests.get("Clients/creer.yml");
-      if (creer) creer.extractions = [{ name: "client.id", source: "body.id", enabled: true }];
+      if (creer)
+        creer.extractions = [
+          { name: "client.id", source: "body.id", enabled: true, scope: "runtime" },
+        ];
       c.workbench.nextSend = okOutcome({
         sent: {
           environment: "Local",

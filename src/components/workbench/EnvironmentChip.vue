@@ -10,7 +10,7 @@ import { computed, ref } from "vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
 import LockIcon from "@/components/ui/LockIcon.vue";
-import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
+import NewEnvironmentDialog from "@/components/workbench/NewEnvironmentDialog.vue";
 import { envHost, envSwatch } from "@/lib/environments";
 import { useCatalogStore } from "@/stores/catalog";
 import { useToastStore } from "@/stores/toasts";
@@ -29,7 +29,7 @@ const active = computed(
   () => view.value?.environments.find((e) => e.name === view.value?.active) ?? null,
 );
 
-const managing = ref(false);
+/** Fenêtre « Nouvel environnement » ouverte depuis le menu (AM34). */
 const creating = ref(false);
 
 const MANAGE = "::gerer";
@@ -56,10 +56,18 @@ const items = computed<MenuItem[]>(() => [
   { id: CREATE, label: "+ Nouvel environnement", tone: "link" },
 ]);
 
-/** Ouvre la gestion des environnements, ou la création d'un nouveau. */
+/**
+ * Ouvre la page des environnements (3.3-a, AM43, Q7), ou la fenêtre de création ; l'environnement
+ * créé s'ouvre ensuite dans la page.
+ */
 function manage(create = false): void {
-  creating.value = create;
-  managing.value = true;
+  if (create) creating.value = true;
+  else void workbench.openEnvironments(props.projectId).catch(toasts.showError);
+}
+
+function onCreated(name: string): void {
+  creating.value = false;
+  void workbench.openEnvironments(props.projectId, name).catch(toasts.showError);
 }
 
 async function onSelect(id: string): Promise<void> {
@@ -104,12 +112,12 @@ defineExpose({ manage });
       </button>
     </template>
   </BaseMenu>
-  <EnvironmentsDialog
-    v-if="managing"
-    :open="managing"
+  <NewEnvironmentDialog
+    v-if="creating"
+    :open="creating"
     :project-id="projectId"
-    :start-new="creating"
-    @close="managing = false"
+    @close="creating = false"
+    @created="onCreated"
   />
 </template>
 

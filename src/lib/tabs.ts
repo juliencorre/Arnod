@@ -63,7 +63,12 @@ export interface Activity {
  * cours, un test dont une étape est jouée, le run d'un projet tant qu'il n'est pas fini.
  */
 export function isRunning(content: ContentRef, activity: Activity): boolean {
-  if (content.kind === "result" || content.kind === "contract" || content.kind === "importReport")
+  if (
+    content.kind === "result" ||
+    content.kind === "contract" ||
+    content.kind === "importReport" ||
+    content.kind === "environments"
+  )
     return false;
   const run = activity.run(content.projectId);
   const live = run && !run.finished ? run : null;

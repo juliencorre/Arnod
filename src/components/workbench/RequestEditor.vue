@@ -26,7 +26,6 @@ import AuthEditor from "@/components/workbench/AuthEditor.vue";
 import SecretNotice from "@/components/workbench/SecretNotice.vue";
 import BodyEditor from "@/components/workbench/BodyEditor.vue";
 import DynamicValuesMenu from "@/components/workbench/DynamicValuesMenu.vue";
-import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
 import TrialGeneralize from "@/components/workbench/TrialGeneralize.vue";
@@ -203,7 +202,10 @@ async function addVariable(variable: UnknownVariable): Promise<void> {
   }
 }
 
-const managingEnvironments = ref(false);
+/** « Environnements… » : la page des environnements du projet (3.3-a, AM43). */
+function manageEnvironments(): void {
+  if (editor.value) void workbench.openEnvironments(editor.value.projectId).catch(toasts.showError);
+}
 
 // --- Copier en cURL (5.1-b quater) -------------------------------------------------
 
@@ -476,7 +478,7 @@ watch(
           </button>
         </li>
       </ul>
-      <button type="button" class="link unknown__manage" @click="managingEnvironments = true">
+      <button type="button" class="link unknown__manage" @click="manageEnvironments">
         Environnements…
       </button>
     </div>
@@ -649,13 +651,6 @@ watch(
     <p v-if="request.preserved.length > 0" class="editor__preserved" role="note">
       Conservé dans le fichier sans être modifié par Arnod : {{ request.preserved.join(", ") }}.
     </p>
-    <EnvironmentsDialog
-      v-if="managingEnvironments && editor"
-      :open="managingEnvironments"
-      :project-id="editor.projectId"
-      :start-new="false"
-      @close="managingEnvironments = false"
-    />
     <DynamicValuesMenu :root="editorRoot" />
   </section>
 </template>

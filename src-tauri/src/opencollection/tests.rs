@@ -1025,11 +1025,14 @@ fn lot_e_r8_extractions_lues_ecrites_et_autres_actions_gardees() {
             Extraction {
                 name: "client.id".into(),
                 source: "body.id".into(),
+                // Portée écrite à la main : lue et gardée (AM44).
+                scope: crate::request::model::ExtractionScope::Collection,
                 enabled: true
             },
             Extraction {
                 name: "lieu".into(),
                 source: "headers.location".into(),
+                scope: crate::request::model::ExtractionScope::Runtime,
                 enabled: false
             },
         ]
@@ -1041,6 +1044,7 @@ fn lot_e_r8_extractions_lues_ecrites_et_autres_actions_gardees() {
     request.extractions.push(Extraction {
         name: "ref".into(),
         source: "request.body.externalRef".into(),
+        scope: crate::request::model::ExtractionScope::Runtime,
         enabled: true,
     });
     file::write(&path, &request).unwrap();
@@ -1080,6 +1084,7 @@ fn lot_e_r8_sans_extraction_les_actions_disparaissent_et_seq_est_ecrit() {
     request.extractions.push(Extraction {
         name: "id".into(),
         source: "body.id".into(),
+        scope: crate::request::model::ExtractionScope::Runtime,
         enabled: true,
     });
     request.seq = Some(2.0);
@@ -1257,4 +1262,27 @@ fn lot_h_r8_oauth2_identifiants_client_aller_retour_conforme() {
     })));
     assert_eq!(other.kind, AuthKind::Other);
     assert_eq!(other.other, "oauth2");
+}
+
+/// AM44 (4.2-b bis) : la portée choisie est écrite dans `variable.scope`, relue telle quelle.
+#[test]
+fn am44_portee_d_une_extraction_ecrite_et_relue() {
+    use crate::request::model::ExtractionScope;
+    let dir = project();
+    let path = dir.path().join("creer.yml");
+    fs::write(&path, ACTIONS).unwrap();
+    let mut request = file::read(&path).unwrap();
+    assert_eq!(request.extractions[1].scope, ExtractionScope::Runtime);
+    request.extractions[1].scope = ExtractionScope::Environment;
+    file::write(&path, &request).unwrap();
+    assert_valid(Part::HttpRequest, &path);
+    let value = read(&path);
+    let actions = value.pointer("/runtime/actions").unwrap();
+    assert_eq!(actions[2]["variable"]["scope"], json!("environment"));
+    // La portée « collection » écrite à la main reste.
+    assert_eq!(actions[1]["variable"]["scope"], json!("collection"));
+    assert_eq!(
+        file::read(&path).unwrap().extractions[1].scope,
+        ExtractionScope::Environment
+    );
 }

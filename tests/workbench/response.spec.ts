@@ -176,7 +176,7 @@ describe("corps de la réponse (5.1-b bis)", () => {
     await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_MS + 50));
     await flushPromises();
     expect(core.workbench.requests.get("Clients/creer.yml")?.extractions).toEqual([
-      { name: "sku", source: "body.items[0].sku", enabled: true },
+      { name: "sku", source: "body.items[0].sku", enabled: true, scope: "runtime" },
     ]);
   });
 

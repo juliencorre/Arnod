@@ -71,7 +71,7 @@ export type ConflictItem = { key: string, label: string, disk: string | null, dr
 
 export type ConflictSide = "disk" | "draft";
 
-export type ContentRef = { "kind": "request", projectId: string, path: string, } | { "kind": "run", projectId: string, } | { "kind": "contract", projectId: string, path: string, } | { "kind": "result" } | { "kind": "importReport", projectId: string, } | { "kind": "test", projectId: string, path: string, } | { "kind": "folder", projectId: string, path: string, };
+export type ContentRef = { "kind": "request", projectId: string, path: string, } | { "kind": "run", projectId: string, } | { "kind": "contract", projectId: string, path: string, } | { "kind": "result" } | { "kind": "importReport", projectId: string, } | { "kind": "test", projectId: string, path: string, } | { "kind": "folder", projectId: string, path: string, } | { "kind": "environments", projectId: string, };
 
 export type ContentTab = { id: string, content: ContentRef, preview: boolean, };
 
@@ -121,6 +121,8 @@ export type EnvironmentDeleted = { view: EnvironmentsView, undoToken: string, };
 
 export type EnvironmentDoc = { name: string, color: string, protected: boolean, variables: Array<EnvVariable>, locals: Array<string>, };
 
+export type EnvironmentUsage = { environment: string, number: number, folder: string, contract: string | null, startedAt: number, };
+
 export type EnvironmentView = { localVars: Array<LocalVarView>, name: string, color: string, protected: boolean, variables: Array<EnvVariable>, locals: Array<string>, };
 
 export type EnvironmentsView = { environments: Array<EnvironmentView>, active: string, };
@@ -135,7 +137,9 @@ export type ExampleRef = { index: number, status: number | null, name: string, }
 
 export type ExtractedValue = { name: string, source: string, value: string | null, message: string | null, };
 
-export type Extraction = { name: string, source: string, enabled: boolean, };
+export type Extraction = { name: string, source: string, enabled: boolean, scope: ExtractionScope, };
+
+export type ExtractionScope = "runtime" | "environment" | "request" | "folder" | "collection";
 
 export type FailureCause = "certificate" | "proxy" | "proxyAuth" | "dns" | "unreachable" | "timeout" | "tls" | "other";
 
@@ -511,6 +515,7 @@ export type CheckEnvironmentDoc = Check<Same<Ipc.EnvironmentDoc, EnvironmentDoc>
 export type CheckLocalVarView = Check<Same<Ipc.LocalVarView, LocalVarView>>;
 export type CheckEnvironmentView = Check<Same<Ipc.EnvironmentView, EnvironmentView>>;
 export type CheckEnvironmentsView = Check<Same<Ipc.EnvironmentsView, EnvironmentsView>>;
+export type CheckEnvironmentUsage = Check<Same<Ipc.EnvironmentUsage, EnvironmentUsage>>;
 export type CheckNewEnvironment = Check<Same<Ipc.NewEnvironment, NewEnvironment>>;
 export type CheckEnvironmentDeleted = Check<Same<Ipc.EnvironmentDeleted, EnvironmentDeleted>>;
 export type CheckRunItemStatus = Check<Same<Ipc.RunItemStatus, RunItemStatus>>;
@@ -601,6 +606,7 @@ export type CheckImportDone = Check<Same<Ipc.ImportDone, ImportDone>>;
 export type CheckScriptChoice = Check<Same<Ipc.ScriptChoice, ScriptChoice>>;
 export type CheckScriptResolved = Check<Same<Ipc.ScriptResolved, ScriptResolved>>;
 export type CheckExtraction = Check<Same<Ipc.Extraction, Extraction>>;
+export type CheckExtractionScope = Check<Same<Ipc.ExtractionScope, ExtractionScope>>;
 export type CheckExtractedValue = Check<Same<Ipc.ExtractedValue, ExtractedValue>>;
 export type CheckDrawnValue = Check<Same<Ipc.DrawnValue, DrawnValue>>;
 export type CheckUsedSource = Check<Same<Ipc.UsedSource, UsedSource>>;

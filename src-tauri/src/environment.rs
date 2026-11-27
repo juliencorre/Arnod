@@ -500,6 +500,37 @@ pub fn reorder(root: &Path, names: &[String]) -> Result<(), CommandError> {
     collection::update_meta(root, |meta| meta.environment_order = names.to_vec())
 }
 
+/// « Copier depuis un autre projet… » (3.3-a, AM43) : les environnements `names` du projet
+/// `from` sont ajoutés en fin de chaîne de `root`, avec leur couleur, leur protection, leurs
+/// variables partagées et les noms de leurs variables locales ; jamais les valeurs locales ni
+/// les secrets, qui restent sur le poste. Un nom déjà pris reçoit un numéro (« Recette 2 »).
+/// Rend les noms créés.
+pub fn copy_from(root: &Path, from: &Path, names: &[String]) -> Result<Vec<String>, CommandError> {
+    let source = list(from);
+    let mut created = Vec::new();
+    for wanted in names {
+        let environment = source
+            .iter()
+            .find(|env| same_name(&env.name, wanted))
+            .ok_or_else(|| invalid(format!("L'environnement « {wanted} » n'existe plus.")))?;
+        let taken = list(root);
+        let free = |candidate: &str| !taken.iter().any(|env| same_name(&env.name, candidate));
+        let mut name = environment.name.clone();
+        let mut n = 2;
+        while !free(&name) {
+            name = format!("{} {n}", environment.name);
+            n += 1;
+        }
+        let copy = Environment {
+            name: name.clone(),
+            ..environment.clone()
+        };
+        save(root, &copy, None)?;
+        created.push(name);
+    }
+    Ok(created)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -515,6 +546,39 @@ mod tests {
             }],
             locals: vec!["token".into()],
         }
+    }
+
+    /// AM43 (3.3-a) : la copie depuis un autre projet reprend variables partagées, noms des
+    /// locales, couleur et protection, en fin de chaîne ; un nom pris reçoit un numéro.
+    #[test]
+    fn am43_copie_depuis_un_autre_projet() {
+        let from = tempfile::tempdir().unwrap();
+        let to = tempfile::tempdir().unwrap();
+        init(from.path()).unwrap();
+        init(to.path()).unwrap();
+        let mut recette = env("Recette");
+        recette.protected = true;
+        save(from.path(), &recette, None).unwrap();
+        let created = copy_from(
+            to.path(),
+            from.path(),
+            &["Recette".to_owned(), "local".to_owned()],
+        )
+        .unwrap();
+        assert_eq!(created, ["Recette", "Local 2"]);
+        let all = list(to.path());
+        let names: Vec<&str> = all.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, ["Local", "Recette", "Local 2"]);
+        let copied = &all[1];
+        assert_eq!((copied.color.as_str(), copied.protected), ("blue", true));
+        assert_eq!(copied.variables[0].value, "https://x");
+        assert_eq!(copied.locals, ["token"]);
+        assert_eq!(
+            copy_from(to.path(), from.path(), &["Absent".to_owned()])
+                .unwrap_err()
+                .kind,
+            CommandErrorKind::InvalidRequest
+        );
     }
 
     /// ER1 : « Annuler » remet l'environnement supprimé, à sa place dans la chaîne et protégé ;

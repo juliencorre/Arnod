@@ -21,7 +21,7 @@ use crate::network::oauth::TokenStatus;
 use crate::network::{Network, Session};
 use crate::request::assertions::{self, AssertionResult, DEFAULT_LIMIT, ResponseData};
 use crate::request::extract::{self, ExtractedValue};
-use crate::request::model::{Method, Request};
+use crate::request::model::{Extraction, ExtractionScope, Method, Request};
 use crate::request::resolve::{self, DrawnValue, MASK, Prepared, Variables};
 use crate::request::{file, inherit};
 use crate::secrets::{self, SecretStore};
@@ -449,6 +449,26 @@ pub trait Notifier: Send + Sync {
     fn run_changed(&self, project: Uuid, run: &RunView);
     /// Les statuts des requêtes d'un projet ont changé.
     fn statuses_changed(&self, project: Uuid, statuses: &Statuses);
+    /// Les environnements d'un projet ont changé hors d'une commande : une valeur extraite de
+    /// portée « l'environnement » (AM44) a été gardée.
+    fn environments_changed(&self, _project: Uuid) {}
+}
+
+/// Utilisation d'un environnement (3.3-a, AM43, Q8) : le dernier run fait dessus parmi ceux que
+/// le cœur garde (en mémoire et le dernier du projet sur le poste).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentUsage {
+    pub environment: String,
+    /// Numéro du run dans le projet (0 : run gardé par une version précédente).
+    pub number: u32,
+    /// Dossier exécuté (`""` : tout le projet).
+    pub folder: String,
+    /// Contrat exécuté, sinon `None`.
+    pub contract: Option<String>,
+    /// Début du run, en millisecondes depuis l'époque Unix.
+    pub started_at: u64,
 }
 
 /// Résumé du dernier run d'un projet, pour « Tous les projets » (O12).
@@ -853,6 +873,93 @@ impl Workbench {
             .unwrap_or_default()
     }
 
+    /// Valeurs extraites de portée « l'environnement » (4.2-b bis, AM44, Q9) : gardées aussi en
+    /// variables locales (poste) de l'environnement `env`, déclarées au besoin, jamais dans ses
+    /// variables partagées. Une valeur qui ne peut pas être gardée reste variable d'exécution :
+    /// l'envoi n'échoue pas pour autant.
+    fn keep_in_environment(
+        &self,
+        ctx: &ProjectCtx,
+        env: &str,
+        extractions: &[Extraction],
+        values: &[ExtractedValue],
+    ) {
+        let wanted: Vec<(&str, &str)> = values
+            .iter()
+            .filter(|value| {
+                extractions.iter().any(|e| {
+                    e.enabled
+                        && e.scope == ExtractionScope::Environment
+                        && e.name.trim() == value.name
+                })
+            })
+            .filter_map(|value| value.value.as_deref().map(|v| (value.name.as_str(), v)))
+            .collect();
+        if wanted.is_empty() {
+            return;
+        }
+        let Ok(mut environment) = Self::find_environment(ctx, env) else {
+            return;
+        };
+        let shared = |name: &str| environment.variables.iter().any(|v| v.name == name);
+        let missing: Vec<String> = wanted
+            .iter()
+            .map(|(name, _)| (*name).to_owned())
+            .filter(|name| !shared(name) && !environment.locals.contains(name))
+            .collect();
+        if !missing.is_empty() {
+            environment.locals.extend(missing);
+            let previous = environment.name.clone();
+            if environment::save(&ctx.root, &environment, Some(&previous)).is_err() {
+                return;
+            }
+        }
+        let mut kept = false;
+        for (name, value) in wanted {
+            kept |= self
+                .set_local(ctx, &environment.name, name, value, false)
+                .is_ok();
+        }
+        if let (true, Some(notifier)) = (kept, self.notifier()) {
+            notifier.environments_changed(ctx.id);
+        }
+    }
+
+    /// Dernier run de chaque environnement du projet (3.3-a, AM43) ; un environnement sans run
+    /// gardé n'apparaît pas.
+    pub fn environment_usage(&self, ctx: &ProjectCtx) -> Vec<EnvironmentUsage> {
+        let mut views: Vec<RunView> = self
+            .runs
+            .lock()
+            .map(|runs| {
+                runs.values()
+                    .filter(|h| h.project == ctx.id)
+                    .filter_map(|h| h.view.lock().ok().map(|v| v.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if let Some(last) = Self::last_run(ctx)
+            && !views.iter().any(|v| v.id == last.id)
+        {
+            views.push(last);
+        }
+        views.sort_by_key(|view| std::cmp::Reverse(view.started_at));
+        let mut usage: Vec<EnvironmentUsage> = Vec::new();
+        for view in views {
+            if usage.iter().any(|u| u.environment == view.environment) {
+                continue;
+            }
+            usage.push(EnvironmentUsage {
+                environment: view.environment,
+                number: view.number,
+                folder: view.folder,
+                contract: view.contract,
+                started_at: view.started_at,
+            });
+        }
+        usage
+    }
+
     /// Garde des valeurs extraites pour la session (R6).
     fn keep_runtime(&self, project: Uuid, values: &BTreeMap<String, String>) {
         if values.is_empty() {
@@ -953,6 +1060,7 @@ impl Workbench {
         let mut kept = BTreeMap::new();
         extract::store(&extracted, &mut kept);
         self.keep_runtime(ctx.id, &kept);
+        self.keep_in_environment(ctx, &environment.name, &request.extractions, &extracted);
         let response = Self::mask_response(&variables, raw);
         let mut outcome = Self::outcome(&ctx.root, &request, response);
         let mut sent = Sent::of(
@@ -1355,6 +1463,12 @@ impl Workbench {
                     &sent_data(&prepared),
                 );
                 extract::store(&extracted, runtime);
+                self.keep_in_environment(
+                    ctx,
+                    &variables.environment,
+                    &request.extractions,
+                    &extracted,
+                );
                 let outcome = Self::outcome(
                     &ctx.root,
                     &request,

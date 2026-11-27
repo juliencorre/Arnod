@@ -807,23 +807,24 @@ describe("Fenêtres et zones", () => {
     await screenshot(browser, "08b-menu-environnement");
 
     await browser.$('[role="menuitem"]*=Gérer les environnements').click();
-    const dialog = browser.$("dialog[open]");
-    await dialog.waitForDisplayed();
-    // Aucun champ ne dépasse : le contenu suit la largeur de la fenêtre, sans défilement horizontal.
+    // 3.3-a (AM43) : la page des environnements, dans un onglet.
+    const page = browser.$(".envs");
+    await page.waitForDisplayed();
+    // Aucun champ ne dépasse : le contenu suit la largeur de la zone, sans défilement horizontal.
     const fits = await browser.execute(() => {
-      const body = document.querySelector("dialog[open] .dialog__body");
+      const body = document.querySelector(".envs");
       return body ? body.scrollWidth <= body.clientWidth : null;
     });
     expect(fits).toBe(true);
     await screenshot(browser, "08c-environnements");
     // 3.3-b (AM34) : « + Nouvel environnement » ouvre sa fenêtre de création.
-    await clickText("dialog[open] button", "+ Nouvel environnement");
+    await clickText(".envs__head-actions button", "+ Nouvel environnement");
     await browser.$("#new-environment").waitForExist({ timeout: 5_000 });
     await screenshot(browser, "08d-nouvel-environnement");
     await clickText("dialog[open] button", "Annuler");
     await browser.$("#new-environment").waitForExist({ reverse: true, timeout: 5_000 });
-    await browser.keys("Escape");
-    await browser.$("dialog[open]").waitForExist({ reverse: true });
+    await clickHidden('[aria-label="Fermer Environnements"]');
+    await browser.$(".envs").waitForExist({ reverse: true, timeout: 5_000 });
   });
 });
 

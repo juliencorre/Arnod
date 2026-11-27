@@ -70,6 +70,9 @@ export type CommandName =
   | "environment_delete"
   | "environment_delete_undo"
   | "environment_create"
+  // Lot G de l'alignement : page des environnements (3.3-a, AM43).
+  | "environment_copy"
+  | "environment_usage"
   | "environments_reorder"
   | "local_set"
   | "run_start"
@@ -654,6 +657,22 @@ export interface EnvironmentsView {
 }
 
 /**
+ * Utilisation d'un environnement (3.3-a, AM43, `EnvironmentUsage`) : le dernier run fait dessus
+ * parmi ceux que le cœur garde.
+ */
+export interface EnvironmentUsage {
+  environment: string;
+  /** Numéro du run dans le projet (0 : run gardé par une version précédente). */
+  number: number;
+  /** Dossier exécuté (`""` : tout le projet). */
+  folder: string;
+  /** Contrat exécuté, sinon `null`. */
+  contract: string | null;
+  /** Début du run, en millisecondes depuis l'époque Unix. */
+  startedAt: number;
+}
+
+/**
  * Nouvel environnement, depuis la fenêtre « Nouvel environnement » (3.3-b, AM34). Équivalent
  * Rust : `environment::NewEnvironment`.
  */
@@ -788,7 +807,9 @@ export type ContentRef =
   /** Test du projet, dossier d'étapes (docs/plan-mvp-e-tests-etapes.md, TE2). */
   | { kind: "test"; projectId: string; path: string }
   /** Vue d'un dossier du référentiel, son contenu dans l'ordre d'exécution (4.1-a bis, AM37). */
-  | { kind: "folder"; projectId: string; path: string };
+  | { kind: "folder"; projectId: string; path: string }
+  /** Environnements d'un projet (3.3-a, AM43) : la page qui remplace la fenêtre de gestion. */
+  | { kind: "environments"; projectId: string };
 
 /** Onglet de contenu d'une zone (`Tab`). */
 export interface ContentTab {
@@ -1473,7 +1494,16 @@ export interface Extraction {
   /** `body.id`, `headers.Location`, `status`, ou `request.body.ref` pour une valeur envoyée. */
   source: string;
   enabled: boolean;
+  /** Portée de la variable, `variable.scope` de l'action (4.2-b bis, AM44). */
+  scope: ExtractionScope;
 }
+
+/**
+ * Portée d'une variable extraite (`ExtractionScope`) : `runtime` (le test) ou `environment`
+ * (gardée aussi en variable locale de l'environnement de l'envoi) ; `request`, `folder` et
+ * `collection`, écrites par Bruno ou à la main, sont gardées et appliquées comme `runtime`.
+ */
+export type ExtractionScope = "runtime" | "environment" | "request" | "folder" | "collection";
 
 /** Valeur extraite à un envoi (`ExtractedValue`). */
 export interface ExtractedValue {

@@ -10,8 +10,8 @@ use serde_json::{Map, Value, json};
 use crate::opencollection::schema::{self, Part};
 use crate::request::model::{
     ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, BodyVariant, ContractLink,
-    DEFAULT_MAX_DURATION_MS, Example, ExampleBodyKind, Extraction, Method, Operator, Origin, Pair,
-    ParamKind, Request, ResponseHeader, Scalar, Settings,
+    DEFAULT_MAX_DURATION_MS, Example, ExampleBodyKind, Extraction, ExtractionScope, Method,
+    Operator, Origin, Pair, ParamKind, Request, ResponseHeader, Scalar, Settings,
 };
 // Lot H : OAuth 2 par identifiants client (docs/plan-mvp-h-reseau-auth.md, R8).
 use crate::request::model::{CredentialsPlacement, OAuth2, TokenPlacement};
@@ -631,11 +631,17 @@ fn extraction_from(item: &Value) -> Option<Extraction> {
         name: name.to_owned(),
         source: extraction_source(expression),
         enabled: !disabled(item),
+        scope: ExtractionScope::parse(
+            item.pointer("/variable/scope")
+                .and_then(Value::as_str)
+                .unwrap_or("runtime"),
+        ),
     })
 }
 
 /// Actions écrites : celles qu'Arnod ne gère pas d'abord, telles quelles, puis
-/// les extractions ; description et portée d'une extraction de même nom gardées (R8).
+/// les extractions ; la description d'une extraction de même nom est gardée (R8), sa portée est
+/// celle de l'extraction (AM44).
 fn action_values(list: &[Extraction], previous: Option<&Value>) -> Option<Value> {
     let previous: &[Value] = previous
         .and_then(Value::as_array)
@@ -654,10 +660,7 @@ fn action_values(list: &[Extraction], previous: Option<&Value>) -> Option<Value>
             extraction_from(item).is_some()
                 && item.pointer("/variable/name").and_then(Value::as_str) == Some(name)
         });
-        let scope = old
-            .and_then(|o| o.pointer("/variable/scope"))
-            .and_then(Value::as_str)
-            .unwrap_or("runtime");
+        let scope = extraction.scope.as_str();
         let mut item = Map::new();
         item.insert("type".to_owned(), Value::from("set-variable"));
         if let Some(description) = old.and_then(|o| o.get("description")) {

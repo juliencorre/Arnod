@@ -12,7 +12,6 @@ import ResponseBody from "@/components/workbench/ResponseBody.vue";
 import SentPanel from "@/components/workbench/SentPanel.vue";
 import TimelinePanel from "@/components/workbench/TimelinePanel.vue";
 import NetworkFailurePanel from "@/components/workbench/NetworkFailurePanel.vue";
-import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import { useGuard } from "@/composables/useGuard";
 import { durationLabel } from "@/lib/assertions";
 import { countLabel, formatBytes, formatDuration } from "@/lib/format";
@@ -81,7 +80,10 @@ const unknownNames = computed(() => unknown.value.map((v) => v.name).join(", "))
 const environment = computed(() =>
   editor.value ? workbench.activeEnvironment(editor.value.projectId) : null,
 );
-const managingEnvironments = ref(false);
+/** « Environnements… » : la page des environnements du projet (3.3-a, AM43). */
+function manageEnvironments(): void {
+  if (editor.value) void workbench.openEnvironments(editor.value.projectId).catch(toasts.showError);
+}
 
 async function declareUnknown(): Promise<void> {
   if (!editor.value || unknown.value.length === 0) return;
@@ -110,7 +112,7 @@ async function declareUnknown(): Promise<void> {
           <BaseButton @click="guard(declareUnknown)">
             Ajouter<span class="visually-hidden"> {{ unknownNames }} à {{ environment }}</span>
           </BaseButton>
-          <BaseButton @click="managingEnvironments = true">Environnements…</BaseButton>
+          <BaseButton @click="manageEnvironments">Environnements…</BaseButton>
         </template>
         <BaseButton v-else @click="guard(() => workbench.send(editorKey))">Réessayer</BaseButton>
       </p>
@@ -252,13 +254,6 @@ async function declareUnknown(): Promise<void> {
         </ul>
       </details>
     </template>
-    <EnvironmentsDialog
-      v-if="managingEnvironments && editor"
-      :open="managingEnvironments"
-      :project-id="editor.projectId"
-      :start-new="false"
-      @close="managingEnvironments = false"
-    />
   </section>
 </template>
 

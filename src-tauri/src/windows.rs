@@ -106,6 +106,11 @@ impl<R: Runtime> Notifier for EventNotifier<R> {
             },
         );
     }
+
+    /// Valeur extraite gardée dans un environnement (AM44) : toutes les fenêtres le relisent.
+    fn environments_changed(&self, project_id: Uuid) {
+        project_changed(&self.app, "", project_id, ProjectScope::Environments, None);
+    }
 }
 
 /// Run démarré dans une fenêtre, diffusé aux autres (R7).

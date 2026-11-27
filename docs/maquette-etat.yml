@@ -647,6 +647,7 @@ pages:
       - "2026-11-26 : a : environnement enregistré seul (« ✓ Enregistré »), Échap ne jette rien, × et « + Variable » ; une suppression se rattrape par « Annuler » (plan-qualite-mvp, lot J, ER1, ER2, ER8)."
       - "2026-11-26 : c : « Envoyer vers <env> ? » avec le cadenas, la requête et l'hôte visés, bouton plein ; cadenas sur la pastille d'un environnement protégé (plan-alignement-maquette, lot C, AM31)."
       - "2026-11-26 : a, b : liste numérotée avec l'adresse de base, « Couleur ▾ » à droite du nom, « Demander une confirmation avant POST, PUT, PATCH et DELETE », « Supprimer l'environnement » ; « + Nouvel environnement » ouvre sa fenêtre (URL de base, variables reprises sans les secrets, place dans la chaîne, protection) ; b passe à « livré » (plan-alignement-maquette, lot D, AM33, AM34)."
+      - "2026-11-27 : a : la page des environnements s'ouvre dans un onglet (fil d'Ariane, « Environnements · N · propres à ce projet », « Copier depuis un autre projet… », « + Nouvel environnement ») ; liste réordonnée par ⋮⋮ (glisser, ↑ ↓) ; un seul tableau Variable, Valeur, Portée (partagée ou locale, au coffre) ; « Utilisation » donne le dernier run (plan-alignement-maquette, lot G, AM43)."
     ecrans:
       "0":
         etat: livré
@@ -659,9 +660,6 @@ pages:
         etat: livré
         pr: [27]
         captures: [08c-environnements]
-        ecart:
-          texte: "Environnements dans un tableau unique avec la portée de chaque variable, l'utilisation et « Copier depuis un autre projet… » ; le code garde un dialogue modal (enregistré seul depuis le lot J, ER2) et deux listes ordonnées par ↑ ↓."
-          aligner: code
       b:
         etat: livré
         pr: [27]
@@ -823,6 +821,7 @@ pages:
       - "2026-11-26 : c : « Laisser dans la requête » pour une requête libre (plan-alignement-maquette, lot A, AM10)."
       - "2026-11-26 : a, b, c : barre des étapes sur une rangée qui défile ; échec affiché une fois dans un panneau dépliable, « Ignorer pour ce résultat » ; note du coffre lisible (plan-qualite-mvp, lot I, DE8, DE10, ER3, DE2)."
       - "2026-11-26 : b bis : un clic sur une valeur du corps propose « Extraire dans une variable », la valeur extraite est marquée « → nom » (plan-alignement-maquette, lot C, AM32)."
+      - "2026-11-27 : b bis : la portée d'une extraction se choisit, « le test » ou « l'environnement » (variable locale de l'environnement de l'envoi) ; écrite dans variable.scope (plan-alignement-maquette, lot G, AM44)."
     ecrans:
       a:
         etat: livré
@@ -845,10 +844,8 @@ pages:
         pr: [51]
         captures: [23-variables]
         ecart:
-          - texte: "La portée d'une extraction est toujours « le test » (variable d'exécution)."
-            aligner: code
-          - texte: "Chaque extraction a une case d'activation et un × de retrait (EX1)."
-            aligner: maquette
+          texte: "Chaque extraction a une case d'activation et un × de retrait (EX1)."
+          aligner: maquette
       c:
         etat: livré
         pr: [65]

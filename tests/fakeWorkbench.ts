@@ -613,6 +613,39 @@ export function handleWorkbench(
       wb.envs.splice(at, 0, env);
       return envView(wb);
     }
+    case "environment_copy": {
+      // Règles du cœur (environment::copy_from) : un nom pris reçoit un numéro, en fin de chaîne.
+      // Le faux cœur n'a qu'une liste d'environnements : l'autre projet a les mêmes.
+      const source = clone(wb.envs);
+      for (const wanted of args.names as string[]) {
+        const env =
+          source.find((e) => e.name.toLowerCase() === wanted.toLowerCase()) ??
+          fail("invalidRequest", `L'environnement « ${wanted} » n'existe plus.`);
+        let name = env.name;
+        let n = 2;
+        while (wb.envs.some((e) => e.name.toLowerCase() === name.toLowerCase())) {
+          name = `${env.name} ${String(n)}`;
+          n += 1;
+        }
+        wb.envs.push({ ...clone(env), name });
+      }
+      return envView(wb);
+    }
+    case "environment_usage": {
+      // Dernier run gardé, s'il y en a un (Workbench::environment_usage).
+      const run = wb.lastRun;
+      return run
+        ? [
+            {
+              environment: run.environment,
+              number: run.number,
+              folder: run.folder,
+              contract: run.contract,
+              startedAt: run.startedAt,
+            },
+          ]
+        : [];
+    }
     case "environment_delete_undo": {
       const removed =
         deletedEnvs.get(String(args.undoToken)) ??

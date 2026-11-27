@@ -5,13 +5,16 @@
  * Elle range une valeur de la réponse (`body.id`, `headers.Location`, `status`) ou de la requête
  * envoyée (`request.body.ref`) dans une variable que les étapes suivantes du test lisent. Montre
  * la dernière valeur extraite et les requêtes qui lisent ces variables. Aucun script.
+ *
+ * AM44 (4.2-b bis) : chaque ligne choisit sa portée, « le test » (variable d'exécution) ou
+ * « l'environnement » (gardée aussi en variable locale de l'environnement de l'envoi).
  */
 import { computed, ref, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import RowRemoveButton from "@/components/ui/RowRemoveButton.vue";
 import { useWorkbenchStore } from "@/stores/workbench";
-import type { ExtractedValue, Extraction, VariableUser } from "@/types/ipc";
+import type { ExtractedValue, Extraction, ExtractionScope, VariableUser } from "@/types/ipc";
 
 const props = defineProps<{
   projectId: string;
@@ -24,8 +27,27 @@ const extractions = defineModel<Extraction[]>({ required: true });
 const workbench = useWorkbenchStore();
 const users = ref<VariableUser[]>([]);
 
+/** Portées proposées ; celles du schéma écrites ailleurs restent montrées, comme le test. */
+const SCOPES: { id: ExtractionScope; label: string }[] = [
+  { id: "runtime", label: "le test" },
+  { id: "environment", label: "l'environnement" },
+];
+const OTHER_SCOPES: Record<string, string> = {
+  request: "la requête (comme le test)",
+  folder: "le dossier (comme le test)",
+  collection: "le projet (comme le test)",
+};
+
+function scopesOf(extraction: Extraction): { id: ExtractionScope; label: string }[] {
+  const other = OTHER_SCOPES[extraction.scope];
+  return other === undefined ? SCOPES : [...SCOPES, { id: extraction.scope, label: other }];
+}
+
 function add(): void {
-  extractions.value = [...extractions.value, { name: "", source: "body.", enabled: true }];
+  extractions.value = [
+    ...extractions.value,
+    { name: "", source: "body.", enabled: true, scope: "runtime" },
+  ];
 }
 
 function remove(index: number): void {
@@ -108,7 +130,15 @@ watch(
           :title="lastOf(extraction)?.text"
           >{{ lastOf(extraction)?.text ?? "—" }}</span
         >
-        <span class="vars__scope">le test</span>
+        <select
+          v-model="extraction.scope"
+          class="vars__scope"
+          :aria-label="`Portée de ${nameOf(extraction, index)}`"
+        >
+          <option v-for="scope in scopesOf(extraction)" :key="scope.id" :value="scope.id">
+            {{ scope.label }}
+          </option>
+        </select>
         <RowRemoveButton :label="`Supprimer ${nameOf(extraction, index)}`" @click="remove(index)" />
       </div>
     </div>
@@ -156,7 +186,7 @@ watch(
 .vars__head,
 .vars__row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr) 4.5rem auto;
+  grid-template-columns: auto minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr) 9rem auto;
   gap: 0.25rem 0.5rem;
   align-items: center;
 }
@@ -221,8 +251,9 @@ watch(
 }
 
 .vars__scope {
+  min-width: 0;
+  min-height: var(--control-sm);
   font-size: var(--text-body);
-  color: var(--color-muted);
 }
 
 .vars__add {
