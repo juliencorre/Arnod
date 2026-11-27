@@ -381,8 +381,8 @@ Les lots sont livrés ensemble, sur la branche de la session, en une pull reques
       propriétés, templates, « Plus », sur le faux cœur.
 - [x] `arnod run` joue un test en schéma et une requête à jeu de données.
 - [x] `npm run check` passe.
-- [ ] Installeur < 15 Mo (QuickJS compte pour environ 1 Mo) : mesuré par la CI Windows
-      (`scripts/bundle-size.mjs`) sur la pull request.
+- [x] Installeur < 15 Mo (QuickJS compte pour environ 1 Mo) : 5,25 Mo mesurés par la CI Windows
+      (`scripts/bundle-size.mjs`, PR #97).
 
 ## 10. Risques
 
