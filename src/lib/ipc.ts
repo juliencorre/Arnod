@@ -56,9 +56,12 @@ import type {
   PairsText,
   RequestInput,
   ImportDone,
+  ImportOptions,
   ImportReport,
   ImportSource,
   ImportTarget,
+  ScriptChoice,
+  ScriptResolved,
   TreeView,
   ProjectCreated,
   ProjectCreateInput,
@@ -413,11 +416,17 @@ export const ipc = {
   importDetect: (path: string): Promise<ImportSource> =>
     call<ImportSource>("import_detect", { path }),
   /** Importe dans un nouveau projet ou dans un projet existant. */
-  importRun: (path: string, target: ImportTarget): Promise<ImportDone> =>
-    call<ImportDone>("import_run", { path, target }),
+  importRun: (path: string, target: ImportTarget, options: ImportOptions): Promise<ImportDone> =>
+    call<ImportDone>("import_run", { path, target, options }),
   /** Dernier rapport d'import d'un projet. */
   importReport: (projectId: string): Promise<ImportReport | null> =>
     call<ImportReport | null>("import_report", { projectId }),
+  /** Reprend un script Bruno du rapport : retiré du fichier, sans lui ou par une assertion (AM42). */
+  importScript: (projectId: string, index: number, choice: ScriptChoice): Promise<ScriptResolved> =>
+    call<ScriptResolved>("import_script", { projectId, index, choice }),
+  /** « Annuler » un script repris : il revient dans son fichier. */
+  importScriptUndo: (undoToken: string): Promise<ImportReport> =>
+    call<ImportReport>("import_script_undo", { undoToken }),
   runStart: (
     project: string,
     folder: string,

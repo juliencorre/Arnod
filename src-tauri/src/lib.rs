@@ -234,6 +234,8 @@ pub fn run() {
             commands::import::import_detect,
             commands::import::import_run,
             commands::import::import_report,
+            commands::import::import_script,
+            commands::import::import_script_undo,
             // Lot E : tests et étapes.
             commands::test_steps::test_read,
             commands::test_steps::tree_create_test,

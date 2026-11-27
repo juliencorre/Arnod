@@ -991,11 +991,11 @@ fn environment(
                 request: None,
                 detail: if known.is_some() {
                     format!(
-                        "Valeur de {DOTENV} (process.env.{env_name}) : variable locale, rangée dans le coffre du système, jamais dans le projet."
+                        "Valeur de {DOTENV} (process.env.{env_name}) : variable locale, jamais dans le projet."
                     )
                 } else {
                     format!(
-                        "Lue dans {DOTENV} par Bruno (process.env.{env_name}) : variable locale à renseigner."
+                        "Lue dans {DOTENV} par Bruno (process.env.{env_name}), sans valeur connue : renseignez-la dans les environnements du projet."
                     )
                 },
                 code: Some(format!("{}: {}", entry.key, entry.value)),
@@ -1035,7 +1035,7 @@ fn environment(
             ItemKind::Env,
             ItemStatus::ToFill,
             Some("vars:secret"),
-            "Valeurs gardées par Bruno hors de la collection : variables locales à renseigner, jamais dans le projet.",
+            "Valeurs gardées par Bruno hors de la collection : renseignez-les dans les environnements du projet, qui ne les écrit jamais.",
             None,
         );
     }

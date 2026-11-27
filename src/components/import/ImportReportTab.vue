@@ -4,20 +4,27 @@
  * ce qui est signalé avec son fichier d'origine (« À reprendre »), des exemples convertis sans
  * code, et le détail de l'élément choisi : avant (Bruno), après (dans Arnod). Le rapport est
  * calculé par le cœur et gardé sur le poste.
+ *
+ * AM42 : un script non repris se remplace par une assertion (retiré du fichier, la requête
+ * s'ouvre sur une assertion ajoutée) ou s'accepte sans lui (retiré, marqué « repris ») ;
+ * « Annuler » dans la notification.
  */
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import { useGuard } from "@/composables/useGuard";
 import { countLabel, formatDayTime } from "@/lib/format";
 import {
   FORMAT_LABELS,
   KIND_TAGS,
   STATUS_HEADLINES,
   STATUS_LABELS,
+  isScript,
   originalBlock,
 } from "@/lib/imports";
 import { useCatalogStore } from "@/stores/catalog";
 import { useImportStore } from "@/stores/imports";
+import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
 import { useWindowsStore } from "@/stores/windows";
 
@@ -30,6 +37,8 @@ const imports = useImportStore();
 const catalog = useCatalogStore();
 const windows = useWindowsStore();
 const toasts = useToastStore();
+const sidebar = useSidebarStore();
+const guard = useGuard();
 const list = useTemplateRef<HTMLElement>("list");
 
 const report = computed(() => imports.reports[props.projectId] ?? null);
@@ -122,6 +131,29 @@ async function openRequest(path: string): Promise<void> {
 }
 
 const before = computed(() => (current.value ? originalBlock(current.value) : null));
+
+/** Script à reprendre : remplacé par une assertion (s'il est d'une requête) ou accepté. */
+const pendingScript = computed(
+  () => current.value !== null && isScript(current.value) && current.value.status === "notRun",
+);
+
+/** « Remplacer par une assertion… » : le script quitte le fichier, l'assertion s'ajoute. */
+function replaceScript(): void {
+  const item = current.value;
+  const request = item?.request ?? null;
+  if (!item || request === null) return;
+  const index = selected.value;
+  guard(async () => {
+    await imports.resolveScript(props.projectId, index, "replace");
+    await sidebar.openNewAssertion(props.projectId, request);
+  });
+}
+
+/** « Accepter sans ce script » : retiré du fichier, l'élément est marqué repris. */
+function acceptScript(): void {
+  const index = selected.value;
+  guard(() => imports.resolveScript(props.projectId, index, "accept"));
+}
 </script>
 
 <template>
@@ -246,6 +278,12 @@ const before = computed(() => (current.value ? originalBlock(current.value) : nu
               Les assertions et extractions de la requête sont reprises sans code : elle s'exécute
               sans ce script.
             </p>
+          </div>
+          <div v-if="pendingScript" class="report__actions">
+            <BaseButton v-if="current.request" @click="replaceScript">
+              Remplacer par une assertion…
+            </BaseButton>
+            <BaseButton @click="acceptScript">Accepter sans ce script</BaseButton>
           </div>
         </aside>
       </div>
@@ -441,7 +479,9 @@ const before = computed(() => (current.value ? originalBlock(current.value) : nu
   color: var(--color-link);
 }
 
-.report__status--stored {
+.report__status--stored,
+.report__status--accepted,
+.report__status--replaced {
   color: var(--color-success);
 }
 
@@ -552,5 +592,11 @@ const before = computed(() => (current.value ? originalBlock(current.value) : nu
   margin: 0;
   font-size: var(--text-small);
   color: var(--color-muted);
+}
+
+.report__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 </style>

@@ -1445,6 +1445,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     // Lot J : copier et déplacer.
     followTransfer,
     reloadIn,
+    reloadOpened,
     // Lot K : secret en clair.
     holdSecret,
     // Sélection multiple.

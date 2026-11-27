@@ -25,22 +25,58 @@ async function clickChoice(app: AppWrapper, title: string): Promise<void> {
   await flushPromises();
 }
 
-describe("importer un projet existant (P12)", () => {
+/** Choisit un dossier dans la fenêtre « Importer » (import unique, AM40). */
+async function chooseFolder(app: AppWrapper): Promise<void> {
+  const button = app
+    .findAll("dialog[open] button")
+    .find((b) => b.text().trim() === "Choisir un dossier…");
+  if (!button) throw new Error("« Choisir un dossier… » introuvable");
+  await button.trigger("click");
+  await flushPromises();
+}
+
+describe("importer un projet existant (P12, par l'import unique AM40)", () => {
   it("depuis « Ajouter un projet », l'inscrit dans « Tous les projets » et ce workspace", async () => {
     const core = installFakeCore(boutiqueSnapshot());
-    core.pickedFolder = "/home/julien/dev/catalogue-legacy";
+    const path = "/home/julien/dev/catalogue-legacy";
+    core.imports.sources[path] = {
+      path,
+      format: "openCollection",
+      name: "catalogue-legacy",
+      counts: {
+        folders: 0,
+        requests: 0,
+        environments: 0,
+        assertions: 0,
+        extractions: 0,
+        secrets: 0,
+        dynamicValues: 0,
+        scripts: 0,
+      },
+      files: 0,
+      environments: [],
+      secrets: [],
+    };
+    core.imports.picked = path;
     wrapper = await mountApp();
     await wrapper.get("main .add-card").trigger("click");
     await flushPromises();
 
     await clickChoice(wrapper, "Importer…");
+    await chooseFolder(wrapper);
+    const open = wrapper.get("dialog[open]");
+    expect(open.text()).toContain(
+      "Ajouté à « Tous les projets » et à « Boutique », sans conversion.",
+    );
+    const importer = open.findAll("button").find((b) => b.text() === "Importer");
+    await importer?.trigger("click");
+    await flushPromises();
 
-    expect(core.calls.find((c) => c.cmd === "project_add_existing")?.args).toEqual({
-      path: "/home/julien/dev/catalogue-legacy",
-      workspaceId: BOUTIQUE,
+    expect(core.calls.find((c) => c.cmd === "import_run")?.args).toMatchObject({
+      path,
+      target: { kind: "newProject", location: null, workspaceId: BOUTIQUE },
     });
     expect(wrapper.find("dialog[open]").exists()).toBe(false);
-    expect(wrapper.findAll("main article h2").map((h) => h.text())).toContain("catalogue-legacy");
     expect(wrapper.get(".toast").text()).toBe(
       "« catalogue-legacy » ajouté à « Tous les projets » et à « Boutique ».",
     );
@@ -53,25 +89,27 @@ describe("importer un projet existant (P12)", () => {
     await flushPromises();
 
     await clickChoice(wrapper, "Importer…");
+    await chooseFolder(wrapper);
 
-    expect(core.commands()).toContain("project_pick_folder");
-    expect(core.commands()).not.toContain("project_add_existing");
+    expect(core.commands()).toContain("import_pick");
+    expect(core.commands()).not.toContain("import_run");
+    expect(wrapper.get("dialog[open]").text()).toContain("Choisir un dossier…");
     expect(wrapper.find(".toast").exists()).toBe(false);
   });
 
-  it("notifie un dossier qui n'est pas un projet", async () => {
+  it("explique un dossier qu'Arnod ne reconnaît pas", async () => {
     const core = installFakeCore(boutiqueSnapshot());
-    core.pickedFolder = "/home/julien/vide";
+    core.imports.picked = "/home/julien/vide";
     wrapper = await mountApp();
     await wrapper.get("main .add-card").trigger("click");
     await flushPromises();
 
     await clickChoice(wrapper, "Importer…");
+    await chooseFolder(wrapper);
 
-    const toast = wrapper.get(".toast");
-    expect(toast.classes()).toContain("toast--error");
-    expect(toast.text()).toBe(
-      "Le dossier /home/julien/vide ne contient pas de projet Arnod (arnod.yml absent).",
+    expect(wrapper.get("dialog[open] [role=alert]").text()).toContain(
+      "Arnod ne reconnaît pas /home/julien/vide",
     );
+    expect(core.commands()).not.toContain("import_run");
   });
 });

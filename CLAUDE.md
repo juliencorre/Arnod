@@ -578,7 +578,17 @@ Référence : `docs/plan-mvp-c-import-bruno.md` (cas IM1 à IM6, règles R1 à R
   exécutés ; `{{$…}}` gardé ; `vars:secret` et `{{process.env.X}}` → variables locales sans valeur,
   une valeur lue dans `.env` va au coffre.
 - Rapport : `ImportReport` gardé sur le poste (`projects/<id>/import.json`), montré dans l'onglet
-  `importReport` (`ImportReportTab`) ; chaque élément signalé cite son fichier et son bloc d'origine.
+  `importReport` (`ImportReportTab`, rouvert par « Rapport d'import » du menu ⋯ du projet) ; chaque
+  élément signalé cite son fichier et son bloc d'origine.
+- « Importer… » d'« Ajouter un projet » passe par l'import unique (AM40). Fenêtre « Importer »
+  (AM41) : `ImportSource.environments` et `secrets` (noms qui ressemblent à un secret,
+  `import::looks_secret`) ; `ImportOptions` (`environments` : cible de chaque environnement,
+  `secretsLocal`) est appliqué par le cœur (`import::apply_options`) avant l'écriture.
+- Script Bruno du rapport (AM42) : `import_script` (`accept` ou `replace`) le retire du fichier où
+  l'import l'a gardé (`runtime.scripts` d'une requête, `request.scripts` d'un `folder.yml` ou de la
+  racine) et marque l'élément `accepted` ou `replaced` ; `import_script_undo` le remet.
+  « Remplacer par une assertion… » ouvre la requête sur une assertion ajoutée
+  (`sidebar.openNewAssertion`, servie par `RequestEditor`).
 
 ## Tests, étapes et variables
 

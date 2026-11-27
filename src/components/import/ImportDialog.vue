@@ -4,6 +4,11 @@
  * fichier choisi, son format reconnu par le cœur (collection Bruno, projet OpenCollection,
  * contrat OpenAPI), la destination (nouveau projet, ou un dossier du projet ouvert) et ce qui
  * sera repris. Rien n'est écrit avant « Importer » ; le rapport s'ouvre ensuite.
+ *
+ * AM41 (2.3-b) : chaque environnement de la collection va dans un environnement du projet (ou
+ * un nouveau), avec le nombre de variables qu'il y ajoute ; les valeurs qui ressemblent à des
+ * secrets vont en variables locales, au coffre (case cochée par défaut). Le cœur applique ;
+ * l'interface ne fait que compter.
  */
 import { computed, ref, useId, watch } from "vue";
 
@@ -11,6 +16,7 @@ import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
 import { ALL_PROJECTS, useProjectActions } from "@/composables/useProjectActions";
 import { IpcError } from "@/lib/ipc";
+import { envSwatch } from "@/lib/environments";
 import { countLabel } from "@/lib/format";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
@@ -18,7 +24,7 @@ import { useImportStore } from "@/stores/imports";
 import { useNavigationStore } from "@/stores/navigation";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
-import type { ImportSource, ImportTarget } from "@/types/ipc";
+import type { ImportSource, ImportTarget, SourceEnvironment } from "@/types/ipc";
 
 const imports = useImportStore();
 const catalog = useCatalogStore();
@@ -27,7 +33,7 @@ const workbench = useWorkbenchStore();
 const contracts = useContractsStore();
 const toasts = useToastStore();
 const { announceCreated } = useProjectActions();
-const ids = { destination: useId(), folder: useId() };
+const ids = { destination: useId(), folder: useId(), environments: useId() };
 
 const source = ref<ImportSource | null>(null);
 const destination = ref<"newProject" | "project">("newProject");
@@ -35,6 +41,10 @@ const location = ref<string | null>(null);
 const folder = ref("");
 const error = ref<string | null>(null);
 const busy = ref(false);
+/** Environnement du projet qui reçoit chaque environnement de la collection (AM41). */
+const targets = ref<Record<string, string>>({});
+/** Valeurs qui ressemblent à des secrets en variables locales (Q5 : oui par défaut). */
+const secretsLocal = ref(true);
 
 const state = computed(() => imports.dialog);
 const project = computed(() =>
@@ -51,6 +61,11 @@ watch(
     destination.value = current?.projectId ? "project" : "newProject";
     location.value = null;
     error.value = null;
+    secretsLocal.value = true;
+    // Les environnements du projet, pour la correspondance (AM41).
+    if (current?.projectId && !workbench.environments[current.projectId]) {
+      workbench.refreshEnvironments(current.projectId).catch(() => undefined);
+    }
   },
   { immediate: true },
 );
@@ -78,6 +93,58 @@ watch(
   },
   { immediate: true },
 );
+
+/** Environnements du projet de destination ; aucun pour un nouveau projet. */
+const projectEnvironments = computed(() => {
+  const id = state.value?.projectId;
+  return id && !toNewProject.value ? (workbench.environments[id]?.environments ?? []) : [];
+});
+
+function existing(name: string) {
+  const key = name.toLocaleLowerCase();
+  return projectEnvironments.value.find((env) => env.name.toLocaleLowerCase() === key);
+}
+
+/** Par défaut, l'environnement de même nom du projet, sinon un nouvel environnement. */
+watch(
+  [() => source.value?.environments, projectEnvironments],
+  ([environments]) => {
+    targets.value = Object.fromEntries(
+      (environments ?? []).map((env) => [env.name, existing(env.name)?.name ?? env.name]),
+    );
+  },
+  { immediate: true },
+);
+
+function targetOf(env: SourceEnvironment): string {
+  return targets.value[env.name] ?? env.name;
+}
+
+/** Variables que l'environnement de la collection ajoute à sa cible (affichage). */
+function addedCount(env: SourceEnvironment): number {
+  const target = existing(targetOf(env));
+  if (!target) return env.variables.length;
+  const known = new Set([...target.variables.map((v) => v.name), ...target.locals]);
+  return env.variables.filter((name) => !known.has(name)).length;
+}
+
+/** « token, password, apiKey : elles iront en variables locales… » (2.3-b). */
+const secretsHint = computed(() => {
+  const names = source.value?.secrets ?? [];
+  const one = names.length === 1;
+  const fate = secretsLocal.value
+    ? one
+      ? "elle ira en variable locale, au coffre du système, jamais partagée."
+      : "elles iront en variables locales, au coffre du système, jamais partagées."
+    : one
+      ? "elle restera partagée, dans les fichiers du projet."
+      : "elles resteront partagées, dans les fichiers du projet.";
+  return `${names.join(", ")} : ${fate}`;
+});
+
+function swatchOf(env: SourceEnvironment): string {
+  return envSwatch(existing(targetOf(env))?.color);
+}
 
 const badge = computed(() => {
   switch (source.value?.format) {
@@ -140,6 +207,8 @@ function close(): void {
 async function submit(): Promise<void> {
   const s = source.value;
   const current = state.value;
+  // Lu avant la fermeture, qui vide l'état de la fenêtre.
+  const ws = workspace.value;
   if (!s || !current || busy.value) return;
   const target: ImportTarget =
     toNewProject.value || current.projectId === null
@@ -148,14 +217,18 @@ async function submit(): Promise<void> {
   busy.value = true;
   error.value = null;
   try {
-    const done = await imports.run(s.path, target);
+    const done = await imports.run(s.path, target, {
+      environments: s.environments.map((env) => ({
+        from: env.name,
+        to: toNewProject.value ? env.name : targetOf(env),
+      })),
+      secretsLocal: secretsLocal.value,
+    });
     imports.close();
     if (s.format === "openCollection") {
       // Projet ajouté tel quel (P12) : ouvert et annoncé, sans rapport.
       navigation.showProject(done.projectId, current.workspaceId);
-      const where = workspace.value
-        ? `« ${ALL_PROJECTS} » et à « ${workspace.value.name} »`
-        : `« ${ALL_PROJECTS} »`;
+      const where = ws ? `« ${ALL_PROJECTS} » et à « ${ws.name} »` : `« ${ALL_PROJECTS} »`;
       toasts.show(`« ${catalog.projectById(done.projectId)?.name ?? s.name} » ajouté à ${where}.`);
     } else if (target.kind === "newProject") {
       announceCreated(done.projectId, current.workspaceId);
@@ -252,20 +325,65 @@ async function submit(): Promise<void> {
         </template>
 
         <template v-if="source.format === 'bruno'">
-          <dt>Environnements</dt>
+          <dt :id="ids.environments">Environnements</dt>
           <dd>
-            {{
-              source.counts.environments === 0
-                ? "Aucun : le projet aura l'environnement « Local »."
-                : `${countLabel(source.counts.environments, "environnement repris", "environnements repris")}${toNewProject ? "" : " ; un environnement de même nom est complété, sans rien remplacer"}.`
-            }}
+            <span v-if="source.environments.length === 0">
+              Aucun : le projet aura l'environnement « Local ».
+            </span>
+            <ul v-else class="import__envs" :aria-labelledby="ids.environments">
+              <li v-for="env in source.environments" :key="env.name" class="import__env">
+                <code class="import__env-from">{{ env.name }}</code>
+                <span class="import__env-arrow" aria-hidden="true">→</span>
+                <span v-if="toNewProject" class="import__env-new">nouvel environnement</span>
+                <span v-else class="import__env-target">
+                  <span
+                    class="import__swatch"
+                    :style="{ backgroundColor: swatchOf(env) }"
+                    aria-hidden="true"
+                  />
+                  <select
+                    v-model="targets[env.name]"
+                    class="import__env-select"
+                    :aria-label="`Environnement du projet qui reçoit ${env.name}`"
+                  >
+                    <option
+                      v-for="target in projectEnvironments"
+                      :key="target.name"
+                      :value="target.name"
+                    >
+                      {{ target.name }}
+                    </option>
+                    <option v-if="!existing(env.name)" :value="env.name">
+                      Nouvel environnement « {{ env.name }} »
+                    </option>
+                  </select>
+                </span>
+                <span class="import__hint">{{
+                  countLabel(addedCount(env), "variable ajoutée", "variables ajoutées")
+                }}</span>
+              </li>
+            </ul>
           </dd>
-          <template v-if="source.counts.secrets > 0">
+          <template v-if="source.secrets.length > 0 || source.counts.secrets > 0">
             <dt>Secrets</dt>
             <dd>
-              {{ countLabel(source.counts.secrets, "variable secrète", "variables secrètes") }}
-              <span class="import__hint">
-                Elles iront en variables locales, au coffre du système, jamais dans le projet.
+              <label v-if="source.secrets.length > 0" class="import__check">
+                <input v-model="secretsLocal" type="checkbox" />
+                <span>
+                  <span>{{
+                    source.secrets.length === 1
+                      ? "1 valeur ressemble à un secret"
+                      : `${String(source.secrets.length)} valeurs ressemblent à des secrets`
+                  }}</span>
+                  <span class="import__hint">{{ secretsHint }}</span>
+                </span>
+              </label>
+              <span v-if="source.counts.secrets > 0">
+                {{ countLabel(source.counts.secrets, "variable secrète", "variables secrètes") }}
+                de Bruno
+                <span class="import__hint">
+                  Variables locales, au coffre du système, jamais dans le projet.
+                </span>
               </span>
             </dd>
           </template>
@@ -424,6 +542,56 @@ async function submit(): Promise<void> {
 .import__folder code {
   font: var(--text-body) var(--font-mono);
   overflow-wrap: anywhere;
+}
+
+.import__envs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.import__env {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.import__env-from {
+  min-width: 5rem;
+  font: var(--text-body) var(--font-mono);
+}
+
+.import__env-arrow {
+  color: var(--color-muted);
+}
+
+.import__env-target {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+}
+
+.import__swatch {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--radius-sm);
+}
+
+.import__check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.import__check > span {
+  display: flex;
+  flex-direction: column;
 }
 
 .import__error {

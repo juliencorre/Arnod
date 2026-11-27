@@ -10,7 +10,7 @@
  * au retrait d'un niveau, le nom après la colonne de tête ; la pastille d'environnement
  * s'aligne sur le nom, les lignes du projet sur sa pastille.
  */
-import { computed, nextTick, useTemplateRef } from "vue";
+import { computed, nextTick, useTemplateRef, watch } from "vue";
 
 import { CONTRACT_ADD_ITEMS } from "@/components/contracts/addItems";
 import ContractsSection from "@/components/contracts/ContractsSection.vue";
@@ -24,6 +24,7 @@ import { vTitleIfCut } from "@/lib/truncate";
 import { startProjectDrag } from "@/lib/dnd";
 import { countLabel } from "@/lib/format";
 import { useCatalogStore } from "@/stores/catalog";
+import { useImportStore } from "@/stores/imports";
 import { useNavigationStore } from "@/stores/navigation";
 import { useNetworkStore } from "@/stores/network";
 import { useToastStore } from "@/stores/toasts";
@@ -40,6 +41,7 @@ const windows = useWindowsStore();
 const toasts = useToastStore();
 const actions = useProjectActions();
 const network = useNetworkStore();
+const imports = useImportStore();
 
 const tree = useTemplateRef<InstanceType<typeof TreePanel>>("tree");
 const contracts = useTemplateRef<InstanceType<typeof ContractsSection>>("contracts");
@@ -48,6 +50,17 @@ const environment = useTemplateRef<InstanceType<typeof EnvironmentChip>>("enviro
 const id = computed(() => props.project.id);
 const name = computed(() => props.project.name);
 const expanded = computed(() => workbench.isExpanded(id.value));
+
+/** Rapport du dernier import, lu une fois quand le projet se déplie : le menu ⋯ le rouvre. */
+watch(
+  [expanded, id],
+  ([open, projectId]) => {
+    if (open && imports.reports[projectId] === undefined) {
+      imports.load(projectId).catch(() => undefined);
+    }
+  },
+  { immediate: true },
+);
 const missing = computed(() => props.project.status === "missing");
 /** « Non classés » : icône de bac, jamais glissé vers un workspace (N3, R5). */
 const inbox = computed(() => catalog.isInbox(id.value));
@@ -91,6 +104,8 @@ const moreItems = computed<MenuItem[]>(() => {
     // Lot H : réglages du projet, authentification (3.4-a).
     { id: "settings", label: "Réglages du projet…" },
   ];
+  // 2.3-f : le rapport du dernier import se rouvre d'ici, même son onglet fermé.
+  if (imports.reports[id.value]) items.push({ id: "importReport", label: "Rapport d'import" });
   const workspace = props.workspaceId === null ? null : catalog.workspaceById(props.workspaceId);
   if (workspace) {
     items.push(
@@ -158,6 +173,7 @@ async function onMore(item: string): Promise<void> {
   else if (item === "environments") {
     if (await ensureExpanded()) environment.value?.manage();
   } else if (item === "settings") await openSettings();
+  else if (item === "importReport") await imports.openReport(id.value);
   else if (item === "reveal") await navigation.showAll(id.value);
   else if (item === "remove" && props.workspaceId !== null) {
     await actions.removeFromWorkspace(id.value, props.workspaceId);

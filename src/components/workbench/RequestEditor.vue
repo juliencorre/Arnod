@@ -34,12 +34,14 @@ import TrialTransfer from "@/components/workbench/TrialTransfer.vue";
 import TagsEditor from "@/components/workbench/TagsEditor.vue";
 import VariablesEditor from "@/components/workbench/VariablesEditor.vue";
 import { useGuard } from "@/composables/useGuard";
+import { manualAssertion } from "@/lib/assertions";
 import { onTablistKeydown } from "@/lib/tablist";
 import { pathParamNames } from "@/lib/url";
 import { KNOWN_VARIABLES, vVariables } from "@/lib/variables";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
 import { useInputStore } from "@/stores/input";
+import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { CurlCopy, HttpMethod, Pair, RequestDoc, UnknownVariable } from "@/types/ipc";
@@ -52,6 +54,7 @@ const workbench = useWorkbenchStore();
 const contracts = useContractsStore();
 const catalog = useCatalogStore();
 const inputs = useInputStore();
+const sidebar = useSidebarStore();
 const toasts = useToastStore();
 const guard = useGuard();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
@@ -299,6 +302,26 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
   ];
 });
 // --- Lot E : modifié depuis l'envoi (écart 4.2-b), curseur dans l'adresse (4.1-b) ---------
+
+/**
+ * « Remplacer par une assertion… » du rapport d'import (AM42) : l'onglet « Assertions » s'ouvre
+ * sur une assertion ajoutée, sa cible prête à la saisie.
+ */
+watch(
+  [() => sidebar.assertionFocus, request],
+  async ([focus, draft]) => {
+    if (focus !== props.editorKey || !draft) return;
+    sidebar.consumeAssertionFocus(props.editorKey);
+    tab.value = "assertions";
+    draft.assertions = [...draft.assertions, manualAssertion()];
+    await nextTick();
+    const targets = editorRoot.value?.querySelectorAll<HTMLInputElement>(
+      '.assertions input[aria-label^="Cible de l"]',
+    );
+    targets?.[targets.length - 1]?.focus();
+  },
+  { immediate: true },
+);
 
 const changedSinceSent = computed(() => workbench.isChangedSinceSent(props.editorKey));
 const urlInput = useTemplateRef<HTMLInputElement>("urlInput");

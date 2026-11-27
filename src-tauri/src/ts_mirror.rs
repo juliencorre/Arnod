@@ -132,6 +132,11 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::import::SourceFormat>();
     v.visit::<crate::import::ImportSource>();
     v.visit::<crate::import::ImportTarget>();
+    v.visit::<crate::import::SourceEnvironment>();
+    v.visit::<crate::import::ImportOptions>();
+    v.visit::<crate::import::EnvironmentChoice>();
+    v.visit::<crate::import::ScriptChoice>();
+    v.visit::<crate::import::ScriptResolved>();
     v.visit::<crate::import::ImportReport>();
     v.visit::<crate::import::ImportDone>();
     v.visit::<crate::input::added::AddedOrigin>();

@@ -216,6 +216,27 @@ async function clickText(selector: string, text: string): Promise<void> {
   );
 }
 
+/**
+ * Clique un bouton qui ferme sa propre fenêtre (« Rattacher ») : le clic part après la réponse de
+ * WebDriver. Un clic WebDriver attend la suite de l'action ; si la fenêtre se ferme avant, la
+ * commande échoue (« no such window ») et la session perd sa fenêtre courante.
+ */
+async function clickClosing(selector: string, text: string): Promise<void> {
+  await browser.execute(
+    (css, label) => {
+      const target = Array.from(document.querySelectorAll<HTMLElement>(css)).find(
+        (element) => element.textContent.trim() === label,
+      );
+      if (!target) throw new Error(`« ${label} » introuvable dans ${css}`);
+      setTimeout(() => {
+        target.click();
+      }, 0);
+    },
+    selector,
+    text,
+  );
+}
+
 /** Attend qu'une requête écrite sur disque apparaisse dans l'arborescence, puis l'ouvre. */
 async function openTreeRequest(name: string): Promise<void> {
   await browser.waitUntil(
@@ -725,7 +746,7 @@ describe("Fenêtres et zones", () => {
       input.value = `${input.value}?rattache=1`;
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    await browser.$(".content-window__bar").$("button=Rattacher").click();
+    await clickClosing(".content-window__bar button", "Rattacher");
     await waitForWindows(1);
     expect(readFileSync(listerFile, "utf8")).toContain("rattache=1");
     await browser.switchToWindow(mainWindow);
@@ -753,7 +774,7 @@ describe("Fenêtres et zones", () => {
     });
     await screenshot(browser, "08-barre-detachee");
 
-    await browser.$(".sidebar-window__footer").$("button=Rattacher").click();
+    await clickClosing(".sidebar-window__footer button", "Rattacher");
     await waitForWindows(1);
     await browser.switchToWindow(mainWindow);
     await browser.$("aside").waitForDisplayed();
@@ -1152,10 +1173,10 @@ describe("Contrats de services", () => {
 
     // Rattacher : le résultat revient dans l'onglet de la requête (R4).
     await browser.switchToWindow(result);
-    await browser.$(".content-window__bar").$("button=Rattacher").click();
+    await clickClosing(".content-window__bar button", "Rattacher");
     await waitForWindows(2);
     await browser.switchToWindow(sidebar);
-    await browser.$(".sidebar-window__footer").$("button=Rattacher").click();
+    await clickClosing(".sidebar-window__footer button", "Rattacher");
     await waitForWindows(1);
     await browser.switchToWindow(mainWindow);
     await browser.waitUntil(async () => (await linked("state")).response, {
@@ -2213,6 +2234,7 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
     const done = (await invoke("import_run", {
       path: source(),
       target: { kind: "newProject", location: path.join(sandbox.home, "arnod"), workspaceId: null },
+      options: { environments: [], secretsLocal: true },
     })) as { projectId: string };
     await invoke("layout_open_selection", {
       content: { kind: "importReport", projectId: done.projectId },
@@ -2241,6 +2263,27 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
     expect(request).toContain("{{$randomUUID}}");
     expect(readFileSync(path.join(project(), "environments", "recette.yml"), "utf8")).not.toContain(
       "ne-pas-lire",
+    );
+  });
+
+  it("« Accepter sans ce script » retire le script du fichier (2.3-f, AM42)", async () => {
+    const file = path.join(project(), "Commandes", "creer-une-commande.yml");
+    expect(readFileSync(file, "utf8")).toContain("type: tests");
+    // Le rapport montre 5 éléments, puis « … N autres » : le script peut être plus loin.
+    if (await browser.$(".report__more").isExisting()) await clickText(".report__more", "autre");
+    await clickText(".report__item", "TESTS");
+    await browser.waitUntil(async () => await browser.$(".report__actions").isExisting(), {
+      timeout: 5_000,
+      timeoutMsg: "actions du script attendues",
+    });
+    await screenshot(browser, "c1b-script-a-reprendre");
+    await clickText(".report__actions button", "Accepter sans ce script");
+    await browser.waitUntil(() => !readFileSync(file, "utf8").includes("type: tests"), {
+      timeout: 5_000,
+      timeoutMsg: "script retiré du fichier attendu",
+    });
+    expect(await browser.$(".report__item[aria-pressed='true'] .report__status").getText()).toBe(
+      "repris",
     );
   });
 });

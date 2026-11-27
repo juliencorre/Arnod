@@ -115,6 +115,8 @@ export type DynamicValue = { name: string, description: string, example: string,
 
 export type EnvVariable = { name: string, value: string, };
 
+export type EnvironmentChoice = { from: string, to: string, };
+
 export type EnvironmentDeleted = { view: EnvironmentsView, undoToken: string, };
 
 export type EnvironmentDoc = { name: string, color: string, protected: boolean, variables: Array<EnvVariable>, locals: Array<string>, };
@@ -171,13 +173,15 @@ export type ImportFormat = "bruno" | "openCollection" | "openApi";
 
 export type ImportItemKind = "tests" | "preRequest" | "postResponse" | "env" | "auth" | "body" | "request" | "assertion" | "extraction" | "option";
 
-export type ImportItemStatus = "notRun" | "toFill" | "toCheck" | "skipped" | "stored";
+export type ImportItemStatus = "notRun" | "toFill" | "toCheck" | "skipped" | "stored" | "accepted" | "replaced";
+
+export type ImportOptions = { environments: Array<EnvironmentChoice>, secretsLocal: boolean, };
 
 export type ImportReport = { collection: string, format: ImportFormat, source: string, sourceFiles: number, projectId: string, projectName: string, folder: string | null, importedAt: number, counts: ImportCounts, items: Array<ImportReportItem>, examples: Array<ConversionExample>, };
 
 export type ImportReportItem = { kind: ImportItemKind, status: ImportItemStatus, name: string, place: string, file: string, block: string | null, request: string | null, detail: string, code: string | null, };
 
-export type ImportSource = { path: string, format: ImportFormat, name: string, counts: ImportCounts, files: number, };
+export type ImportSource = { path: string, format: ImportFormat, name: string, counts: ImportCounts, files: number, environments: Array<SourceEnvironment>, secrets: Array<string>, };
 
 export type ImportTarget = { "kind": "newProject", location: string | null, workspaceId: string | null, } | { "kind": "project", projectId: string, };
 
@@ -311,6 +315,10 @@ export type RunView = { id: string, number: number, folder: string, environment:
 
 export type Scalar = boolean | number | number | string;
 
+export type ScriptChoice = "accept" | "replace";
+
+export type ScriptResolved = { report: ImportReport, undoToken: string, };
+
 export type SendOutcome = { response: HttpResponse, assertions: Array<AssertionResult>, passed: boolean, slow: boolean, sent: Sent | null, };
 
 export type Sent = { environment: string, method: string, url: string, headers: Array<[string, string]>, body: string | null, drawn: Array<DrawnValue>, used: Array<UsedVariable>, extracted: Array<ExtractedValue>, oauth2: SentToken | null, };
@@ -320,6 +328,8 @@ export type SentToken = { tokenUrl: string, status: TokenStatus | null, };
 export type Side = "right" | "bottom";
 
 export type SkippedOperation = { operation: string, reason: string, };
+
+export type SourceEnvironment = { name: string, variables: Array<string>, };
 
 export type SpecKind = "openApi3" | "swagger2";
 
@@ -577,6 +587,9 @@ export type CheckCurlIgnored = Check<Same<Ipc.CurlIgnored, CurlIgnored>>;
 export type CheckCurlImport = Check<Same<Ipc.CurlImport, CurlImport>>;
 export type CheckImportFormat = Check<Same<Ipc.ImportFormat, ImportFormat>>;
 export type CheckImportSource = Check<Same<Ipc.ImportSource, ImportSource>>;
+export type CheckSourceEnvironment = Check<Same<Ipc.SourceEnvironment, SourceEnvironment>>;
+export type CheckImportOptions = Check<Same<Ipc.ImportOptions, ImportOptions>>;
+export type CheckEnvironmentChoice = Check<Same<Ipc.EnvironmentChoice, EnvironmentChoice>>;
 export type CheckImportTarget = Check<Same<Ipc.ImportTarget, ImportTarget>>;
 export type CheckImportItemKind = Check<Same<Ipc.ImportItemKind, ImportItemKind>>;
 export type CheckImportItemStatus = Check<Same<Ipc.ImportItemStatus, ImportItemStatus>>;
@@ -585,6 +598,8 @@ export type CheckConversionExample = Check<Same<Ipc.ConversionExample, Conversio
 export type CheckImportCounts = Check<Same<Ipc.ImportCounts, ImportCounts>>;
 export type CheckImportReport = Check<Same<Ipc.ImportReport, ImportReport>>;
 export type CheckImportDone = Check<Same<Ipc.ImportDone, ImportDone>>;
+export type CheckScriptChoice = Check<Same<Ipc.ScriptChoice, ScriptChoice>>;
+export type CheckScriptResolved = Check<Same<Ipc.ScriptResolved, ScriptResolved>>;
 export type CheckExtraction = Check<Same<Ipc.Extraction, Extraction>>;
 export type CheckExtractedValue = Check<Same<Ipc.ExtractedValue, ExtractedValue>>;
 export type CheckDrawnValue = Check<Same<Ipc.DrawnValue, DrawnValue>>;

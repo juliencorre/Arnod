@@ -2570,6 +2570,7 @@ fn perf_7_groupes() {
                         location: None,
                         workspace_id: None,
                     },
+                    &import::ImportOptions::default(),
                     &|_: &ProjectCtx, _: &SecretValue| Ok(()),
                 )
                 .expect("import")

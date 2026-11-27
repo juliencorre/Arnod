@@ -124,10 +124,16 @@ fn nouveau_projet_depuis_bruno_sans_toucher_aux_fichiers_d_origine() {
     let f = fixture();
     let before = snapshot(&source());
     let stored = RefCell::new(Vec::new());
-    let done = run(&f.state, &source(), &new_project(), &|_, secret| {
-        stored.borrow_mut().push(secret.clone());
-        Ok(())
-    })
+    let done = run(
+        &f.state,
+        &source(),
+        &new_project(),
+        &ImportOptions::default(),
+        &|_, secret| {
+            stored.borrow_mut().push(secret.clone());
+            Ok(())
+        },
+    )
     .unwrap();
     assert_eq!(
         snapshot(&source()),
@@ -200,12 +206,18 @@ fn nouveau_projet_depuis_bruno_sans_toucher_aux_fichiers_d_origine() {
 #[test]
 fn secret_non_range_reste_a_renseigner() {
     let f = fixture();
-    let done = run(&f.state, &source(), &new_project(), &|_, _| {
-        Err(CommandError::new(
-            CommandErrorKind::SecretStore,
-            "Le coffre du système est indisponible.",
-        ))
-    })
+    let done = run(
+        &f.state,
+        &source(),
+        &new_project(),
+        &ImportOptions::default(),
+        &|_, _| {
+            Err(CommandError::new(
+                CommandErrorKind::SecretStore,
+                "Le coffre du système est indisponible.",
+            ))
+        },
+    )
     .unwrap();
     let report = done.report.unwrap();
     let item = report
@@ -221,7 +233,14 @@ fn secret_non_range_reste_a_renseigner() {
 fn nom_deja_pris_rien_n_est_ecrit() {
     let f = fixture();
     f.state.create_project("boutique api", None, None).unwrap();
-    let error = run(&f.state, &source(), &new_project(), &no_store).unwrap_err();
+    let error = run(
+        &f.state,
+        &source(),
+        &new_project(),
+        &ImportOptions::default(),
+        &no_store,
+    )
+    .unwrap_err();
     assert_eq!(error.kind, CommandErrorKind::NameTaken);
     assert_eq!(f.state.snapshot().unwrap().projects.len(), 1);
 }
@@ -233,7 +252,14 @@ fn dans_un_projet_existant_un_dossier_et_des_environnements_completes() {
     let target = ImportTarget::Project {
         project_id: created.project_id,
     };
-    let done = run(&f.state, &source(), &target, &no_store).unwrap();
+    let done = run(
+        &f.state,
+        &source(),
+        &target,
+        &ImportOptions::default(),
+        &no_store,
+    )
+    .unwrap();
     assert!(done.snapshot.is_none());
     let report = done.report.unwrap();
     assert_eq!(report.folder.as_deref(), Some("Boutique API"));
@@ -261,7 +287,14 @@ fn dans_un_projet_existant_un_dossier_et_des_environnements_completes() {
     assert_eq!(envs[1].name, "Recette");
 
     // Un deuxième import ne remplace rien : un autre dossier.
-    let again = run(&f.state, &source(), &target, &no_store).unwrap();
+    let again = run(
+        &f.state,
+        &source(),
+        &target,
+        &ImportOptions::default(),
+        &no_store,
+    )
+    .unwrap();
     assert_eq!(
         again.report.unwrap().folder.as_deref(),
         Some("Boutique API 2")
@@ -276,7 +309,14 @@ fn projet_existant_ajoute_tel_quel() {
     f.state
         .mutate(|c| c.forget_project(created.project_id).map(|_| ()))
         .unwrap();
-    let done = run(&f.state, &path, &new_project(), &no_store).unwrap();
+    let done = run(
+        &f.state,
+        &path,
+        &new_project(),
+        &ImportOptions::default(),
+        &no_store,
+    )
+    .unwrap();
     assert_eq!(done.project_id, created.project_id);
     assert!(done.report.is_none());
 }
@@ -290,7 +330,14 @@ fn contrat_openapi_dans_un_nouveau_projet() {
         "openapi: 3.0.3\ninfo:\n  title: Petstore\n  version: '1'\npaths: {}\n",
     )
     .unwrap();
-    let done = run(&f.state, &contract, &new_project(), &no_store).unwrap();
+    let done = run(
+        &f.state,
+        &contract,
+        &new_project(),
+        &ImportOptions::default(),
+        &no_store,
+    )
+    .unwrap();
     assert_eq!(done.contract.as_deref(), Some("contracts/petstore.yaml"));
     let root = f.state.project_ctx(done.project_id).unwrap().root;
     assert!(root.join("contracts/petstore.yaml").is_file());
@@ -319,4 +366,406 @@ fn cible_serialisee() {
     let target: ImportTarget =
         serde_json::from_value(serde_json::json!({ "kind": "project", "projectId": id })).unwrap();
     assert_eq!(target, ImportTarget::Project { project_id: id });
+}
+
+#[test]
+fn coffre_en_echec_sans_message_du_systeme() {
+    let f = fixture();
+    let done = run(
+        &f.state,
+        &source(),
+        &new_project(),
+        &ImportOptions::default(),
+        &|_, _| {
+            Err(CommandError::new(
+                CommandErrorKind::SecretStore,
+                "Platform secure storage failure",
+            ))
+        },
+    )
+    .unwrap();
+    let report = done.report.unwrap();
+    let item = report
+        .items
+        .iter()
+        .find(|i| i.kind == ItemKind::Env && i.name == "partnerKey")
+        .unwrap();
+    assert!(!item.detail.contains("Platform"), "{}", item.detail);
+    assert!(!item.detail.contains("à renseigner"), "{}", item.detail);
+}
+
+#[test]
+fn nom_qui_ressemble_a_un_secret() {
+    for name in [
+        "token",
+        "accessToken",
+        "password",
+        "db_password",
+        "apiKey",
+        "API_KEY",
+        "clientSecret",
+        "pwd",
+        "key",
+    ] {
+        assert!(looks_secret(name), "{name}");
+    }
+    for name in [
+        "baseUrl",
+        "tokenUrl",
+        "token_endpoint",
+        "passwordPolicy",
+        "partnerKeyName",
+        "monkey",
+        "userId",
+    ] {
+        assert!(!looks_secret(name), "{name}");
+    }
+}
+
+/// Collection d'exemple convertie, avec deux variables partagées de plus dans « Recette » :
+/// un jeton en clair et l'adresse du jeton.
+fn converted_with_clear_token() -> Converted {
+    let mut converted = convert::convert(&bruno::read(&source()).unwrap());
+    let recette = converted
+        .environments
+        .iter_mut()
+        .find(|env| env["name"] == "Recette")
+        .unwrap();
+    let variables = recette["variables"].as_array_mut().unwrap();
+    variables.push(json!({ "name": "apiToken", "value": "s3cr3t" }));
+    variables.push(json!({ "name": "tokenUrl", "value": "https://auth.boutique.dev/token" }));
+    variables.push(json!({ "name": "refreshToken", "value": "{{token}}" }));
+    converted
+}
+
+#[test]
+fn source_decrit_environnements_et_secrets() {
+    let detected = detect(&source()).unwrap();
+    assert_eq!(
+        detected.environments,
+        vec![
+            SourceEnvironment {
+                name: "Local".into(),
+                variables: vec!["baseUrl".into()],
+            },
+            SourceEnvironment {
+                name: "Recette".into(),
+                variables: vec![
+                    "baseUrl".into(),
+                    "partnerKey".into(),
+                    "token".into(),
+                    "password".into(),
+                ],
+            },
+        ]
+    );
+    // Les secrets de Bruno sont déjà des variables locales : rien ne ressemble à un secret en clair.
+    assert!(detected.secrets.is_empty());
+    assert_eq!(
+        secret_names(&converted_with_clear_token()),
+        vec!["apiToken".to_owned()]
+    );
+}
+
+#[test]
+fn valeurs_qui_ressemblent_a_des_secrets_vont_au_coffre() {
+    let mut converted = converted_with_clear_token();
+    let before = converted.counts.secrets;
+    apply_options(&mut converted, &ImportOptions::default());
+    let recette = converted
+        .environments
+        .iter()
+        .find(|env| env["name"] == "Recette")
+        .unwrap();
+    let token = recette["variables"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["name"] == "apiToken")
+        .unwrap();
+    assert_eq!(token, &json!({ "name": "apiToken", "secret": true }));
+    assert!(
+        recette["variables"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v["name"] == "tokenUrl" && v["value"] == "https://auth.boutique.dev/token")
+    );
+    assert!(converted.secrets.contains(&SecretValue {
+        environment: "Recette".into(),
+        name: "apiToken".into(),
+        value: "s3cr3t".into(),
+    }));
+    assert_eq!(converted.counts.secrets, before + 1);
+    let item = converted
+        .items
+        .iter()
+        .find(|i| i.name == "apiToken")
+        .unwrap();
+    assert_eq!(item.status, ItemStatus::Stored);
+    assert_eq!(item.code, None);
+    assert!(schema::check(Part::Environment, recette).is_ok());
+
+    // Case décochée : la valeur reste partagée.
+    let mut kept = converted_with_clear_token();
+    apply_options(
+        &mut kept,
+        &ImportOptions {
+            environments: Vec::new(),
+            secrets_local: false,
+        },
+    );
+    assert!(!kept.secrets.iter().any(|s| s.name == "apiToken"));
+}
+
+#[test]
+fn environnements_vers_leur_cible() {
+    let mut converted = converted_with_clear_token();
+    apply_options(
+        &mut converted,
+        &ImportOptions {
+            environments: vec![EnvironmentChoice {
+                from: "Recette".into(),
+                to: "Recette fonctionnelle".into(),
+            }],
+            secrets_local: true,
+        },
+    );
+    let names: Vec<String> = converted.environments.iter().map(env_name).collect();
+    assert_eq!(names, ["Local", "Recette fonctionnelle"]);
+    assert!(
+        converted
+            .secrets
+            .iter()
+            .all(|s| s.environment == "Recette fonctionnelle")
+    );
+    assert!(
+        converted
+            .items
+            .iter()
+            .filter(|i| i.kind == ItemKind::Env)
+            .all(|i| i.place == "Recette fonctionnelle")
+    );
+
+    // Deux environnements vers la même cible n'en font qu'un ; le premier garde ses valeurs.
+    let mut merged = convert::convert(&bruno::read(&source()).unwrap());
+    apply_options(
+        &mut merged,
+        &ImportOptions {
+            environments: vec![EnvironmentChoice {
+                from: "Local".into(),
+                to: "Recette".into(),
+            }],
+            secrets_local: true,
+        },
+    );
+    assert_eq!(merged.environments.len(), 1);
+    let variables = merged.environments[0]["variables"].as_array().unwrap();
+    assert_eq!(variables[0]["value"], "http://localhost:8080");
+    assert!(variables.iter().any(|v| v["name"] == "token"));
+}
+
+#[test]
+fn dans_un_projet_existant_l_environnement_choisi_est_complete() {
+    let f = fixture();
+    let created = f.state.create_project("boutique", None, None).unwrap();
+    let target = ImportTarget::Project {
+        project_id: created.project_id,
+    };
+    let stored = RefCell::new(Vec::new());
+    run(
+        &f.state,
+        &source(),
+        &target,
+        &ImportOptions {
+            environments: vec![EnvironmentChoice {
+                from: "Recette".into(),
+                to: "Local".into(),
+            }],
+            secrets_local: true,
+        },
+        &|_, secret| {
+            stored.borrow_mut().push(secret.clone());
+            Ok(())
+        },
+    )
+    .unwrap();
+    let root = f.state.project_ctx(created.project_id).unwrap().root;
+    let envs = environment::list(&root);
+    assert_eq!(envs.len(), 1, "aucun environnement « Recette » créé");
+    assert_eq!(envs[0].name, "Local");
+    assert_eq!(envs[0].locals, ["partnerKey", "token", "password"]);
+    assert!(
+        stored
+            .borrow()
+            .iter()
+            .all(|secret| secret.environment == "Local")
+    );
+}
+
+/// Nouveau projet importé de la collection d'exemple : racine et rapport.
+fn imported() -> (Fixture, Uuid, PathBuf) {
+    let f = fixture();
+    let done = run(
+        &f.state,
+        &source(),
+        &new_project(),
+        &ImportOptions::default(),
+        &no_store,
+    )
+    .unwrap();
+    let root = f.state.project_ctx(done.project_id).unwrap().root;
+    (f, done.project_id, root)
+}
+
+fn item_index(f: &Fixture, project: Uuid, kind: ItemKind) -> usize {
+    load_report(f.state.data_dir(), project)
+        .unwrap()
+        .items
+        .iter()
+        .position(|i| i.kind == kind)
+        .unwrap()
+}
+
+fn scripts_of(value: &Value, key: &str) -> Vec<String> {
+    value
+        .get(key)
+        .and_then(|h| h.get("scripts"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|s| s["type"].as_str().map(str::to_owned))
+        .collect()
+}
+
+#[test]
+fn accepter_sans_ce_script_le_retire_puis_annuler_le_remet() {
+    let (f, project, root) = imported();
+    let index = item_index(&f, project, ItemKind::Tests);
+    let file = root.join("Commandes/creer-une-commande.yml");
+    let before = fs::read_to_string(&file).unwrap();
+    assert!(scripts_of(&yaml::read(&file).unwrap(), "runtime").contains(&"tests".to_owned()));
+
+    let (report, undo) = resolve_script(
+        f.state.data_dir(),
+        &root,
+        project,
+        index,
+        ScriptChoice::Accept,
+    )
+    .unwrap();
+    assert_eq!(report.items[index].status, ItemStatus::Accepted);
+    assert!(!scripts_of(&yaml::read(&file).unwrap(), "runtime").contains(&"tests".to_owned()));
+    assert!(schema::check(Part::HttpRequest, &yaml::read(&file).unwrap()).is_ok());
+    // Gardé sur le poste : le rapport relu dit « repris ».
+    assert_eq!(
+        load_report(f.state.data_dir(), project).unwrap().items[index].status,
+        ItemStatus::Accepted
+    );
+    // Une deuxième fois : ce n'est plus un script à reprendre.
+    assert_eq!(
+        resolve_script(
+            f.state.data_dir(),
+            &root,
+            project,
+            index,
+            ScriptChoice::Accept
+        )
+        .unwrap_err()
+        .kind,
+        CommandErrorKind::InvalidRequest
+    );
+
+    let back = undo_script(f.state.data_dir(), &undo).unwrap();
+    assert_eq!(back.items[index].status, ItemStatus::NotRun);
+    assert_eq!(fs::read_to_string(&file).unwrap(), before);
+}
+
+#[test]
+fn remplacer_un_script_de_dossier() {
+    let (f, project, root) = imported();
+    let index = item_index(&f, project, ItemKind::PreRequest);
+    let folder = root.join("Commandes/folder.yml");
+    assert_eq!(
+        scripts_of(&yaml::read(&folder).unwrap(), "request"),
+        ["before-request"]
+    );
+    let (report, _) = resolve_script(
+        f.state.data_dir(),
+        &root,
+        project,
+        index,
+        ScriptChoice::Replace,
+    )
+    .unwrap();
+    assert_eq!(report.items[index].status, ItemStatus::Replaced);
+    let value = yaml::read(&folder).unwrap();
+    assert!(scripts_of(&value, "request").is_empty());
+    assert!(schema::check(Part::Folder, &value).is_ok());
+}
+
+#[test]
+fn script_modifie_a_la_main_refuse_sans_rien_ecrire() {
+    let (f, project, root) = imported();
+    let index = item_index(&f, project, ItemKind::PostResponse);
+    let report = load_report(f.state.data_dir(), project).unwrap();
+    let file = root.join(report.items[index].request.as_deref().unwrap());
+    let text = fs::read_to_string(&file)
+        .unwrap()
+        .replace("res.body.access_token", "res.body.token");
+    fs::write(&file, &text).unwrap();
+    let error = resolve_script(
+        f.state.data_dir(),
+        &root,
+        project,
+        index,
+        ScriptChoice::Accept,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, CommandErrorKind::NotFound);
+    assert_eq!(fs::read_to_string(&file).unwrap(), text);
+    assert_eq!(
+        load_report(f.state.data_dir(), project).unwrap().items[index].status,
+        ItemStatus::NotRun
+    );
+}
+
+#[test]
+fn script_d_une_collection_importee_dans_un_projet() {
+    let f = fixture();
+    let created = f.state.create_project("boutique", None, None).unwrap();
+    let target = ImportTarget::Project {
+        project_id: created.project_id,
+    };
+    run(
+        &f.state,
+        &source(),
+        &target,
+        &ImportOptions::default(),
+        &no_store,
+    )
+    .unwrap();
+    let root = f.state.project_ctx(created.project_id).unwrap().root;
+    for kind in [
+        ItemKind::Tests,
+        ItemKind::PreRequest,
+        ItemKind::PostResponse,
+    ] {
+        let index = item_index(&f, created.project_id, kind);
+        resolve_script(
+            f.state.data_dir(),
+            &root,
+            created.project_id,
+            index,
+            ScriptChoice::Accept,
+        )
+        .unwrap();
+    }
+    assert!(
+        scripts_of(
+            &yaml::read(&root.join("Boutique API/Commandes/folder.yml")).unwrap(),
+            "request"
+        )
+        .is_empty()
+    );
 }

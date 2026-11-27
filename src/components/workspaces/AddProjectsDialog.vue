@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
- * « Ajouter un projet à un workspace » (2c revu, W6) : d'abord les deux actions
- * principales, créer un projet (P2) ou importer un dossier projet existant
- * (P12) ; ensuite, s'il y en a, les projets de « Tous les projets » absents de ce
- * workspace, à cocher. La recherche n'apparaît que pour une longue liste.
+ * « Ajouter un projet à un workspace » (2c revu, W6, 1.1-c) : d'abord les deux actions
+ * principales, créer un projet (P2) ou importer (AM40 : l'import unique, qui reconnaît un projet
+ * Arnod, une collection Bruno ou un contrat OpenAPI) ; ensuite, s'il y en a, les projets de
+ * « Tous les projets » absents de ce workspace, à cocher. La recherche n'apparaît que pour une
+ * longue liste.
  */
 import { computed, ref, useId, watch } from "vue";
 
@@ -11,9 +12,10 @@ import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
 import SearchInput from "@/components/ui/SearchInput.vue";
 import { countLabel } from "@/lib/format";
-import { joinNames, useProjectActions } from "@/composables/useProjectActions";
+import { joinNames } from "@/composables/useProjectActions";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
+import { useImportStore } from "@/stores/imports";
 import { useToastStore } from "@/stores/toasts";
 
 /** Au-delà de ce nombre de projets proposés, la liste se filtre. */
@@ -22,7 +24,7 @@ const SEARCH_THRESHOLD = 6;
 const catalog = useCatalogStore();
 const dialogs = useDialogStore();
 const toasts = useToastStore();
-const { addExistingProject } = useProjectActions();
+const imports = useImportStore();
 
 const createTitleId = useId();
 const createTextId = useId();
@@ -84,11 +86,14 @@ function createProject(): void {
   if (target) dialogs.openNewProject(target.id);
 }
 
-/** Dossier projet existant, par exemple après un clone Git (P12). */
-async function importExisting(): Promise<void> {
+/**
+ * Import unique (AM40, 1.1-c) : la fenêtre « Importer » reconnaît le format choisi ; un projet
+ * Arnod est ajouté tel quel, une collection ou un contrat devient un projet, dans ce workspace.
+ */
+function importExisting(): void {
   const target = workspace.value;
   close();
-  if (target) await addExistingProject(target.id);
+  if (target) imports.open(null, target.id);
 }
 
 async function submit(): Promise<void> {
@@ -146,7 +151,7 @@ async function submit(): Promise<void> {
           </span>
           <span :id="importTitleId" class="choice__title">Importer…</span>
           <span :id="importTextId" class="choice__text">
-            Un projet Arnod existant, par exemple après un clone Git : choisissez son dossier.
+            Un projet Arnod, une collection Bruno, un fichier OpenAPI : Arnod reconnaît le format.
           </span>
         </button>
       </div>

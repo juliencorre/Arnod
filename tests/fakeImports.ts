@@ -13,6 +13,8 @@ import type {
 export interface FakeImports {
   /** Chemin renvoyé par le prochain `import_pick` (`null` : annulé). */
   picked: string | null;
+  /** Scripts repris (AM42), à remettre par leur jeton : projet, élément et état d'avant. */
+  undos: Map<string, { projectId: string; index: number; item: ImportReport["items"][number] }>;
   /** Sources reconnues, par chemin ; un chemin absent n'est pas reconnu. */
   sources: Record<string, ImportSource>;
   /** Dernier rapport par projet. */
@@ -20,7 +22,7 @@ export interface FakeImports {
 }
 
 export function createFakeImports(): FakeImports {
-  return { picked: null, sources: {}, reports: {} };
+  return { picked: null, sources: {}, reports: {}, undos: new Map() };
 }
 
 /** Collection Bruno « Boutique API » (comme la collection d'exemple des tests Rust). */
@@ -40,6 +42,11 @@ export function brunoSource(path = "/home/julien/bruno/boutique-api"): ImportSou
       scripts: 3,
     },
     files: 12,
+    environments: [
+      { name: "Local", variables: ["baseUrl"] },
+      { name: "Recette", variables: ["baseUrl", "partnerKey", "token", "password"] },
+    ],
+    secrets: [],
   };
 }
 
@@ -106,7 +113,7 @@ export function brunoReport(
         block: "vars:secret",
         request: null,
         detail:
-          "Valeurs gardées par Bruno hors de la collection : variables locales à renseigner, jamais dans le projet.",
+          "Valeurs gardées par Bruno hors de la collection : renseignez-les dans les environnements du projet, qui ne les écrit jamais.",
         code: null,
       },
       {
@@ -215,6 +222,34 @@ export function handleImports(
     }
     case "import_report":
       return structuredClone(fi.reports[String(args.projectId)] ?? null);
+    case "import_script": {
+      const projectId = String(args.projectId);
+      const index = Number(args.index);
+      const report = fi.reports[projectId] ?? fail("notFound", "Aucun rapport.");
+      const item = report.items[index];
+      if (!item || item.status !== "notRun") {
+        fail("invalidRequest", "Cet élément du rapport n'est pas un script à reprendre.");
+      }
+      const undoToken = `script-${String(fi.undos.size + 1)}`;
+      fi.undos.set(undoToken, { projectId, index, item: structuredClone(item) });
+      const accept = args.choice === "accept";
+      report.items[index] = {
+        ...item,
+        status: accept ? "accepted" : "replaced",
+        detail: accept
+          ? "Retiré du fichier : la requête s'exécute sans ce script."
+          : "Retiré du fichier : une assertion de la requête le remplace.",
+      };
+      return { report: structuredClone(report), undoToken };
+    }
+    case "import_script_undo": {
+      const undo = fi.undos.get(String(args.undoToken));
+      if (!undo) fail("undoExpired", "Ce script ne peut plus être remis.");
+      fi.undos.delete(String(args.undoToken));
+      const report = fi.reports[undo.projectId] ?? fail("notFound", "Aucun rapport.");
+      report.items[undo.index] = undo.item;
+      return structuredClone(report);
+    }
     default:
       return undefined;
   }

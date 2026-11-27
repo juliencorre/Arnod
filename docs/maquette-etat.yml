@@ -142,6 +142,7 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 10 écarts ajoutés."
       - "2026-11-26 : a, b bis, d, e : carte introuvable au bord plein et « Ouvrir » grisé ; actions d'un workspace à côté du sélecteur ; gestion des workspaces mise en forme ; outils à droite du titre (plan-alignement-maquette, lot B, AM13 à AM16)."
+      - "2026-11-27 : c : « Importer… » passe par l'import unique (collection Bruno, projet Arnod ou OpenCollection, contrat OpenAPI), rangé dans le workspace (plan-alignement-maquette, lot F, AM40)."
     ecrans:
       a:
         etat: livré
@@ -169,9 +170,6 @@ pages:
       c:
         etat: livré
         pr: [14]
-        ecart:
-          texte: "« Importer… » n'ajoute qu'un dossier de projet Arnod (« …après un clone Git ») ; la maquette annonce Bruno et OpenAPI reconnus, comme l'« Importer » unique de l'accueil (Postman en V4)."
-          aligner: code
       d:
         etat: livré
         pr: [10]
@@ -513,6 +511,8 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 3 écarts ajoutés, 3 réécrits ou complétés."
       - "2026-11-26 : b : « 10 vérifications deviendront des assertions sans code » (plan-alignement-maquette, lot A, AM6)."
+      - "2026-11-27 : b : chaque environnement de la collection va dans un environnement du projet (liste) ou un nouveau, avec le nombre de variables ajoutées ; « N valeurs ressemblent à des secrets » (case cochée : variables locales au coffre) (plan-alignement-maquette, lot F, AM41)."
+      - "2026-11-27 : f : « Remplacer par une assertion… » et « Accepter sans ce script » retirent le script du fichier, avec « Annuler » ; « Rapport d'import » dans le menu ⋯ du projet ; une variable secrète sans coffre ne répète plus « à renseigner » ni l'erreur du système (plan-alignement-maquette, lot F, AM42)."
     ecrans:
       a:
         etat: livré
@@ -525,20 +525,16 @@ pages:
         version: MVP
         pr: [50]
         ecart:
-          - texte: "La fenêtre « Importer » ne montre pas la correspondance des environnements ni la case des secrets (ils vont toujours en variables locales)."
-            aligner: code
-          - texte: "« 7 scripts gardés dans les fichiers, pas exécutés » au lieu de « deviendront des étapes Script » : un script Bruno n'est jamais exécuté (Import Bruno)."
-            aligner: maquette
+          texte: "« 7 scripts gardés dans les fichiers, pas exécutés » au lieu de « deviendront des étapes Script » : un script Bruno n'est jamais exécuté (Import Bruno)."
+          aligner: maquette
       d: { etat: à faire, version: V4 }
       e: { etat: à faire, version: V5 }
       f:
         etat: livré
         version: MVP
         pr: [50]
-        captures: [c1-rapport-import]
+        captures: [c1-rapport-import, c1b-script-a-reprendre]
         ecart:
-          - texte: "Sans « Remplacer par une assertion… » ni « Accepter sans ce script » : un script Bruno reste dans le fichier, signalé ; le rapport se rouvre par son onglet tant qu'il est ouvert, pas depuis la barre latérale ; sans coffre du système, une variable secrète répète « Variable locale, à renseigner. Variable locale à renseigner : … » et montre l'erreur du système en anglais (lib/imports.ts, import.rs)."
-            aligner: code
           - texte: "« Ouvrir la requête » au lieu de « Ouvrir le test » : la requête importée devient une étape."
             aligner: à décider
           - texte: "Chaque élément du rapport cite en plus son fichier .bru."
