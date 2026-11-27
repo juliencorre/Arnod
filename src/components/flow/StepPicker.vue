@@ -77,7 +77,9 @@ onMounted(() => {
 
 <template>
   <div class="picker" role="dialog" :aria-label="label ?? 'Ajouter une étape'">
+    <label :for="`${id}-input`" class="visually-hidden">Nature de l'étape</label>
     <input
+      :id="`${id}-input`"
       ref="input"
       v-model="query"
       class="picker__input"

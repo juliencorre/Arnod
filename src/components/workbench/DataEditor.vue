@@ -12,6 +12,7 @@ import RowRemoveButton from "@/components/ui/RowRemoveButton.vue";
 import SaveState from "@/components/ui/SaveState.vue";
 import { useAutosave } from "@/composables/useAutosave";
 import { useGuard } from "@/composables/useGuard";
+import { variableNames } from "@/lib/variables";
 import { useDatasetsStore } from "@/stores/datasets";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { DataTable, TreeNode } from "@/types/ipc";
@@ -108,10 +109,8 @@ function selectCase(number: number): void {
 /** Commence un tableau : les variables de l'adresse deviennent les colonnes. */
 function start(): void {
   const url = editor.value?.draft?.url ?? "";
-  const names = [...url.matchAll(/\{\{\s*([^}$\s]+)\s*\}\}/g)]
-    .map((m) => m[1] ?? "")
-    .filter((name) => name !== "" && name !== "baseUrl");
-  const columns = names.length > 0 ? [...new Set(names)] : ["valeur"];
+  const names = variableNames(url).filter((name) => name !== "baseUrl");
+  const columns = names.length > 0 ? names : ["valeur"];
   table.value = { columns, rows: [columns.map(() => "")] };
 }
 

@@ -3,7 +3,7 @@ import { emptyOAuth2 } from "@/lib/auth";
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { variableSegments } from "@/lib/variables";
+import { variableNames, variableSegments } from "@/lib/variables";
 import type { Pair, RequestDoc } from "@/types/ipc";
 
 import { installFakeCore } from "../fakeCore";
@@ -79,6 +79,14 @@ describe("variables inconnues soulignées (5.1-b ter)", () => {
     expect(variableSegments("sans variable {{", known)).toEqual([
       { text: "sans variable {{", unknown: false },
     ]);
+  });
+
+  it("liste les noms des variables d'un texte, sans doublon ni valeur dynamique (4.7-a)", () => {
+    expect(variableNames("{{baseUrl}}/pays/{{ code }}?q={{code}}&id={{$guid}}&x={{}}")).toEqual([
+      "baseUrl",
+      "code",
+    ]);
+    expect(variableNames("/sans/variable/{{")).toEqual([]);
   });
 
   it("souligne et signale la variable inconnue de l'environnement actif, avec où elle est définie", async () => {
