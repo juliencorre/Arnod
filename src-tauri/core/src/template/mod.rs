@@ -673,13 +673,14 @@ pub fn create(
                 if path.file_name().is_some_and(|n| n == FOLDER_FILE) {
                     continue;
                 }
-                crate::watch::settle(&path);
                 trash::delete(&path).map_err(|error| {
                     CommandError::new(
                         CommandErrorKind::Io,
                         format!("Mise à la corbeille impossible : {error}"),
                     )
                 })?;
+                // Après la suppression : son écho n'est pas pris pour une modification externe.
+                crate::watch::settle(&path);
             }
         }
         flows::forget(root, folder)?;
@@ -1061,12 +1062,13 @@ pub fn from_request(
         })
         .collect();
     mark_template(root, &target, name, &params)?;
-    crate::watch::settle(&source);
     trash::delete(&source).map_err(|error| {
         CommandError::new(
             CommandErrorKind::Io,
             format!("Mise à la corbeille impossible : {error}"),
         )
     })?;
+    // Après la suppression : son écho n'est pas pris pour une modification externe.
+    crate::watch::settle(&source);
     read(root, &target)
 }

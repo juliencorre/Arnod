@@ -9,6 +9,7 @@
 import { computed, ref } from "vue";
 
 import StepPicker from "@/components/flow/StepPicker.vue";
+import BaseButton from "@/components/ui/BaseButton.vue";
 import {
   KIND_FAMILY,
   KIND_LABELS,
@@ -21,6 +22,8 @@ import {
 } from "@/lib/flow";
 import { edgePath, layoutFlow, type LayoutEdge } from "@/lib/flowLayout";
 import { useFlowsStore } from "@/stores/flows";
+import { useNavigationStore } from "@/stores/navigation";
+import { useWorkbenchStore } from "@/stores/workbench";
 import { useToastStore } from "@/stores/toasts";
 import type { Flow, RunItem, StepKind, StepPlacement, TestEnd, TestView } from "@/types/ipc";
 
@@ -36,6 +39,8 @@ const props = defineProps<{
 const emit = defineEmits<{ select: [id: string] }>();
 
 const flows = useFlowsStore();
+const navigation = useNavigationStore();
+const workbench = useWorkbenchStore();
 const toasts = useToastStore();
 
 const layout = computed(() => layoutFlow(props.flow));
@@ -126,8 +131,8 @@ function openPicker(edge: LayoutEdge): void {
 async function add(kind: StepKind, placement: StepPlacement): Promise<void> {
   picker.value = null;
   try {
-    const id = await flows.add(props.projectId, props.path, kind, placement);
-    emit("select", id);
+    // Le store choisit l'étape insérée (« à configurer ») : la choisir encore la quitterait.
+    await flows.add(props.projectId, props.path, kind, placement);
   } catch (caught) {
     toasts.show(caught instanceof Error ? caught.message : String(caught), { tone: "error" });
   }
@@ -166,8 +171,29 @@ const stopped = computed(() => {
   return {
     step: id === null ? null : label(id),
     detail: failure === null ? null : target === undefined ? failure : `${target} — ${failure}`,
+    open: id === null ? null : opener(id),
   };
 });
+
+/** « Ouvrir le template » ou « Ouvrir la requête » de l'étape qui a arrêté le test (4.3-d). */
+function opener(id: string): { label: string; run: () => void } | null {
+  const step = props.flow.steps.find((s) => s.id === id);
+  if (step?.kind === "template" && step.template !== "") {
+    const template = step.template;
+    return {
+      label: "Ouvrir le template",
+      run: () => void workbench.openFolder(props.projectId, template),
+    };
+  }
+  const file = step?.kind === "request" || step?.kind === "wait" ? step.file : null;
+  if (file) {
+    return {
+      label: "Ouvrir la requête",
+      run: () => void workbench.openRequest(props.projectId, `${props.path}/${file}`),
+    };
+  }
+  return null;
+}
 </script>
 
 <template>
@@ -190,6 +216,10 @@ const stopped = computed(() => {
           <span aria-hidden="true">⋮⋮</span> {{ paletteLabel(kind) }}
         </button>
       </div>
+      <!-- Le catalogue des étapes, en lecture seule (plan V4, hors périmètre : synchronisation). -->
+      <BaseButton variant="link" @click="navigation.showSteps()"
+        >Parcourir le catalogue…</BaseButton
+      >
       <p class="palette__hint">
         Glissez sur un lien pour insérer, ou dans le vide pour une étape libre.
       </p>
@@ -333,6 +363,9 @@ const stopped = computed(() => {
       <p v-if="stopped" class="diagram__stopped" role="status">
         <b>✕ Arrêtée{{ stopped.step === null ? "" : ` à « ${stopped.step} »` }}</b>
         <span v-if="stopped.detail"> · {{ stopped.detail }}</span>
+        <BaseButton v-if="stopped.open" variant="link" @click="stopped.open.run()">{{
+          stopped.open.label
+        }}</BaseButton>
       </p>
       <p v-else-if="played" class="diagram__legend">
         Chemin suivi en vert, branche non empruntée en pointillé. Les valeurs passées d'une étape à

@@ -240,7 +240,16 @@ pub async fn run(
             break;
         }
         let on_failure = step.on_failure.unwrap_or(flow.on_failure);
+        // Étape enregistrée « à configurer » : elle échoue sans rien jouer.
+        let missing = super::reconcile::incomplete(step);
         let outcome = match &step.action {
+            _ if missing.is_some() => {
+                let mut report = Report::done(false);
+                report.state = StepState::Error;
+                report.error = missing.map(|what| format!("Étape à configurer : {what}."));
+                runner.report(&step.id, report);
+                Outcome::Failed
+            }
             Action::Request { file } => {
                 let result = runner.request(&step.id, file, vars, 1).await;
                 vars.extend(result.extracted);

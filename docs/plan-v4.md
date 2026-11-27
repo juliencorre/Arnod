@@ -261,34 +261,39 @@ s'y jouent comme dans l'application.
 
 ### 6.3 Commandes IPC
 
-| Commande                | Paramètres                                                   | Réponse               | Erreurs (`kind`)               |
-| ----------------------- | ------------------------------------------------------------ | --------------------- | ------------------------------ |
-| `flow_save`             | `project`, `path`, `flow`                                    | `TestView`            | `invalidRequest`, `notFound`   |
-| `flow_add_step`         | `project`, `path`, `kind`, `after?`, `link?`                 | `FlowAdded`           | `invalidRequest`               |
-| `hooks_read`            | `project`, `path`                                            | `FolderHooks`         | -                              |
-| `hooks_save`            | `project`, `path`, `hooks`                                   | `FolderHooks`         | `invalidRequest`               |
-| `hooks_add_request`     | `project`, `path`, `phase`                                   | `FolderHooks`         | `invalidRequest`               |
-| `folder_properties`     | `project`, `path`, `environment`                             | `FolderProperty[]`    | `notFound`                     |
-| `folder_set_properties` | `project`, `path`, `properties`                              | `FolderProperty[]`    | `invalidRequest`               |
-| `data_read`             | `project`, `path`                                            | `DataSet?`            | `invalidRequest`               |
-| `data_save`             | `project`, `path`, `columns`, `rows`                         | `DataSet`             | `invalidRequest`               |
-| `data_import`           | `project`, `path`                                            | `DataSet?`            | `invalidRequest`, `cancelled`  |
-| `data_remove`           | `project`, `path`                                            | -                     | -                              |
-| `data_parse`            | `text`                                                       | `DataTable`           | -                              |
-| `data_case`             | `project`, `path`, `request`, `env`, `case`                  | `CasePreview`         | `invalidRequest`               |
-| `request_send_cases`    | `project`, `path`, `request`, `env`, `cases?`                | `CasesOutcome`        | `protectedEnvironment`, réseau |
-| `data_open`             | `project`, `path`                                            | -                     | `notFound`                     |
-| `template_list`         | `project`                                                    | `TemplateSummary[]`   | -                              |
-| `template_read`         | `project`, `path`                                            | `TemplateView`        | `notFound`                     |
-| `template_save_params`  | `project`, `path`, `params`                                  | `TemplateView`        | `invalidRequest`               |
-| `template_candidates`   | `project`, `folder`, `environment`                           | `TemplateCandidate[]` | `notFound`                     |
-| `template_create`       | `project`, `folder`, `name`, `category`, `params`, `replace` | `TemplateView`        | `invalidRequest`, `nameTaken`  |
-| `template_use`          | `project`, `template`, `folder`, `name`                      | `string`              | `nameTaken`                    |
-| `template_instance`     | `project`, `path`, `environment`                             | `InstanceView`        | `notFound`                     |
-| `template_set_values`   | `project`, `path`, `values`                                  | `InstanceView`        | `invalidRequest`               |
-| `template_literals`     | `project`, `path`                                            | `Literal[]`           | `notFound`                     |
-| `template_from_request` | `project`, `path`, `name`, `category`, `params`              | `TemplateView`        | `invalidRequest`, `nameTaken`  |
-| `sections_show`         | `project`, `section`, `shown`                                | `string[]`            | -                              |
+| Commande                | Paramètres                                                         | Réponse               | Erreurs (`kind`)               |
+| ----------------------- | ------------------------------------------------------------------ | --------------------- | ------------------------------ |
+| `flow_save`             | `project`, `path`, `flow`                                          | `TestView`            | `invalidRequest`, `notFound`   |
+| `flow_add_step`         | `project`, `path`, `kind`, `placement`, `name?`                    | `StepAdded`           | `invalidRequest`, `notFound`   |
+| `flow_remove_step`      | `project`, `path`, `step`                                          | `TestView`            | `notFound`                     |
+| `flow_step_operation`   | `project`, `path`, `step`, `contract`, `operation`, `environment?` | `TestView`            | `notFound`, `invalidRequest`   |
+| `hooks_read`            | `project`, `path`                                                  | `HooksView`           | -                              |
+| `hooks_save`            | `project`, `path`, `hooks`                                         | `HooksView`           | `invalidRequest`               |
+| `hooks_add_step`        | `project`, `path`, `phase`, `kind`                                 | `HooksView`           | `invalidRequest`               |
+| `hooks_remove_step`     | `project`, `path`, `phase`, `step`                                 | `HooksView`           | -                              |
+| `folder_properties`     | `project`, `path`, `environment`                                   | `FolderProperty[]`    | `notFound`                     |
+| `folder_set_properties` | `project`, `path`, `properties`                                    | `FolderProperty[]`    | `invalidRequest`               |
+| `data_read`             | `project`, `path`                                                  | `DataSet?`            | `invalidRequest`               |
+| `data_save`             | `project`, `path`, `columns`, `rows`                               | `DataSet`             | `invalidRequest`               |
+| `data_import`           | `project`, `path`                                                  | `DataSet?`            | `invalidRequest`, `cancelled`  |
+| `data_remove`           | `project`, `path`                                                  | -                     | -                              |
+| `data_parse`            | `text`                                                             | `DataTable`           | -                              |
+| `data_case`             | `project`, `path`, `request`, `env`, `case`                        | `CasePreview`         | `invalidRequest`               |
+| `request_send_cases`    | `project`, `path`, `request`, `env`, `cases?`                      | `CasesOutcome`        | `protectedEnvironment`, réseau |
+| `data_open`             | `project`, `path`                                                  | -                     | `notFound`                     |
+| `template_list`         | `project`                                                          | `TemplateSummary[]`   | -                              |
+| `template_categories`   | `project`                                                          | `string[]`            | -                              |
+| `template_read`         | `project`, `path`                                                  | `TemplateView`        | `notFound`                     |
+| `template_save_params`  | `project`, `path`, `params`                                        | `TemplateView`        | `invalidRequest`               |
+| `template_candidates`   | `project`, `folder`, `environment`                                 | `TemplateCandidate[]` | `notFound`                     |
+| `template_create`       | `project`, `folder`, `name`, `category`, `params`, `replace`       | `TemplateView`        | `invalidRequest`, `nameTaken`  |
+| `template_use`          | `project`, `template`, `folder`, `name`                            | `string`              | `nameTaken`                    |
+| `template_instance`     | `project`, `path`, `environment`                                   | `InstanceView`        | `notFound`                     |
+| `template_set_values`   | `project`, `path`, `values`                                        | `InstanceView`        | `invalidRequest`               |
+| `template_literals`     | `project`, `path`                                                  | `Literal[]`           | `notFound`                     |
+| `template_from_request` | `project`, `path`, `name`, `category`, `params`                    | `TemplateView`        | `invalidRequest`, `nameTaken`  |
+| `sections_show`         | `project`, `section`, `shown`                                      | `string[]`            | `invalidRequest`               |
+| `sections_show`         | `project`, `section`, `shown`                                      | `string[]`            | -                              |
 
 `test_view` (existant) rend aussi le schéma réconcilié (`TestView.flow`, `TestView.info`) ;
 `tree_load` rend les templates du projet (`TreeView.templates`) et les sections affichées.
@@ -335,47 +340,49 @@ Les lots sont livrés ensemble, sur la branche de la session, en une pull reques
 
 **Lot A - Test en liste**
 
-- [ ] **T1** `flow/` : modèle, réconciliation (R2, R3), stockage (R1), suivi (R4) ; tests règle par règle.
-- [ ] **T2** `test_view` avec le schéma, `flow_save`, `flow_add_step` ; types IPC, faux cœur.
-- [ ] **T3** `TestTab` en liste, `StepPicker`, `StepPanel` ; Vitest au clavier.
+- [x] **T1** `flow/` : modèle, réconciliation (R2, R3), stockage (R1), suivi (R4) ; tests règle par règle.
+- [x] **T2** `test_view` avec le schéma, `flow_save`, `flow_add_step` ; types IPC, faux cœur.
+- [x] **T3** `TestTab` en liste, `StepPicker`, `StepPanel` ; Vitest au clavier.
 
 **Lot B - Exécution et schéma**
 
-- [ ] **T4** `flow/engine.rs` et `workbench` : parcours (R5 à R8) ; tests contre un serveur simulé.
-- [ ] **T5** `FlowDiagram`, palette, insertion, résultats sur le schéma ; `lib/flowLayout.ts`.
+- [x] **T4** `flow/engine.rs` et `workbench` : parcours (R5 à R8) ; tests contre un serveur simulé.
+- [x] **T5** `FlowDiagram`, palette, insertion, résultats sur le schéma ; `lib/flowLayout.ts`.
 
 **Lot C - Scripts**
 
-- [ ] **T6** `script/` : étape script (R9), scripts Bruno (R10) ; tests.
-- [ ] **T7** Éditeur de script dans `StepPanel` ; rapport d'import.
+- [x] **T6** `script/` : étape script (R9), scripts Bruno (R10) ; tests.
+- [x] **T7** Éditeur de script dans `StepPanel` ; rapport d'import.
 
 **Lot D - Jeux de données**
 
-- [ ] **T8** `dataset/` (R11, R12), envoi par cas, run ; tests.
-- [ ] **T9** `DataEditor`, cas du résultat, run ; Vitest.
+- [x] **T8** `dataset/` (R11, R12), envoi par cas, run ; tests.
+- [x] **T9** `DataEditor`, cas du résultat, run ; Vitest.
 
 **Lot E - Avant / Après et propriétés**
 
-- [ ] **T10** Avant / Après (R13, R14), propriétés et résolution (R15) ; tests.
-- [ ] **T11** `FolderTab` : Avant / Après, Propriétés ; Vitest.
+- [x] **T10** Avant / Après (R13, R14), propriétés et résolution (R15) ; tests.
+- [x] **T11** `FolderTab` : Avant / Après, Propriétés ; Vitest.
 
 **Lot F - Templates**
 
-- [ ] **T12** `template/` (R16 à R19), étape template, run d'une utilisation ; tests.
-- [ ] **T13** Section Templates, `TemplateTab`, `InstanceTab`, dialogues, 3.2-d ; Vitest.
+- [x] **T12** `template/` (R16 à R19), étape template, run d'une utilisation ; tests.
+- [x] **T13** Section Templates, `TemplateTab`, `InstanceTab`, dialogues, 3.2-d ; Vitest.
 
 **Lot G - Plus**
 
-- [ ] **T14** « Plus » (R21) ; Vitest ; maquette-etat, CLAUDE.md, e2e.
+- [x] **T14** « Plus » (R21) ; Vitest ; maquette-etat, CLAUDE.md, e2e.
 
 ## 9. Critères d'acceptation
 
-- [ ] `cargo test` : règles R1 à R21, dont un test joué contre un serveur simulé (condition,
+- [x] `cargo test` : règles R1 à R21, dont un test joué contre un serveur simulé (condition,
       boucle, attente, script, test existant, template, jeu de données, Avant / Après).
-- [ ] Vitest : liste, schéma et insertion au clavier, panneau d'étape, données, Avant / Après,
+- [x] Vitest : liste, schéma et insertion au clavier, panneau d'étape, données, Avant / Après,
       propriétés, templates, « Plus », sur le faux cœur.
-- [ ] `arnod run` joue un test en schéma et une requête à jeu de données.
-- [ ] `npm run check` passe ; installeur < 15 Mo (QuickJS compte pour environ 1 Mo).
+- [x] `arnod run` joue un test en schéma et une requête à jeu de données.
+- [x] `npm run check` passe.
+- [ ] Installeur < 15 Mo (QuickJS compte pour environ 1 Mo) : mesuré par la CI Windows
+      (`scripts/bundle-size.mjs`) sur la pull request.
 
 ## 10. Risques
 

@@ -183,7 +183,7 @@ export type FlowCheck = { target: string, operator: AssertionOperator, value?: S
 
 export type FlowStep = { id: string, name: string, next?: string, onFailure?: OnFailure, } & ({ "kind": "request", file: string, } | { "kind": "condition", check: FlowCheck, otherwise?: string, } | { "kind": "loop", count?: number, list?: string, item: string, until?: string, } | { "kind": "wait", file?: string, check: FlowCheck, intervalMs: number, attempts: number, } | { "kind": "variable", variable: string, value: string, } | { "kind": "script", code: string, } | { "kind": "test", test: string, } | { "kind": "template", template: string, values: { [key in string]: string }, });
 
-export type FlowStepInfo = { id: string, inputs: Array<StepInput>, extracts: Array<string>, };
+export type FlowStepInfo = { id: string, inputs: Array<StepInput>, extracts: Array<string>, available: Array<StepInput>, };
 
 export type FolderHooks = { beforeAll: Array<FlowStep>, beforeEach: Array<FlowStep>, afterEach: Array<FlowStep>, afterAll: Array<FlowStep>, };
 

@@ -1680,6 +1680,15 @@ impl Workbench {
                 ItemStatus::Failed | ItemStatus::Error => Some(false),
                 _ => None,
             };
+            // La fin d'un test arrêté par cette étape ne tient plus (`docs/plan-v4.md`, R5) : le
+            // test se lit alors sur ses lignes, les étapes suivantes restent « non jouées ».
+            if let (Some(true), Some(test), Some(step)) =
+                (passed, item.test.clone(), item.flow.step_id.clone())
+            {
+                view.ends.retain(|end| {
+                    end.passed || end.test != test || end.failed_step.as_deref() != Some(&step)
+                });
+            }
             view.touch();
             Ok(passed)
         };

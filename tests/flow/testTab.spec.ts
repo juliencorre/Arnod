@@ -7,9 +7,10 @@ import { clearMocks } from "@tauri-apps/api/mocks";
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { AUTOSAVE_MS } from "@/stores/workbench";
+import { AUTOSAVE_MS, useWorkbenchStore } from "@/stores/workbench";
 import type { Flow } from "@/types/ipc";
 
+import { PETSTORE_OPERATIONS, PETSTORE_SOURCE } from "../fakeContracts";
 import type { FakeCore } from "../fakeCore";
 import type { AppWrapper } from "../mountApp";
 import { click, openProject } from "../workbench/helpers";
@@ -176,6 +177,93 @@ describe("test en schéma (4.3-b, 4.3-b bis, 4.3-d)", () => {
       placement: { kind: "link", after: "r:creer.yml", otherwise: false },
     });
     expect(page().findAll(".node")).toHaveLength(4);
+    // L'étape insérée reste choisie, « à configurer », et son insertion s'annule (4.3-b quater).
+    const panel = page().get(".panel");
+    expect(panel.text()).toContain("à configurer");
+    await click(page(), ".panel button", "Annuler l'insertion");
+    expect(core.calls.some((c) => c.cmd === "flow_remove_step")).toBe(true);
+    expect(page().findAll(".node")).toHaveLength(3);
+  });
+
+  it("une requête insérée propose le service, l'opération et les données disponibles (4.3-b quater)", async () => {
+    const core = await openTest((c) => {
+      c.contracts.files.set("contracts/petstore.yaml", {
+        name: "Petstore",
+        version: "1.0.0",
+        source: PETSTORE_SOURCE,
+        operations: structuredClone(PETSTORE_OPERATIONS),
+      });
+      const created = c.workbench.requests.get("Clients/creer.yml");
+      if (created)
+        created.extractions = [
+          { name: "client.id", source: "body.id", enabled: true, scope: "runtime" },
+        ];
+    });
+    await page().findAll(".test__mode")[1]?.trigger("click");
+    await flushPromises();
+    await page()
+      .findAll(".edge__plus")
+      .find((b) => b.attributes("aria-label")?.includes("« Créer » et « Client créé ? »"))
+      ?.trigger("click");
+    const input = page().get(".board__picker .picker__input");
+    await input.setValue("rest");
+    await input.trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    const panel = page().get(".panel");
+    expect(panel.text()).toContain("à configurer");
+    expect(panel.text()).toContain("Après « Créer », puis vers « Client créé ? ».");
+    // Données disponibles à ce point : ce que « Créer » extrait.
+    expect(panel.text()).toContain("client.id de « Créer »");
+    const [service, operation] = panel.findAll("select.panel__select");
+    expect(operation?.attributes("disabled")).toBeDefined();
+    await service?.setValue("contracts/petstore.yaml");
+    expect(
+      operation
+        ?.findAll("option")
+        .map((o) => o.text())
+        .slice(1),
+    ).toEqual([
+      "GET /pets · Lister les animaux",
+      "POST /pets · Créer un animal",
+      "GET /health · Santé",
+    ]);
+    await operation?.setValue("GET /pets");
+    await flushPromises();
+    const call = core.calls.find((c) => c.cmd === "flow_step_operation");
+    expect(call?.args).toMatchObject({
+      path: "Clients",
+      contract: "contracts/petstore.yaml",
+      operation: "GET /pets",
+    });
+    expect(page().get(".panel").text()).toContain("{{baseUrl}}/pets");
+  });
+
+  it("« Parcourir le catalogue… » de la palette ouvre le catalogue des étapes", async () => {
+    await openTest();
+    await page().findAll(".test__mode")[1]?.trigger("click");
+    await flushPromises();
+    await click(page(), ".palette button", "Parcourir le catalogue…");
+    expect(page().get("h1").text()).toBe("Catalogue des étapes");
+  });
+
+  it("un test arrêté dit où, et ouvre la requête de l'étape (4.3-d)", async () => {
+    await openTest();
+    await click(page(), ".test button", "Exécuter le test");
+    await click(page(), ".zone__tab-button", "Clients");
+    // Fin du test telle que le cœur la donne : arrêté par « Créer ».
+    const run = Object.values(useWorkbenchStore().runs)[0];
+    if (!run) throw new Error("run attendu");
+    run.ends = [{ test: "Clients", passed: false, reason: null, failedStep: "r:creer.yml" }];
+    await page().findAll(".test__mode")[1]?.trigger("click");
+    await flushPromises();
+    const stopped = page().get(".diagram__stopped");
+    expect(stopped.text()).toContain("✕ Arrêtée à « Créer »");
+    await click(page(), ".diagram__stopped button", "Ouvrir la requête");
+    expect(
+      page()
+        .findAll(".zone__tab-button")
+        .some((t) => t.text().includes("Créer")),
+    ).toBe(true);
   });
 
   it("après exécution, marque chaque étape et suit le chemin", async () => {

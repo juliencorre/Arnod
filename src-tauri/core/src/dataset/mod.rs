@@ -293,8 +293,8 @@ pub fn remove(root: &Path, path: &str) -> Result<(), CommandError> {
         && let Ok(target) = tree::resolve(root, &link.file)
         && target.is_file()
     {
-        crate::watch::settle(&target);
         let _ = trash::delete(&target);
+        crate::watch::settle(&target);
     }
     Ok(())
 }

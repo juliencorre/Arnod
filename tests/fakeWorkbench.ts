@@ -592,12 +592,21 @@ export function flowOf(wb: FakeWorkbench, path: string, steps: StepView[]): Flow
   };
 }
 
-/** Ce que lit et extrait chaque étape, comme `flow::edit::info` (sans les entrées lues). */
+/**
+ * Ce que lit et extrait chaque étape, comme `flow::edit::info` (sans les entrées lues) ; les
+ * données disponibles sont celles des étapes d'avant.
+ */
 export function infoOf(flow: Flow, steps: StepView[]): FlowStepInfo[] {
+  const provided = new Map<string, { from: string; source: string }>();
   return flow.steps.map((step) => {
     const request = "file" in step ? steps.find((s) => s.file === step.file) : undefined;
     const extracts = request?.extractions ?? (step.kind === "variable" ? [step.variable] : []);
-    return { id: step.id, inputs: [], extracts };
+    const available = [...provided.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, { from, source }]) => ({ name, from, source }));
+    for (const name of extracts)
+      provided.set(name, { from: step.id, source: request ? "extraite" : "valeur" });
+    return { id: step.id, inputs: [], extracts, available };
   });
 }
 

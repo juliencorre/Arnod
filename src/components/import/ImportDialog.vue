@@ -400,7 +400,7 @@ async function submit(): Promise<void> {
             {{
               source.counts.scripts === 0
                 ? "aucun script."
-                : `${countLabel(source.counts.scripts, "script gardé", "scripts gardés")} dans les fichiers, pas exécutés.`
+                : `${countLabel(source.counts.scripts, "script gardé", "scripts gardés")} dans les fichiers, exécutés à l'envoi.`
             }}
           </dd>
         </template>

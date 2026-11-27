@@ -48,7 +48,7 @@ pub enum ItemKind {
 #[cfg_attr(feature = "ts", ts(rename = "ImportItemStatus"))]
 #[serde(rename_all = "camelCase")]
 pub enum ItemStatus {
-    /// Gardé dans le fichier, pas exécuté (scripts).
+    /// Script gardé dans le fichier, exécuté à chaque envoi (V4, R10).
     NotRun,
     /// Valeur à renseigner (secret).
     ToFill,

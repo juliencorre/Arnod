@@ -7,6 +7,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 
 import { ipc } from "@/lib/ipc";
+import { useToastStore } from "@/stores/toasts";
 import { contentKey } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type {
@@ -122,6 +123,37 @@ export const useFlowsStore = defineStore("flows", () => {
     if (inserted.value[k] === id) inserted.value[k] = null;
   }
 
+  /**
+   * « Service » puis « Opération » d'une étape requête insérée (4.3-b quater) : le cœur lui donne
+   * la requête de l'opération, sans lien au contrat ; une requête ouverte du test est relue.
+   */
+  async function fromOperation(
+    projectId: string,
+    path: string,
+    id: string,
+    contract: string,
+    operation: string,
+  ): Promise<void> {
+    await save(projectId, path);
+    const view = await ipc.flowStepOperation(
+      projectId,
+      path,
+      id,
+      contract,
+      operation,
+      workbench.activeEnvironment(projectId),
+    );
+    adopt(projectId, path, view);
+    await workbench.refreshTree(projectId);
+    await workbench.reloadIn(projectId, path);
+  }
+
+  /** « Utiliser » une donnée disponible (4.3-b quater) : `{{nom}}`, à coller dans la requête. */
+  async function copyVariable(name: string): Promise<void> {
+    await navigator.clipboard.writeText(`{{${name}}}`);
+    useToastStore().show(`{{${name}}} copiée : collez-la dans la requête.`);
+  }
+
   /** Annule la dernière insertion (Ctrl+Z dans l'onglet du test). */
   async function undoInsert(projectId: string, path: string): Promise<boolean> {
     const id = inserted.value[key(projectId, path)];
@@ -226,6 +258,8 @@ export const useFlowsStore = defineStore("flows", () => {
     add,
     remove,
     undoInsert,
+    fromOperation,
+    copyVariable,
     select,
     mode,
     setMode,

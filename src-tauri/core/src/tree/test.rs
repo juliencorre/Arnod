@@ -315,6 +315,17 @@ pub fn extracted_before(root: &Path, path: &str) -> Vec<String> {
             }
         }
     }
+    // Test en schéma (`docs/plan-v4.md`) : aussi ce que posent les étapes variable, boucle… d'avant.
+    let file = path.rsplit('/').next().unwrap_or(path);
+    if let Some(step) = view.flow.steps.iter().find(|s| s.file() == Some(file))
+        && let Some(info) = view.info.iter().find(|i| i.id == step.id)
+    {
+        for input in &info.available {
+            if !names.contains(&input.name) {
+                names.push(input.name.clone());
+            }
+        }
+    }
     names
 }
 

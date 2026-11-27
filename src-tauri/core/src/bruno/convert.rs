@@ -335,7 +335,7 @@ fn scripts(file: &BruFile, at: &At<'_>, ctx: &mut Ctx) -> Vec<Value> {
             item,
             ItemStatus::NotRun,
             Some(block),
-            "Aucun JavaScript n'est exécuté par Arnod : ce script n'a pas d'équivalent sans code.",
+            "Arnod exécute ce script à chaque envoi (bru, req, res, test, expect) ; il peut aussi être remplacé par une assertion sans code.",
             Some(code.to_owned()),
         );
     }

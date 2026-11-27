@@ -240,17 +240,25 @@ pub fn validate(flow: &Flow, files: &[String]) -> Result<(), String> {
                     ));
                 }
             }
-            Action::Variable { variable, .. } if variable.trim().is_empty() => {
-                return Err(format!("{label} : nommez la variable."));
-            }
-            Action::Test { test } if test.trim().is_empty() => {
-                return Err(format!("{label} : choisissez le test à jouer."));
-            }
-            Action::Template { template, .. } if template.trim().is_empty() => {
-                return Err(format!("{label} : choisissez le template à jouer."));
-            }
+            // Une variable sans nom, un test ou un template à choisir s'enregistrent « à
+            // configurer » (4.3-b quater) : l'étape échoue à l'exécution (`incomplete`).
             _ => {}
         }
     }
     Ok(())
+}
+
+/// Ce qui manque à une étape enregistrée « à configurer » pour être jouée, en clair ; `None`
+/// pour une étape complète.
+pub fn incomplete(step: &Step) -> Option<&'static str> {
+    match &step.action {
+        Action::Variable { variable, .. } if variable.trim().is_empty() => {
+            Some("nommez la variable")
+        }
+        Action::Test { test } if test.trim().is_empty() => Some("choisissez le test à jouer"),
+        Action::Template { template, .. } if template.trim().is_empty() => {
+            Some("choisissez le template à jouer")
+        }
+        _ => None,
+    }
 }

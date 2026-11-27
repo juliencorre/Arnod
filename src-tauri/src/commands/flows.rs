@@ -73,6 +73,43 @@ pub fn flow_remove_step(
     tree::test_view(&ctx.root, &path)
 }
 
+/// Donne à une étape requête insérée la requête d'une opération d'un contrat du projet
+/// (4.3-b quater, « Service » puis « Opération »), sans lien au contrat ; `environment` reçoit
+/// `baseUrl` si elle y est vide.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn flow_step_operation(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    project: Uuid,
+    path: String,
+    step: String,
+    contract: String,
+    operation: String,
+    environment: Option<String>,
+) -> Result<TestView, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    edit::from_operation(
+        &ctx.root,
+        &path,
+        &step,
+        &contract,
+        &operation,
+        environment.as_deref(),
+    )?;
+    tree_changed(&window, project);
+    if environment.is_some() {
+        windows::project_changed(
+            window.app_handle(),
+            window.label(),
+            project,
+            ProjectScope::Environments,
+            None,
+        );
+    }
+    tree::test_view(&ctx.root, &path)
+}
+
 /// Retire une étape d'un Avant / Après (4.7-c) ; sa requête va à la corbeille.
 #[tauri::command]
 pub fn hooks_remove_step(

@@ -756,7 +756,7 @@ pub fn generate(
 /// Renseigne `baseUrl` dans l'environnement `name` si elle est vide ou absente,
 /// avec le premier serveur absolu du contrat (R8). Une variable locale n'est
 /// jamais modifiée.
-fn fill_base_url(root: &Path, name: &str, contract: &Contract) -> Option<BaseUrlSet> {
+pub(crate) fn fill_base_url(root: &Path, name: &str, contract: &Contract) -> Option<BaseUrlSet> {
     let server = contract
         .servers
         .iter()

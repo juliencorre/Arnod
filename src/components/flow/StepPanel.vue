@@ -6,11 +6,12 @@
  * se règlent ici. « Si cette étape échoue » et la suite (« puis → ») valent pour toute étape. Les
  * modifications vont au brouillon du schéma, qui s'enregistre seul.
  */
-import { computed, watch } from "vue";
+import { computed, ref, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import { OPERATORS } from "@/lib/assertions";
 import { KIND_LABELS, following, stepName, stepRequest } from "@/lib/flow";
+import { useContractsStore } from "@/stores/contracts";
 import { useFlowsStore } from "@/stores/flows";
 import { useTemplatesStore } from "@/stores/templates";
 import { useToastStore } from "@/stores/toasts";
@@ -26,6 +27,7 @@ const props = defineProps<{
 }>();
 
 const flows = useFlowsStore();
+const contracts = useContractsStore();
 const workbench = useWorkbenchStore();
 const templates = useTemplatesStore();
 const toasts = useToastStore();
@@ -159,6 +161,64 @@ async function remove(): Promise<void> {
 function openRequest(): void {
   if (request.value) void workbench.openRequest(props.projectId, request.value.path);
 }
+
+async function attempt(work: () => Promise<unknown>): Promise<void> {
+  try {
+    await work();
+  } catch (caught) {
+    toasts.show(caught instanceof Error ? caught.message : String(caught), { tone: "error" });
+  }
+}
+
+// --- Étape insérée (4.3-b quater) : service, opération, données disponibles, enchaînement ------
+
+/** Contrats lisibles du projet, pour « Service ». */
+const services = computed(() =>
+  (contracts.lists[props.projectId] ?? []).filter((c) => c.error === null),
+);
+watch(
+  () => justInserted.value && props.step.kind === "request",
+  (shown) => {
+    if (shown && !contracts.lists[props.projectId])
+      void contracts.loadList(props.projectId).catch(() => undefined);
+  },
+  { immediate: true },
+);
+const service = ref("");
+const operations = computed(
+  () =>
+    services.value
+      .find((c) => c.path === service.value)
+      ?.resources.flatMap((r) => r.operations)
+      .filter((o) => o.supported) ?? [],
+);
+
+function chooseOperation(key: string): void {
+  if (key === "" || service.value === "") return;
+  void attempt(() =>
+    flows.fromOperation(props.projectId, props.path, props.step.id, service.value, key),
+  );
+}
+
+const available = computed(() => info.value?.available ?? []);
+
+/** « Après « … », puis vers « … ». » : l'étape qui mène ici et la suite. */
+const linkedFrom = computed(() => {
+  const at = props.flow.steps.findIndex(
+    (s, i) =>
+      s.id !== props.step.id &&
+      (following(props.flow, i) === props.step.id ||
+        (s.kind === "condition" && s.otherwise === props.step.id)),
+  );
+  const step = props.flow.steps[at];
+  return step ? `« ${stepName(step, props.view.steps)} »` : "le départ";
+});
+const linkedTo = computed(() => {
+  const id = following(props.flow, index.value);
+  const step = props.flow.steps.find((s) => s.id === id);
+  if (step) return `« ${stepName(step, props.view.steps)} »`;
+  return id === "fail" ? "« Fin en échec »" : "la fin";
+});
 </script>
 
 <template>
@@ -182,6 +242,51 @@ function openRequest(): void {
       <p class="panel__url">
         <b>{{ request.method }}</b> <code>{{ request.url }}</code>
       </p>
+      <!-- Requête insérée (4.3-b quater) : service, opération et données déjà disponibles. -->
+      <template v-if="justInserted">
+        <label class="panel__field">
+          <span class="panel__label">Service</span>
+          <select v-model="service" class="panel__select">
+            <option value="">Choisir un contrat…</option>
+            <option v-for="c in services" :key="c.path" :value="c.path">
+              {{ c.deduced || c.version === "" ? c.name : `${c.name} v${c.version}` }}
+            </option>
+          </select>
+        </label>
+        <p v-if="services.length === 0" class="panel__muted">
+          Aucun contrat dans le projet : réglez la requête dans l'éditeur, ou ajoutez un contrat
+          depuis la barre latérale.
+        </p>
+        <label class="panel__field">
+          <span class="panel__label">Opération</span>
+          <select
+            class="panel__select"
+            :disabled="service === ''"
+            @change="chooseOperation(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">
+              {{ service === "" ? "après le choix du service" : "Choisir une opération…" }}
+            </option>
+            <option v-for="o in operations" :key="o.key" :value="o.key">
+              {{ o.summary ? `${o.key} · ${o.summary}` : o.key }}
+            </option>
+          </select>
+        </label>
+        <div class="panel__block">
+          <p class="panel__label">Données disponibles à ce point</p>
+          <p v-for="d in available" :key="d.name" class="panel__line panel__line--row">
+            <span
+              ><code>{{ d.name }}</code> de « {{ sourceName(d.from) }} »</span
+            >
+            <BaseButton variant="link" @click="attempt(() => flows.copyVariable(d.name))"
+              >Utiliser</BaseButton
+            >
+          </p>
+          <p v-if="available.length === 0" class="panel__muted">
+            Aucune valeur extraite avant cette étape.
+          </p>
+        </div>
+      </template>
       <div v-if="info?.inputs.length" class="panel__block">
         <p class="panel__label">Entrées</p>
         <p v-for="input in info.inputs" :key="input.name" class="panel__line">
@@ -512,6 +617,9 @@ function openRequest(): void {
     <!-- Enchaînement -->
     <div class="panel__block">
       <p class="panel__label">Enchaînement</p>
+      <p v-if="justInserted" class="panel__muted">
+        Après {{ linkedFrom }}, puis vers {{ linkedTo }}. Les liens ont été reconnectés.
+      </p>
       <template v-if="step.kind === 'condition'">
         <label class="panel__row">
           <span class="panel__hint">si oui →</span>
@@ -626,15 +734,26 @@ function openRequest(): void {
   color: var(--color-muted);
 }
 
+.panel__line--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .panel__field {
   display: flex;
-  flex: 1;
   flex-direction: column;
   gap: 0.25rem;
   min-width: 0;
 }
 
-.panel__field--wide {
+/* Côte à côte dans une rangée ; seuls, les champs gardent leur hauteur. */
+.panel__row .panel__field {
+  flex: 1;
+}
+
+.panel__row .panel__field--wide {
   flex: 2;
 }
 

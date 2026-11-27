@@ -680,6 +680,23 @@ export const ipc = {
   /** Retire une étape (« Supprimer l'étape », « Annuler l'insertion ») ; rend le test. */
   flowRemoveStep: (project: string, path: string, step: string): Promise<TestView> =>
     call<TestView>("flow_remove_step", { project, path, step }),
+  /** Étape requête insérée : la requête d'une opération d'un contrat, sans lien (4.3-b quater). */
+  flowStepOperation: (
+    project: string,
+    path: string,
+    step: string,
+    contract: string,
+    operation: string,
+    environment: string | null,
+  ): Promise<TestView> =>
+    call<TestView>("flow_step_operation", {
+      project,
+      path,
+      step,
+      contract,
+      operation,
+      environment,
+    }),
   hooksRemoveStep: (
     project: string,
     path: string,

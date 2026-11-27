@@ -27,7 +27,7 @@ export const KIND_TAGS: Record<ImportItemKind, string> = {
 
 /** Suite donnée, à droite de la ligne. */
 export const STATUS_LABELS: Record<ImportItemStatus, string> = {
-  notRun: "non repris",
+  notRun: "exécuté à l'envoi",
   toFill: "à renseigner",
   toCheck: "à vérifier",
   skipped: "non importé",
@@ -38,7 +38,7 @@ export const STATUS_LABELS: Record<ImportItemStatus, string> = {
 
 /** Phrase de tête de « Après · dans Arnod ». */
 export const STATUS_HEADLINES: Record<ImportItemStatus, string> = {
-  notRun: "Gardé dans le fichier, pas exécuté.",
+  notRun: "Gardé dans le fichier, exécuté à chaque envoi.",
   toFill: "Variable locale, à renseigner.",
   toCheck: "Repris, à vérifier.",
   skipped: "Non importé.",

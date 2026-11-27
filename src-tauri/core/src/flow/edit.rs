@@ -52,6 +52,9 @@ pub struct FlowStepInfo {
     pub id: String,
     pub inputs: Vec<StepInput>,
     pub extracts: Vec<String>,
+    /// Données disponibles à ce point (4.3-b quater) : extraites ou posées par les étapes
+    /// d'avant, dans l'ordre des noms.
+    pub available: Vec<StepInput>,
 }
 
 /// Fichiers de requête candidats d'un test, dans l'ordre du dossier (sans contrat).
@@ -93,6 +96,14 @@ pub fn test_flow(root: &Path, ext: &Extensions, path: &str, children: &[TreeNode
 /// Étape neuve d'une nature, à configurer (4.3-b quater) ; `file` pour une requête ou une
 /// attente.
 pub fn new_step(flow: &Flow, kind: StepKind, file: Option<String>) -> Step {
+    // Une étape requête prend l'identifiant de son fichier : un schéma linéaire n'est pas écrit
+    // (R1), et sa relecture redonne ce même identifiant.
+    let id = match (kind, &file) {
+        (StepKind::Request, Some(file)) if flow.position(&super::request_id(file)).is_none() => {
+            super::request_id(file)
+        }
+        _ => flow.free_id(),
+    };
     let action = match kind {
         StepKind::Request => Action::Request {
             file: file.clone().unwrap_or_default(),
@@ -139,7 +150,7 @@ pub fn new_step(flow: &Flow, kind: StepKind, file: Option<String>) -> Step {
         StepKind::Template => "Template".to_owned(),
     };
     Step {
-        id: flow.free_id(),
+        id,
         name,
         action,
         next: None,
@@ -279,6 +290,14 @@ pub fn info(root: &Path, folder: &str, flow: &Flow) -> Vec<FlowStepInfo> {
             }
             _ => {}
         }
+        let available: Vec<StepInput> = provided
+            .iter()
+            .map(|(name, (from, source))| StepInput {
+                name: name.clone(),
+                from: Some(from.clone()),
+                source: source.clone(),
+            })
+            .collect();
         let mut seen = HashSet::new();
         let inputs: Vec<StepInput> = reads
             .into_iter()
@@ -298,6 +317,7 @@ pub fn info(root: &Path, folder: &str, flow: &Flow) -> Vec<FlowStepInfo> {
             id: step.id.clone(),
             inputs,
             extracts: extracts.into_iter().map(|(name, _)| name).collect(),
+            available,
         });
     }
     out
@@ -435,6 +455,63 @@ pub fn add(
     insert(&mut flow, step, placement);
     save(root, path, &flow)?;
     Ok(StepAdded { step: id, request })
+}
+
+/// Donne à l'étape requête `id` du test `path` la requête de l'opération `operation` du contrat
+/// `contract` (4.3-b quater) : méthode, adresse, paramètres, corps et assertion d'exemple, sans
+/// lien au contrat (une étape n'est jamais liée). Le fichier et son rang restent ceux de
+/// l'étape ; `environment` reçoit `baseUrl` si elle y est vide.
+pub fn from_operation(
+    root: &Path,
+    path: &str,
+    id: &str,
+    contract: &str,
+    operation: &str,
+    environment: Option<&str>,
+) -> Result<(), CommandError> {
+    let ext = Extensions::read(root);
+    let (_, children) = folder_files(root, &ext, path)?;
+    let flow = test_flow(root, &ext, path, &children);
+    let file_name = flow
+        .steps
+        .iter()
+        .find(|s| s.id == id)
+        .and_then(|s| match &s.action {
+            Action::Request { file } => Some(file.clone()),
+            _ => None,
+        })
+        .ok_or_else(|| {
+            CommandError::new(
+                CommandErrorKind::NotFound,
+                "Cette étape n'est plus une requête du test.",
+            )
+        })?;
+    let parsed = crate::contract::file::read(root, contract)?;
+    let found = parsed.operation(operation).ok_or_else(|| {
+        CommandError::new(
+            CommandErrorKind::NotFound,
+            format!("L'opération {operation} n'est plus dans le contrat."),
+        )
+    })?;
+    let mut request = crate::contract::generate::request_for(&parsed, found, contract)
+        .map_err(|reason| invalid(format!("L'opération {operation} : {reason}.")))?;
+    request.contract = None;
+    let full = tree::resolve(root, &format!("{path}/{file_name}"))?;
+    let current = file::read(&full)?;
+    request.seq = current.seq;
+    if let Some(dir) = full.parent() {
+        let base = request.name.clone();
+        let mut n = 2;
+        while tree::request_name_taken(dir, &request.name, Some(&full)) {
+            request.name = format!("{base} ({n})");
+            n += 1;
+        }
+    }
+    file::write(&full, &request)?;
+    if let Some(name) = environment {
+        crate::contract::file::fill_base_url(root, name, &parsed);
+    }
+    Ok(())
 }
 
 /// Retire l'étape `id` du test `path` (« Supprimer l'étape », « Annuler l'insertion », 4.3-b

@@ -754,3 +754,138 @@ fn r1_r3_ajouter_une_etape_cree_sa_requete_et_garde_l_ordre() {
     let view = crate::tree::test_view(dir.path(), &folder).unwrap();
     assert!(view.steps.iter().any(|s| s.path == request));
 }
+
+#[test]
+fn b_quater_une_etape_inseree_prend_l_operation_d_un_contrat_sans_lien() {
+    use crate::request::model::{Extraction, ExtractionScope, Method};
+    let dir = project();
+    let root = dir.path();
+    fs::create_dir_all(root.join("contracts")).unwrap();
+    fs::write(
+        root.join("contracts/boutique.yaml"),
+        "openapi: 3.0.0\ninfo:\n  title: Boutique\n  version: 1.0.0\npaths:\n  /orders/{orderId}:\n    get:\n      summary: Lire une commande\n      parameters:\n        - name: orderId\n          in: path\n          required: true\n          schema:\n            type: string\n      responses:\n        '200':\n          description: ok\n",
+    )
+    .unwrap();
+    crate::tree::create_folder(root, "", "Parcours").unwrap();
+    let first = crate::tree::create_request(root, "Parcours", Some("Créer")).unwrap();
+    let full = crate::tree::resolve(root, &first).unwrap();
+    let mut created = crate::request::file::read(&full).unwrap();
+    created.extractions.push(Extraction {
+        name: "order.id".into(),
+        source: "body.id".into(),
+        enabled: true,
+        scope: ExtractionScope::default(),
+    });
+    crate::request::file::write(&full, &created).unwrap();
+    let added = edit::add(
+        root,
+        "Parcours",
+        StepKind::Request,
+        &edit::Placement::End,
+        None,
+    )
+    .unwrap();
+
+    edit::from_operation(
+        root,
+        "Parcours",
+        &added.step,
+        "contracts/boutique.yaml",
+        "GET /orders/{orderId}",
+        None,
+    )
+    .unwrap();
+
+    // La requête de l'opération, dans le fichier de l'étape, jamais liée au contrat.
+    let path = added.request.unwrap();
+    let request = crate::request::file::read(&crate::tree::resolve(root, &path).unwrap()).unwrap();
+    assert_eq!(request.name, "Lire une commande");
+    assert_eq!(request.method, Method::Get);
+    assert_eq!(request.url, "{{baseUrl}}/orders/:orderId");
+    assert!(request.contract.is_none());
+    let text = fs::read_to_string(crate::tree::resolve(root, &path).unwrap()).unwrap();
+    assert!(!text.contains("contract:"), "{text}");
+    // Données disponibles à ce point : ce que les étapes d'avant extraient.
+    let view = crate::tree::test_view(root, "Parcours").unwrap();
+    let info = view.info.iter().find(|i| i.id == added.step).unwrap();
+    assert_eq!(info.available.len(), 1);
+    assert_eq!(info.available[0].name, "order.id");
+    assert_eq!(info.available[0].source, "body.id");
+    assert!(view.info[0].available.is_empty());
+    // Une étape qui n'est pas une requête est refusée.
+    let error = edit::from_operation(
+        root,
+        "Parcours",
+        "absente",
+        "contracts/boutique.yaml",
+        "GET /orders/{orderId}",
+        None,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, crate::error::CommandErrorKind::NotFound);
+}
+
+#[test]
+fn une_variable_posee_par_une_etape_d_avant_est_connue_a_la_saisie() {
+    let dir = project();
+    let root = dir.path();
+    crate::tree::create_folder(root, "", "Parcours").unwrap();
+    let first = crate::tree::create_request(root, "Parcours", Some("Lire")).unwrap();
+    let file = first.rsplit('/').next().unwrap().to_owned();
+    // Une étape variable avant la requête : « jeton » est connu de la requête, pas d'elle-même.
+    let flow = Flow {
+        on_failure: OnFailure::Stop,
+        steps: vec![
+            step(
+                "v",
+                Action::Variable {
+                    variable: "jeton".into(),
+                    value: "abc".into(),
+                },
+            ),
+            request(&crate::flow::request_id(&file), &file),
+        ],
+    };
+    edit::save(root, "Parcours", &flow).unwrap();
+    assert_eq!(crate::tree::extracted_before(root, &first), ["jeton"]);
+}
+
+#[test]
+fn b_quater_une_etape_a_configurer_s_enregistre_et_echoue_a_l_execution() {
+    // « + Variable », « + Test existant », « + Template » : l'étape neuve est vide.
+    let flow = Flow {
+        on_failure: OnFailure::Stop,
+        steps: vec![
+            step(
+                "v",
+                Action::Variable {
+                    variable: String::new(),
+                    value: String::new(),
+                },
+            ),
+            step(
+                "t",
+                Action::Test {
+                    test: String::new(),
+                },
+            ),
+            request("s1", "a.yml"),
+        ],
+    };
+    assert_eq!(validate(&flow, &files(&["a.yml"])), Ok(()));
+    let fake = Fake::with(&[]);
+    let done = block(engine::run(&flow, &fake, &mut BTreeMap::new(), 0));
+    assert!(!done.passed);
+    assert_eq!(done.failed_step.as_deref(), Some("v"));
+    assert!(
+        fake.played().is_empty(),
+        "rien n'est joué : {:?}",
+        fake.played()
+    );
+    let report = fake.last_report("v").unwrap();
+    assert_eq!(report.state, StepState::Error);
+    assert_eq!(
+        report.error.as_deref(),
+        Some("Étape à configurer : nommez la variable.")
+    );
+}

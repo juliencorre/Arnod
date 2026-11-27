@@ -323,7 +323,13 @@ export function handleV4(wb: FakeWorkbench, cmd: string, args: Record<string, un
             )
           : null;
       const file = request === null ? null : (request.split("/").at(-1) ?? request);
-      const step = newStep(freeId(flow), kind, file);
+      // Comme `flow::edit::new_step` : une étape requête prend l'identifiant de son fichier.
+      const own = file === null ? null : `r:${file}`;
+      const id =
+        kind === "request" && own !== null && !flow.steps.some((s) => s.id === own)
+          ? own
+          : freeId(flow);
+      const step = newStep(id, kind, file);
       insertStep(flow, step, args.placement as StepPlacement);
       wb.flows.set(path, flow);
       return { step: step.id, request };
@@ -341,6 +347,24 @@ export function handleV4(wb: FakeWorkbench, cmd: string, args: Record<string, un
       if ((step.kind === "request" || step.kind === "wait") && step.file)
         wb.requests.delete(`${path}/${step.file}`);
       wb.flows.set(path, flow);
+      return testView(wb, path);
+    }
+    case "flow_step_operation": {
+      // Comme `flow::edit::from_operation` : la requête de l'opération, sans lien au contrat.
+      const flow = testView(wb, path).flow;
+      const step = flow.steps.find((s) => s.id === args.step);
+      if (step?.kind !== "request")
+        return fail("notFound", "Cette étape n'est plus une requête du test.");
+      const key = String(args.operation);
+      const [method = "GET", route = "/"] = key.split(" ");
+      const file = `${path}/${step.file}`;
+      const current = wb.requests.get(file) ?? fail("notFound", "Cette requête n'existe plus.");
+      wb.requests.set(file, {
+        ...current,
+        name: key,
+        method: method as RequestDoc["method"],
+        url: `{{baseUrl}}${route.replaceAll(/\{(\w+)\}/g, ":$1")}`,
+      });
       return testView(wb, path);
     }
     case "hooks_remove_step": {

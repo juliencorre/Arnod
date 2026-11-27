@@ -249,6 +249,7 @@ pub fn run() {
             commands::flows::flow_save,
             commands::flows::flow_add_step,
             commands::flows::flow_remove_step,
+            commands::flows::flow_step_operation,
             commands::flows::hooks_remove_step,
             commands::flows::hooks_read,
             commands::flows::hooks_save,

@@ -218,6 +218,12 @@ const QUICK: StepKind[] = PALETTE.flatMap((g) => g.kinds);
             >✕ dernière exécution en échec : {{ end.reason ?? "étape en échec" }}</span
           >
         </template>
+        <template v-else-if="verdict?.status === 'passed'">
+          ·
+          <span class="test__ok">
+            ✓ dernière exécution réussie, {{ verdict.passed }}/{{ verdict.steps }} étapes</span
+          ><template v-if="run?.finishedAt">, {{ formatAgo(run.finishedAt) }}</template>
+        </template>
         <template v-else-if="last">
           ·
           <span :class="last.ok ? 'test__ok' : 'test__ko'">

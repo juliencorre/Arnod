@@ -122,6 +122,7 @@ export type CommandName =
   | "flow_save"
   | "flow_add_step"
   | "flow_remove_step"
+  | "flow_step_operation"
   | "hooks_remove_step"
   | "hooks_read"
   | "hooks_save"
@@ -2560,6 +2561,8 @@ export interface FlowStepInfo {
   id: string;
   inputs: StepInput[];
   extracts: string[];
+  /** Données disponibles à ce point (4.3-b quater) : extraites ou posées par les étapes d'avant. */
+  available: StepInput[];
 }
 
 /** Où insérer une étape (4.3-b bis) : fin de liste, libre, au départ, ou sur un lien. */

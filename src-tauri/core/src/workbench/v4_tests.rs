@@ -446,3 +446,45 @@ async fn r17_une_utilisation_joue_le_template_avec_ses_valeurs() {
     assert_eq!(instance.flow.detail.as_deref(), Some("1/1"));
     let _ = view;
 }
+
+#[tokio::test]
+async fn r5_ignorer_l_echec_qui_a_arrete_le_test_rend_sa_fin() {
+    let server = MockServer::start().await;
+    Mock::given(path("/ok"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&server)
+        .await;
+    let f = fixture(&server).await;
+    tree::create_folder(&f.ctx.root, "", "T").unwrap();
+    // Un test joué comme la liste de ses requêtes : la première échoue, la seconde n'est pas jouée.
+    let first = request(&f, "T", "Créer", "{{baseUrl}}/ok", |r| {
+        r.seq = Some(1.0);
+        r.assertions.push(status_is(201));
+    });
+    request(&f, "T", "Lire", "{{baseUrl}}/ok", |r| r.seq = Some(2.0));
+    let done = run(&f, "T").await;
+    assert_eq!(done.tests[0].status, ItemStatus::Failed);
+    assert_eq!(done.tests[0].failed_step, Some(1));
+    assert_eq!(done.ends.len(), 1);
+    // Les identifiants des assertions ne sont pas écrits : celui du run vient de la lecture.
+    let check = line(&done, "Créer")
+        .assertions
+        .iter()
+        .find(|a| !a.passed)
+        .unwrap()
+        .id
+        .clone();
+
+    let after = f
+        .bench
+        .ignore_in_run(&f.ctx, done.id, &first, &check)
+        .unwrap();
+
+    // La fin en échec tenait à cette étape : le test se lit sur ses lignes, la suivante non jouée.
+    assert!(after.ends.is_empty());
+    assert_eq!(line(&after, "Créer").status, ItemStatus::Passed);
+    assert_eq!(line(&after, "Lire").status, ItemStatus::Skipped);
+    assert_eq!(after.tests[0].failed_step, None);
+    assert_ne!(after.tests[0].status, ItemStatus::Failed);
+    assert_eq!(after.tests[0].passed, 1);
+}
