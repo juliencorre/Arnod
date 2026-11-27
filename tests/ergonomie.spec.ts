@@ -211,7 +211,8 @@ describe("erreur d'envoi avec son action (ER6)", () => {
     const saved = core.calls.filter((c) => c.cmd === "environment_save").at(-1);
     expect(JSON.stringify(saved?.args)).toContain("apiUrl");
     await click(app, ".response__error-actions button", "Environnements…");
-    expect(app.find("dialog[open]").exists()).toBe(true);
+    // 3.3-a (AM43) : la page des environnements s'ouvre dans un onglet.
+    expect(app.find(".envs").exists()).toBe(true);
   });
 
   it("une autre erreur propose « Réessayer », qui renvoie la requête", async () => {
@@ -290,17 +291,17 @@ describe("« Annuler » des suppressions (ER1)", () => {
       });
     }));
     await menu("Plus d'actions sur boutique-tests", "Gérer les environnements…");
-    await click(app, "dialog[open] .envs__item", "Recette");
-    expect(app.get("dialog[open] .envs__item[aria-current='true'] .envs__item-name").text()).toBe(
+    await click(app, ".envs .envs__item", "Recette");
+    expect(app.get(".envs .envs__item[aria-current='true'] .envs__item-name").text()).toBe(
       "Recette",
     );
-    await click(app, "dialog[open] button", "Supprimer");
+    await click(app, ".envs button", "Supprimer l'environnement");
     expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local"]);
     expect(app.get(".toast").text()).toContain("Environnement « Recette » supprimé.");
     await click(app, ".toast button", "Annuler");
     await flushPromises();
     expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local", "Recette"]);
-    expect(app.findAll("dialog[open] .envs__item-name").map((b) => b.text())).toContain("Recette");
+    expect(app.findAll(".envs .envs__item-name").map((b) => b.text())).toContain("Recette");
   });
 });
 
@@ -329,7 +330,7 @@ describe("une forme d'ajout et une de retrait de ligne (ER8)", () => {
     "src/components/workbench/PairsEditor.vue",
     "src/components/workbench/AssertionsEditor.vue",
     "src/components/workbench/VariablesEditor.vue",
-    "src/components/workbench/EnvironmentsDialog.vue",
+    "src/components/workbench/EnvironmentsTab.vue",
     "src/components/workbench/ExpectedResponses.vue",
   ];
 
@@ -363,7 +364,7 @@ describe("focus rendu (AC2)", () => {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   }
 
-  it("Échap dans Environnements rend le focus à la pastille qui a ouvert le menu", async () => {
+  it("« Gérer les environnements… » ouvre la page sans laisser le focus sur la page vide", async () => {
     ({ app } = await openProject());
     const chip = app.get<HTMLButtonElement>(
       '[aria-label="Environnement de boutique-tests : Local"]',
@@ -373,12 +374,9 @@ describe("focus rendu (AC2)", () => {
     await flushPromises();
     await click(app, '[role="menuitem"]', "Gérer les environnements…");
     await flushPromises();
-    const dialog = app.get("dialog[open]");
-    (dialog.element as HTMLElement).querySelector("input")?.focus();
-    await dialog.trigger("cancel");
-    await flushPromises();
-    expect(app.find("dialog[open]").exists()).toBe(false);
-    expect(focused()).toBe(chip.element);
+    // 3.3-a (AM43) : une page en onglet, plus une fenêtre ; le focus reste sur un contrôle.
+    expect(app.find(".envs").exists()).toBe(true);
+    expect(focused()).not.toBeNull();
   });
 
   it("après ▶, le focus va à l'onglet du run", async () => {
@@ -430,36 +428,34 @@ describe("environnements et réglages enregistrés seuls (ER2)", () => {
     let core;
     ({ app, core } = await openProject());
     await openEnvironments();
-    expect(app.findAll("dialog[open] button").map((b) => b.text())).not.toContain("Enregistrer");
-    await app.get('dialog[open] input[aria-label="Valeur de la variable 1"]').setValue("https://x");
-    expect(app.get("dialog[open] .save-state").text()).toBe("Modifications en attente…");
+    expect(app.findAll(".envs button").map((b) => b.text())).not.toContain("Enregistrer");
+    await app.get('.envs input[aria-label="Valeur de baseUrl"]').setValue("https://x");
+    expect(app.get(".envs .save-state").text()).toBe("Modifications en attente…");
     await settle();
     expect(core.workbench.envs[0]?.variables[0]?.value).toBe("https://x");
-    expect(app.get("dialog[open] .save-state").text()).toBe("✓ Enregistré");
+    expect(app.get(".envs .save-state").text()).toBe("✓ Enregistré");
   });
 
-  it("Échap ne jette rien : la modification en attente est enregistrée avant de fermer", async () => {
+  it("fermer l'onglet ne jette rien : la modification en attente est enregistrée", async () => {
     let core;
     ({ app, core } = await openProject());
     await openEnvironments();
-    await app.get('dialog[open] input[aria-label="Valeur de la variable 1"]').setValue("https://y");
-    await app.get("dialog[open]").trigger("cancel");
+    await app.get('.envs input[aria-label="Valeur de baseUrl"]').setValue("https://y");
+    await click(app, '[aria-label="Fermer Environnements"]');
     await flushPromises();
     expect(core.workbench.envs[0]?.variables[0]?.value).toBe("https://y");
-    expect(app.find("dialog[open]").exists()).toBe(false);
+    expect(app.find(".envs").exists()).toBe(false);
   });
 
-  it("un enregistrement refusé garde la fenêtre ouverte et le dit", async () => {
+  it("un enregistrement refusé le dit dans la page", async () => {
     let core;
     ({ app, core } = await openProject());
     await openEnvironments();
-    await app.get('dialog[open] input[aria-label="Valeur de la variable 1"]').setValue("https://z");
     core.failNext("environment_save", { kind: "io", message: "Disque plein." });
-    await app.get("dialog[open]").trigger("cancel");
-    await flushPromises();
-    expect(app.find("dialog[open]").exists()).toBe(true);
-    expect(app.get("dialog[open] [role='alert']").text()).toContain("Disque plein.");
-    expect(app.get("dialog[open] .save-state").text()).toContain("Non enregistré");
+    await app.get('.envs input[aria-label="Valeur de baseUrl"]').setValue("https://z");
+    await settle();
+    expect(app.get(".envs [role='alert']").text()).toContain("Disque plein.");
+    expect(app.get(".envs .save-state").text()).toContain("Non enregistré");
   });
 
   it("Échap dans les réglages du projet enregistre l'authentification modifiée", async () => {

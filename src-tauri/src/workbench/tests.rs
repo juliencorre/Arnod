@@ -1261,3 +1261,34 @@ async fn am44_portee_environnement_garde_la_valeur_en_variable_locale() {
         Some("jeton-43")
     );
 }
+
+/// AM43 (3.3-a, Q8) : « Utilisation » d'un environnement, le dernier run fait dessus.
+#[tokio::test]
+async fn am43_utilisation_dernier_run_de_chaque_environnement() {
+    let server = MockServer::start().await;
+    Mock::given(path("/ok"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&server)
+        .await;
+    let f = fixture();
+    set_base_url(&f, &server.uri());
+    assert!(f.bench.environment_usage(&f.ctx).is_empty());
+    let saved = tree::create_request(&f.ctx.root, "", Some("Santé")).unwrap();
+    let mut request = Request::new("Santé");
+    request.url = "{{baseUrl}}/ok".into();
+    file::write(&tree::resolve(&f.ctx.root, &saved).unwrap(), &request).unwrap();
+    for _ in 0..2 {
+        let run = f.bench.start_run(&f.ctx, "", "Local", None, false).unwrap();
+        wait(&f.bench, run.id).await;
+    }
+    let usage = f.bench.environment_usage(&f.ctx);
+    assert_eq!(usage.len(), 1);
+    assert_eq!(
+        (
+            usage[0].environment.as_str(),
+            usage[0].number,
+            usage[0].folder.as_str()
+        ),
+        ("Local", 2, "")
+    );
+}

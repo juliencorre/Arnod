@@ -454,6 +454,23 @@ pub trait Notifier: Send + Sync {
     fn environments_changed(&self, _project: Uuid) {}
 }
 
+/// Utilisation d'un environnement (3.3-a, AM43, Q8) : le dernier run fait dessus parmi ceux que
+/// le cœur garde (en mémoire et le dernier du projet sur le poste).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentUsage {
+    pub environment: String,
+    /// Numéro du run dans le projet (0 : run gardé par une version précédente).
+    pub number: u32,
+    /// Dossier exécuté (`""` : tout le projet).
+    pub folder: String,
+    /// Contrat exécuté, sinon `None`.
+    pub contract: Option<String>,
+    /// Début du run, en millisecondes depuis l'époque Unix.
+    pub started_at: u64,
+}
+
 /// Résumé du dernier run d'un projet, pour « Tous les projets » (O12).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -906,6 +923,41 @@ impl Workbench {
         if let (true, Some(notifier)) = (kept, self.notifier()) {
             notifier.environments_changed(ctx.id);
         }
+    }
+
+    /// Dernier run de chaque environnement du projet (3.3-a, AM43) ; un environnement sans run
+    /// gardé n'apparaît pas.
+    pub fn environment_usage(&self, ctx: &ProjectCtx) -> Vec<EnvironmentUsage> {
+        let mut views: Vec<RunView> = self
+            .runs
+            .lock()
+            .map(|runs| {
+                runs.values()
+                    .filter(|h| h.project == ctx.id)
+                    .filter_map(|h| h.view.lock().ok().map(|v| v.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if let Some(last) = Self::last_run(ctx)
+            && !views.iter().any(|v| v.id == last.id)
+        {
+            views.push(last);
+        }
+        views.sort_by_key(|view| std::cmp::Reverse(view.started_at));
+        let mut usage: Vec<EnvironmentUsage> = Vec::new();
+        for view in views {
+            if usage.iter().any(|u| u.environment == view.environment) {
+                continue;
+            }
+            usage.push(EnvironmentUsage {
+                environment: view.environment,
+                number: view.number,
+                folder: view.folder,
+                contract: view.contract,
+                started_at: view.started_at,
+            });
+        }
+        usage
     }
 
     /// Garde des valeurs extraites pour la session (R6).

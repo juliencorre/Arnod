@@ -11,7 +11,7 @@ use crate::error::{CommandError, CommandErrorKind};
 use crate::state::AppState;
 use crate::tree::undo::UndoBook;
 use crate::windows::{self, ProjectScope};
-use crate::workbench::{EnvironmentRestore, EnvironmentsView, Workbench};
+use crate::workbench::{EnvironmentRestore, EnvironmentUsage, EnvironmentsView, Workbench};
 
 /// Environnements après une suppression, et le jeton de « Annuler » (ER1).
 #[derive(Debug, Clone, Serialize)]
@@ -220,4 +220,38 @@ pub fn local_set(
         );
     }
     result
+}
+
+/// « Copier depuis un autre projet… » (3.3-a, AM43) : environnements du projet `from_project`
+/// ajoutés à `project`, sans valeurs locales ni secrets.
+#[tauri::command]
+pub fn environment_copy(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
+    project: Uuid,
+    from_project: Uuid,
+    names: Vec<String>,
+) -> Result<EnvironmentsView, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    let from = state.project_ctx(from_project)?;
+    environment::copy_from(&ctx.root, &from.root, &names)?;
+    windows::project_changed(
+        window.app_handle(),
+        window.label(),
+        project,
+        ProjectScope::Environments,
+        None,
+    );
+    Ok(bench.environments(&ctx))
+}
+
+/// Dernier run de chaque environnement du projet (3.3-a, AM43, « Utilisation »).
+#[tauri::command]
+pub fn environment_usage(
+    state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
+    project: Uuid,
+) -> Result<Vec<EnvironmentUsage>, CommandError> {
+    Ok(bench.environment_usage(&state.project_ctx(project)?))
 }

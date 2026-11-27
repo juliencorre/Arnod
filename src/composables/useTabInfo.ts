@@ -31,6 +31,9 @@ export function useTabInfo(): (tab: ContentTab) => TabInfo {
         dirty: false,
       };
     }
+    if (content.kind === "environments") {
+      return { name: "Environnements", badge: "ENV", dirty: false };
+    }
     if (content.kind === "importReport") {
       const report = imports.reports[content.projectId];
       return {

@@ -10,7 +10,7 @@ import { computed, ref } from "vue";
 
 import ContractDialog from "@/components/contracts/ContractDialog.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
-import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
+import NewEnvironmentDialog from "@/components/workbench/NewEnvironmentDialog.vue";
 import { useContractAdd } from "@/composables/useContractAdd";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
@@ -85,6 +85,12 @@ function start(id: Start): void {
   else if (id === "test") void newTest();
   else creatingEnvironment.value = true;
 }
+
+/** L'environnement créé s'ouvre dans la page des environnements (3.3-a, AM43). */
+function onEnvironmentCreated(name: string): void {
+  creatingEnvironment.value = false;
+  void workbench.openEnvironments(props.projectId, name).catch(toasts.showError);
+}
 </script>
 
 <template>
@@ -106,12 +112,12 @@ function start(id: Start): void {
       @close="adding.close"
       @submit="adding.submit"
     />
-    <EnvironmentsDialog
+    <NewEnvironmentDialog
       v-if="creatingEnvironment"
       :open="creatingEnvironment"
       :project-id="projectId"
-      start-new
       @close="creatingEnvironment = false"
+      @created="onEnvironmentCreated"
     />
   </div>
   <div v-else-if="project" class="welcome">

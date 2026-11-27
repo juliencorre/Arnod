@@ -195,8 +195,9 @@ describe("projet créé (1.2-d) et menu « + » (1.2-a ter)", () => {
     await click(wrapper(), "dialog[open] button", "Annuler");
 
     await click(wrapper(), "main .start__action", "+ Environnement");
-    expect(wrapper().get("dialog[open]").text()).toContain("Environnements");
-    await click(wrapper(), "dialog[open] button", "Fermer");
+    // AM34 (3.3-b) : la fenêtre de création ; l'environnement créé s'ouvre dans sa page (AM43).
+    expect(wrapper().get("dialog[open] h2").text()).toBe("Nouvel environnement");
+    await click(wrapper(), "dialog[open] button", "Annuler");
 
     await click(wrapper(), "main .start__action", "+ Test");
     expect(core.calls.find((c) => c.cmd === "tree_create_test")?.args).toMatchObject({

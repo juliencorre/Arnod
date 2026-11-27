@@ -205,6 +205,8 @@ pub fn run() {
             commands::environments::environment_delete,
             commands::environments::environment_delete_undo,
             commands::environments::environment_create,
+            commands::environments::environment_copy,
+            commands::environments::environment_usage,
             commands::environments::environments_reorder,
             commands::environments::local_set,
             commands::runs::run_start,

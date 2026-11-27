@@ -278,13 +278,14 @@ pull request dit après laquelle la fusionner. Ordre, avec les lots de `plan-qua
 
 **Lot G - Variables** (`claude/alignement-g-variables`)
 
-- [ ] **T18** AM43 : page des environnements en onglet, tableau unique, copie depuis un autre
+- [x] **T18** AM43 : page des environnements en onglet, tableau unique, copie depuis un autre
       projet, utilisation.
-- [ ] **T19** AM44 : portée d'une extraction.
+- [x] **T19** AM44 : portée d'une extraction.
 
 ## 9. Critères d'acceptation
 
-- [ ] `maquette-etat.yml` n'a plus aucun écart `aligner: code` ; `check-maquette` le compte.
+- [x] `maquette-etat.yml` n'a plus aucun écart `aligner: code` ; `check-maquette` le compte
+      (lot G, 27 novembre 2026).
 - [ ] Chaque écart retiré a son test de preuve, qui échouait avant le lot.
 - [ ] La maquette est régénérée après chaque fusion (`scripts/maquette-sync.py`).
 - [ ] `npm run check`, la CI et les e2e passent ; l'installeur reste sous 15 Mo.

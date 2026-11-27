@@ -71,7 +71,7 @@ export type ConflictItem = { key: string, label: string, disk: string | null, dr
 
 export type ConflictSide = "disk" | "draft";
 
-export type ContentRef = { "kind": "request", projectId: string, path: string, } | { "kind": "run", projectId: string, } | { "kind": "contract", projectId: string, path: string, } | { "kind": "result" } | { "kind": "importReport", projectId: string, } | { "kind": "test", projectId: string, path: string, } | { "kind": "folder", projectId: string, path: string, };
+export type ContentRef = { "kind": "request", projectId: string, path: string, } | { "kind": "run", projectId: string, } | { "kind": "contract", projectId: string, path: string, } | { "kind": "result" } | { "kind": "importReport", projectId: string, } | { "kind": "test", projectId: string, path: string, } | { "kind": "folder", projectId: string, path: string, } | { "kind": "environments", projectId: string, };
 
 export type ContentTab = { id: string, content: ContentRef, preview: boolean, };
 
@@ -120,6 +120,8 @@ export type EnvironmentChoice = { from: string, to: string, };
 export type EnvironmentDeleted = { view: EnvironmentsView, undoToken: string, };
 
 export type EnvironmentDoc = { name: string, color: string, protected: boolean, variables: Array<EnvVariable>, locals: Array<string>, };
+
+export type EnvironmentUsage = { environment: string, number: number, folder: string, contract: string | null, startedAt: number, };
 
 export type EnvironmentView = { localVars: Array<LocalVarView>, name: string, color: string, protected: boolean, variables: Array<EnvVariable>, locals: Array<string>, };
 
@@ -513,6 +515,7 @@ export type CheckEnvironmentDoc = Check<Same<Ipc.EnvironmentDoc, EnvironmentDoc>
 export type CheckLocalVarView = Check<Same<Ipc.LocalVarView, LocalVarView>>;
 export type CheckEnvironmentView = Check<Same<Ipc.EnvironmentView, EnvironmentView>>;
 export type CheckEnvironmentsView = Check<Same<Ipc.EnvironmentsView, EnvironmentsView>>;
+export type CheckEnvironmentUsage = Check<Same<Ipc.EnvironmentUsage, EnvironmentUsage>>;
 export type CheckNewEnvironment = Check<Same<Ipc.NewEnvironment, NewEnvironment>>;
 export type CheckEnvironmentDeleted = Check<Same<Ipc.EnvironmentDeleted, EnvironmentDeleted>>;
 export type CheckRunItemStatus = Check<Same<Ipc.RunItemStatus, RunItemStatus>>;

@@ -37,8 +37,9 @@ vagues, règles R1 à R14), d'après l'audit `docs/audit-2026-11-mvp.md` (99 con
 (`docs/maquette-consignes-qualite.md`). Un lot = une branche `claude/qualite-<lot>` et une pull
 request ; chaque constat se corrige avec son test de preuve, qui échoue avant et passe après (R1).
 En parallèle, alignement du code sur la maquette selon `docs/plan-alignement-maquette.md` (écarts
-`aligner: code` de `maquette-etat.yml`, cas AM1 à AM42, lots A à F en `claude/alignement-<lot>`,
-entrelacés avec les lots I, J et T25 du plan de qualité, ordre au § 8).
+`aligner: code` de `maquette-etat.yml`, cas AM1 à AM44, lots A à G en `claude/alignement-<lot>`,
+entrelacés avec les lots I, J et T25 du plan de qualité, ordre au § 8). Le lot G retire les deux
+derniers écarts : plus aucun écran n'a d'écart `aligner: code`.
 
 ## Architecture
 
@@ -607,7 +608,11 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
   (`Request.extractions`, source `body.id`, `headers.Nom`, `status`, `request.body.…` écrite
   `req.…`) ; les autres actions restent conservées (`preserved`). Valeurs extraites : variables
   d'exécution, passées aux étapes suivantes du test, puis gardées par projet pour la session
-  (`Workbench::runtime_variables`), jamais écrites dans un environnement ; elles priment sur lui.
+  (`Workbench::runtime_variables`) ; elles priment sur l'environnement. Portée (`Extraction.scope`,
+  `variable.scope`, AM44) : « le test » (`runtime`) ou « l'environnement » (`environment` : la
+  valeur devient aussi une variable locale, poste, de l'environnement de l'envoi, déclarée au
+  besoin, jamais une variable partagée) ; `request`, `folder`, `collection` sont gardées et
+  appliquées comme `runtime`.
 - **Valeurs dynamiques** `{{$nom}}` (noms de Bruno, `request/dynamic.rs`, sans crate ajoutée) :
   tirées par `resolve.rs` à chaque occurrence, jamais inconnues (un nom inconnu part tel quel).
   `SendOutcome.sent` porte ce qui est parti (masqué), les valeurs tirées (avec leur source si elles
@@ -898,6 +903,12 @@ AC4, AC7, AC8 ; décision Q5).
   les valeurs locales ni les secrets, `baseUrl`, place dans la chaîne).
 - Environnements et réglages du projet s'enregistrent seuls (`useAutosave`, `SaveState`) : fermer,
   Échap ou changer d'élément enregistre d'abord ce qui attend ; un échec garde la fenêtre ouverte.
+- Environnements (3.3-a, AM43) : une page en onglet (contenu `environments`, `EnvironmentsTab`,
+  ouverte par `workbench.openEnvironments`, Ctrl+Maj+E, la pastille, « Environnements… ») ; un
+  seul tableau Variable, Valeur, Portée (partagée : dans le projet ; locale : valeur au coffre,
+  sauf une valeur déjà en clair sur le poste) ; ⋮⋮ réordonne la chaîne (glisser, ↑ ↓) ;
+  « Copier depuis un autre projet… » (`environment_copy`, sans valeurs locales ni secrets) ;
+  « Utilisation » : dernier run de l'environnement (`environment_usage`).
 - Ajouter une ligne : un `BaseButton` « + Nom » ; la retirer : `RowRemoveButton` (×, 24 px).
 - Arbre du référentiel (T25, AC1) : un seul arrêt de tabulation (`TREE_TAB_STOP`, fourni par
   `TreePanel` : dernière ligne focalisée, sinon celle de l'onglet actif, sinon la première) ;

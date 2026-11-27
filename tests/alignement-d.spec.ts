@@ -46,18 +46,16 @@ describe("page des environnements (AM33, 3.3-a)", () => {
       c.workbench.envs.push(structuredClone(RECETTE));
     }));
     await openEnvironments();
-    const items = app.findAll("dialog[open] .envs__item");
+    const items = app.findAll(".envs .envs__item");
     expect(items.map((i) => i.get(".envs__number").text())).toEqual(["1", "2"]);
     expect(items[1]?.get(".envs__item-host").text()).toBe("recette.boutique.dev");
     await items[1]?.trigger("click");
     await flushPromises();
-    expect(app.get("dialog[open] .envs__check").text()).toBe(
+    expect(app.get(".envs .envs__check").text()).toContain(
       "Demander une confirmation avant POST, PUT, PATCH et DELETE",
     );
-    expect(app.findAll("dialog[open] button").map((b) => b.text())).toContain(
-      "Supprimer l'environnement",
-    );
-    await click(app, "dialog[open] .envs__color");
+    expect(app.findAll(".envs button").map((b) => b.text())).toContain("Supprimer l'environnement");
+    await click(app, ".envs .envs__color");
     await click(app, '[role="menuitemradio"]', "Vert");
     await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_MS + 50));
     await flushPromises();
@@ -72,7 +70,7 @@ describe("fenêtre « Nouvel environnement » (AM34, 3.3-b)", () => {
       c.workbench.envs.push(structuredClone(RECETTE));
     }));
     await openEnvironments();
-    await click(app, "dialog[open] button", "+ Nouvel environnement");
+    await click(app, ".envs button", "+ Nouvel environnement");
     const form = app.get("#new-environment");
     const [name, url] = form.findAll("input");
     await name?.setValue("Recette client");
@@ -93,8 +91,8 @@ describe("fenêtre « Nouvel environnement » (AM34, 3.3-b)", () => {
       protected: true,
     });
     expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local", "Recette client", "Recette"]);
-    // L'environnement créé est ouvert dans la gestion.
-    expect(app.get("dialog[open] .envs__item[aria-current='true'] .envs__item-name").text()).toBe(
+    // L'environnement créé est ouvert dans la page des environnements.
+    expect(app.get(".envs .envs__item[aria-current='true'] .envs__item-name").text()).toBe(
       "Recette client",
     );
   });

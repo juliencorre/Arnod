@@ -33,6 +33,7 @@ import type {
   EnvironmentDeleted,
   EnvironmentDoc,
   EnvironmentsView,
+  EnvironmentUsage,
   NewEnvironment,
   HelloResponse,
   Assertion,
@@ -344,6 +345,18 @@ export const ipc = {
   /** Crée un environnement (3.3-b, AM34) : variables reprises, place dans la chaîne. */
   environmentCreate: (project: string, environment: NewEnvironment): Promise<EnvironmentsView> =>
     call<EnvironmentsView>("environment_create", { project, environment }),
+
+  /** « Copier depuis un autre projet… » (3.3-a, AM43) : sans valeurs locales ni secrets. */
+  environmentCopy: (
+    project: string,
+    fromProject: string,
+    names: string[],
+  ): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environment_copy", { project, fromProject, names }),
+
+  /** Dernier run de chaque environnement du projet (3.3-a, AM43, « Utilisation »). */
+  environmentUsage: (project: string): Promise<EnvironmentUsage[]> =>
+    call<EnvironmentUsage[]>("environment_usage", { project }),
 
   environmentsReorder: (project: string, names: string[]): Promise<EnvironmentsView> =>
     call<EnvironmentsView>("environments_reorder", { project, names }),

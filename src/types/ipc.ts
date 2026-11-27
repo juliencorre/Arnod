@@ -70,6 +70,9 @@ export type CommandName =
   | "environment_delete"
   | "environment_delete_undo"
   | "environment_create"
+  // Lot G de l'alignement : page des environnements (3.3-a, AM43).
+  | "environment_copy"
+  | "environment_usage"
   | "environments_reorder"
   | "local_set"
   | "run_start"
@@ -654,6 +657,22 @@ export interface EnvironmentsView {
 }
 
 /**
+ * Utilisation d'un environnement (3.3-a, AM43, `EnvironmentUsage`) : le dernier run fait dessus
+ * parmi ceux que le cœur garde.
+ */
+export interface EnvironmentUsage {
+  environment: string;
+  /** Numéro du run dans le projet (0 : run gardé par une version précédente). */
+  number: number;
+  /** Dossier exécuté (`""` : tout le projet). */
+  folder: string;
+  /** Contrat exécuté, sinon `null`. */
+  contract: string | null;
+  /** Début du run, en millisecondes depuis l'époque Unix. */
+  startedAt: number;
+}
+
+/**
  * Nouvel environnement, depuis la fenêtre « Nouvel environnement » (3.3-b, AM34). Équivalent
  * Rust : `environment::NewEnvironment`.
  */
@@ -788,7 +807,9 @@ export type ContentRef =
   /** Test du projet, dossier d'étapes (docs/plan-mvp-e-tests-etapes.md, TE2). */
   | { kind: "test"; projectId: string; path: string }
   /** Vue d'un dossier du référentiel, son contenu dans l'ordre d'exécution (4.1-a bis, AM37). */
-  | { kind: "folder"; projectId: string; path: string };
+  | { kind: "folder"; projectId: string; path: string }
+  /** Environnements d'un projet (3.3-a, AM43) : la page qui remplace la fenêtre de gestion. */
+  | { kind: "environments"; projectId: string };
 
 /** Onglet de contenu d'une zone (`Tab`). */
 export interface ContentTab {

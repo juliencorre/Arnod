@@ -51,6 +51,9 @@ pub enum Content {
     /// relatif (4.1-a bis, AM37).
     #[serde(rename_all = "camelCase")]
     Folder { project_id: Uuid, path: String },
+    /// Environnements d'un projet (3.3-a, AM43) : la page qui remplace la fenêtre de gestion.
+    #[serde(rename_all = "camelCase")]
+    Environments { project_id: Uuid },
 }
 
 impl Content {
@@ -62,7 +65,8 @@ impl Content {
             | Self::Contract { project_id, .. }
             | Self::ImportReport { project_id }
             | Self::Test { project_id, .. }
-            | Self::Folder { project_id, .. } => Some(*project_id),
+            | Self::Folder { project_id, .. }
+            | Self::Environments { project_id } => Some(*project_id),
             Self::Result => None,
         }
     }
@@ -763,7 +767,10 @@ impl Layout {
                     project_id: id,
                     path: tab_path,
                 } => *id == project_id && within(tab_path, path).is_some(),
-                Content::Run { .. } | Content::Result | Content::ImportReport { .. } => false,
+                Content::Run { .. }
+                | Content::Result
+                | Content::ImportReport { .. }
+                | Content::Environments { .. } => false,
             })
             .map(|tab| tab.id)
             .collect();
