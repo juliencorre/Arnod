@@ -109,6 +109,41 @@ for (const [i, gap] of (doc.transverses ?? []).entries()) {
   }
 }
 
+// Feuille de route (0.1-a) : versions connues, chaque fonction cite des pages ou des écrans de
+// l'état, ou donne son état et ce qui la situe.
+const ROADMAP_STATES = ["livré", "en partie", "à faire"];
+const roadmap = doc.feuille_de_route;
+if (roadmap === undefined) fail("feuille_de_route", "section manquante (écran 0.1-a)");
+const seenVersions = new Set();
+for (const version of roadmap?.versions ?? []) {
+  const where = `feuille de route ${String(version?.code)}`;
+  if (!VERSIONS.includes(version?.code) || version.code === "Cadre")
+    fail(where, "version inconnue");
+  if (seenVersions.has(version?.code)) fail(where, "version en double");
+  seenVersions.add(version?.code);
+  if (typeof version?.titre !== "string" || version.titre === "") fail(where, "« titre » manquant");
+  for (const feature of version?.fonctions ?? []) {
+    const at = `${where}, « ${String(feature?.nom)} »`;
+    if (typeof feature?.nom !== "string" || typeof feature?.texte !== "string") {
+      fail(at, "« nom » et « texte » attendus");
+    }
+    const refs = list(feature?.ecrans);
+    if (refs.length === 0 && !ROADMAP_STATES.includes(feature?.etat)) {
+      fail(at, `sans écran, la fonction donne son état (${ROADMAP_STATES.join(", ")})`);
+    }
+    if (refs.length > 0 && feature?.etat !== undefined) {
+      fail(at, "l'état se déduit des écrans cités : pas de « etat »");
+    }
+    for (const ref of refs) {
+      const [code, letter] = String(ref).split(/-(.*)/s);
+      if (!(code in doc.pages)) fail(at, `page inconnue « ${String(ref)} »`);
+      else if (letter !== undefined && !(letter in (doc.pages[code].ecrans ?? {}))) {
+        fail(at, `écran inconnu « ${String(ref)} »`);
+      }
+    }
+  }
+}
+
 /** Fichiers Markdown du dépôt où un repère peut être cité. */
 function markdown(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
