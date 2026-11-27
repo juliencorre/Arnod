@@ -878,6 +878,11 @@ export const ipc = {
    */
   searchQuery: (workspace: string | null, text: string, refresh: boolean): Promise<SearchResults> =>
     call<SearchResults>("search_query", { workspace, text, refresh }),
+
+  // --- Version 2, lot B : étiquettes partagées (4.9-b) ---
+  /** Étiquettes d'un dossier : elles valent pour tout ce qu'il contient. */
+  treeSetFolderTags: (project: string, path: string, tags: string[]): Promise<void> =>
+    call<null>("tree_set_folder_tags", { project, path, tags }).then(() => undefined),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

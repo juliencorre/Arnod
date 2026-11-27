@@ -445,7 +445,7 @@ export type TransferredRequest = { path: string, name: string, };
 
 export type TransferredTrial = { test: string, step: string, };
 
-export type TreeNode = { "kind": "folder", name: string, path: string, children: Array<TreeNode>, requestCount: number, test: boolean, } | { "kind": "request", name: string, path: string, method: HttpMethod | null, assertionCount: number, invalid: boolean, contract: string | null, url: string, tags: Array<string>, };
+export type TreeNode = { "kind": "folder", name: string, path: string, children: Array<TreeNode>, requestCount: number, test: boolean, tags: Array<string>, } | { "kind": "request", name: string, path: string, method: HttpMethod | null, assertionCount: number, invalid: boolean, contract: string | null, url: string, tags: Array<string>, };
 
 export type TreeView = { nodes: Array<TreeNode>, tests: Array<TreeNode>, collapsed: Array<string>, };
 

@@ -291,6 +291,7 @@ fn folder(path: &str, children: Vec<TreeNode>) -> TreeNode {
         test: is_test(&children),
         children,
         request_count,
+        tags: Vec::new(),
     }
 }
 
@@ -646,4 +647,78 @@ fn am38_reordonner_le_contenu_d_un_dossier() {
     let refused = reorder(dir.path(), "commandes", &["autre.yml".into()]);
     assert!(refused.is_err());
     assert_eq!(children(dir.path()), ["Annuler", "v2", "erreurs"]);
+}
+
+/// Étiquettes d'un nœud : celles d'un dossier, ou les étiquettes effectives d'une requête.
+fn tags_of(nodes: &[TreeNode], path: &str) -> Vec<String> {
+    for node in nodes {
+        match node {
+            TreeNode::Folder {
+                path: p,
+                tags,
+                children,
+                ..
+            } => {
+                if p == path {
+                    return tags.clone();
+                }
+                let found = tags_of(children, path);
+                if !found.is_empty() {
+                    return found;
+                }
+            }
+            TreeNode::Request { path: p, tags, .. } if p == path => return tags.clone(),
+            TreeNode::Request { .. } => {}
+        }
+    }
+    Vec::new()
+}
+
+#[test]
+fn v2_r4_une_etiquette_de_dossier_vaut_pour_tout_ce_qu_il_contient() {
+    let dir = project();
+    create_folder(dir.path(), "", "paiements").unwrap();
+    create_folder(dir.path(), "paiements", "plusieurs-fois").unwrap();
+    let payer = create_request(dir.path(), "paiements/plusieurs-fois", Some("Payer")).unwrap();
+    let mut request = file::read(&dir.path().join(&payer)).unwrap();
+    request.tags = vec!["nominal".into(), "Smoke".into()];
+    file::write(&dir.path().join(&payer), &request).unwrap();
+
+    set_folder_tags(
+        dir.path(),
+        "paiements",
+        &[
+            " smoke ".into(),
+            "".into(),
+            "SMOKE".into(),
+            "contract:x#y".into(),
+            "lent".into(),
+        ],
+    )
+    .unwrap();
+    let nodes = read(dir.path()).unwrap();
+    // Nettoyées : espaces, vides, doublons sans casse, lien au contrat refusé.
+    assert_eq!(tags_of(&nodes, "paiements"), ["smoke", "lent"]);
+    // La requête garde les siennes, puis prend celles des parents, sans doublon.
+    assert_eq!(tags_of(&nodes, &payer), ["nominal", "Smoke", "lent"]);
+
+    // Écrites dans folder.yml, conforme au schéma ; le fichier de la requête ne change pas.
+    let value = yaml::read(&dir.path().join("paiements").join(FOLDER_FILE)).unwrap();
+    assert_eq!(value["info"]["tags"], serde_json::json!(["smoke", "lent"]));
+    assert_eq!(value["info"]["name"], "paiements");
+    assert!(schema::check(Part::Folder, &value).is_ok());
+    assert_eq!(
+        file::read(&dir.path().join(&payer)).unwrap().tags,
+        ["nominal", "Smoke"]
+    );
+
+    // Sans étiquette, la clé est retirée.
+    set_folder_tags(dir.path(), "paiements", &[]).unwrap();
+    let value = yaml::read(&dir.path().join("paiements").join(FOLDER_FILE)).unwrap();
+    assert!(value["info"].get("tags").is_none());
+    assert!(tags_of(&read(dir.path()).unwrap(), "paiements").is_empty());
+
+    // Seul un dossier du projet reçoit des étiquettes.
+    assert!(set_folder_tags(dir.path(), "", &["x".into()]).is_err());
+    assert!(set_folder_tags(dir.path(), &payer, &["x".into()]).is_err());
 }

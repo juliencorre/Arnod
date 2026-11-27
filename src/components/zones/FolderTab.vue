@@ -8,13 +8,19 @@
  *
  * AM38 (4.1-a ter) : ⋮⋮ réordonne les lignes (glisser, ou ↑ ↓ sur la poignée) ; déposer un
  * élément sur le milieu d'un sous-dossier l'y range. Le cœur écrit les rangs (`tree_reorder`).
+ *
+ * V2, lot B (4.9-b, `docs/plan-v2.md`, ET1 à ET3) : les étiquettes du dossier (elles valent pour
+ * tout ce qu'il contient, R4), celles de chaque ligne (effectives, fournies par le cœur), et un
+ * filtre par étiquettes : « 6 tests sur 28 · les autres sont estompés ».
  */
-import { computed, nextTick, ref, useId, useTemplateRef } from "vue";
+import { computed, nextTick, ref, useId, useTemplateRef, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import TagsEditor from "@/components/workbench/TagsEditor.vue";
 import { useGuard } from "@/composables/useGuard";
 import { countLabel } from "@/lib/format";
 import { countStatuses, requestPaths } from "@/lib/status";
+import { foldTag, hasTags, tagCounts, taggedTests } from "@/lib/tags";
 import { findFolder, folderSummary, testCount, type FolderNode } from "@/lib/tree";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { TreeNode } from "@/types/ipc";
@@ -25,6 +31,8 @@ const workbench = useWorkbenchStore();
 const guard = useGuard();
 const titleId = useId();
 const handleHintId = useId();
+const tagsLabelId = useId();
+const filterLabelId = useId();
 
 const folder = computed<FolderNode | null>(() =>
   findFolder(workbench.trees[props.projectId]?.tests ?? [], props.path),
@@ -50,11 +58,16 @@ type Kind = "request" | "test" | "folder";
 const kindOf = (node: TreeNode): Kind =>
   node.kind === "request" ? "request" : node.test ? "test" : "folder";
 
-/** Colonne « Contenu » : étapes d'un test, tests d'un dossier ; rien pour une requête. */
+/**
+ * Colonne « Contenu » : étapes d'un test, tests d'un dossier (« 12 tests · 4 smoke » pendant un
+ * filtre) ; rien pour une requête.
+ */
 function content(node: TreeNode): string {
   if (node.kind === "request") return "—";
   if (node.test) return countLabel(node.children.length, "étape", "étapes");
-  return countLabel(testCount(node), "test", "tests");
+  const tests = countLabel(testCount(node), "test", "tests");
+  if (filter.value.length === 0) return tests;
+  return `${tests} · ${String(taggedTests(node, filter.value).matching)} ${filter.value.join(" ")}`;
 }
 
 /** Colonne « Résultat » : dernière exécution, « réussies/exécutées » pour un dossier. */
@@ -76,6 +89,67 @@ function open(node: TreeNode): void {
   if (node.kind === "request") void workbench.openRequest(props.projectId, node.path);
   else if (node.test) void workbench.openTest(props.projectId, node.path);
   else void workbench.openFolder(props.projectId, node.path);
+}
+
+// --- Étiquettes (V2, lot B, 4.9-b) ------------------------------------------------------
+
+/** Étiquettes du dossier, modifiées sur place ; le cœur les écrit dans `folder.yml`. */
+const folderTags = ref<string[]>([]);
+watch(
+  () => folder.value?.tags,
+  (tags) => {
+    folderTags.value = [...(tags ?? [])];
+  },
+  { immediate: true },
+);
+watch(
+  folderTags,
+  (next) => {
+    const saved = folder.value?.tags ?? [];
+    if (next.join("\u0000") === saved.join("\u0000")) return;
+    guard(() => workbench.setFolderTags(props.projectId, props.path, [...next]));
+  },
+  { deep: true },
+);
+
+/** Étiquettes du filtre de la vue (ET3) ; les lignes qui ne les portent pas sont estompées. */
+const filter = ref<string[]>([]);
+/** Étiquettes qu'on peut ajouter au filtre : celles du dossier et de ce qu'il contient. */
+const filterChoices = computed(() => {
+  const chosen = new Set(filter.value.map(foldTag));
+  return tagCounts(folder.value?.children ?? [])
+    .map((t) => t.tag)
+    .filter((tag) => !chosen.has(foldTag(tag)));
+});
+
+function addFilter(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  if (select.value !== "") filter.value = [...filter.value, select.value];
+  select.value = "";
+}
+
+function removeFilter(tag: string): void {
+  filter.value = filter.value.filter((t) => t !== tag);
+}
+
+/** « 6 tests sur 28 · les autres sont estompés ». */
+const filterSummary = computed(() => {
+  const current = folder.value;
+  if (!current || filter.value.length === 0) return "";
+  const { matching, total } = taggedTests(current, filter.value);
+  return `${String(matching)} ${matching > 1 ? "tests" : "test"} sur ${String(total)} · les autres sont estompés`;
+});
+
+/** Étiquettes montrées sur une ligne : effectives pour une requête, du dossier sinon. */
+function rowTags(node: TreeNode): string[] {
+  return node.tags;
+}
+
+/** La ligne répond au filtre ; sans filtre, toutes. */
+function matches(node: TreeNode): boolean {
+  if (filter.value.length === 0) return true;
+  if (node.kind === "request") return hasTags(node.tags, filter.value);
+  return taggedTests(node, filter.value).matching > 0;
 }
 
 // --- Réordonner et ranger (AM38) --------------------------------------------------------
@@ -213,6 +287,36 @@ function cancelCreate(): void {
         </BaseButton>
       </div>
       <p class="folder__summary">{{ summary }}</p>
+      <div class="folder__tags">
+        <span :id="tagsLabelId" class="folder__tags-label">Étiquettes du dossier</span>
+        <TagsEditor v-model="folderTags" :project-id="projectId" :labelledby="tagsLabelId" />
+      </div>
+      <div class="folder__filter" role="group" :aria-labelledby="filterLabelId">
+        <span :id="filterLabelId" class="folder__tags-label">Filtrer par étiquettes</span>
+        <span v-for="tag in filter" :key="tag" class="folder__chip">
+          {{ tag }}
+          <button
+            type="button"
+            class="folder__chip-remove"
+            :aria-label="`Retirer ${tag} du filtre`"
+            @click="removeFilter(tag)"
+          >
+            ×
+          </button>
+        </span>
+        <select
+          v-if="filterChoices.length > 0"
+          class="folder__filter-add"
+          aria-label="Ajouter une étiquette au filtre"
+          @change="addFilter"
+        >
+          <option value="">+ Étiquette</option>
+          <option v-for="tag in filterChoices" :key="tag" :value="tag">{{ tag }}</option>
+        </select>
+        <span v-if="filterSummary" class="folder__filter-summary" role="status">{{
+          filterSummary
+        }}</span>
+      </div>
     </header>
 
     <p :id="handleHintId" class="visually-hidden">
@@ -235,7 +339,10 @@ function cancelCreate(): void {
           v-for="(node, index) in folder.children"
           :key="node.path"
           class="folder__row"
-          :class="dropping?.path === node.path && `folder__row--${dropping.where}`"
+          :class="[
+            dropping?.path === node.path && `folder__row--${dropping.where}`,
+            !matches(node) && 'folder__row--faded',
+          ]"
           @dragover="onDragOver($event, node)"
           @dragleave="dropping = null"
           @drop="onDrop($event, node, index)"
@@ -269,6 +376,7 @@ function cancelCreate(): void {
           </td>
           <td>
             <button type="button" class="folder__name" @click="open(node)">{{ node.name }}</button>
+            <span v-for="tag in rowTags(node)" :key="tag" class="folder__row-tag">{{ tag }}</span>
           </td>
           <td class="folder__muted">{{ content(node) }}</td>
           <td :class="`folder__result folder__result--${result(node).tone}`">
@@ -314,6 +422,66 @@ function cancelCreate(): void {
 </template>
 
 <style scoped>
+.folder__tags,
+.folder__filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+}
+
+.folder__tags-label {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+.folder__chip,
+.folder__row-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
+  background-color: var(--color-chip);
+}
+
+.folder__row-tag {
+  margin-left: 0.375rem;
+  color: var(--color-muted);
+}
+
+.folder__chip-remove {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: var(--color-muted);
+  background: none;
+  cursor: pointer;
+}
+
+.folder__chip-remove:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.folder__filter-add {
+  min-height: var(--control-sm);
+}
+
+.folder__filter-summary {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+/* Estompée par la couleur, jamais par l'opacité (Impeccable). */
+.folder__row--faded,
+.folder__row--faded :is(.folder__name, .folder__method, .folder__kind, .folder__result) {
+  color: var(--color-subtle);
+}
+
 .folder {
   display: flex;
   flex-direction: column;

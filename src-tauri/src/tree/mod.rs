@@ -38,6 +38,9 @@ pub enum TreeNode {
         /// Test : au moins une requête et aucun sous-dossier
         /// (`docs/plan-mvp-e-tests-etapes.md`, R1).
         test: bool,
+        /// Étiquettes du dossier (`info.tags` de son `folder.yml`) : elles valent pour tout ce
+        /// qu'il contient (`docs/plan-v2.md`, R4).
+        tags: Vec<String>,
     },
     Request {
         name: String,
@@ -51,7 +54,8 @@ pub enum TreeNode {
         /// Adresse de la requête, pour le filtre de la barre latérale
         /// (docs/plan-mvp-d-barre-laterale.md, R1) ; vide pour un fichier illisible.
         url: String,
-        /// Étiquettes, sans celle du lien au contrat (R1).
+        /// Étiquettes effectives, sans celle du lien au contrat (R1) : les siennes, puis celles
+        /// de ses dossiers parents (`docs/plan-v2.md`, R4).
         tags: Vec<String>,
     },
 }
@@ -79,7 +83,101 @@ fn is_request_file(path: &Path) -> bool {
 /// par nom sans tenir compte de la casse ; éléments cachés, racine de la
 /// collection et réglages de dossier (`folder.yml`) ignorés (R7 du format).
 pub fn read(root: &Path) -> Result<Vec<TreeNode>, CommandError> {
-    read_dir(root, root, true, &mut vec![canonical(root)])
+    let mut nodes = read_dir(root, root, true, &mut vec![canonical(root)])?;
+    inherit_tags(&mut nodes, &[]);
+    Ok(nodes)
+}
+
+/// Étiquettes effectives (`docs/plan-v2.md`, R4) : une requête garde les siennes, puis prend
+/// celles de chacun de ses dossiers parents, sans doublon (sans tenir compte de la casse).
+fn inherit_tags(nodes: &mut [TreeNode], inherited: &[String]) {
+    for node in nodes {
+        match node {
+            TreeNode::Folder { children, tags, .. } => {
+                let mut below = inherited.to_vec();
+                add_tags(&mut below, tags);
+                inherit_tags(children, &below);
+            }
+            TreeNode::Request { tags, .. } => add_tags(tags, inherited),
+        }
+    }
+}
+
+fn add_tags(into: &mut Vec<String>, more: &[String]) {
+    for tag in more {
+        if !into.iter().any(|t| t.eq_ignore_ascii_case(tag)) {
+            into.push(tag.clone());
+        }
+    }
+}
+
+/// Étiquettes d'un dossier : `info.tags` de son `folder.yml`, s'il en a un.
+fn folder_tags(dir: &Path) -> Vec<String> {
+    yaml::read(&dir.join(FOLDER_FILE))
+        .ok()
+        .and_then(|value| {
+            value.get("info")?.get("tags")?.as_array().map(|tags| {
+                tags.iter()
+                    .filter_map(|t| t.as_str().map(str::to_owned))
+                    .collect()
+            })
+        })
+        .unwrap_or_default()
+}
+
+/// Étiquettes d'un dossier (`docs/plan-v2.md`, R4, ET1) : écrites dans `info.tags` de son
+/// `folder.yml`, créé conforme au besoin ; sans étiquette, la clé est retirée. Les étiquettes
+/// sont nettoyées (espaces, doublons sans tenir compte de la casse, lien au contrat refusé).
+pub fn set_folder_tags(root: &Path, path: &str, tags: &[String]) -> Result<(), CommandError> {
+    let dir = resolve(root, path)?;
+    if !dir.is_dir() || dir == root {
+        return Err(invalid_request(
+            "Seul un dossier du projet reçoit des étiquettes.",
+        ));
+    }
+    let mut clean: Vec<String> = Vec::new();
+    for tag in tags {
+        let tag = tag.trim();
+        if tag.is_empty() || tag.starts_with("contract:") {
+            continue;
+        }
+        add_tags(&mut clean, &[tag.to_owned()]);
+    }
+    let file = dir.join(FOLDER_FILE);
+    let mut value = if file.exists() {
+        yaml::read(&file)?
+    } else {
+        let name = dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        serde_json::json!({ "info": { "name": name, "type": "folder" } })
+    };
+    let Some(info) = value
+        .as_object_mut()
+        .map(|object| {
+            object
+                .entry("info")
+                .or_insert_with(|| serde_json::json!({}))
+        })
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return Err(invalid_request(
+            "Le fichier folder.yml de ce dossier est illisible.",
+        ));
+    };
+    if clean.is_empty() {
+        info.remove("tags");
+    } else {
+        info.insert("tags".to_owned(), serde_json::json!(clean));
+    }
+    // Un contenu non conforme n'est jamais écrit (format OpenCollection strict).
+    schema::check(Part::Folder, &value).map_err(|error| {
+        invalid_request(format!(
+            "Étiquettes non conformes au format OpenCollection : {error}"
+        ))
+    })?;
+    yaml::write(&file, &value)
 }
 
 /// Chemin réel d'un dossier, liens suivis ; tel quel s'il ne se résout pas.
@@ -136,6 +234,7 @@ fn read_dir(
                     children,
                     request_count,
                     test,
+                    tags: folder_tags(&path),
                 },
             ));
         } else if is_request_file(&path) {
@@ -308,6 +407,7 @@ pub fn tests_view(nodes: &[TreeNode], contracts: &HashSet<String>) -> Vec<TreeNo
                 children,
                 request_count,
                 test,
+                tags,
             } => {
                 let kept = tests_view(children, contracts);
                 let count: usize = kept.iter().map(TreeNode::count).sum();
@@ -320,6 +420,7 @@ pub fn tests_view(nodes: &[TreeNode], contracts: &HashSet<String>) -> Vec<TreeNo
                     children: kept,
                     request_count: count,
                     test: *test,
+                    tags: tags.clone(),
                 })
             }
         })

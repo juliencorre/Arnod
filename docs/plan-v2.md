@@ -1,6 +1,6 @@
 # Plan - Version 2 : travailler en équipe, jouer les tests hors de l'application
 
-**Version** 0.1 · **Date** 2026-11-27 · **Statut** En cours (lot A livré ; questions du § 11 à trancher par lot) ·
+**Version** 0.1 · **Date** 2026-11-27 · **Statut** En cours (lots A et B livrés ; questions du § 11 à trancher par lot) ·
 **Base** version 0.0.4 (Develop @46f5d44)
 
 Plan d'implémentation de la **V2** de la maquette : « Les projets sont déjà des fichiers dans Git :
@@ -277,8 +277,8 @@ d'abord (courts, visibles), puis C, D, puis E, F.
 
 **Lot B - Étiquettes partagées (4.9-b)**
 
-- [ ] **T4** Étiquettes d'un dossier (`folder.yml`) et étiquettes effectives (R4), `tree_set_folder_tags`.
-- [ ] **T5** `FolderTab` : étiquettes du dossier, par ligne, filtre ; filtre du référentiel et
+- [x] **T4** Étiquettes d'un dossier (`folder.yml`) et étiquettes effectives (R4), `tree_set_folder_tags`.
+- [x] **T5** `FolderTab` : étiquettes du dossier, par ligne, filtre ; filtre du référentiel et
       recherche sur les étiquettes effectives ; Vitest, e2e.
 
 **Lot C - Cœur sans Tauri**

@@ -313,6 +313,8 @@ pub fn run() {
             commands::history::history_restore,
             // Version 2 (lot A) : recherche Ctrl+K.
             commands::search::search_query,
+            // Version 2 (lot B) : étiquettes partagées.
+            commands::tree::tree_set_folder_tags,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

@@ -195,6 +195,7 @@ fn r11_numero_d_essai_libre() {
             }],
             request_count: 1,
             test: true,
+            tags: Vec::new(),
         },
         TreeNode::Request {
             name: "Essai rapide".to_owned(),

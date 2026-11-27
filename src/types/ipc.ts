@@ -181,7 +181,9 @@ export type CommandName =
   | "history_clear"
   | "history_restore"
   // Version 2, lot A : recherche Ctrl+K.
-  | "search_query";
+  | "search_query"
+  // Version 2, lot B : étiquettes partagées.
+  | "tree_set_folder_tags";
 
 /**
  * Nature d'une erreur de commande.
@@ -350,6 +352,8 @@ export type TreeNode =
       requestCount: number;
       /** Test : au moins une requête et aucun sous-dossier (docs/plan-mvp-e-tests-etapes.md, R1). */
       test: boolean;
+      /** Étiquettes du dossier (`folder.yml`) : elles valent pour tout ce qu'il contient (V2, R4). */
+      tags: string[];
     }
   | {
       kind: "request";
@@ -363,7 +367,10 @@ export type TreeNode =
       contract: string | null;
       /** Adresse, pour le filtre (docs/plan-mvp-d-barre-laterale.md, R1) ; vide si illisible. */
       url: string;
-      /** Étiquettes, sans celle du lien au contrat (R1). */
+      /**
+       * Étiquettes effectives, sans celle du lien au contrat (R1) : les siennes, puis celles de
+       * ses dossiers parents (V2, R4).
+       */
       tags: string[];
     };
 

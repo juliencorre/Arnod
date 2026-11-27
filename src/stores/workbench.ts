@@ -187,6 +187,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return load;
   }
 
+  /** Étiquettes d'un dossier (V2, lot B, ET1) : elles valent pour tout ce qu'il contient. */
+  async function setFolderTags(projectId: string, path: string, tags: string[]): Promise<void> {
+    await ipc.treeSetFolderTags(projectId, path, tags);
+    await refreshTree(projectId);
+  }
+
   async function refreshTree(projectId: string): Promise<void> {
     trees.value[projectId] = await ipc.treeLoad(projectId);
   }
@@ -1396,6 +1402,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     pending,
     loadProject,
     refreshTree,
+    setFolderTags,
     refreshEnvironments,
     peekEnvironments,
     isExpanded,

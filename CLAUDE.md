@@ -1020,3 +1020,17 @@ Référence : `docs/plan-v2.md`, lot A (cas RH1 à RH6, règles R1 à R3), écra
 - Interface : `SearchPalette.vue` (montée par `AppShell`, motif combobox, Entrée, Ctrl+Entrée
   dans une autre zone, Échap rend le focus), store `search` (150 ms après la dernière frappe, une
   réponse dépassée est ignorée) ; raccourci « Rechercher » (Ctrl+K) des raccourcis modifiables.
+
+## Étiquettes partagées
+
+Référence : `docs/plan-v2.md`, lot B (cas ET1 à ET4, règle R4), écran 4.9-b.
+
+- Un dossier porte des étiquettes (`info.tags` de son `folder.yml`, `TreeNode::Folder.tags`,
+  écrites par `tree_set_folder_tags`, `folder.yml` créé conforme au besoin) ; elles valent pour
+  tout ce qu'il contient. `tree::read` donne à chaque requête ses étiquettes **effectives**
+  (`TreeNode::Request.tags` : les siennes, puis celles des dossiers parents, sans doublon) : le
+  filtre du référentiel, la recherche et les propositions de 4.9-a les prennent. Le fichier d'une
+  requête ne garde que les siennes (`RequestDoc.tags`).
+- Vue d'un dossier (`FolderTab.vue`) : « Étiquettes du dossier » (`TagsEditor`), étiquettes de
+  chaque ligne, filtre par étiquettes (`lib/tags.ts` : `hasTags`, `taggedTests`, comptages
+  d'affichage) ; une ligne hors filtre est estompée par sa couleur (`--color-subtle`).

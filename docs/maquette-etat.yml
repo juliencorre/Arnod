@@ -982,12 +982,13 @@ pages:
       - "plan-configuration-endpoint (étiquettes)"
       - "plan-v2 (ET1–ET4, LC3, lots B et D)"
     liees: ["4.1", "6.3", "5.3"]
-    reste: "filtrer, composer une campagne, ligne de commande (b, c, d)."
+    reste: "composer une campagne (c, V7), ligne de commande (d, lot D du plan V2)."
     journal:
       - "2026-11-09 : Étiquettes libres d'une requête (PR #32)."
       - "2026-11-13 : Étiquettes du projet proposées avec leur nombre de requêtes à la saisie, puis « + Créer » (a, PR #56)."
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 1 réécrit ou complété."
+      - "2026-11-27 : Étiquettes partagées (plan-v2, lot B) : un dossier reçoit des étiquettes (folder.yml), qui valent pour tout ce qu'il contient ; la vue d'un dossier montre les étiquettes de chaque ligne et se filtre par étiquettes, « N tests sur T · les autres sont estompés » ; le filtre du référentiel et la recherche prennent les étiquettes héritées."
     ecrans:
       a:
         etat: livré
@@ -997,7 +998,14 @@ pages:
         ecart:
           texte: "Le champ d'ajout s'ouvre par « + Étiquette » sous les étiquettes, pas en ligne sous l'adresse ; le nombre compte les requêtes du projet qui portent l'étiquette. La liste des assertions de l'écran n'est pas rendue (gabarits « {{ … }} »)."
           aligner: maquette
-      b: { etat: à faire, version: V2 }
+      b:
+        etat: livré
+        version: V2
+        pr: [96]
+        captures: [v2-etiquettes-dossier]
+        ecart:
+          texte: "Le filtre s'ajoute par une liste « + Étiquette » et ses pastilles se retirent par × ; les étiquettes du dossier ont leur propre ligne (« Étiquettes du dossier ») sous le résumé ; un sous-dossier dit « N tests · M smoke » pendant un filtre ; les lignes estompées le sont par la couleur du texte."
+          aligner: maquette
       c: { etat: à faire, version: V7 }
       d: { etat: à faire, version: V2 }
   "5.1":

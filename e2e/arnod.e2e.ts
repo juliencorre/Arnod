@@ -3209,6 +3209,63 @@ describe("Version 2 - Recherche Ctrl+K (1.5-a, 1.5-b)", () => {
   });
 });
 
+describe("Version 2 - Étiquettes partagées (4.9-b)", () => {
+  const folder = () => path.join(sandbox.home, "arnod", "boutique-tests", "Etiquettes V2");
+
+  beforeAll(() => {
+    // Un dossier ordinaire (un sous-dossier, deux requêtes), écrit hors d'Arnod : le lot I le
+    // fait paraître dans l'arborescence.
+    mkdirSync(path.join(folder(), "archives"), { recursive: true });
+    writeFileSync(
+      path.join(folder(), "smoke.yml"),
+      "info:\n  name: Requête smoke\n  type: http\n  tags:\n    - smoke\nhttp:\n  method: GET\n  url: http://127.0.0.1:1/smoke\n",
+    );
+    writeFileSync(
+      path.join(folder(), "autre.yml"),
+      "info:\n  name: Autre requête\n  type: http\nhttp:\n  method: GET\n  url: http://127.0.0.1:1/autre\n",
+    );
+  });
+
+  it("une étiquette de dossier vaut pour ses requêtes ; le filtre estompe les autres", async () => {
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document.querySelector('aside [role="treeitem"][data-path="Etiquettes V2"]') !== null,
+        ),
+      { timeout: 15_000, timeoutMsg: "dossier « Etiquettes V2 » attendu dans l'arborescence" },
+    );
+    await clickHidden('aside [role="treeitem"][data-path="Etiquettes V2"]');
+    await browser.$(".folder__tags").waitForExist({ timeout: 10_000 });
+    await clickHidden(".folder__tags .tag__add");
+    await browser.$(".folder__tags .tag__input").setValue("régression");
+    await browser.keys("Enter");
+    await browser.waitUntil(
+      () => readFileSync(path.join(folder(), "folder.yml"), "utf8").includes("régression"),
+      { timeout: 10_000, timeoutMsg: "étiquette écrite dans folder.yml attendue" },
+    );
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll(".folder__row-tag")).some((t) =>
+            t.textContent.includes("régression"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "étiquette du dossier sur les lignes attendue" },
+    );
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".folder__filter-add");
+      if (!select) throw new Error("filtre d'étiquettes introuvable");
+      select.value = "smoke";
+      select.dispatchEvent(new Event("change"));
+    });
+    await browser.$(".folder__filter-summary").waitForExist({ timeout: 5_000 });
+    expect(await browser.$(".folder__filter-summary").getText()).toContain("1 test sur 2");
+    await screenshot(browser, "v2-etiquettes-dossier");
+    await clickHidden('button[aria-label="Fermer Etiquettes V2"]');
+  });
+});
+
 describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
   const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
   const file = () => path.join(project(), "chrono-k.yml");

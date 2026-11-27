@@ -30,7 +30,8 @@
           }
         ],
         "requestCount": 2,
-        "test": true
+        "test": true,
+        "tags": []
       },
       {
         "kind": "request",
@@ -85,7 +86,8 @@
           }
         ],
         "requestCount": 2,
-        "test": true
+        "test": true,
+        "tags": []
       },
       {
         "kind": "request",

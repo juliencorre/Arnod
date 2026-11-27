@@ -113,6 +113,8 @@ export interface FakeWorkbench {
   /** Requêtes par chemin ; les dossiers se déduisent des chemins et de `folders`. */
   requests: Map<string, RequestDoc>;
   folders: Set<string>;
+  /** Étiquettes des dossiers (`folder.yml`, V2 lot B), par chemin. */
+  folderTags: Map<string, string[]>;
   /** Rang d'un dossier (`info.seq` de son `folder.yml`, AM38). */
   folderSeq: Map<string, number>;
   /** Fichiers de requête illisibles : listés sans méthode, comme `tree::read` (A10). */
@@ -143,6 +145,7 @@ export function createFakeWorkbench(): FakeWorkbench {
   return {
     requests: new Map(),
     folders: new Set(),
+    folderTags: new Map(),
     folderSeq: new Map(),
     unreadable: new Set(),
     envs: [
@@ -176,6 +179,18 @@ const fail = (kind: CommandError["kind"], message: string): never => {
   throw { kind, message } satisfies CommandError;
 };
 
+/** Étiquettes effectives (V2, R4) : les siennes, puis celles des dossiers parents, sans doublon. */
+function effectiveTags(wb: FakeWorkbench, path: string, own: string[]): string[] {
+  const out = [...own];
+  const parts = path.split("/").slice(0, -1);
+  for (let i = parts.length; i > 0; i--) {
+    for (const tag of wb.folderTags.get(parts.slice(0, i).join("/")) ?? []) {
+      if (!out.some((t) => t.toLowerCase() === tag.toLowerCase())) out.push(tag);
+    }
+  }
+  return out;
+}
+
 export function buildTree(wb: FakeWorkbench): TreeNode[] {
   const build = (parent: string): TreeNode[] => {
     const prefix = parent === "" ? "" : `${parent}/`;
@@ -195,6 +210,7 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
         test:
           children.some((c) => c.kind === "request" && c.contract === null) &&
           !children.some((c) => c.kind === "folder"),
+        tags: wb.folderTags.get(path) ?? [],
       };
     });
     // Rang (`seq`) d'abord, puis le nom sans casse, comme `tree::read` (lot E, R1) ; un fichier
@@ -215,7 +231,7 @@ export function buildTree(wb: FakeWorkbench): TreeNode[] {
           invalid: false,
           contract: request.contract?.file ?? null,
           url: request.url,
-          tags: request.tags,
+          tags: effectiveTags(wb, path, request.tags),
         },
       });
     }
@@ -463,6 +479,16 @@ export function handleWorkbench(
     case "tree_set_collapsed":
       wb.collapsed = args.collapsed as string[];
       return null;
+    case "tree_set_folder_tags": {
+      const tags: string[] = [];
+      for (const tag of args.tags as string[]) {
+        const clean = tag.trim();
+        if (clean !== "" && !tags.some((t) => t.toLowerCase() === clean.toLowerCase()))
+          tags.push(clean);
+      }
+      wb.folderTags.set(String(args.path), tags);
+      return null;
+    }
     case "tree_create_folder": {
       const parent = String(args.parent);
       const path = parent === "" ? String(args.name) : `${parent}/${String(args.name)}`;

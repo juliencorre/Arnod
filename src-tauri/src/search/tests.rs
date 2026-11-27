@@ -24,6 +24,7 @@ fn folder(name: &str, path: &str, test: bool, children: Vec<TreeNode>) -> TreeNo
         request_count: children.len(),
         children,
         test,
+        tags: Vec::new(),
     }
 }
 

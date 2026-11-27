@@ -314,6 +314,7 @@ fn walk(project: &ProjectSource, nodes: &[TreeNode], out: &mut Vec<Entry>) {
                 path,
                 children,
                 test,
+                tags,
                 ..
             } => {
                 let (kind, group) = if *test {
@@ -327,7 +328,7 @@ fn walk(project: &ProjectSource, nodes: &[TreeNode], out: &mut Vec<Entry>) {
                     group,
                     hit: h,
                     extra: Vec::new(),
-                    tags: Vec::new(),
+                    tags: tags.clone(),
                 });
                 walk(project, children, out);
             }
