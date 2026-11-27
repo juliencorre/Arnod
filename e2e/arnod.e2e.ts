@@ -3895,6 +3895,11 @@ describe("Version 4 - Tests en schéma, données, Avant / Après et templates", 
       () => readFileSync(path.join(project(), "Suite V4", "folder.yml"), "utf8").includes("pays"),
       { timeout: 10_000, timeoutMsg: "propriété écrite dans folder.yml attendue" },
     );
+    // Écrite dans request.variables du folder.yml, et montrée « défini ici ».
+    expect(readFileSync(path.join(project(), "Suite V4", "folder.yml"), "utf8")).toMatch(
+      /variables:[\s\S]*name: pays[\s\S]*value: FR/,
+    );
+    expect(await browser.$(".props").getText()).toContain("défini ici");
     await screenshot(browser, "v4-proprietes");
   });
 
@@ -3937,6 +3942,11 @@ describe("Version 4 - Tests en schéma, données, Avant / Après et templates", 
         ),
       { timeout: 15_000, timeoutMsg: "Avant du dossier réussi attendu" },
     );
+    expect(
+      await browser.execute(
+        () => document.querySelector(".hooks__content")?.textContent.trim() ?? "",
+      ),
+    ).toBe("jeton = abc");
     await screenshot(browser, "v4-avant-apres");
   });
 
