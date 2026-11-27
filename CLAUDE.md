@@ -310,6 +310,10 @@ Référence : `docs/plan-suivi-maquette.md` (règles R1 à R9).
   request ou son plan, ses captures e2e et ses écarts avec le code (`aligner` : maquette, code ou
   à décider ; une liste quand un écran diffère sur plusieurs points). Une pull request qui livre, modifie ou écarte un écran le met à jour ;
   `scripts/check-maquette.mjs` le vérifie (`npm run check`, CI).
+- La feuille de route (0.1-a) est générée depuis la section `feuille_de_route` de
+  `maquette-etat.yml` : chaque fonction cite ses pages ou écrans et son état s'en déduit (page :
+  écrans de la même version). Une fonction nouvelle ou réécrite se change là, jamais dans la
+  maquette ; seule une fonction sans écran donne son état.
 - Une capture citée existe dans `e2e/arnod.e2e.ts` (`screenshot(browser, "…")`) : un écran livré
   visible gagne une capture e2e. La maquette est régénérée depuis le fichier après fusion
   (`scripts/maquette-sync.py`, toutes les pages ou celles dont on donne le code).

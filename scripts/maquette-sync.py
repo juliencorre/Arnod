@@ -302,6 +302,145 @@ def index_option() -> str:
     return option("p2", "b", "Index des pages — état, écarts avec le code et plans de chaque page, depuis docs/maquette-etat.yml", card)
 
 
+# ---------------------------------------------------------------------------
+# Feuille de route (0.1-a), depuis la section « feuille_de_route » de l'état
+
+# Couleur de l'en-tête d'une colonne : bord, puis code de la version.
+HEADS = {"MVP": ("#e8962e", "#9a4a12"), "V1": ("#2f9c95", "#1c726d"), "suite": ("#3f7fd6", "#2e64b0")}
+COUNTED = ("livré", "en partie", "à faire")
+
+
+def screen_version(page, e: dict) -> str:
+    """Version d'un écran : la sienne, sinon la première de sa page."""
+    return e.get("version") or (versions(page) or ["MVP"])[0]
+
+
+def feature_screens(feature: dict, vcode: str) -> list:
+    """Écrans cités par une fonction : un repère, ou les écrans de la page de la même version."""
+    found = []
+    for ref in feature.get("ecrans") or []:
+        code, _, letter = str(ref).partition("-")
+        page = doc["pages"][code]
+        screens = page.get("ecrans") or {}
+        if letter:
+            found.append(screens[letter])
+        else:
+            found += [e for e in screens.values() if screen_version(page, e) == vcode]
+    return found
+
+
+def pending_screens(feature: dict, vcode: str) -> list:
+    """(page, lettre, écran) des écrans cités, de la version, pas encore livrés."""
+    out = []
+    for ref in feature.get("ecrans") or []:
+        code, _, letter = str(ref).partition("-")
+        page = doc["pages"][code]
+        for lt, e in (page.get("ecrans") or {}).items():
+            if (lt == letter or (not letter and screen_version(page, e) == vcode)) and e["etat"] in ("en partie", "à faire"):
+                out.append((code, lt, e))
+    return out
+
+
+def feature_state(feature: dict, vcode: str) -> str:
+    """Tous livrés : livré ; un écran livré ou en partie : en partie ; sinon à faire."""
+    if not feature.get("ecrans"):
+        return feature["etat"]
+    st = [e["etat"] for e in feature_screens(feature, vcode) if e["etat"] in COUNTED]
+    if st and all(x == "livré" for x in st):
+        return "livré"
+    if any(x in ("livré", "en partie") for x in st):
+        return "en partie"
+    return "à faire"
+
+
+def feature_refs(feature: dict) -> str:
+    """« 1.1 Workspaces · 4.1-f, g Référentiel de tests » : repères groupés par page, dans l'ordre."""
+    groups = []
+    for ref in feature.get("ecrans") or []:
+        code, _, letter = str(ref).partition("-")
+        if groups and groups[-1][0] == code and letter and groups[-1][1]:
+            groups[-1][1].append(letter)
+        else:
+            groups.append((code, [letter] if letter else []))
+    parts = [(f"{code}-{', '.join(letters)}" if letters else code) + f" {doc['pages'][code]['nom']}"
+             for code, letters in groups]
+    if feature.get("note"):
+        parts.append(feature["note"])
+    return " · ".join(parts)
+
+
+def feature_card(feature: dict, vcode: str, quiet_todo: bool) -> str:
+    state = feature_state(feature, vcode)
+    badge = "" if quiet_todo and state == "à faire" else pill(state)
+    left = feature.get("reste")
+    if not left and state == "en partie":
+        # Les écrans cités qui ne sont pas encore livrés.
+        left = ", ".join(f"{code}-{letter} ({e['etat']})" for code, letter, e in pending_screens(feature, vcode)) + "."
+    rest = (f'<span style="font-size:12px;color:#9a5a0c;line-height:1.45"><b style="font-weight:600">Reste :</b> '
+            f'{esc(left)}</span>') if left else ""
+    refs = feature_refs(feature)
+    refs_html = f'<span style="font:12px {MONO};color:#6b665e">{esc(refs)}</span>' if refs else ""
+    return (f'<div data-arnod="fonction" style="display:flex;flex-direction:column;gap:3px;padding:10px 12px;'
+            f'border:1px solid #ebe6de;border-radius:6px;background:#fff">'
+            f'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
+            f'<span style="font-size:13px;font-weight:600;color:#1d1b18">{esc(feature["nom"])}</span>{badge}</div>'
+            f'<span style="font-size:13px;color:#4a463f;line-height:1.45">{esc(feature["texte"])}</span>{rest}'
+            f'{refs_html}</div>')
+
+
+def tally(version: dict) -> str:
+    c = {}
+    for f in version.get("fonctions") or []:
+        st = feature_state(f, version["code"])
+        c[st] = c.get(st, 0) + 1
+    return " · ".join(f"{c[x]} {WORDS[x][0] if c[x] == 1 else WORDS[x][1]}" for x in COUNTED if x in c)
+
+
+def version_head(code: str, title: str, color: tuple, sub: str = "") -> str:
+    sub_html = f'<span style="font-size:12px;color:#6b665e">{esc(sub)}</span>' if sub else ""
+    return (f'<div style="display:flex;flex-direction:column;gap:4px;padding:0 2px 6px;border-bottom:2px solid {color[0]}">'
+            f'<span style="font:600 11px {MONO};letter-spacing:.06em;color:{color[1]}">{esc(code)}</span>'
+            f'<span style="font-size:15px;font-weight:600;color:#1d1b18">{esc(title)}</span>{sub_html}</div>')
+
+
+def version_column(version: dict, color: tuple, quiet_todo: bool, sub: str) -> str:
+    cards = "".join(feature_card(f, version["code"], quiet_todo) for f in version.get("fonctions") or [])
+    return (f'<div style="display:flex;flex-direction:column;gap:10px;min-width:0">'
+            f'{version_head(version["code"], version["titre"], color, sub)}{cards}</div>')
+
+
+def roadmap_option() -> str:
+    road = doc["feuille_de_route"]
+    by_code = {v["code"]: v for v in road["versions"]}
+    legend = "".join(f'{pill(x)}<span>{d}</span>' for x, d in
+                     [("livré", "disponible"), ("en partie", "commencé, le reste est indiqué"), ("à faire", "pas commencé")])
+    top = (f'<div style="grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:12px;'
+           f'color:#6b665e;margin:-6px 0 2px"><span>État au {TODAY} ({esc(SOURCE)}), déduit des écrans cités '
+           f'(docs/maquette-etat.yml) :</span>{legend}</div>')
+    mvp = version_column(by_code["MVP"], HEADS["MVP"], False, tally(by_code["MVP"]))
+    v1 = version_column(by_code["V1"], HEADS["V1"], False, tally(by_code["V1"]))
+    later = [v for v in road["versions"] if v["code"] not in ("MVP", "V1")]
+    suite = road.get("suite") or {}
+    span = f'{later[0]["code"]} À {later[-1]["code"]}' if later else ""
+    progression = (f'<div style="display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid #d6e2f3;'
+                   f'border-radius:6px;background:#f4f8fd;font-size:13px;color:#4a463f;line-height:1.5">'
+                   f'<span style="font:600 11px {MONO};letter-spacing:.06em;color:#2e64b0">PROGRESSION</span>'
+                   f'<span>{esc(suite.get("progression", ""))}</span></div>') if suite.get("progression") else ""
+    columns = "".join(version_column(v, HEADS["suite"], True, v.get("sous_titre", "")) for v in later)
+    decide = "".join(f'<span><b style="font-weight:600;color:#1d1b18">{esc(q["sujet"])}</b> — {esc(q["texte"])}</span>'
+                     for q in road.get("a_decider") or [])
+    decide_html = (f'<div style="display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px dashed #d6d0c6;'
+                   f'border-radius:6px;font-size:13px;color:#4a463f;line-height:1.5">'
+                   f'<span style="font:600 11px {MONO};letter-spacing:.06em;color:#6b665e">À DÉCIDER</span>{decide}</div>') if decide else ""
+    third = (f'<div style="display:flex;flex-direction:column;gap:22px">'
+             f'{version_head(span, suite.get("titre", ""), HEADS["suite"])}{progression}'
+             f'<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 18px;align-items:start">{columns}</div>'
+             f'{decide_html}</div>')
+    card = (f'<div class="dv-card" style="width:1280px;box-sizing:border-box;padding:28px 32px 32px;background:#fbfaf8;'
+            f'display:grid;grid-template-columns:1.25fr 0.75fr 2fr;gap:22px;align-items:start">{top}{mvp}{v1}{third}</div>')
+    return option("p1", "a", "Ce qui vient quand — chaque fonction dessinée, rangée par version, état déduit des écrans", card)
+
+
 def legend_option() -> str:
     def item(t, body):
         return f'<div style="display:flex;flex-direction:column;gap:6px"><div style="{LABEL}">{t}</div><div>{body}</div></div>'
@@ -636,7 +775,9 @@ def sync_page(code: str, page, text: str) -> str:
         block = text[m.start():end]
         oid = re.search(r'<a class="dv-oid"[^>]*>([^<]*)</a>', block).group(1)
         letter = oid.split("-", 1)[1] if oid.startswith(code + "-") else oid
-        if code == "0.1" and m.group(1) == "p2":
+        if code == "0.1" and m.group(1) == "p1":
+            block = roadmap_option()
+        elif code == "0.1" and m.group(1) == "p2":
             block = index_option()
         elif code == "0.1" and m.group(1) == "p3":
             block = legend_option()

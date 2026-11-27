@@ -30,7 +30,7 @@ pages:
     nom: "Périmètre et feuille de route"
     version: Cadre
     etat: référence
-    developpement: "Tenue à jour à chaque lot fusionné : docs/maquette-etat.yml, index 0.1-b."
+    developpement: "Générée depuis docs/maquette-etat.yml à chaque lot fusionné : feuille de route 0.1-a (section feuille_de_route, état déduit des écrans), index 0.1-b."
     questions:
       - "macOS et Linux : les annoncer, et pour quelle version ?"
       - "Tests de sécurité et de charge : les dessiner ou les sortir du périmètre ?"
@@ -38,6 +38,7 @@ pages:
       - "2026-11-12 : Devient l'index de la maquette : état au 12 novembre, index des pages (b), repères (c), correspondance des anciens repères (d)."
       - "2026-11-13 : Vague 1 de la finalisation du MVP fusionnée (PR #46 à #51, docs/plan-finalisation-mvp.md) : réponse, saisie et cURL, import Bruno, barre latérale, tests et étapes ; carte MVP à 11 livrés · 4 en partie · 4 à faire."
       - "2026-11-26 : Vérification des 88 écrans livrés ou en partie face à l'application (captures e2e et aperçu) : 88 écarts ajoutés, un écart transverse (cases et radios cochées) ; 3.3-b, 4.1-a bis, 4.1-a ter et 5.2-d passent en partie ; trois défauts corrigés au passage (assertions sous leur seul onglet, compteurs de statut en couleur, « du projet »)."
+      - "2026-11-27 : La feuille de route (a) est générée depuis docs/maquette-etat.yml (section feuille_de_route) : l'état de chaque fonction se déduit des écrans qu'elle cite ; la V1 (historique, raccourcis, apparence) et les mises à jour installées passent en livré."
     ecrans:
       a: { etat: référence }
       b: { etat: référence }
@@ -1231,3 +1232,231 @@ pages:
       c: { etat: à faire }
       d: { etat: à faire }
       e: { etat: à faire }
+
+# Feuille de route (écran 0.1-a), générée par scripts/maquette-sync.py. L'état d'une fonction se
+# déduit des écrans qu'elle cite (« ecrans ») : un code de page prend les écrans de la page de la
+# même version (version de l'écran, sinon la première de la page) ; un repère prend son écran.
+# Tous livrés : livré ; un écran livré ou en partie : en partie ; sinon à faire. Une fonction sans
+# écran donne son état (« etat ») et ce qui la situe (« note »). check-maquette.mjs le vérifie.
+feuille_de_route:
+  versions:
+    - code: MVP
+      titre: "Remplacer Bruno au quotidien"
+      fonctions:
+        - nom: "Projets et workspaces"
+          texte: "Créer ou reprendre un projet, le ranger dans zéro, un ou plusieurs workspaces ; « Tous les projets » ; la ligne du projet porte ▶, + et ⋯."
+          ecrans: ["1.1", "1.2"]
+        - nom: "Requête d'essai sans projet"
+          texte: "Envoyer une première requête sans créer de projet : elle est gardée dans « Non classés », sous le contrat déduit de son serveur et à son opération."
+          ecrans: ["2.1", "2.2"]
+          reste: "natures autres que REST en V6."
+        - nom: "Requêtes et assertions"
+          texte: "Requêtes REST, assertions sans code (28 opérateurs, proposées d'après la réponse), Basic, Bearer, clé d'API et OAuth 2, héritage des dossiers ; enregistrement automatique."
+          ecrans: ["4.2", "3.4", "5.1", "2.1"]
+        - nom: "Tests et étapes"
+          texte: "Un test est un dossier qui contient une liste ordonnée d'étapes (ses requêtes) ; il réussit si toutes ses étapes réussissent. Verdict, arrêt sur la première étape en échec, valeurs extraites passées aux étapes suivantes, onglet du test."
+          ecrans: ["0.2", "4.2"]
+        - nom: "Environnements"
+          texte: "Chaîne d'environnements du projet, variables partagées ou locales, secrets dans le coffre du système, environnements protégés ; choisis sous le nom du projet."
+          ecrans: ["3.3"]
+        - nom: "Exécution d'une requête et d'un dossier"
+          texte: "Envoyer, annuler, lire la réponse et ses temps ; lancer un dossier, un projet ou un contrat, relancer les échecs ; le dernier run est gardé sur le poste, hors Git."
+          ecrans: ["5.1", "5.2"]
+        - nom: "Contrats de service et endpoints"
+          texte: "Contrat créé à la main ou importé ; endpoint configuré sur place : paramètres, corps, authentification, réglages hérités, docs, réponses attendues, tests. Les requêtes d'un contrat sont rangées sous lui : ressource, opération, requêtes."
+          ecrans: ["3.1", "3.2"]
+        - nom: "Import OpenAPI"
+          texte: "OpenAPI 3.0, 3.1 ou Swagger 2.0 depuis un fichier, un texte ou une adresse ; une requête prête par opération, vérifiée conforme au contrat."
+          ecrans: ["2.3", "3.1"]
+        - nom: "Onglets, fenêtres et zones"
+          texte: "Zones côte à côte, dispositions, fenêtres détachées, barre latérale détachable ; résultat dans sa propre fenêtre, qui suit la requête active."
+          ecrans: ["1.3", "1.4"]
+        - nom: "Fichiers OpenCollection"
+          texte: "Un projet est un dossier lisible et versionnable (format OpenCollection 1.0.0 strict) ; rien d'inconnu n'est perdu à l'enregistrement."
+          etat: livré
+          note: "sans écran · docs/plan-opencollection.md"
+        - nom: "Thème sombre"
+          texte: "Clair ou sombre selon le réglage du système, contrastes vérifiés."
+          ecrans: ["0.4"]
+        - nom: "Import Bruno"
+          texte: "Une collection Bruno, au format OpenCollection ou en fichiers .bru, s'ouvre comme un projet : environnements, authentification, assertions, extractions et valeurs dynamiques repris sans code ; scripts signalés."
+          ecrans: ["2.3"]
+        - nom: "Étiquettes"
+          texte: "Étiquettes libres sur chaque requête, proposées à la saisie avec leur nombre."
+          ecrans: ["4.9"]
+        - nom: "Valeurs dynamiques"
+          texte: "Identifiant unique, date, heure, nombre ou e-mail tirés à chaque envoi, avec les noms de Bruno ; « Garder » range la valeur dans une variable. Sans script."
+          ecrans: ["5.1-h"]
+        - nom: "Réseau d'entreprise"
+          texte: "Proxy et autorités repris du système ; un échec réseau donne sa cause et l'action qui règle le poste (autorité interne ajoutée après vérification)."
+          ecrans: ["1.6-e", "5.1-i"]
+        - nom: "Fichiers modifiés hors d'Arnod"
+          texte: "Après un git pull ou une modification dans un éditeur, arborescence et onglets se rechargent ; un brouillon en conflit se règle élément par élément."
+          ecrans: ["4.1-e"]
+        - nom: "Filtrer l'arborescence"
+          texte: "Un champ en tête du référentiel filtre par nom, adresse, #étiquette ou méthode."
+          ecrans: ["1.2-e"]
+        - nom: "Mises à jour de l'application"
+          texte: "Une version plus récente publiée est signalée (au démarrage, puis chaque jour, ou à la demande), téléchargée par le réseau du poste, sa signature vérifiée, puis installée sans droits administrateur ; canal stable ou préversions."
+          ecrans: ["1.6-g"]
+        - nom: "Copier et déplacer une requête"
+          texte: "Vers un dossier, une place dans un test, une opération ou un autre projet : « Copier ou déplacer… », glisser-déposer, Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+Z. Ce qui change s'affiche avant de valider. Sélection multiple : déplacer, dupliquer, exécuter ou supprimer d'un coup."
+          ecrans: ["4.1-f", "4.1-g", "4.1-a quater"]
+    - code: V1
+      titre: "Garder l'historique, régler son poste"
+      fonctions:
+        - nom: "Historique local des envois"
+          texte: "Les 20 derniers envois de chaque requête, gardés sur le poste, hors Git, dans un onglet Historique de la réponse : chaque envoi se déplie et se compare au précédent."
+          ecrans: ["5.1-c bis"]
+        - nom: "Raccourcis modifiables"
+          texte: "Préférences → Raccourcis : chaque action et sa combinaison, par usage ; un conflit est signalé avant d'être remplacé ; « Rétablir » revient aux raccourcis par défaut."
+          ecrans: ["1.6-f bis"]
+        - nom: "Apparence"
+          texte: "Préférences → Apparence : forcer le thème clair ou sombre, zoom, police des éditeurs."
+          ecrans: ["1.6-f"]
+    - code: V2
+      titre: "Travailler en équipe et en intégration continue"
+      sous_titre: "Les projets sont déjà des fichiers dans Git : on les partage, et on les joue hors de l'application."
+      fonctions:
+        - nom: "Synchronisation"
+          texte: "Relier le projet à GitHub ou GitLab ; envoyer, récupérer, régler un conflit assertion par assertion ; les secrets ne voyagent pas."
+          ecrans: ["7.1"]
+        - nom: "Ligne de commande arnod"
+          texte: "Lancer un test, un dossier ou une étiquette hors de l'application ; rapports JUnit, Allure, HTML ; image Docker, exemples GitHub Actions et Jenkins."
+          ecrans: ["5.3-a", "5.3-c", "5.3-d"]
+        - nom: "Étiquettes partagées"
+          texte: "Étiquettes communes au projet, visibles dans le référentiel et choisies à la ligne de commande."
+          ecrans: ["4.9-b", "4.9-d"]
+        - nom: "Recherche Ctrl+K"
+          texte: "Retrouver tout élément du workspace par nom, identifiant ou adresse."
+          ecrans: ["1.5"]
+        - nom: "Barre d'état"
+          texte: "Elle arrive avec les modifications à envoyer ; mocks (V5) et catalogue (V6) s'y ajoutent ensuite."
+          etat: à faire
+          note: "toutes les pages"
+    - code: V3
+      titre: "Couvrir tous les appels HTTP"
+      sous_titre: "Ce qui manque encore pour quitter Bruno sur tous les projets."
+      fonctions:
+        - nom: "GraphQL"
+          texte: "Requête, variables, schéma par introspection ; assertions sur data et errors."
+          ecrans: ["4.5-a"]
+        - nom: "Envoi de fichiers"
+          texte: "Corps multipart ou binaire ; fichiers rangés dans le projet, utilisables par la commande arnod."
+          ecrans: ["4.5-b"]
+        - nom: "WebSocket"
+          texte: "Envoyer, attendre un message précis, extraire ; le fil des messages."
+          ecrans: ["4.5-c"]
+        - nom: "Authentification avancée"
+          texte: "OAuth 2 avec connexion, Windows (NTLM, Kerberos), certificat client par environnement."
+          ecrans: ["3.4-d"]
+    - code: V4
+      titre: "Enchaîner et réutiliser"
+      sous_titre: "Les tests deviennent des scénarios ; les scripts gardés à l'import Bruno s'exécutent."
+      fonctions:
+        - nom: "Tests en schéma"
+          texte: "Enchaîner des étapes, conditions, boucles, attentes ; chemin suivi et valeurs réelles après exécution."
+          ecrans: ["4.3-a", "4.3-b", "4.3-c", "4.3-d", "4.3-e"]
+        - nom: "Étape script"
+          texte: "Quelques lignes de JavaScript isolé, avec vars, response et assert()."
+          ecrans: ["4.3-g"]
+        - nom: "Jeux de données, avant / après"
+          texte: "Un test joué une fois par cas, depuis un tableau ou un fichier CSV ; préparer et nettoyer les données."
+          ecrans: ["4.7"]
+        - nom: "Templates"
+          texte: "Réutiliser un test, un dossier ou une arborescence avec des paramètres ; transfert depuis un endpoint."
+          ecrans: ["4.8", "3.2-d"]
+        - nom: "Import Postman"
+          texte: "Reprendre ses collections Postman par le même « Importer… » ; scripts convertis en étapes script."
+          ecrans: ["2.3-d"]
+        - nom: "Barre latérale « Plus »"
+          texte: "Les sections des versions suivantes, rangées sous « Plus » ; chacune s'affiche seule à sa première utilisation."
+          ecrans: ["1.2-d bis"]
+    - code: V5
+      titre: "Remplacer SoapUI"
+      sous_titre: "Avec les scénarios et les jeux de données de la V4, un projet SoapUI se reprend entier."
+      fonctions:
+        - nom: "Étape SOAP"
+          texte: "Opération WSDL, enveloppe XML avec variables, XPath, WS-Addressing, pièces jointes MTOM."
+          ecrans: ["4.3-f"]
+        - nom: "WS-Security"
+          texte: "Signature, chiffrement et jeton ajoutés à l'enveloppe, à la place de l'authentification du projet."
+          ecrans: ["3.4-c"]
+        - nom: "Import SoapUI"
+          texte: "Reprise des projets SoapUI ; réécriture sans code proposée pour les scripts Groovy."
+          ecrans: ["2.3-e"]
+        - nom: "Mocks"
+          texte: "Simuler un service d'après son contrat, tester contre lui, journal en direct ; un appel sans endpoint s'ajoute au contrat."
+          ecrans: ["3.5"]
+    - code: V6
+      titre: "Tester toutes les natures"
+      sous_titre: "La vision d'Arnod : services, données, messages et IHM dans un même test."
+      fonctions:
+        - nom: "Catalogue des étapes"
+          texte: "Nouvelles natures signées, ajoutées sans nouvelle version d'Arnod : SQL, Kafka, batch, SFTP, gRPC."
+          ecrans: ["4.4"]
+        - nom: "Étapes IHM (Playwright)"
+          texte: "Ouvrir, cliquer, saisir, lire dans un navigateur, entre deux appels de services ; capture à chaque échec."
+          ecrans: ["4.3-h", "4.3-i"]
+        - nom: "Enregistreur IHM"
+          texte: "Les gestes faits dans le navigateur deviennent des étapes."
+          etat: à faire
+          note: "étude du catalogue, § 10.7"
+    - code: V7
+      titre: "Organiser la recette"
+      sous_titre: "Les tests se rattachent à ce qu'ils valident et se jouent par campagne."
+      fonctions:
+        - nom: "Produits et versions"
+          texte: "Versions métier ordonnées, ce qui s'applique à chacune."
+          ecrans: ["6.1"]
+        - nom: "Exigences et couverture"
+          texte: "Exigences par produit et version, en dossiers sans limite ; tests créés depuis une exigence ou un critère ; matrice de couverture."
+          ecrans: ["6.2"]
+        - nom: "Campagnes, plans de test, compte rendu"
+          texte: "Valider une version métier environnement par environnement ; campagnes par étiquettes, lancées aussi à la ligne de commande."
+          ecrans: ["6.3", "4.9-c"]
+        - nom: "Étapes manuelles"
+          texte: "Une étape qui demande une intervention humaine et un verdict, dans l'application ou le terminal."
+          ecrans: ["4.6", "5.3-b"]
+        - nom: "Anomalies"
+          texte: "Créées depuis un test en échec, clôturées par un rejeu ; synchronisées avec Jira, GitLab ou GitHub."
+          ecrans: ["6.4"]
+    - code: V8
+      titre: "Décider de la mise en production"
+      sous_titre: "Avec les campagnes et les anomalies de la V7 : mesurer, décider, anticiper."
+      fonctions:
+        - nom: "Critères de sortie, PV de recette"
+          texte: "Seuils du projet ajustables par validation ; décision et PV à signer."
+          ecrans: ["6.5"]
+        - nom: "Tableau de bord"
+          texte: "L'état d'une validation, à la manière d'Allure ; exports PDF et HTML."
+          ecrans: ["6.7"]
+        - nom: "Analyse d'impact"
+          texte: "Exigence ou contrat modifié : les tests à revoir, les anomalies concernées."
+          ecrans: ["6.6"]
+    - code: V9
+      titre: "Assister et éprouver"
+      sous_titre: "Ce qui demande une base riche de contrats, de tests et d'exécutions."
+      fonctions:
+        - nom: "Agent"
+          texte: "Génération de tests depuis un contrat ou une exigence, analyse des échecs."
+          etat: à faire
+        - nom: "Note de qualité des tests"
+          texte: "Une note selon les assertions de chaque test."
+          etat: à faire
+        - nom: "Tests de sécurité"
+          texte: "Contrôles de base tirés des contrats : accès sans jeton, en-têtes, injections."
+          etat: à faire
+          note: "à décider · sans écran"
+        - nom: "Tests de charge"
+          texte: "Mesurer la tenue en charge d'un service."
+          etat: à faire
+          note: "à décider · sans écran"
+  suite:
+    titre: "Remplacer Bruno partout, puis SoapUI, puis piloter la recette"
+    progression: "Chaque version s'appuie sur les précédentes. L'équipe et la CI (V2) puis tous les appels HTTP (V3) achèvent de remplacer Bruno. Les scénarios et les jeux de données (V4) rendent possibles SoapUI (V5) et les autres natures de test (V6). La recette (V7, V8) s'appuie sur des tests complets ; l'assistance (V9), sur leur historique."
+  a_decider:
+    - sujet: "macOS et Linux"
+      texte: "l'application est annoncée pour Windows seulement ; Bruno et SoapUI tournent sur les trois systèmes. La commande arnod tourne sous Linux dès la V2 (image Docker). L'application : pour quelle version ?"
+    - sujet: "Tests de sécurité et de charge"
+      texte: "rangés en V9, sans écran dessiné. Les dessiner, ou les sortir du périmètre ?"
