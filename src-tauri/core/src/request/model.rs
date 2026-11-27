@@ -457,6 +457,17 @@ impl ExtractionScope {
     }
 }
 
+/// Jeu de données d'une requête (`docs/plan-v4.md`, R11) : un fichier CSV du projet.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct DataLink {
+    /// Fichier, relatif au projet (`données/Lister les commandes.csv`).
+    pub file: String,
+    /// Tableau modifiable dans Arnod (`data:`) ; sinon fichier relu, jamais écrit (`data-file:`).
+    pub editable: bool,
+}
+
 /// Opération d'un contrat dont la requête est issue (C7).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -592,6 +603,20 @@ pub struct InheritedHeader {
     pub source: String,
 }
 
+/// Propriété d'un dossier ou variable de la collection (`request.variables`), reprise par une
+/// requête (`docs/plan-v4.md`, R15).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct InheritedVariable {
+    pub name: String,
+    pub value: String,
+    /// « dossier « v2 » » ou « projet « Boutique » ».
+    pub source: String,
+    /// Dossier qui la définit, relatif au projet ; vide pour la collection.
+    pub folder: String,
+}
+
 /// Ce qu'une requête hérite de ses dossiers et de la collection : calculé à
 /// la lecture pour l'éditeur, jamais écrit (R3, R4).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -604,6 +629,10 @@ pub struct Inherited {
     pub headers: Vec<InheritedHeader>,
     #[serde(default)]
     pub settings: ResolvedSettings,
+    /// Propriétés des dossiers puis variables de la collection, de la plus proche à la plus
+    /// lointaine (`docs/plan-v4.md`, R15).
+    #[serde(default)]
+    pub variables: Vec<InheritedVariable>,
 }
 
 /// Requête éditée : un endpoint (docs/plan-configuration-endpoint.md).
@@ -650,6 +679,10 @@ pub struct Request {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub contract: Option<ContractLink>,
+    /// Jeu de données lié (étiquette `data:` ou `data-file:`, `docs/plan-v4.md`, R11).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub data: Option<DataLink>,
     /// Parties du fichier conservées sans être gérées par Arnod (scripts,
     /// variables…), pour le signaler dans l'éditeur. Ignoré à l'enregistrement.
     #[serde(default)]
@@ -687,6 +720,7 @@ impl Request {
             seq: None,
             examples: Vec::new(),
             contract: None,
+            data: None,
             preserved: Vec::new(),
             inherited: Inherited::default(),
         }

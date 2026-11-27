@@ -25,6 +25,7 @@ fn folder(name: &str, path: &str, test: bool, children: Vec<TreeNode>) -> TreeNo
         children,
         test,
         tags: Vec::new(),
+        template: None,
     }
 }
 

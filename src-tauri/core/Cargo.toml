@@ -67,6 +67,9 @@ tower-service = "0.3"
 # « smart HTTP » est écrit par Arnod sur reqwest (`sync::transport`) ; libgit2 compilé avec Arnod
 # (`vendored-libgit2`), sans bibliothèque du système à installer.
 git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"], optional = true }
+# V4 (`docs/plan-v4.md`, Q2) : moteur JavaScript QuickJS compilé avec Arnod, pour l'étape script
+# et les scripts Bruno ; sans module système (ni disque, ni réseau, R9).
+rquickjs = { version = "0.14", default-features = false, features = ["std"] }
 # Miroir IPC, voir la feature `ts`.
 ts-rs = { version = "12", features = ["serde-json-impl", "uuid-impl"], optional = true }
 

@@ -122,10 +122,19 @@ pub fn set_meta(root: &mut Value, meta: &ArnodMeta) {
     let Some(extensions) = extensions.as_object_mut() else {
         return;
     };
-    let mut arnod = Map::new();
+    // Les autres clés d'`extensions.arnod` (schémas des tests, Avant / Après, V4) sont gardées.
+    let mut arnod = match extensions.remove("arnod") {
+        Some(Value::Object(map)) => map,
+        _ => Map::new(),
+    };
     arnod.insert("version".to_owned(), Value::from(ARNOD_VERSION));
-    if let Some(id) = meta.id {
-        arnod.insert("id".to_owned(), Value::from(id.to_string()));
+    match meta.id {
+        Some(id) => {
+            arnod.insert("id".to_owned(), Value::from(id.to_string()));
+        }
+        None => {
+            arnod.remove("id");
+        }
     }
     let mut environments = Map::new();
     if !meta.environment_order.is_empty() {
@@ -134,10 +143,43 @@ pub fn set_meta(root: &mut Value, meta: &ArnodMeta) {
     if !meta.protected.is_empty() {
         environments.insert("protected".to_owned(), json!(meta.protected));
     }
-    if !environments.is_empty() {
+    if environments.is_empty() {
+        arnod.remove("environments");
+    } else {
         arnod.insert("environments".to_owned(), Value::Object(environments));
     }
     extensions.insert("arnod".to_owned(), Value::Object(arnod));
+}
+
+/// Clé `key` d'`extensions.arnod` d'une racine (schémas des tests, Avant / Après, V4).
+pub fn arnod_value<'a>(root: &'a Value, key: &str) -> Option<&'a Value> {
+    root.pointer("/extensions/arnod")?.get(key)
+}
+
+/// `extensions.arnod` d'un projet lu sans contrôle du schéma, pour l'arborescence et les runs :
+/// une racine absente ou illisible n'en a pas.
+pub fn read_arnod(folder: &Path) -> Option<Value> {
+    yaml::read(&root_file(folder))
+        .ok()?
+        .pointer("/extensions/arnod")
+        .cloned()
+}
+
+/// Modifie `extensions.arnod` d'un projet existant (V4) et l'écrit, valide pour le schéma.
+pub fn update_arnod(
+    folder: &Path,
+    edit: impl FnOnce(&mut Map<String, Value>),
+) -> Result<(), CommandError> {
+    let mut root = read(folder)?;
+    let current = meta(&root);
+    set_meta(&mut root, &current);
+    if let Some(arnod) = root
+        .pointer_mut("/extensions/arnod")
+        .and_then(Value::as_object_mut)
+    {
+        edit(arnod);
+    }
+    write(folder, &root)
 }
 
 /// Racine lue (R5) : absente, illisible ou non conforme → `NotAProject`.
