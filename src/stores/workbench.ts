@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch, type ComputedRef } from "vue";
 
 import { events, ipc, IpcError } from "@/lib/ipc";
 import { targetOf } from "@/lib/url";
+import { useDatasetsStore } from "@/stores/datasets";
 import { contentKey, MAIN_WINDOW, useWindowsStore } from "@/stores/windows";
 import { useToastStore } from "@/stores/toasts";
 import type {
@@ -528,14 +529,37 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       await save(key).catch(() => undefined);
       editor.execId = crypto.randomUUID();
       const sending = canonical(editor.draft);
-      editor.outcome = await ipc.requestSend(
-        editor.projectId,
-        editor.execId,
-        environment,
-        editor.path,
-        editor.draft,
-        confirmed,
-      );
+      if (editor.draft.data) {
+        // V4 (4.7-b, R12) : une requête à jeu de données part une fois par cas ; la réponse
+        // montrée est celle du cas choisi.
+        const datasets = useDatasetsStore();
+        const cases = await ipc.requestSendCases(
+          editor.projectId,
+          editor.execId,
+          environment,
+          editor.path,
+          editor.draft,
+          confirmed,
+        );
+        datasets.setOutcome(key, cases);
+        const wanted = datasets.selected[key] ?? 1;
+        const shown = cases.cases.find((c) => c.number === wanted) ?? cases.cases[0];
+        if (shown && !shown.outcome) throw new Error(shown.error ?? "Cas non envoyé.");
+        editor.outcome = shown?.outcome ?? null;
+        statuses.value[editor.projectId] = {
+          ...(statuses.value[editor.projectId] ?? {}),
+          [editor.path]: { passed: cases.passed, at: Date.now() },
+        };
+      } else {
+        editor.outcome = await ipc.requestSend(
+          editor.projectId,
+          editor.execId,
+          environment,
+          editor.path,
+          editor.draft,
+          confirmed,
+        );
+      }
       editor.receivedAt = new Date();
       editor.sent = sending;
     } catch (caught) {

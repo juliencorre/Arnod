@@ -75,7 +75,7 @@ fn texts_under(path: &Path, out: &mut Vec<(PathBuf, String)>) -> Result<(), Comm
 }
 
 /// Copie le dossier `source` en `target`, fichier par fichier.
-fn copy_dir(source: &Path, target: &Path) -> Result<(), CommandError> {
+pub(crate) fn copy_dir(source: &Path, target: &Path) -> Result<(), CommandError> {
     fs::create_dir_all(target)
         .map_err(|e| CommandError::io("Création du dossier impossible", target, &e))?;
     let entries =

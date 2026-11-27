@@ -31,7 +31,8 @@
         ],
         "requestCount": 2,
         "test": true,
-        "tags": []
+        "tags": [],
+        "template": null
       },
       {
         "kind": "request",
@@ -87,7 +88,8 @@
         ],
         "requestCount": 2,
         "test": true,
-        "tags": []
+        "tags": [],
+        "template": null
       },
       {
         "kind": "request",
@@ -112,7 +114,9 @@
         "tags": []
       }
     ],
-    "collapsed": []
+    "collapsed": [],
+    "templates": [],
+    "sections": []
   },
   "requestRead": {
     "name": "Lister",
@@ -175,7 +179,8 @@
         "followRedirects": true,
         "maxRedirects": 5,
         "encodeUrl": true
-      }
+      },
+      "variables": []
     }
   }
 }

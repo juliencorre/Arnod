@@ -65,11 +65,14 @@ describe("test = dossier d'étapes (4.2-a)", () => {
     expect(app.get(".test__summary").text()).toContain("en échec à l'étape 1");
   });
 
-  it("« + Étape » ajoute l'étape suivante et l'ouvre, curseur dans l'adresse", async () => {
+  it("« + Étape ▾ » › Requête ajoute l'étape suivante et l'ouvre, curseur dans l'adresse", async () => {
     let core;
     ({ app, core } = await openProject());
     await click(app, '[role="treeitem"]', "Clients");
     await click(app, ".test button", "+ Étape");
+    // V4 (4.3-e) : le choix de la nature, au clavier ; « REST » est la première.
+    await app.get(".picker__input").trigger("keydown", { key: "Enter" });
+    await flushPromises();
     expect(core.calls.find((c) => c.cmd === "tree_add_step")?.args).toMatchObject({
       test: "Clients",
     });
@@ -86,6 +89,7 @@ describe("test = dossier d'étapes (4.2-a)", () => {
     ({ app } = await openProject());
     await click(app, '[role="treeitem"]', "Clients");
     await click(app, ".test button", "+ Étape");
+    await app.get(".picker__input").trigger("keydown", { key: "Enter" });
     await flushPromises();
     const target = reveal.mock.contexts.at(-1) as HTMLElement | undefined;
     expect(target?.textContent.trim()).toBe("3 · Étape 3");

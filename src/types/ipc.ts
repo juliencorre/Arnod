@@ -119,6 +119,36 @@ export type CommandName =
   | "tree_create_test"
   | "tree_add_step"
   | "request_variable_users"
+  | "flow_save"
+  | "flow_add_step"
+  | "flow_remove_step"
+  | "flow_step_operation"
+  | "hooks_remove_step"
+  | "hooks_read"
+  | "hooks_save"
+  | "hooks_add_step"
+  | "folder_properties"
+  | "folder_set_properties"
+  | "data_read"
+  | "data_save"
+  | "data_import"
+  | "data_remove"
+  | "data_parse"
+  | "data_open"
+  | "data_case"
+  | "request_send_cases"
+  | "template_list"
+  | "template_categories"
+  | "template_read"
+  | "template_save_params"
+  | "template_candidates"
+  | "template_create"
+  | "template_use"
+  | "template_instance"
+  | "template_set_values"
+  | "template_literals"
+  | "template_from_request"
+  | "sections_show"
   // Essais : chemins généralisés et transfert au référentiel (2.2-b, 2.2-c).
   | "trial_generalization"
   | "trial_generalize"
@@ -375,6 +405,8 @@ export type TreeNode =
       test: boolean;
       /** Étiquettes du dossier (`folder.yml`) : elles valent pour tout ce qu'il contient (V2, R4). */
       tags: string[];
+      /** Utilisation d'un template : son chemin (étiquette `template:`, V4, R17). */
+      template: string | null;
     }
   | {
       kind: "request";
@@ -404,6 +436,10 @@ export interface TreeView {
    */
   tests: TreeNode[];
   collapsed: string[];
+  /** Templates du projet (V4, lot F) : la section « Templates » s'affiche dès qu'il y en a un. */
+  templates: TemplateSummary[];
+  /** Sections affichées depuis « Plus » (V4, R21). */
+  sections: string[];
 }
 
 /** Emplacement d'un paramètre : adresse (`?nom=valeur`) ou chemin (`:nom`). */
@@ -521,6 +557,18 @@ export interface Inherited {
   auth: { auth: Auth; source: string } | null;
   headers: { name: string; value: string; source: string }[];
   settings: ResolvedSettings;
+  /** Propriétés des dossiers puis variables de la collection, de la plus proche (V4, R15). */
+  variables: InheritedVariable[];
+}
+
+/** Propriété d'un dossier ou variable de la collection reprise par une requête (V4, R15). */
+export interface InheritedVariable {
+  name: string;
+  value: string;
+  /** « dossier « v2 » » ou « projet « Boutique » ». */
+  source: string;
+  /** Dossier qui la définit ; vide pour la collection. */
+  folder: string;
 }
 
 /** Opérateurs d'OpenCollection et de Bruno (`Operator` en Rust). */
@@ -595,6 +643,8 @@ export interface RequestDoc {
   examples: Example[];
   /** Opération du contrat liée (étiquette `contract:` du fichier, C7). */
   contract?: ContractLink;
+  /** Jeu de données lié (étiquette `data:` ou `data-file:`, V4, R11). */
+  data?: DataLink;
   /** Parties du fichier conservées sans être gérées par Arnod (scripts, variables…). */
   preserved: string[];
   /** Héritage, calculé à la lecture ; ignoré à l'enregistrement. */
@@ -761,6 +811,44 @@ export interface RunItem {
   step: number | null;
   /** Valeurs extraites par la ligne, masquées. */
   extracted: ExtractedValue[];
+  /** Nature de l'étape (V4) ; une requête pour une ligne d'avant la V4. */
+  kind: StepKind;
+  /** Identifiant de l'étape dans le schéma de son test. */
+  stepId: string | null;
+  /** Résumé court : « oui », « 3 tours », « 9/12 », « 3 essais », « 12 cas ». */
+  detail: string | null;
+  /** Branche prise par une condition. */
+  branch: boolean | null;
+  /** Passages de l'étape (boucle, attente, Avant chaque test, cas). */
+  passes: number;
+  /** Phase d'un Avant / Après (R13) et son dossier. */
+  hook: HookPhase | null;
+  folder: string | null;
+  /** Résultat de chaque cas d'un jeu de données (R12). */
+  cases: CaseResult[];
+}
+
+/** Résultat d'un cas d'un jeu de données dans un run (4.7-b bis, R12). */
+export interface CaseResult {
+  /** Numéro du cas, à partir de 1. */
+  number: number;
+  /** Valeurs du cas, masquées. */
+  values: [string, string][];
+  status: RunItemStatus;
+  httpStatus: number | null;
+  durationMs: number | null;
+  assertions: AssertionResult[];
+  error: string | null;
+}
+
+/** Fin d'un test joué par son schéma (V4, R5). */
+export interface TestEnd {
+  test: string;
+  passed: boolean;
+  /** « Fin en échec », « Avant en échec »… */
+  reason: string | null;
+  /** Identifiant de l'étape qui a arrêté le test. */
+  failedStep: string | null;
 }
 
 /** Résultat d'un groupe de requêtes d'un run (`RunGroup`, R2). */
@@ -796,6 +884,8 @@ export interface RunView {
   groups: RunGroup[];
   /** Verdict de chaque test (lot E, R4). */
   tests: RunTest[];
+  /** Fin de chaque test joué par son schéma (V4, R5). */
+  ends: TestEnd[];
 }
 
 /** Dernière exécution d'une requête (`RequestStatus`, R4). */
@@ -1610,12 +1700,17 @@ export interface RunTest {
 /** Étape d'un test (`StepView`). */
 export interface StepView {
   path: string;
+  /** Nom du fichier dans le dossier du test : l'étape requête du schéma qui le joue (V4). */
+  file: string;
   name: string;
   method: HttpMethod | null;
   url: string;
   assertionCount: number;
   /** Variables extraites par l'étape. */
   extractions: string[];
+  /** Assertions actives et extractions, pour le panneau de l'étape (4.3-c). */
+  assertions: Assertion[];
+  extracts: Extraction[];
   invalid: boolean;
 }
 
@@ -1625,7 +1720,12 @@ export interface TestView {
   name: string;
   /** Le dossier est un test ; sinon il range des dossiers. */
   test: boolean;
+  /** Requêtes du test, celles de ses attentes comprises. */
   steps: StepView[];
+  /** Schéma réconcilié (V4, R2) ; vide pour un dossier qui n'est pas un test. */
+  flow: Flow;
+  /** Ce que chaque étape du schéma lit et extrait (4.3-a, 4.3-c). */
+  info: FlowStepInfo[];
 }
 
 /** Réponse de `tree_create_test` (`CreatedTest`, NT1). */
@@ -2401,4 +2501,236 @@ export interface MissingSecrets {
 export interface SyncLoginOptions {
   githubBrowser: boolean;
   gitlabBrowser: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Version 4 (docs/plan-v4.md) : tests en schéma, scripts, jeux de données, templates
+// ---------------------------------------------------------------------------
+
+/** Ce que fait un test quand une étape échoue (4.2-a, 4.3-c, R5). */
+export type OnFailure = "stop" | "continue";
+
+/** Nature d'une étape (`StepKind`). */
+export type StepKind =
+  "request" | "condition" | "loop" | "wait" | "variable" | "script" | "test" | "template";
+
+/** Condition d'une étape (R6) : cible (`status`, `body.…`, `vars.nom`), opérateur, valeur. */
+export interface FlowCheck {
+  target: string;
+  operator: AssertionOperator;
+  value?: Scalar | null;
+}
+
+/**
+ * Étape d'un schéma (`Step` en Rust, 4.3-a) : `next` vaut une étape, `end` ou `fail` ; absent,
+ * l'étape suivante de la liste.
+ */
+export type FlowStep = {
+  id: string;
+  /** Nom affiché ; vide pour une requête (son nom est celui de la requête). */
+  name: string;
+  next?: string;
+  onFailure?: OnFailure;
+} & (
+  | { kind: "request"; file: string }
+  | { kind: "condition"; check: FlowCheck; otherwise?: string }
+  | { kind: "loop"; count?: number; list?: string; item: string; until?: string }
+  | { kind: "wait"; file?: string; check: FlowCheck; intervalMs: number; attempts: number }
+  | { kind: "variable"; variable: string; value: string }
+  | { kind: "script"; code: string }
+  | { kind: "test"; test: string }
+  | { kind: "template"; template: string; values: Record<string, string> }
+);
+
+/** Schéma d'un test (`Flow`, R1). */
+export interface Flow {
+  onFailure: OnFailure;
+  steps: FlowStep[];
+}
+
+/** Entrée d'une étape : une variable qu'elle lit, et l'étape qui la donne (4.3-c). */
+export interface StepInput {
+  name: string;
+  from: string | null;
+  /** `body.id`, « valeur », « élément de la boucle ». */
+  source: string;
+}
+
+/** Ce qu'une étape lit et extrait (4.3-a). */
+export interface FlowStepInfo {
+  id: string;
+  inputs: StepInput[];
+  extracts: string[];
+  /** Données disponibles à ce point (4.3-b quater) : extraites ou posées par les étapes d'avant. */
+  available: StepInput[];
+}
+
+/** Où insérer une étape (4.3-b bis) : fin de liste, libre, au départ, ou sur un lien. */
+export type StepPlacement =
+  | { kind: "end" }
+  | { kind: "free" }
+  | { kind: "start" }
+  | { kind: "link"; after: string; otherwise: boolean };
+
+/** Étape ajoutée (`flow_add_step`) et la requête créée pour elle. */
+export interface StepAdded {
+  step: string;
+  request: string | null;
+}
+
+/** Phase d'un Avant / Après de dossier (4.7-c, R13). */
+export type HookPhase = "beforeAll" | "beforeEach" | "afterEach" | "afterAll";
+
+/** Avant / Après d'un dossier (`FolderHooks`). */
+export interface FolderHooks {
+  beforeAll: FlowStep[];
+  beforeEach: FlowStep[];
+  afterEach: FlowStep[];
+  afterAll: FlowStep[];
+}
+
+/** Avant / Après d'un dossier et les requêtes de ses étapes (4.7-c). */
+export interface HooksView {
+  folder: string;
+  hooks: FolderHooks;
+  requests: StepView[];
+}
+
+/** Origine d'une propriété de dossier (4.8-a). */
+export type PropertyOrigin =
+  | { kind: "here" }
+  | { kind: "folder"; folder: string }
+  | { kind: "project" }
+  | { kind: "environment"; name: string };
+
+/** Propriété d'un dossier, avec son origine (4.8-a). */
+export interface FolderProperty {
+  name: string;
+  value: string;
+  origin: PropertyOrigin;
+}
+
+/** Jeu de données d'une requête (`DataLink`, R11). */
+export interface DataLink {
+  /** Fichier CSV, relatif au projet (`données/…`). */
+  file: string;
+  /** Tableau modifiable dans Arnod ; sinon fichier relu à chaque envoi, jamais écrit. */
+  editable: boolean;
+}
+
+/** Tableau d'un jeu de données : une colonne par variable, une ligne par cas. */
+export interface DataTable {
+  columns: string[];
+  rows: string[][];
+}
+
+/** Jeu de données lu (4.7-a) ; un fichier illisible donne sa raison. */
+export interface DataSet {
+  link: DataLink;
+  error: string | null;
+  columns: string[];
+  rows: string[][];
+}
+
+/** Requête d'un cas, résolue et masquée (4.7-a). */
+export interface CasePreview {
+  method: string;
+  url: string;
+  values: [string, string][];
+}
+
+/** Envoi d'un cas d'un jeu de données (4.7-b). */
+export interface CaseOutcome {
+  number: number;
+  values: [string, string][];
+  outcome: SendOutcome | null;
+  error: string | null;
+}
+
+/** Envoi de tous les cas (4.7-b, R12) : réussi si chaque cas réussit. */
+export interface CasesOutcome {
+  cases: CaseOutcome[];
+  passed: boolean;
+}
+
+/** Nature d'un template, déduite de son contenu (R16). */
+export type TemplateKind = "test" | "folder" | "tree";
+
+/** Paramètre d'un template (4.8-c) : sans valeur par défaut, il est obligatoire. */
+export interface TemplateParam {
+  name: string;
+  default: string;
+  description: string;
+}
+
+/** Template de la barre latérale. */
+export interface TemplateSummary {
+  path: string;
+  name: string;
+  kind: TemplateKind;
+  /** Dossier de rangement sous `templates/`. */
+  category: string;
+  params: number;
+  folders: number;
+  tests: number;
+  assertions: number;
+}
+
+/** Utilisation d'un template (4.8-c). */
+export interface TemplateUse {
+  path: string;
+  name: string;
+  values: Record<string, string>;
+}
+
+/** Template ouvert dans un onglet (4.8-c). */
+export interface TemplateView extends TemplateSummary {
+  parameters: TemplateParam[];
+  content: TreeNode[];
+  uses: TemplateUse[];
+}
+
+/** Origine de la valeur d'un paramètre dans une utilisation (4.8-d). */
+export type ValueOrigin =
+  | { kind: "here" }
+  | { kind: "property"; folder: string }
+  | { kind: "default" }
+  | { kind: "missing" };
+
+/** Valeur d'un paramètre dans une utilisation (4.8-d). */
+export interface ParamValue {
+  name: string;
+  /** Valeur saisie ici, vide sinon. */
+  value: string;
+  /** Valeur qui part. */
+  effective: string;
+  origin: ValueOrigin;
+  default: string;
+  description: string;
+}
+
+/** Utilisation ouverte dans un onglet (4.8-d). */
+export interface InstanceView {
+  path: string;
+  name: string;
+  template: TemplateSummary | null;
+  templatePath: string;
+  values: ParamValue[];
+  content: TreeNode[];
+}
+
+/** Variable proposée comme paramètre à la création d'un template (4.8-b). */
+export interface TemplateCandidate {
+  name: string;
+  value: string;
+  origin: string;
+  checked: boolean;
+}
+
+/** Valeur écrite d'un endpoint, proposée comme paramètre (3.2-d). */
+export interface Literal {
+  name: string;
+  value: string;
+  /** `body.items[0].sku`, `query.limit`. */
+  location: string;
 }

@@ -292,6 +292,7 @@ fn folder(path: &str, children: Vec<TreeNode>) -> TreeNode {
         children,
         request_count,
         tags: Vec::new(),
+        template: None,
     }
 }
 

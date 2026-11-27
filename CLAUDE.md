@@ -38,6 +38,11 @@ commande `arnod run`, synchronisation Git ; lots A à F en `claude/v2-<lot>`). L
 (sections « Recherche », « Étiquettes partagées », « Ligne de commande », « Synchronisation ») ;
 reste Q2 : enregistrer les applications OAuth d'Arnod pour la connexion par le navigateur.
 
+Livré ensuite : version 4 selon `docs/plan-v4.md` (tests en schéma, étape script, jeux de données,
+Avant / Après et propriétés des dossiers, templates, « Plus » ; scripts Bruno exécutés ; sans
+l'import Postman, 2.3-d) : sections « Tests en schéma », « Scripts », « Jeux de données »,
+« Avant / Après et propriétés » et « Templates ».
+
 **Travail en cours** : qualité du MVP selon `docs/plan-qualite-mvp.md` (lots 0 et A à K en trois
 vagues, règles R1 à R14), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
 `docs/audit-2026-11-mvp/preuves/`). Lot 0 livré : la maquette redessinée est la référence
@@ -113,6 +118,8 @@ src/                    Frontend Vue
   lib/steps.ts          Libellés des natures d'étape (familles, moteurs, règles), pour l'affichage
   lib/status.ts         Comptage d'affichage des statuts (✓ / ✕, « réussies / exécutées »)
   lib/shortcuts.ts      Raccourcis : touche pressée sous forme canonique, affichage, défauts
+  lib/flow.ts           Libellés, résumés et marques des étapes d'un test (V4), pour l'affichage
+  lib/flowLayout.ts     Disposition du schéma d'un test : nœuds, liens, renvois (pur)
   stores/               catalog (instantané), navigation (onglet, vue, titre), toasts (notifications),
                         windows (fenêtres, zones, onglets de contenu), workbench (par projet :
                         arborescence, environnements, run, statuts ; par onglet : brouillon,
@@ -120,7 +127,8 @@ src/                    Frontend Vue
                         contracts (contrats par projet, contrats ouverts), steps (catalogue des
                         étapes, reconnaissance, essai), interface (apparence, raccourcis),
                         history (historique des envois), search (recherche Ctrl+K), sync
-                        (synchronisation Git)
+                        (synchronisation Git), flows (schémas, Avant / Après, propriétés),
+                        datasets (jeux de données), templates (templates, « Plus »)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions),
                         brouillons avant fermeture ou sortie (useDrafts)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification,
@@ -134,6 +142,9 @@ src/                    Frontend Vue
   components/projects/  Vues des projets (premier lancement...)
   components/home/      « Essayer une étape » (TryStep) et formulaire déclaratif d'une nature
   components/steps/     Catalogue des étapes, pastille de nature (couleur de sa famille)
+  components/flow/      Test en liste (FlowList) et en schéma (FlowDiagram), choix de la nature
+                        (StepPicker), panneau de l'étape (StepPanel)
+  components/templates/ Section Templates, « Plus », template, utilisation, création
   components/workspaces/ Vues des workspaces
   components/workbench/ Arborescence, éditeur, réponse, environnements, run, statuts (StatusMark,
                         StatusCount)
@@ -192,6 +203,11 @@ src-tauri/              Application Tauri (espace de travail Cargo : l'applicati
     src/manifest.rs     Dossier d'un projet et sa racine opencollection.yml
     src/watch/          Fichiers modifiés hors d'Arnod : registre, surveillant, conflits
     src/report/         Rapports d'un run : JUnit, Allure, HTML (pur)
+    src/flow/           Schéma d'un test et Avant / Après (V4) : modèle, réconciliation, contrôle,
+                        moteur (engine.rs), stockage dans extensions.arnod (store.rs), édition
+    src/script/         Scripts JavaScript (QuickJS, rquickjs) : étape script, scripts Bruno
+    src/dataset/        Jeux de données : CSV lu et écrit à la main, cas d'un envoi
+    src/template/       Templates : création, paramètres, utilisations, contenu à jouer
     src/sync/           Synchronisation Git (feature sync) : dépôt (git.rs), transport HTTP sur le
                         réseau du poste, forges, fusion, descriptions en clair, sync.json
     src/command/        Commande `arnod run` d'un test ou d'un dossier, citée pour le terminal (pur)
@@ -293,9 +309,10 @@ Linux : installer d'abord les dépendances système
   les composants. Tout nouveau jeton est défini pour les deux thèmes, en `#rrggbb`, et reçoit sa
   note d'usage dans `scripts/design-system.mjs` ; `tests/theme.spec.ts` vérifie les contrastes.
 - Police système uniquement : la CSP interdit les polices distantes des maquettes.
-- Hors périmètre actuel : SOAP (et donc WSDL), mocks, scripts, CLI, signature de code. Les
+- Hors périmètre actuel : SOAP (et donc WSDL), mocks, étapes IHM, signature de code. Les
   requêtes HTTP sont livrées (premier usage), les contrats OpenAPI aussi ; les secrets vont dans le
-  coffre du système, jamais dans le projet.
+  coffre du système, jamais dans le projet. Un script (V4) ne s'exécute que dans QuickJS
+  (`script/`), sans disque ni réseau : jamais par `eval` dans la WebView.
 - Un test Rust qui construit une application Tauri, même simulée (`tauri::test`), vit dans
   `src-tauri/tests/` (test d'intégration) : sous Windows, seuls ces binaires de test reçoivent le
   manifeste Common Controls v6 (`build.rs`, `tests-manifest.xml`) ; un test unitaire qui le fait
@@ -619,8 +636,8 @@ Référence : `docs/plan-mvp-c-import-bruno.md` (cas IM1 à IM6, règles R1 à R
   rapport) ; tests sur la collection d'exemple `bruno/fixtures/boutique/`. Un bloc ou une option
   sans équivalent est signalé, jamais inventé.
 - Correspondances fixes : `vars:post-response` → action `set-variable` `after-response` (sélecteur
-  `jsonq`, expression de Bruno telle quelle) ; scripts et `tests` → `runtime.scripts`, jamais
-  exécutés ; `{{$…}}` gardé ; `vars:secret` et `{{process.env.X}}` → variables locales sans valeur,
+  `jsonq`, expression de Bruno telle quelle) ; scripts et `tests` → `runtime.scripts`, exécutés
+  à chaque envoi depuis la V4 (« Scripts ») ; `{{$…}}` gardé ; `vars:secret` et `{{process.env.X}}` → variables locales sans valeur,
   une valeur lue dans `.env` va au coffre.
 - Rapport : `ImportReport` gardé sur le poste (`projects/<id>/import.json`), montré dans l'onglet
   `importReport` (`ImportReportTab`, rouvert par « Rapport d'import » du menu ⋯ du projet) ; chaque
@@ -1124,3 +1141,104 @@ Q1, Q2, Q6, Q8, Q10, Q11), écrans 7.1-a à 7.1-e.
   Une récupération enregistre d'abord les brouillons (`useDrafts`).
 - Connexion par le navigateur (flux « device ») seulement si `ARNOD_GITHUB_CLIENT_ID` ou
   `ARNOD_GITLAB_CLIENT_ID` sont fournis à la construction (Q2) ; sinon, jeton personnel.
+
+## Tests en schéma
+
+Référence : `docs/plan-v4.md`, lots A à C (cas SC1 à SC10 ; règles R1 à R8), écrans 4.3-a à 4.3-e.
+
+- Le schéma d'un test vit dans `extensions.arnod.tests.<chemin du test>` de `opencollection.yml`
+  (`onFailure`, `steps` : identifiant, nom, nature, `next`) ; un test joué comme la liste de ses
+  requêtes n'y est pas écrit (R1). `flow/reconcile.rs` le recolle au dossier à la lecture (R2) ;
+  `flow/store.rs` le fait suivre aux renommages, déplacements et copies faits dans Arnod (R4 :
+  `follow`, `copy`, appelés par `tree` et `tree_batch`).
+- Natures fermées (`StepKind`) : requête, condition, boucle, attente, variable, script, test
+  existant, template ; SOAP (V5) et IHM (V6) n'existent pas encore. Une requête d'attente ou
+  d'Avant / Après appartient à son étape (R14, `Extensions::owned_files`) : absente de
+  l'arborescence, jamais jouée seule.
+- Le cœur joue (`flow/engine.rs`, trait `Runner`, branché par `workbench/run.rs`) : une étape à la
+  fois dans l'ordre des renvois, condition lue sur la dernière réponse ou `vars.nom` avec les
+  opérateurs des assertions, limites `MAX_LOOP`, `MAX_ATTEMPTS`, `MAX_DEPTH`, `MAX_STEPS` (R7).
+  `RunItem.stepId` relie une ligne du run à son étape ; `RunView.ends` donne la fin de chaque
+  test (réussi, raison, étape) : le rapport et `arnod run` la prennent pour verdict.
+  « Ignorer pour ce run » d'une étape qui avait arrêté le test retire cette fin : le test se lit
+  alors sur ses lignes, les étapes suivantes restent « non jouées ».
+- Édition par le cœur (`flow/edit.rs`) : `flow_add_step` (place `start`, `link`, `end` ou `free`,
+  les liens sont reconnectés, R3), `flow_remove_step`, `flow_save` (brouillon du store `flows`,
+  enregistré par `useAutosave`). `TestTab.vue` : « Liste » (`FlowList`, ⋮⋮ réordonne) ou
+  « Schéma » (`FlowDiagram`, disposition par `lib/flowLayout.ts`), « + Étape ▾ »
+  (`StepPicker`, combobox), « + » sur un lien, dépôt depuis la palette, panneau `StepPanel`,
+  « Annuler l'insertion · Ctrl+Z », « Si une étape échoue » (Arrêter le test, Continuer).
+- Une étape requête prend l'identifiant de son fichier (`request_id`) : un schéma linéaire n'est
+  pas écrit, sa relecture redonne le même. Une variable sans nom, un test existant ou un template
+  à choisir s'enregistrent « à configurer » ; l'étape échoue à l'exécution
+  (`reconcile::incomplete`). Insérée, elle propose « Service » (contrats du projet)
+  et « Opération » (`flow_step_operation` : la requête de l'opération, jamais liée au contrat), les
+  données disponibles à ce point (`FlowStepInfo.available`, aussi connues de `request_input` par
+  `tree::extracted_before`) et l'enchaînement reconnecté. « Parcourir le catalogue… » de la
+  palette ouvre le catalogue des étapes.
+
+## Scripts
+
+Référence : `docs/plan-v4.md`, lot C (cas JS1 à JS3 ; règles R9, R10), écran 4.3-g.
+
+- `src-tauri/core/src/script/` : QuickJS (crate `rquickjs`) sans module, sans disque ni réseau ;
+  `TIMEOUT` 2 s (gestionnaire d'interruption) et `MEMORY_LIMIT` 32 Mo. Les données entrent en
+  JSON (`__input`) et ressortent par `__output()` : `prelude.js` (`vars`, `vars.set`, `response`,
+  `assert`, `console`), puis `bruno.js` pour un script Bruno (`bru`, `req`, `res`, `test`,
+  `expect`, messages en français). Un script tourne sur `spawn_blocking`, jamais sur le fil du
+  runtime.
+- Étape script : `script::run_step` ; une exception ou un `assert` faux fait échouer l'étape, les
+  variables posées passent aux étapes suivantes. Scripts Bruno gardés à l'import
+  (`runtime.scripts`, `request.scripts` des dossiers et de la racine, `Request.inherited.scripts`) :
+  `script::run_bruno` avant la requête (racine, dossiers, requête), puis après la réponse et en
+  `tests` (requête, dossiers, racine) ; un `test(…)` devient une assertion du résultat.
+
+## Jeux de données
+
+Référence : `docs/plan-v4.md`, lot D (cas JD1 à JD7 ; règles R11, R12), écrans 4.7-a à 4.7-b bis.
+
+- Un jeu de données est un CSV du projet lié à la requête par l'étiquette `data:<fichier>`
+  (tableau modifiable, rangé dans `données/`, dossier réservé comme `contracts/`) ou
+  `data-file:<fichier>` (relu à chaque envoi, jamais écrit). `dataset/` lit et écrit le CSV à la
+  main (séparateur `,`, `;` ou tabulation reconnu, `MAX_CASES`).
+- Envoi : `request_send_cases` joue la requête une fois par cas (valeurs du cas en tête des
+  variables, R15) ; le run la compte pour une ligne (`RunItem.cases`). Les colonnes du tableau
+  sont des variables connues de `request_input`. Une étape d'un test ne lit
+  jamais de jeu de données : une boucle répète.
+- Interface : onglet « Données » de l'éditeur (`DataEditor.vue`, store `datasets`, `data_*`),
+  coller depuis un tableur, cas choisi et requête du cas (`data_case`) ; `CasesBar.vue` sous la
+  réponse ; « Voir les N cas » dans `RunPanel`.
+
+## Avant / Après et propriétés
+
+Référence : `docs/plan-v4.md`, lot E (cas AV1 à AV4, PR1, PR2 ; règles R13 à R15), écrans 4.7-c,
+4.7-c bis et 4.8-a.
+
+- Avant / Après d'un dossier : `extensions.arnod.folders.<chemin>` (`beforeAll`, `beforeEach`,
+  `afterEach`, `afterAll`), des étapes comme celles d'un test. Le run les groupe (R13) : « Avant le
+  dossier » une fois avant ses tests directs (en échec : tests « non joués », comptés en échec),
+  « Avant / Après chaque test » autour de chacun, « Après » joué même après un échec ;
+  `RunItem.hook` et `RunItem.folder` les désignent. Commandes `hooks_*`, `FolderHooks.vue`.
+- Propriétés : `request.variables` du `folder.yml` (`folder_properties`, `folder_set_properties`,
+  `FolderProperties.vue`), avec leur origine (ici, dossier parent, projet, environnement). Ordre à
+  l'envoi (R15) : cas, variables d'exécution, valeurs du template, propriétés du plus proche au
+  plus lointain, environnement, collection.
+
+## Templates
+
+Référence : `docs/plan-v4.md`, lots F et G (cas TP1 à TP6, PL1, PL2 ; règles R16 à R21), écrans
+4.8-a à 4.8-d, 3.2-d et 1.2-d bis.
+
+- Un template est un dossier sous `templates/` (réservé) marqué `arnod:template`, ses paramètres
+  sont les `request.variables` de son `folder.yml` (sans défaut : obligatoire) ; une utilisation est
+  un dossier marqué `template:<chemin>` dont les `request.variables` sont les valeurs. Le cœur la
+  joue avec le contenu du template (`template::effective_values`), jamais une copie.
+- `template_create` : paramètres proposés par `template_candidates` (variables lues par les tests,
+  propriétés cochées, environnement non coché), dossier remplacé par une utilisation ou gardé ;
+  `template_from_request` (3.2-d, « Transférer vers les templates » de `TrialTransfer.vue`) fait
+  des valeurs écrites en dur (`template_literals`) des paramètres.
+- Interface : `TemplatesSection`, `TemplateTab` (paramètres, contenu, utilisations), `InstanceTab`
+  (valeurs seulement), `CreateTemplateDialog` ; `FolderTab` montre l'un ou l'autre selon le chemin.
+- « Plus » (`MoreSections.vue`, R21) : les sections masquées du projet avec « Afficher »
+  (`sections_show`, `local.json` du poste) ; une section s'affiche seule à sa première
+  utilisation. Seule « Templates » existe dans cette version (Q7).

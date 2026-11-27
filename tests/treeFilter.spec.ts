@@ -33,6 +33,7 @@ function folder(path: string, children: TreeNode[]): TreeNode {
     requestCount: children.length,
     test: false,
     tags: [],
+    template: null,
   };
 }
 

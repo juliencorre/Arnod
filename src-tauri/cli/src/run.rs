@@ -138,7 +138,12 @@ impl Notifier for Progress {
                 }
             } else {
                 for case in report::cases(run) {
-                    if case.steps.iter().all(|s| terminal(s.status))
+                    // Un test joué par son schéma s'écrit à sa fin (V4, R5) : ses étapes non
+                    // empruntées ne sont « non jouées » qu'après elle.
+                    let ended =
+                        !case.test || run.finished || run.ends.iter().any(|e| e.test == case.path);
+                    if ended
+                        && case.steps.iter().all(|s| terminal(s.status))
                         && printed.insert(case.path.clone())
                     {
                         lines.push(output::case_line(&case));

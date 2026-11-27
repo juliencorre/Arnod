@@ -12,7 +12,7 @@ use crate::opencollection::request::auth_from;
 use crate::opencollection::schema::{self, Part};
 use crate::opencollection::{FOLDER_FILE, collection, yaml};
 use crate::request::model::{
-    AuthKind, Inherited, InheritedAuth, InheritedHeader, ResolvedSettings,
+    AuthKind, Inherited, InheritedAuth, InheritedHeader, InheritedVariable, ResolvedSettings,
 };
 
 /// Libellé du niveau projet (`opencollection.yml`) : « projet « Boutique » ».
@@ -34,6 +34,8 @@ const PROJECT_SOURCE: &str = "projet";
 struct Level {
     source: String,
     request: Value,
+    /// Dossier, relatif au projet ; vide pour la collection.
+    folder: String,
 }
 
 fn folder_level(dir: &Path) -> Option<Level> {
@@ -47,6 +49,7 @@ fn folder_level(dir: &Path) -> Option<Level> {
     Some(Level {
         source: format!("dossier « {name} »"),
         request: value.get("request")?.clone(),
+        folder: String::new(),
     })
 }
 
@@ -56,6 +59,7 @@ fn collection_level(root: &Path) -> Option<Level> {
     Some(Level {
         source: project_source(&name),
         request: value.get("request")?.clone(),
+        folder: String::new(),
     })
 }
 
@@ -68,7 +72,8 @@ fn chain(root: &Path, request_path: &str) -> Vec<Level> {
         let dir = parts[..depth]
             .iter()
             .fold(root.to_path_buf(), |path, part| path.join(part));
-        if let Some(level) = folder_level(&dir) {
+        if let Some(mut level) = folder_level(&dir) {
+            level.folder = parts[..depth].join("/");
             levels.push(level);
         }
     }
@@ -147,7 +152,88 @@ pub fn resolve(root: &Path, request_path: &str) -> Inherited {
         auth,
         headers,
         settings,
+        variables: variables_of(&levels),
+        // Avant la requête : la racine d'abord, puis les dossiers vers la requête (R10).
+        scripts: levels
+            .iter()
+            .rev()
+            .flat_map(|level| {
+                crate::opencollection::request::scripts_from(
+                    level.request.get("scripts"),
+                    &level.source,
+                )
+            })
+            .collect(),
     }
+}
+
+/// Valeur d'une variable du schéma : texte, valeur typée (`data`), ou variante choisie.
+pub fn variable_value(item: &Value) -> String {
+    let value = item.get("value");
+    let scalar = |v: &Value| match v {
+        Value::String(text) => text.clone(),
+        Value::Object(map) => map
+            .get("data")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned(),
+        Value::Null => String::new(),
+        other => other.to_string(),
+    };
+    match value {
+        Some(Value::Array(variants)) => variants
+            .iter()
+            .find(|v| v.get("selected").and_then(Value::as_bool) == Some(true))
+            .or_else(|| variants.first())
+            .and_then(|v| v.get("value"))
+            .map(scalar)
+            .unwrap_or_default(),
+        Some(other) => scalar(other),
+        None => String::new(),
+    }
+}
+
+/// Variables actives (`request.variables`) des niveaux, du plus proche au plus lointain, sans
+/// doublon : la plus proche l'emporte (R15).
+fn variables_of(levels: &[Level]) -> Vec<InheritedVariable> {
+    let mut out: Vec<InheritedVariable> = Vec::new();
+    for level in levels {
+        for item in level
+            .request
+            .get("variables")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let name = item
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            let disabled = item.get("disabled").and_then(Value::as_bool) == Some(true);
+            if name.is_empty() || disabled || out.iter().any(|v| v.name == name) {
+                continue;
+            }
+            out.push(InheritedVariable {
+                name: name.to_owned(),
+                value: variable_value(item),
+                source: level.source.clone(),
+                folder: level.folder.clone(),
+            });
+        }
+    }
+    out
+}
+
+/// Propriétés héritées par le contenu du dossier `folder` (lui compris), de la plus proche à la
+/// plus lointaine (4.8-a).
+pub fn folder_variables(root: &Path, folder: &str) -> Vec<InheritedVariable> {
+    let probe = if folder.is_empty() {
+        "x".to_owned()
+    } else {
+        format!("{folder}/x")
+    };
+    variables_of(&chain(root, &probe))
 }
 
 /// Noms des variables (`request.variables`) des `folder.yml` de la requête et

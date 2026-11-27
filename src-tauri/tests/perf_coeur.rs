@@ -871,6 +871,7 @@ fn finished_run(paths: &[String]) -> RunView {
             test: None,
             step: None,
             extracted: Vec::new(),
+            flow: Default::default(),
         })
         .collect();
     RunView {
@@ -885,6 +886,7 @@ fn finished_run(paths: &[String]) -> RunView {
         cancelled: false,
         groups: run_groups("", &items),
         tests: run_tests(&items),
+        ends: Vec::new(),
         items,
         contract: None,
         revision: 1,
@@ -928,10 +930,13 @@ fn tree_load(project: &Project, watchers: &Watchers) -> TreeView {
     let _ = watchers.watch(ctx.id, &ctx.root);
     let nodes = tree::read(&ctx.root).expect("arborescence");
     let tests = tree::tests_view(&nodes, &contract::file::paths(&ctx.root));
+    let data = local::load(&ctx.data_dir, ctx.id);
     TreeView {
         nodes,
         tests,
-        collapsed: local::load(&ctx.data_dir, ctx.id).collapsed,
+        collapsed: data.collapsed,
+        templates: arnod_lib::template::list(&ctx.root),
+        sections: data.sections,
     }
 }
 

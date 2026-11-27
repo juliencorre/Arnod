@@ -3679,6 +3679,309 @@ describe("Plan qualité, lot A - Corps choisi dans l'éditeur (IN1)", () => {
   });
 });
 
+describe("Version 4 - Tests en schéma, données, Avant / Après et templates", () => {
+  let server: Server;
+  let url = "";
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const rootFile = () => readFileSync(path.join(project(), "opencollection.yml"), "utf8");
+
+  beforeAll(async () => {
+    const names: Record<string, string> = { FR: "France", DE: "Allemagne", IT: "Italia" };
+    server = createServer((request, response) => {
+      const json = (status: number, body: unknown): void => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      const pays = /^\/pays\/([A-Z]{2})$/.exec(request.url ?? "");
+      if (request.method === "POST" && request.url === "/commandes") {
+        json(201, { id: "cmd_1" });
+      } else if (request.method === "GET" && request.url === "/commandes/cmd_1") {
+        json(200, { id: "cmd_1", statut: "payée" });
+      } else if (request.method === "GET" && pays?.[1] && names[pays[1]]) {
+        json(200, { code: pays[1], nom: names[pays[1]] });
+      } else json(404, { message: "absent" });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+
+    // Fichiers écrits hors d'Arnod, comme par Git : un test de deux étapes, une requête seule jouée
+    // par cas d'un jeu de données (CSV de données/), un dossier qui range un test.
+    const write = (file: string, text: string): void => {
+      mkdirSync(path.dirname(path.join(project(), file)), { recursive: true });
+      writeFileSync(path.join(project(), file), text);
+    };
+    write(
+      "Parcours V4/creer.yml",
+      `info:\n  name: Créer la commande\n  type: http\n  seq: 1\nhttp:\n  method: POST\n  url: ${url}/commandes\nruntime:\n  assertions:\n    - expression: res.status\n      operator: eq\n      value: "201"\n  actions:\n    - type: set-variable\n      phase: after-response\n      selector:\n        expression: res.body.id\n        method: jsonq\n      variable:\n        name: cmd.id\n        scope: runtime\n`,
+    );
+    write(
+      "Parcours V4/lire.yml",
+      `info:\n  name: Lire la commande\n  type: http\n  seq: 2\nhttp:\n  method: GET\n  url: ${url}/commandes/{{cmd.id}}\nruntime:\n  assertions:\n    - expression: res.body.statut\n      operator: eq\n      value: payée\n`,
+    );
+    write(
+      "lire-un-pays.yml",
+      `info:\n  name: Lire un pays\n  type: http\n  seq: 1\n  tags:\n    - "data:données/pays.csv"\nhttp:\n  method: GET\n  url: ${url}/pays/{{code}}\nruntime:\n  assertions:\n    - expression: res.body.nom\n      operator: eq\n      value: "{{attendu}}"\n`,
+    );
+    write("données/pays.csv", "code,attendu\nFR,France\nDE,Allemagne\nIT,Italie\n");
+    write(
+      "Suite V4/Achat/payer.yml",
+      `info:\n  name: Payer\n  type: http\n  seq: 1\nhttp:\n  method: GET\n  url: ${url}/pays/{{pays}}\nruntime:\n  assertions:\n    - expression: res.status\n      operator: eq\n      value: "200"\n`,
+    );
+  });
+
+  afterAll(async () => {
+    await closeServer(server);
+  });
+
+  /** Étapes de l'onglet du test : numéro, nom et dernier résultat. */
+  function steps() {
+    return browser.execute(() =>
+      Array.from(document.querySelectorAll(".test .step")).map((step) => ({
+        name: step.querySelector(".step__name")?.textContent.trim() ?? "",
+        mark: step.querySelector(".step__mark")?.textContent.trim() ?? "",
+      })),
+    );
+  }
+
+  /** Change la valeur d'un champ et émet l'événement que le composant écoute. */
+  async function fill(selector: string, value: string, event = "input"): Promise<void> {
+    await browser.execute(
+      (css, text, type) => {
+        const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(css);
+        if (!field) throw new Error(`champ « ${css} » introuvable`);
+        field.value = text;
+        field.dispatchEvent(new Event(type, { bubbles: true }));
+      },
+      selector,
+      value,
+      event,
+    );
+  }
+
+  /** Choisit une nature dans le sélecteur d'étape ouvert (choix à la pression du bouton). */
+  async function pick(label: string): Promise<void> {
+    await browser.$(".picker").waitForExist({ timeout: 5_000 });
+    await browser.execute((text) => {
+      const option = Array.from(document.querySelectorAll(".picker__option")).find(
+        (o) => o.querySelector(".picker__kind")?.textContent.trim() === text,
+      );
+      if (!option) throw new Error(`nature « ${text} » absente du sélecteur`);
+      option.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    }, label);
+  }
+
+  async function openFolder(name: string): Promise<void> {
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          (n) => document.querySelector(`aside [role="treeitem"][data-path="${n}"]`) !== null,
+          name,
+        ),
+      { timeout: 15_000, timeoutMsg: `dossier « ${name} » attendu dans l'arborescence` },
+    );
+    await clickHidden(`aside [role="treeitem"][data-path="${name}"]`);
+  }
+
+  it("une étape Script s'ajoute au test et lit vars, response et assert() (4.3-a, 4.3-c, 4.3-g)", async () => {
+    await restart();
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await openFolder("Parcours V4");
+    await browser.$(".test").waitForDisplayed({ timeout: 10_000 });
+    await browser.waitUntil(async () => (await steps()).length === 2, {
+      timeoutMsg: "deux étapes attendues",
+    });
+
+    await clickText(".test__quick .test__link", "+ Script");
+    await browser.$(".panel__code").waitForExist({ timeout: 10_000 });
+    await fill(
+      ".panel__code",
+      'assert(response.body.statut === "payée", "commande payée");\nvars.set("verifiee", vars["cmd.id"]);\n',
+    );
+    await browser.waitUntil(() => rootFile().includes("verifiee"), {
+      timeout: 10_000,
+      timeoutMsg: "schéma du test écrit dans opencollection.yml attendu",
+    });
+    expect((await steps()).map((s) => s.name)).toEqual([
+      "Créer la commande",
+      "Lire la commande",
+      "Nouveau script",
+    ]);
+    await screenshot(browser, "v4-etape-script");
+
+    await clickText(".test button", "Exécuter le test");
+    const progress = browser.$(".run__progress");
+    await browser.waitUntil(async () => (await progress.getText()).startsWith("Test réussi"), {
+      timeout: 15_000,
+      timeoutMsg: "test réussi attendu",
+    });
+    await clickText(".zone__tab-button", "Parcours V4");
+    await browser.waitUntil(async () => (await steps()).every((s) => s.mark.startsWith("✓")), {
+      timeout: 10_000,
+      timeoutMsg: "résultats des étapes attendus",
+    });
+    await screenshot(browser, "v4-test-liste");
+
+    await clickText(".test .step__name", "Lire la commande");
+    await browser.waitUntil(async () => (await browser.$(".panel").getText()).includes("cmd.id"), {
+      timeoutMsg: "entrée cmd.id de l'étape choisie attendue",
+    });
+    await screenshot(browser, "v4-etape-choisie");
+  });
+
+  it("le schéma montre le chemin suivi ; « + » sur un lien insère une étape, annulable (4.3-b, 4.3-d, 4.3-b bis, 4.3-b quater)", async () => {
+    await clickText(".test__mode", "Schéma");
+    await browser.$(".diagram").waitForDisplayed({ timeout: 10_000 });
+    expect(await browser.$$(".node").length).toBe(3);
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll(".node__mark")).every((m) =>
+            m.textContent.includes("✓"),
+          ),
+        ),
+      { timeoutMsg: "nœuds réussis attendus" },
+    );
+    await screenshot(browser, "v4-test-schema");
+
+    await clickHidden('.edge__plus[aria-label*="« Créer la commande » et « Lire la commande »"]');
+    await screenshot(browser, "v4-inserer");
+    await pick("Condition");
+    await browser.waitUntil(async () => (await browser.$$(".node").length) === 4, {
+      timeoutMsg: "étape insérée attendue",
+    });
+    await browser.$(".panel__new").waitForExist({ timeout: 5_000 });
+    await screenshot(browser, "v4-insere");
+    await clickText(".panel button", "Annuler l'insertion");
+    await browser.waitUntil(async () => (await browser.$$(".node").length) === 3, {
+      timeoutMsg: "insertion annulée attendue",
+    });
+    await clickText(".test__mode", "Liste");
+  });
+
+  it("un jeu de données joue la requête une fois par cas, avec le résultat de chaque cas (4.7-a, 4.7-b)", async () => {
+    await openTreeRequest("Lire un pays");
+    await clickText(".request-tab .editor__tab", "Données");
+    await browser.$(".data__table").waitForExist({ timeout: 10_000 });
+    expect(await browser.$$(".data__table tbody tr").length).toBe(3);
+    // Les colonnes du tableau sont les variables de la requête : aucune n'est inconnue.
+    await browser.pause(500);
+    expect(
+      await browser.execute(() =>
+        (document.querySelector(".request-tab")?.textContent ?? "").includes("est inconnue"),
+      ),
+    ).toBe(false);
+    await screenshot(browser, "v4-donnees");
+
+    await clickText(".request-tab .editor__line button", "Envoyer");
+    await browser.$(".cases").waitForExist({ timeout: 15_000 });
+    await browser.waitUntil(
+      async () => (await browser.$(".cases__head").getText()).includes("1 ✕"),
+      { timeout: 15_000, timeoutMsg: "un cas en échec attendu" },
+    );
+    expect(await browser.$(".cases__ok").getText()).toBe("2 ✓");
+    await screenshot(browser, "v4-cas");
+  });
+
+  it("les propriétés d'un dossier valent pour ses tests (4.8-a)", async () => {
+    await openFolder("Suite V4");
+    await browser.$(".folder").waitForDisplayed({ timeout: 10_000 });
+    await clickText(".folder__view", "Propriétés");
+    await clickText(".props button", "+ Propriété");
+    await fill('.props input[aria-label="Nom de la propriété"]', "pays");
+    await fill('.props input[aria-label="Valeur de la propriété"]', "FR");
+    await clickText(".props button", "Ajouter");
+    await browser.waitUntil(
+      () => readFileSync(path.join(project(), "Suite V4", "folder.yml"), "utf8").includes("pays"),
+      { timeout: 10_000, timeoutMsg: "propriété écrite dans folder.yml attendue" },
+    );
+    // Écrite dans request.variables du folder.yml, et montrée « défini ici ».
+    expect(readFileSync(path.join(project(), "Suite V4", "folder.yml"), "utf8")).toMatch(
+      /variables:[\s\S]*name: pays[\s\S]*value: FR/,
+    );
+    expect(await browser.$(".props").getText()).toContain("défini ici");
+    await screenshot(browser, "v4-proprietes");
+  });
+
+  it("« Avant le dossier » se joue une fois avant ses tests (4.7-c)", async () => {
+    await clickText(".folder__view", "Contenu");
+    await clickText(".folder button", "+ Avant / Après");
+    // Deux blocs : les phases d'avant en tête de la vue, celles d'après à la fin.
+    await browser.waitUntil(
+      () => browser.execute(() => document.querySelectorAll(".hooks__phase").length === 4),
+      { timeout: 5_000, timeoutMsg: "quatre phases d'Avant / Après attendues" },
+    );
+    await clickText(".hooks__phase:first-child button", "+ Étape");
+    await pick("Variable");
+    await browser.waitUntil(() => rootFile().includes("beforeAll"), {
+      timeout: 10_000,
+      timeoutMsg: "Avant du dossier écrit dans opencollection.yml attendu",
+    });
+    await clickText(".hooks__name", "Nouvelle variable");
+    await fill('.hooks__edit input[aria-label="Variable"]', "jeton", "change");
+    await browser.waitUntil(() => rootFile().includes("jeton"), {
+      timeout: 10_000,
+      timeoutMsg: "variable de l'Avant enregistrée attendue",
+    });
+    await fill('.hooks__edit input[aria-label="Valeur"]', "abc", "change");
+    await browser.waitUntil(() => rootFile().includes("abc"), {
+      timeout: 10_000,
+      timeoutMsg: "valeur de l'Avant enregistrée attendue",
+    });
+
+    await clickText(".folder button", "Exécuter le dossier");
+    await browser.waitUntil(
+      async () => (await browser.$(".run__progress").getText()).includes("réussi"),
+      { timeout: 15_000, timeoutMsg: "run du dossier réussi attendu" },
+    );
+    await openFolder("Suite V4");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          (document.querySelector(".hooks__result")?.textContent ?? "").includes("Réussi"),
+        ),
+      { timeout: 15_000, timeoutMsg: "Avant du dossier réussi attendu" },
+    );
+    expect(
+      await browser.execute(
+        () => document.querySelector(".hooks__content")?.textContent.trim() ?? "",
+      ),
+    ).toBe("jeton = abc");
+    await screenshot(browser, "v4-avant-apres");
+  });
+
+  it("« Plus » range les sections masquées ; un template se crée depuis un dossier (1.2-d bis, 4.8-b, 4.8-c, 4.8-d)", async () => {
+    await clickHidden('aside button[aria-label^="Plus de sections pour boutique-tests"]');
+    await browser.$(".more__list").waitForExist({ timeout: 5_000 });
+    expect(await browser.$(".more__list").getText()).toContain("Templates");
+    await screenshot(browser, "v4-plus");
+    await clickHidden('aside button[aria-label^="Plus de sections pour boutique-tests"]');
+
+    await clickText(".folder button", "Créer un template de ce dossier");
+    await browser.$(".tpl").waitForDisplayed({ timeout: 10_000 });
+    await browser.waitUntil(async () => (await browser.$(".tpl").getText()).includes("pays"), {
+      timeoutMsg: "paramètre « pays » détecté attendu",
+    });
+    await screenshot(browser, "v4-creer-template");
+    await clickText(".tpl button", "Créer");
+    await browser.$(".template").waitForDisplayed({ timeout: 10_000 });
+    await browser.waitUntil(() => existsSync(path.join(project(), "templates", "Suite V4")), {
+      timeoutMsg: "template rangé sous templates/ attendu",
+    });
+    expect(await browser.$("aside .templates").isExisting()).toBe(true);
+    await screenshot(browser, "v4-template");
+
+    await openFolder("Suite V4");
+    await browser.waitUntil(
+      async () =>
+        (await browser.$$(".instance").length) > 0 &&
+        (await browser.$(".instance").getText()).includes("pays"),
+      { timeout: 10_000, timeoutMsg: "utilisation du template attendue" },
+    );
+    await screenshot(browser, "v4-utilisation");
+  });
+});
+
 describe("Lot G - Démarrage et erreurs (0.3)", () => {
   const statePath = () => path.join(sandbox.dataDir, "arnod.json");
 

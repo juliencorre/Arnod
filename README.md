@@ -144,6 +144,22 @@ Cas RU1 à RU6, ST1 à ST4 et VT1 à VT4 de
 | ST1 à ST4 | Dans la barre latérale, ✓ ou ✕ par requête et « réussies / exécutées » par dossier ou ressource de contrat, gardés d'une session à l'autre.           |
 | VT1 à VT3 | Sous la réponse, chaque assertion en échec : « Ignorer pour ce run » (la requête n'est pas modifiée) ou « Retirer l'assertion ».                      |
 
+### Tests en schéma, données et templates (version 4)
+
+Cas SC1 à SC10, JS1 à JS3, JD1 à JD7, AV1 à AV4, PR1, PR2, TP1 à TP6, PL1 et PL2 de
+[`docs/plan-v4.md`](docs/plan-v4.md) (écrans 4.3, 4.7, 4.8, 3.2-d et 1.2-d bis).
+
+| ID         | Comportement                                                                                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SC1 à SC5  | Un test en liste : étapes numérotées (requête, condition, boucle, attente, variable, script, test existant, template), chacune dit où l'on va ensuite.          |
+| SC6 à SC10 | Le même test en schéma : palette, « + » sur un lien ou dépôt pour insérer une étape « à configurer », annulable ; après exécution, chemin suivi et valeurs.     |
+| JS1 à JS3  | Étape script : JavaScript isolé (QuickJS, 2 s, sans disque ni réseau) avec `vars`, `response` et `assert()` ; les scripts Bruno importés s'exécutent à l'envoi. |
+| JD1 à JD7  | Onglet « Données » : un tableau ou un fichier CSV du projet, la requête jouée une fois par cas, le résultat de chaque cas sous la réponse et dans le run.       |
+| AV1 à AV4  | Avant / Après d'un dossier : préparer une fois ou avant chaque test, nettoyer après, même en cas d'échec.                                                       |
+| PR1, PR2   | Propriétés d'un dossier, héritées par ses sous-dossiers, avec leur origine ; le plus proche l'emporte.                                                          |
+| TP1 à TP6  | Templates : créés depuis un dossier ou une requête au point, paramètres, contenu et utilisations ; une utilisation ne règle que les valeurs.                    |
+| PL1, PL2   | « Plus » : les sections masquées du projet ; une section s'affiche seule à sa première utilisation.                                                             |
+
 ### Barre latérale du projet
 
 Cas B1 à B6 de [`docs/plan-barre-laterale-projet.md`](docs/plan-barre-laterale-projet.md).

@@ -10,14 +10,26 @@ use serde_json::{Map, Value, json};
 use crate::opencollection::schema::{self, Part};
 use crate::request::model::{
     ApiKeyLocation, Assertion, Auth, AuthKind, Body, BodyKind, BodyVariant, ContractLink,
-    DEFAULT_MAX_DURATION_MS, Example, ExampleBodyKind, Extraction, ExtractionScope, Method,
-    Operator, Origin, Pair, ParamKind, Request, ResponseHeader, Scalar, Settings,
+    DEFAULT_MAX_DURATION_MS, DataLink, Example, ExampleBodyKind, Extraction, ExtractionScope,
+    Method, Operator, Origin, Pair, ParamKind, Request, ResponseHeader, Scalar, Settings,
 };
 // Lot H : OAuth 2 par identifiants client (docs/plan-mvp-h-reseau-auth.md, R8).
 use crate::request::model::{CredentialsPlacement, OAuth2, TokenPlacement};
 
 /// Préfixe de l'étiquette qui lie une requête à une opération de contrat (S7).
 pub const CONTRACT_TAG: &str = "contract:";
+/// Étiquette d'un jeu de données modifiable dans Arnod (`docs/plan-v4.md`, R11).
+pub const DATA_TAG: &str = "data:";
+/// Étiquette d'un jeu de données lu d'un fichier, jamais écrit par Arnod (R11).
+pub const DATA_FILE_TAG: &str = "data-file:";
+
+/// Étiquette propre à Arnod (lien au contrat, jeu de données, template) : jamais montrée ni
+/// héritée (`docs/plan-v4.md`, R20).
+pub fn is_internal_tag(tag: &str) -> bool {
+    [CONTRACT_TAG, DATA_TAG, DATA_FILE_TAG, "template:", "arnod:"]
+        .iter()
+        .any(|prefix| tag.starts_with(prefix))
+}
 
 /// Opérateurs et leur nom OpenCollection (et Bruno).
 pub const OPERATORS: [(Operator, &str); 28] = [
@@ -522,15 +534,62 @@ fn examples_from(value: Option<&Value>) -> Vec<Example> {
         .collect()
 }
 
+/// Scripts d'une liste `scripts` du schéma (R10 du plan V4).
+pub fn scripts_from(
+    value: Option<&Value>,
+    source: &str,
+) -> Vec<crate::request::model::ScriptSource> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            Some(crate::request::model::ScriptSource {
+                phase: item.get("type")?.as_str()?.to_owned(),
+                code: item.get("code")?.as_str()?.to_owned(),
+                source: source.to_owned(),
+            })
+        })
+        .filter(|s| !s.code.trim().is_empty())
+        .collect()
+}
+
 /// Étiquettes de l'utilisateur, sans celle du lien au contrat (R9).
 fn tags_from(tags: Option<&Value>) -> Vec<String> {
     tags.and_then(Value::as_array)
         .into_iter()
         .flatten()
         .filter_map(Value::as_str)
-        .filter(|tag| !tag.starts_with(CONTRACT_TAG))
+        .filter(|tag| !is_internal_tag(tag))
         .map(str::to_owned)
         .collect()
+}
+
+/// Jeu de données porté par une étiquette `data:` ou `data-file:` (R11).
+fn data_from(tags: Option<&Value>) -> Option<DataLink> {
+    tags?.as_array()?.iter().find_map(|tag| {
+        let tag = tag.as_str()?;
+        if let Some(file) = tag.strip_prefix(DATA_FILE_TAG) {
+            return Some(DataLink {
+                file: file.to_owned(),
+                editable: false,
+            });
+        }
+        tag.strip_prefix(DATA_TAG).map(|file| DataLink {
+            file: file.to_owned(),
+            editable: true,
+        })
+    })
+}
+
+/// Étiquette d'un jeu de données.
+pub fn data_tag(link: &DataLink) -> String {
+    let prefix = if link.editable {
+        DATA_TAG
+    } else {
+        DATA_FILE_TAG
+    };
+    format!("{prefix}{}", link.file)
 }
 
 /// Lien au contrat porté par une étiquette `contract:<fichier>#<opération>`.
@@ -766,8 +825,10 @@ pub fn from_value(value: &Value, fallback: &str) -> Result<Request, String> {
         seq: value.pointer("/info/seq").and_then(Value::as_f64),
         examples: examples_from(value.get("examples")),
         contract: contract_from(value.pointer("/info/tags")),
+        data: data_from(value.pointer("/info/tags")),
         preserved: preserved(value),
         inherited: crate::request::model::Inherited::default(),
+        scripts: scripts_from(value.pointer("/runtime/scripts"), ""),
     })
 }
 
@@ -1107,11 +1168,14 @@ pub fn into_value(request: &Request, existing: Option<&Value>) -> Value {
             .tags
             .iter()
             .map(|tag| tag.trim())
-            .filter(|tag| !tag.is_empty() && !tag.starts_with(CONTRACT_TAG))
+            .filter(|tag| !tag.is_empty() && !is_internal_tag(tag))
             .map(Value::from)
             .collect();
         if let Some(link) = &request.contract {
             tags.push(Value::from(contract_tag(link)));
+        }
+        if let Some(link) = &request.data {
+            tags.push(Value::from(data_tag(link)));
         }
         set(
             info,

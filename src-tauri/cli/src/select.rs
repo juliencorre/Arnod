@@ -274,6 +274,7 @@ mod tests {
             children,
             test,
             tags: Vec::new(),
+            template: None,
         }
     }
 

@@ -60,7 +60,7 @@ describe("importer (2.3-a)", () => {
     );
     expect(open.get(".import__folder code").text()).toBe("/home/julien/arnod/Boutique API");
     expect(open.text()).toContain("3 variables secrètes");
-    expect(open.text()).toContain("3 scripts gardés dans les fichiers, pas exécutés.");
+    expect(open.text()).toContain("3 scripts gardés dans les fichiers, exécutés à l'envoi.");
     expect(core.commands()).not.toContain("import_run");
 
     await clickButton(wrapper, "dialog[open]", "Importer");
@@ -246,9 +246,11 @@ describe("rapport d'import (2.3-f)", () => {
     expect(rows).toHaveLength(5);
     expect(rows[0]?.text()).toContain("TESTS");
     expect(rows[0]?.text()).toContain("Créer une commande");
-    expect(rows[0]?.text()).toContain("non repris");
+    expect(rows[0]?.text()).toContain("exécuté à l'envoi");
     expect(app.get(".report__code").text()).toContain('tests {\n  test("total cohérent"');
-    expect(app.get(".report__after-box").text()).toContain("Gardé dans le fichier, pas exécuté.");
+    expect(app.get(".report__after-box").text()).toContain(
+      "Gardé dans le fichier, exécuté à chaque envoi.",
+    );
     expect(app.findAll(".report__example")).toHaveLength(4);
     expect(app.get(".zone__name").text()).toBe("Rapport d'import · Boutique API");
 

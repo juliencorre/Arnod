@@ -44,6 +44,20 @@ export function variableSegments(text: string, known: ReadonlySet<string>): Segm
   return segments;
 }
 
+/**
+ * Noms des `{{nom}}` d'un texte, dans l'ordre et sans doublon (même découpage que
+ * `variableSegments`) ; les valeurs dynamiques `{{$…}}` n'en sont pas.
+ */
+export function variableNames(text: string): string[] {
+  const names: string[] = [];
+  for (const segment of variableSegments(text, new Set())) {
+    if (!segment.text.startsWith("{{") || !segment.text.endsWith("}}")) continue;
+    const name = segment.text.slice(2, -2).trim();
+    if (name !== "" && !name.startsWith("$") && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
 type Field = HTMLInputElement | HTMLTextAreaElement;
 
 interface MarkState {

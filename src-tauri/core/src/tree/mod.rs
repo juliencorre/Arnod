@@ -12,6 +12,7 @@ use serde::Serialize;
 use crate::catalog::names::{self, sort_key};
 use crate::contract::CONTRACTS_DIR;
 use crate::error::{CommandError, CommandErrorKind};
+use crate::opencollection::request::is_internal_tag;
 use crate::opencollection::schema::{self, Part};
 use crate::opencollection::{FOLDER_FILE, ROOT_FILE, yaml};
 use crate::request::file;
@@ -19,6 +20,13 @@ use crate::request::model::{Method, Request};
 
 /// Dossier réservé aux environnements, à la racine du projet.
 pub const ENVIRONMENTS_DIR: &str = "environments";
+/// Dossier réservé aux templates, à la racine du projet (`docs/plan-v4.md`, R20).
+pub const TEMPLATES_DIR: &str = "templates";
+/// Dossier réservé aux jeux de données d'Arnod, à la racine du projet (R11, R20).
+pub const DATA_DIR: &str = "données";
+
+/// Dossiers réservés à la racine du projet : absents de l'arborescence, refusés comme nom.
+pub const RESERVED_DIRS: [&str; 4] = [ENVIRONMENTS_DIR, CONTRACTS_DIR, TEMPLATES_DIR, DATA_DIR];
 
 /// Nœud de l'arborescence affichée dans la barre latérale (A1).
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -41,6 +49,8 @@ pub enum TreeNode {
         /// Étiquettes du dossier (`info.tags` de son `folder.yml`) : elles valent pour tout ce
         /// qu'il contient (`docs/plan-v2.md`, R4).
         tags: Vec<String>,
+        /// Utilisation d'un template : son chemin (étiquette `template:`, `docs/plan-v4.md`, R17).
+        template: Option<String>,
     },
     Request {
         name: String,
@@ -83,7 +93,22 @@ fn is_request_file(path: &Path) -> bool {
 /// par nom sans tenir compte de la casse ; éléments cachés, racine de la
 /// collection et réglages de dossier (`folder.yml`) ignorés (R7 du format).
 pub fn read(root: &Path) -> Result<Vec<TreeNode>, CommandError> {
-    let mut nodes = read_dir(root, root, true, &mut vec![canonical(root)])?;
+    // Requêtes propres à une étape (Avant / Après, attente) : absentes de l'arborescence (R14).
+    let owned = crate::flow::store::Extensions::read(root).owned_files();
+    let mut nodes = read_dir(root, root, true, &mut vec![canonical(root)], &owned)?;
+    inherit_tags(&mut nodes, &[]);
+    Ok(nodes)
+}
+
+/// Arborescence d'un dossier réservé ou d'un sous-dossier (`templates/…`, V4) : chemins relatifs
+/// au projet, étiquettes héritées depuis ce dossier.
+pub fn read_at(root: &Path, folder: &str) -> Result<Vec<TreeNode>, CommandError> {
+    let dir = resolve(root, folder)?;
+    if !dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let owned = crate::flow::store::Extensions::read(root).owned_files();
+    let mut nodes = read_dir(root, &dir, false, &mut vec![canonical(&dir)], &owned)?;
     inherit_tags(&mut nodes, &[]);
     Ok(nodes)
 }
@@ -111,8 +136,8 @@ fn add_tags(into: &mut Vec<String>, more: &[String]) {
     }
 }
 
-/// Étiquettes d'un dossier : `info.tags` de son `folder.yml`, s'il en a un.
-fn folder_tags(dir: &Path) -> Vec<String> {
+/// Étiquettes écrites d'un dossier : `info.tags` de son `folder.yml`, internes comprises.
+pub fn folder_tags_raw(dir: &Path) -> Vec<String> {
     yaml::read(&dir.join(FOLDER_FILE))
         .ok()
         .and_then(|value| {
@@ -124,6 +149,24 @@ fn folder_tags(dir: &Path) -> Vec<String> {
         })
         .unwrap_or_default()
 }
+
+/// Étiquettes d'un dossier, sans celles propres à Arnod (R20 du plan V4).
+fn folder_tags(dir: &Path) -> Vec<String> {
+    folder_tags_raw(dir)
+        .into_iter()
+        .filter(|tag| !is_internal_tag(tag))
+        .collect()
+}
+
+/// Template d'une utilisation : étiquette `template:<chemin>` du dossier (R17 du plan V4).
+pub fn folder_template(dir: &Path) -> Option<String> {
+    folder_tags_raw(dir)
+        .into_iter()
+        .find_map(|tag| tag.strip_prefix(TEMPLATE_TAG).map(str::to_owned))
+}
+
+/// Étiquette d'une utilisation de template.
+pub const TEMPLATE_TAG: &str = "template:";
 
 /// Étiquettes d'un dossier (`docs/plan-v2.md`, R4, ET1) : écrites dans `info.tags` de son
 /// `folder.yml`, créé conforme au besoin ; sans étiquette, la clé est retirée. Les étiquettes
@@ -138,11 +181,17 @@ pub fn set_folder_tags(root: &Path, path: &str, tags: &[String]) -> Result<(), C
     let mut clean: Vec<String> = Vec::new();
     for tag in tags {
         let tag = tag.trim();
-        if tag.is_empty() || tag.starts_with("contract:") {
+        if tag.is_empty() || is_internal_tag(tag) {
             continue;
         }
         add_tags(&mut clean, &[tag.to_owned()]);
     }
+    // Les étiquettes propres à Arnod (template, utilisation) restent (R20 du plan V4).
+    clean.extend(
+        folder_tags_raw(&dir)
+            .into_iter()
+            .filter(|t| is_internal_tag(t)),
+    );
     let file = dir.join(FOLDER_FILE);
     let mut value = if file.exists() {
         yaml::read(&file)?
@@ -180,6 +229,147 @@ pub fn set_folder_tags(root: &Path, path: &str, tags: &[String]) -> Result<(), C
     yaml::write(&file, &value)
 }
 
+/// Modifie le `folder.yml` du dossier `path` (créé conforme au besoin) : `edit` reçoit son
+/// contenu ; un contenu non conforme n'est jamais écrit (format OpenCollection strict, V4).
+pub fn edit_folder(
+    root: &Path,
+    path: &str,
+    edit: impl FnOnce(&mut serde_json::Map<String, serde_json::Value>),
+) -> Result<(), CommandError> {
+    let dir = resolve(root, path)?;
+    if !dir.is_dir() || dir == root {
+        return Err(invalid_request("Ce dossier n'existe plus."));
+    }
+    let file = dir.join(FOLDER_FILE);
+    let mut value = if file.exists() {
+        yaml::read(&file)?
+    } else {
+        let name = dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        serde_json::json!({ "info": { "name": name, "type": "folder" } })
+    };
+    let Some(map) = value.as_object_mut() else {
+        return Err(invalid_request(
+            "Le fichier folder.yml de ce dossier est illisible.",
+        ));
+    };
+    edit(map);
+    schema::check(Part::Folder, &value).map_err(|error| {
+        invalid_request(format!(
+            "Contenu non conforme au format OpenCollection : {error}"
+        ))
+    })?;
+    yaml::write(&file, &value)
+}
+
+/// Variables (`request.variables`) écrites dans le `folder.yml` du dossier `dir`, actives ou non :
+/// nom, valeur, description.
+pub fn folder_variables_raw(dir: &Path) -> Vec<(String, String, String)> {
+    yaml::read(&dir.join(FOLDER_FILE))
+        .ok()
+        .and_then(|value| value.pointer("/request/variables").cloned())
+        .and_then(|v| v.as_array().cloned())
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|item| {
+            let name = item.get("name")?.as_str()?.trim().to_owned();
+            let description = match item.get("description") {
+                Some(serde_json::Value::String(text)) => text.clone(),
+                Some(other) => other
+                    .get("content")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("")
+                    .to_owned(),
+                None => String::new(),
+            };
+            (!name.is_empty()).then(|| {
+                (
+                    name,
+                    crate::request::inherit::variable_value(item),
+                    description,
+                )
+            })
+        })
+        .collect()
+}
+
+/// Écrit les variables d'un dossier dans `request.variables` de son `folder.yml` ; une liste vide
+/// retire la clé (et `request` s'il ne reste rien).
+pub fn set_folder_variables(
+    root: &Path,
+    path: &str,
+    variables: &[(String, String, String)],
+) -> Result<(), CommandError> {
+    let mut seen: Vec<String> = Vec::new();
+    for (name, _, _) in variables {
+        let name = name.trim();
+        if name.is_empty() || name.contains(['{', '}', ' ']) {
+            return Err(invalid_request(format!(
+                "« {name} » n'est pas un nom de variable : ni espace, ni accolade."
+            )));
+        }
+        if seen.iter().any(|n| n == name) {
+            return Err(invalid_request(format!(
+                "La variable « {name} » est en double."
+            )));
+        }
+        seen.push(name.to_owned());
+    }
+    edit_folder(root, path, |map| {
+        let list: Vec<serde_json::Value> = variables
+            .iter()
+            .map(|(name, value, description)| {
+                let mut item = serde_json::Map::new();
+                item.insert("name".to_owned(), serde_json::Value::from(name.trim()));
+                item.insert("value".to_owned(), serde_json::Value::from(value.as_str()));
+                if !description.trim().is_empty() {
+                    item.insert(
+                        "description".to_owned(),
+                        serde_json::Value::from(description.trim()),
+                    );
+                }
+                serde_json::Value::Object(item)
+            })
+            .collect();
+        let request = map
+            .entry("request")
+            .or_insert_with(|| serde_json::json!({}));
+        if !request.is_object() {
+            *request = serde_json::json!({});
+        }
+        if let Some(request) = request.as_object_mut() {
+            if list.is_empty() {
+                request.remove("variables");
+            } else {
+                request.insert("variables".to_owned(), serde_json::Value::Array(list));
+            }
+        }
+        if map
+            .get("request")
+            .and_then(serde_json::Value::as_object)
+            .is_some_and(serde_json::Map::is_empty)
+        {
+            map.remove("request");
+        }
+    })
+}
+
+/// Écrit les étiquettes d'un dossier telles quelles, internes comprises (V4 : template).
+pub fn set_folder_tags_raw(root: &Path, path: &str, tags: &[String]) -> Result<(), CommandError> {
+    edit_folder(root, path, |map| {
+        let info = map.entry("info").or_insert_with(|| serde_json::json!({}));
+        if let Some(info) = info.as_object_mut() {
+            if tags.is_empty() {
+                info.remove("tags");
+            } else {
+                info.insert("tags".to_owned(), serde_json::json!(tags));
+            }
+        }
+    })
+}
+
 /// Chemin réel d'un dossier, liens suivis ; tel quel s'il ne se résout pas.
 fn canonical(path: &Path) -> PathBuf {
     dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
@@ -192,6 +382,7 @@ fn read_dir(
     dir: &Path,
     top: bool,
     ancestors: &mut Vec<PathBuf>,
+    owned: &HashSet<String>,
 ) -> Result<Vec<TreeNode>, CommandError> {
     let entries = fs::read_dir(dir)
         .map_err(|error| CommandError::io("Lecture du dossier impossible", dir, &error))?;
@@ -207,7 +398,7 @@ fn read_dir(
         let path = entry.path();
         let relative = relative_path(root, &path);
         if path.is_dir() {
-            if top && (name == ENVIRONMENTS_DIR || name == CONTRACTS_DIR) {
+            if top && RESERVED_DIRS.contains(&name.as_str()) {
                 continue;
             }
             // Seul un lien demande une résolution ; un dossier ordinaire prolonge son parent.
@@ -221,7 +412,7 @@ fn read_dir(
                 continue;
             }
             ancestors.push(real);
-            let children = read_dir(root, &path, false, ancestors);
+            let children = read_dir(root, &path, false, ancestors, owned);
             ancestors.pop();
             let children = children?;
             let request_count = children.iter().map(TreeNode::count).sum();
@@ -235,9 +426,10 @@ fn read_dir(
                     request_count,
                     test,
                     tags: folder_tags(&path),
+                    template: folder_template(&path),
                 },
             ));
-        } else if is_request_file(&path) {
+        } else if is_request_file(&path) && !owned.contains(&relative) {
             let stem = path
                 .file_stem()
                 .map(|stem| stem.to_string_lossy().into_owned())
@@ -408,6 +600,7 @@ pub fn tests_view(nodes: &[TreeNode], contracts: &HashSet<String>) -> Vec<TreeNo
                 request_count,
                 test,
                 tags,
+                template,
             } => {
                 let kept = tests_view(children, contracts);
                 let count: usize = kept.iter().map(TreeNode::count).sum();
@@ -421,6 +614,7 @@ pub fn tests_view(nodes: &[TreeNode], contracts: &HashSet<String>) -> Vec<TreeNo
                     request_count: count,
                     test: *test,
                     tags: tags.clone(),
+                    template: template.clone(),
                 })
             }
         })
@@ -547,8 +741,9 @@ fn check_folder_name(root: &Path, parent_dir: &Path, name: &str) -> Result<(), C
     }
     let top = parent_dir == root;
     if top
-        && [ENVIRONMENTS_DIR, CONTRACTS_DIR, ROOT_FILE]
+        && RESERVED_DIRS
             .iter()
+            .chain(std::iter::once(&ROOT_FILE))
             .any(|reserved| name.eq_ignore_ascii_case(reserved))
     {
         return Err(CommandError::new(
@@ -832,7 +1027,7 @@ pub mod undo;
 mod test;
 pub use test::{
     CreatedTest, StepView, TestView, VariableUser, add_step, create_test, create_test_named,
-    extracted_before, is_test, test_view, variable_users,
+    extracted_before, is_test, step_view, test_view, variable_users,
 };
 
 #[cfg(test)]

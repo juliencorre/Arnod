@@ -76,6 +76,14 @@ pub fn request_input(
             known.push(name);
         }
     }
+    // V4 : les colonnes du jeu de données de la requête (R12) sont ses variables.
+    if let Some(link) = &request.data {
+        for column in crate::dataset::read(&ctx.root, link).table.columns {
+            if !known.contains(&column) {
+                known.push(column);
+            }
+        }
+    }
     let unknown = input::unknown(&input::used_names(&request), &known, &all, &active.name);
     // Valeurs non secrètes, pour nommer l'hôte.
     let mut values: BTreeMap<String, String> = active

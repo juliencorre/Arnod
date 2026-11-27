@@ -56,6 +56,10 @@ pub fn tree_batch(
     let (mut renamed, mut removed) = (Vec::new(), Vec::new());
     for (from, to) in &done.items {
         match to {
+            Some(to) if matches!(action, batch::BatchAction::Duplicate) => {
+                // La copie d'un test garde son schéma (`docs/plan-v4.md`, R4).
+                let _ = crate::flow::store::copy(&ctx.root, from, to);
+            }
             Some(to) if matches!(action, batch::BatchAction::Move { .. }) => {
                 follow_path(&window, project, from, to);
                 renamed.push(Renamed {

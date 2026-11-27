@@ -11,8 +11,10 @@ pub mod catalog;
 pub mod command;
 pub mod contract;
 pub mod curl;
+pub mod dataset;
 pub mod environment;
 pub mod error;
+pub mod flow;
 pub mod history;
 pub mod http;
 pub mod import;
@@ -26,6 +28,7 @@ pub mod report;
 pub mod request;
 pub mod response;
 pub mod results;
+pub mod script;
 pub mod search;
 pub mod secrets;
 pub mod startup;
@@ -35,6 +38,7 @@ pub mod steps;
 pub mod storage;
 #[cfg(feature = "sync")]
 pub mod sync;
+pub mod template;
 pub mod tree;
 pub mod trial;
 #[cfg(any(test, feature = "ts"))]

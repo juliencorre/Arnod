@@ -37,6 +37,9 @@ pub struct LocalData {
     /// Variables locales, par environnement.
     #[serde(default)]
     pub locals: BTreeMap<String, Vec<LocalVar>>,
+    /// Sections de la barre latérale affichées depuis « Plus » (`docs/plan-v4.md`, R21).
+    #[serde(default)]
+    pub sections: Vec<String>,
 }
 
 /// Dossier des données locales d'un projet.

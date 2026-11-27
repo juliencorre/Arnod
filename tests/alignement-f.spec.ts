@@ -203,7 +203,9 @@ describe("scripts Bruno remplacés ou acceptés (AM42, 2.3-f)", () => {
     await undo?.trigger("click");
     await flushPromises();
     expect(opened.core.commands()).toContain("import_script_undo");
-    expect(app.findAll(".report__item")[0]?.get(".report__status").text()).toBe("non repris");
+    expect(app.findAll(".report__item")[0]?.get(".report__status").text()).toBe(
+      "exécuté à l'envoi",
+    );
   });
 
   it("« Remplacer par une assertion… » ouvre la requête sur une assertion ajoutée", async () => {

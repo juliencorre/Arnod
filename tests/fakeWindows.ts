@@ -86,6 +86,10 @@ function same(a: ContentRef, b: ContentRef): boolean {
   if (a.kind === "request" && b.kind === "request") {
     return a.projectId === b.projectId && a.path === b.path;
   }
+  // Comme le cœur : un test, un dossier ou un contrat se reconnaît aussi à son chemin.
+  if ("path" in a && "path" in b && a.kind === b.kind) {
+    return a.projectId === b.projectId && a.path === b.path;
+  }
   return a.kind === b.kind && a.projectId === b.projectId;
 }
 

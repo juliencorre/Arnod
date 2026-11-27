@@ -160,13 +160,34 @@ pub fn cases(view: &RunView) -> Vec<Case<'_>> {
     }
     for case in &mut cases {
         case.verdict = verdict_of(&case.steps);
+        // Un test joué par son schéma (V4, R5) prend le verdict de sa fin : une étape non
+        // empruntée (branche, boucle) ne le rend pas « non joué ».
+        if case.test
+            && let Some(end) = view.ends.iter().find(|e| e.test == case.path)
+            && !matches!(case.verdict, Verdict::Error | Verdict::Cancelled)
+        {
+            case.verdict = if end.passed {
+                Verdict::Passed
+            } else {
+                Verdict::Failed
+            };
+        }
         case.duration_ms = case.steps.iter().filter_map(|s| s.duration_ms).sum();
-        case.failure = case.steps.iter().find_map(|step| {
-            item_failure(step).map(|text| match (case.test, step.step) {
-                (true, Some(number)) => format!("étape {number} · {text}"),
-                _ => text,
+        case.failure = case
+            .steps
+            .iter()
+            .find_map(|step| {
+                item_failure(step).map(|text| match (case.test, step.step) {
+                    (true, Some(number)) => format!("étape {number} · {text}"),
+                    _ => text,
+                })
             })
-        });
+            .or_else(|| {
+                view.ends
+                    .iter()
+                    .find(|e| case.test && e.test == case.path && !e.passed)
+                    .and_then(|e| e.reason.clone())
+            });
     }
     cases
 }

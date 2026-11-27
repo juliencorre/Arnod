@@ -49,6 +49,14 @@ export type BodyToken = { text: string, kind: TokenKind, path?: string, };
 
 export type BodyVariant = { title: string, content: string, form: Array<Pair>, };
 
+export type CaseOutcome = { number: number, values: Array<[string, string]>, outcome: SendOutcome | null, error: string | null, };
+
+export type CasePreview = { method: string, url: string, values: Array<[string, string]>, };
+
+export type CaseResult = { number: number, values: Array<[string, string]>, status: RunItemStatus, httpStatus: number | null, durationMs: number | null, assertions: Array<AssertionResult>, error: string | null, };
+
+export type CasesOutcome = { cases: Array<CaseOutcome>, passed: boolean, };
+
 export type CatalogFile = { version: number, projects: Array<Project>, workspaces: Array<Workspace>, lastWorkspaceId: string | null, inboxProjectId?: string, };
 
 export type CatalogFileV1 = { projects: Array<Project>, workspaces: Array<Workspace>, defaultWorkspaceId: string, lastWorkspaceId: string, };
@@ -107,6 +115,12 @@ export type CurlImport = { secrets: Array<CurlSecret>, ignored: Array<CurlIgnore
 
 export type CurlSecret = { name: string, value: string, header: string, };
 
+export type DataLink = { file: string, editable: boolean, };
+
+export type DataSet = { link: DataLink, error: string | null, columns: Array<string>, rows: Array<Array<string>>, };
+
+export type DataTable = { columns: Array<string>, rows: Array<Array<string>>, };
+
 export type Definition = { format: number, id: string, version: string, name: string, title: string, noun: string, description: string, family: StepFamily, publisher: string, engine: StepEngine, action: string, subject: StepSubject, detect: Array<StepRule>, form: Array<StepField>, };
 
 export type DetailRow = { label: string, value: string, };
@@ -163,6 +177,18 @@ export type FilterMatch = { path: string, value: string, assertion: Assertion | 
 
 export type FilterResult = { matches: Array<FilterMatch>, total: number, error: string | null, };
 
+export type Flow = { onFailure: OnFailure, steps: Array<FlowStep>, };
+
+export type FlowCheck = { target: string, operator: AssertionOperator, value?: Scalar | null, };
+
+export type FlowStep = { id: string, name: string, next?: string, onFailure?: OnFailure, } & ({ "kind": "request", file: string, } | { "kind": "condition", check: FlowCheck, otherwise?: string, } | { "kind": "loop", count?: number, list?: string, item: string, until?: string, } | { "kind": "wait", file?: string, check: FlowCheck, intervalMs: number, attempts: number, } | { "kind": "variable", variable: string, value: string, } | { "kind": "script", code: string, } | { "kind": "test", test: string, } | { "kind": "template", template: string, values: { [key in string]: string }, });
+
+export type FlowStepInfo = { id: string, inputs: Array<StepInput>, extracts: Array<string>, available: Array<StepInput>, };
+
+export type FolderHooks = { beforeAll: Array<FlowStep>, beforeEach: Array<FlowStep>, afterEach: Array<FlowStep>, afterAll: Array<FlowStep>, };
+
+export type FolderProperty = { name: string, value: string, origin: PropertyOrigin, };
+
 export type FolderTarget = { path: string, current: boolean, };
 
 export type GenerateReport = { folder: string, created: Array<string>, skipped: Array<SkippedOperation>, baseUrl: BaseUrlSet | null, };
@@ -182,6 +208,10 @@ export type HistoryItem = { entry: HistoryEntry, previousAt: number | null, chan
 export type HistorySent = { method: string, url: string, headers: Array<[string, string]>, body: string | null, };
 
 export type HistoryView = { path: string, items: Array<HistoryItem>, max: number, };
+
+export type HookPhase = "beforeAll" | "beforeEach" | "afterEach" | "afterAll";
+
+export type HooksView = { folder: string, hooks: FolderHooks, requests: Array<StepView>, };
 
 export type HtmlNode = { "kind": "text", text: string, } | { "kind": "element", tag: string, children: Array<HtmlNode>, };
 
@@ -209,13 +239,17 @@ export type ImportSource = { path: string, format: ImportFormat, name: string, c
 
 export type ImportTarget = { "kind": "newProject", location: string | null, workspaceId: string | null, } | { "kind": "project", projectId: string, };
 
-export type Inherited = { auth: InheritedAuth | null, headers: Array<InheritedHeader>, settings: ResolvedSettings, };
+export type Inherited = { auth: InheritedAuth | null, headers: Array<InheritedHeader>, settings: ResolvedSettings, variables: Array<InheritedVariable>, };
 
 export type InheritedAuth = { auth: Auth, source: string, };
 
 export type InheritedHeader = { name: string, value: string, source: string, };
 
+export type InheritedVariable = { name: string, value: string, source: string, folder: string, };
+
 export type InstallState = { "state": "idle" } | { "state": "downloading", received: number, total: number | null, } | { "state": "ready", version: string, onExit: boolean, } | { "state": "failed", message: string, };
+
+export type InstanceView = { path: string, name: string, template: TemplateSummary | null, templatePath: string, values: Array<ParamValue>, content: Array<TreeNode>, };
 
 export type InterfaceTheme = "system" | "light" | "dark";
 
@@ -231,7 +265,9 @@ export type LayoutPreset = "one" | "twoColumns" | "twoRows" | "three" | "four";
 
 export type LinkedView = { path: string, name: string, method: HttpMethod, examples: Array<ExampleRef>, };
 
-export type LocalData = { lastEnvironment: string | null, collapsed: Array<string>, locals: { [key in string]: Array<LocalVar> }, };
+export type Literal = { name: string, value: string, location: string, };
+
+export type LocalData = { lastEnvironment: string | null, collapsed: Array<string>, locals: { [key in string]: Array<LocalVar> }, sections: Array<string>, };
 
 export type LocalVar = { name: string, value: string | null, secret: boolean, };
 
@@ -255,6 +291,8 @@ export type NewEnvironment = { name: string, baseUrl: string, copyFrom: string |
 
 export type OAuth2 = { accessTokenUrl: string, clientId: string, clientSecret: string, scope: string, credentials: CredentialsPlacement, tokenPlacement: TokenPlacement, tokenName: string, };
 
+export type OnFailure = "stop" | "continue";
+
 export type OperationNode = { key: string, method: string, path: string, summary: string | null, supported: boolean, requests: Array<LinkedView>, };
 
 export type OperationTarget = { contract: string, contractName: string, operation: string, current: boolean, };
@@ -270,6 +308,8 @@ export type PairsFormat = "header" | "query";
 export type PairsText = { pairs: Array<Pair>, errors: Array<TextError>, };
 
 export type ParamKind = "query" | "path";
+
+export type ParamValue = { name: string, value: string, effective: string, origin: ValueOrigin, default: string, description: string, };
 
 export type PathGeneralization = { path: string, template: Template, contract: string, };
 
@@ -295,6 +335,8 @@ export type ProjectStatus = "ok" | "missing";
 
 export type ProjectView = { id: string, name: string, path: string, status: ProjectStatus, workspaceIds: Array<string>, };
 
+export type PropertyOrigin = { "kind": "here" } | { "kind": "folder", folder: string, } | { "kind": "project" } | { "kind": "environment", name: string, };
+
 export type ProposeInput = { status: number, durationMs: number, headers: Array<[string, string]>, body: string, };
 
 export type ProxyMode = "system" | "none" | "manual";
@@ -311,7 +353,7 @@ export type RenderedBody = { format: ResponseFormat, detected: ResponseFormat, l
 
 export type RequestConflict = { items: Array<ConflictItem>, modifiedAt: number | null, };
 
-export type RequestDoc = { name: string, description: string, tags: Array<string>, method: HttpMethod, url: string, params: Array<Pair>, headers: Array<Pair>, auth: Auth, body: Body, settings: RequestSettings, docs: string, assertions: Array<Assertion>, extractions: Array<Extraction>, seq?: number, examples: Array<Example>, contract?: ContractLink, preserved: Array<string>, inherited: Inherited, };
+export type RequestDoc = { name: string, description: string, tags: Array<string>, method: HttpMethod, url: string, params: Array<Pair>, headers: Array<Pair>, auth: Auth, body: Body, settings: RequestSettings, docs: string, assertions: Array<Assertion>, extractions: Array<Extraction>, seq?: number, examples: Array<Example>, contract?: ContractLink, data?: DataLink, preserved: Array<string>, inherited: Inherited, };
 
 export type RequestInput = { environment: string, known: Array<string>, unknown: Array<UnknownVariable>, added: Array<AddedHeader>, secrets: Array<ClearSecret>, };
 
@@ -337,13 +379,13 @@ export type RunChange = { projectId: string, run: RunView, origin: string, };
 
 export type RunGroup = { name: string, path: string, passed: number, failed: number, total: number, };
 
-export type RunItem = { path: string, name: string, method: HttpMethod, status: RunItemStatus, httpStatus: number | null, durationMs: number | null, slow: boolean, assertions: Array<AssertionResult>, error: string | null, test: string | null, step: number | null, extracted: Array<ExtractedValue>, };
+export type RunItem = { path: string, name: string, method: HttpMethod, status: RunItemStatus, httpStatus: number | null, durationMs: number | null, slow: boolean, assertions: Array<AssertionResult>, error: string | null, test: string | null, step: number | null, extracted: Array<ExtractedValue>, kind: StepKind, stepId: string | null, detail: string | null, branch: boolean | null, passes: number, hook: HookPhase | null, folder: string | null, cases: Array<CaseResult>, };
 
 export type RunItemStatus = "pending" | "running" | "passed" | "failed" | "error" | "cancelled" | "skipped";
 
 export type RunTest = { path: string, name: string, status: RunItemStatus, steps: number, passed: number, failedStep: number | null, };
 
-export type RunView = { id: string, number: number, folder: string, environment: string, concurrency: number, startedAt: number, finishedAt: number | null, finished: boolean, cancelled: boolean, items: Array<RunItem>, contract: string | null, revision: number, groups: Array<RunGroup>, tests: Array<RunTest>, };
+export type RunView = { id: string, number: number, folder: string, environment: string, concurrency: number, startedAt: number, finishedAt: number | null, finished: boolean, cancelled: boolean, items: Array<RunItem>, contract: string | null, revision: number, groups: Array<RunGroup>, tests: Array<RunTest>, ends: Array<TestEnd>, };
 
 export type Scalar = boolean | number | number | string;
 
@@ -397,6 +439,8 @@ export type StartupTarget = "folder" | "releases" | "issue";
 
 export type StatusesChange = { projectId: string, statuses: { [key in string]: RequestStatus }, };
 
+export type StepAdded = { step: string, request: string | null, };
+
 export type StepCatalog = { source: StepCatalogSource, natures: Array<StepNature>, };
 
 export type StepCatalogSource = { name: string, updated: string, synced: boolean, };
@@ -409,15 +453,21 @@ export type StepField = { key: string, label: string, kind: StepFieldKind, defau
 
 export type StepFieldKind = "choice" | "text" | "multiline";
 
+export type StepInput = { name: string, from: string | null, source: string, };
+
+export type StepKind = "request" | "condition" | "loop" | "wait" | "variable" | "script" | "test" | "template";
+
 export type StepNature = { origin: StepOrigin, format: number, id: string, version: string, name: string, title: string, noun: string, description: string, family: StepFamily, publisher: string, engine: StepEngine, action: string, subject: StepSubject, detect: Array<StepRule>, form: Array<StepField>, };
 
 export type StepOrigin = "builtin";
+
+export type StepPlacement = { "kind": "end" } | { "kind": "free" } | { "kind": "start" } | { "kind": "link", after: string, otherwise: boolean, };
 
 export type StepRule = { "kind": "url", schemes: Array<string>, methodField: string | null, } | { "kind": "keywords", words: Array<string>, } | { "kind": "prefix", text: string, } | { "kind": "suffix", text: string, } | { "kind": "curl" };
 
 export type StepSubject = { key: string, label: string, placeholder: string, };
 
-export type StepView = { path: string, name: string, method: HttpMethod | null, url: string, assertionCount: number, extractions: Array<string>, invalid: boolean, };
+export type StepView = { path: string, file: string, name: string, method: HttpMethod | null, url: string, assertionCount: number, extractions: Array<string>, assertions: Array<Assertion>, extracts: Array<Extraction>, invalid: boolean, };
 
 export type StepVisibleWhen = { key: string, in: Array<string>, };
 
@@ -451,9 +501,23 @@ export type SystemProxy = { http: string | null, https: string | null, noProxy: 
 
 export type Template = { path: string, params: Array<PathParam>, };
 
+export type TemplateCandidate = { name: string, value: string, origin: string, checked: boolean, };
+
+export type TemplateKind = "test" | "folder" | "tree";
+
+export type TemplateParam = { name: string, default: string, description: string, };
+
+export type TemplateSummary = { path: string, name: string, kind: TemplateKind, category: string, params: number, folders: number, tests: number, assertions: number, };
+
+export type TemplateUse = { path: string, name: string, values: { [key in string]: string }, };
+
+export type TemplateView = { parameters: Array<TemplateParam>, content: Array<TreeNode>, uses: Array<TemplateUse>, path: string, name: string, kind: TemplateKind, category: string, params: number, folders: number, tests: number, assertions: number, };
+
+export type TestEnd = { test: string, passed: boolean, reason: string | null, failedStep: string | null, };
+
 export type TestTarget = { path: string, name: string, steps: Array<string>, current: number | null, };
 
-export type TestView = { path: string, name: string, test: boolean, steps: Array<StepView>, };
+export type TestView = { path: string, name: string, test: boolean, steps: Array<StepView>, flow: Flow, info: Array<FlowStepInfo>, };
 
 export type TextError = { line: number, message: string, };
 
@@ -479,9 +543,9 @@ export type TransferredRequest = { path: string, name: string, };
 
 export type TransferredTrial = { test: string, step: string, };
 
-export type TreeNode = { "kind": "folder", name: string, path: string, children: Array<TreeNode>, requestCount: number, test: boolean, tags: Array<string>, } | { "kind": "request", name: string, path: string, method: HttpMethod | null, assertionCount: number, invalid: boolean, contract: string | null, url: string, tags: Array<string>, };
+export type TreeNode = { "kind": "folder", name: string, path: string, children: Array<TreeNode>, requestCount: number, test: boolean, tags: Array<string>, template: string | null, } | { "kind": "request", name: string, path: string, method: HttpMethod | null, assertionCount: number, invalid: boolean, contract: string | null, url: string, tags: Array<string>, };
 
-export type TreeView = { nodes: Array<TreeNode>, tests: Array<TreeNode>, collapsed: Array<string>, };
+export type TreeView = { nodes: Array<TreeNode>, tests: Array<TreeNode>, collapsed: Array<string>, templates: Array<TemplateSummary>, sections: Array<string>, };
 
 export type TrialResult = { snapshot: CatalogSnapshot, projectId: string, path: string, contract: string, outcome: SendOutcome, };
 
@@ -498,6 +562,8 @@ export type UpdatesView = { current: string, prefs: UpdatePrefs, latest: Release
 export type UsedSource = "environment" | "local" | "extracted";
 
 export type UsedVariable = { name: string, value: string, source: UsedSource, };
+
+export type ValueOrigin = { "kind": "here" } | { "kind": "property", folder: string, } | { "kind": "default" } | { "kind": "missing" };
 
 export type VariableSource = { environment: string, value: string | null, };
 
@@ -572,6 +638,7 @@ export type CheckExampleBodyKind = Check<Same<Ipc.ExampleBodyKind, ExampleBodyKi
 export type CheckResponseHeader = Check<Same<Ipc.ResponseHeader, ResponseHeader>>;
 export type CheckExample = Check<Same<Ipc.Example, Example>>;
 export type CheckInherited = Check<Same<Ipc.Inherited, Inherited>>;
+export type CheckInheritedVariable = Check<Same<Ipc.InheritedVariable, InheritedVariable>>;
 export type CheckAssertionOperator = Check<Same<Ipc.AssertionOperator, AssertionOperator>>;
 export type CheckAssertionOrigin = Check<Same<Ipc.AssertionOrigin, AssertionOrigin>>;
 export type CheckScalar = Check<Same<Ipc.Scalar, Scalar>>;
@@ -592,6 +659,8 @@ export type CheckNewEnvironment = Check<Same<Ipc.NewEnvironment, NewEnvironment>
 export type CheckEnvironmentDeleted = Check<Same<Ipc.EnvironmentDeleted, EnvironmentDeleted>>;
 export type CheckRunItemStatus = Check<Same<Ipc.RunItemStatus, RunItemStatus>>;
 export type CheckRunItem = Check<Same<Ipc.RunItem, RunItem>>;
+export type CheckCaseResult = Check<Same<Ipc.CaseResult, CaseResult>>;
+export type CheckTestEnd = Check<Same<Ipc.TestEnd, TestEnd>>;
 export type CheckRunGroup = Check<Same<Ipc.RunGroup, RunGroup>>;
 export type CheckRunView = Check<Same<Ipc.RunView, RunView>>;
 export type CheckRequestStatus = Check<Same<Ipc.RequestStatus, RequestStatus>>;
@@ -780,6 +849,36 @@ export type CheckSyncRepository = Check<Same<Ipc.SyncRepository, SyncRepository>
 export type CheckSyncDeviceCode = Check<Same<Ipc.SyncDeviceCode, SyncDeviceCode>>;
 export type CheckMissingSecrets = Check<Same<Ipc.MissingSecrets, MissingSecrets>>;
 export type CheckSyncLoginOptions = Check<Same<Ipc.SyncLoginOptions, SyncLoginOptions>>;
+export type CheckOnFailure = Check<Same<Ipc.OnFailure, OnFailure>>;
+export type CheckStepKind = Check<Same<Ipc.StepKind, StepKind>>;
+export type CheckFlowCheck = Check<Same<Ipc.FlowCheck, FlowCheck>>;
+export type CheckFlowStep = Check<Same<Ipc.FlowStep, FlowStep>>;
+export type CheckFlow = Check<Same<Ipc.Flow, Flow>>;
+export type CheckStepInput = Check<Same<Ipc.StepInput, StepInput>>;
+export type CheckFlowStepInfo = Check<Same<Ipc.FlowStepInfo, FlowStepInfo>>;
+export type CheckStepPlacement = Check<Same<Ipc.StepPlacement, StepPlacement>>;
+export type CheckStepAdded = Check<Same<Ipc.StepAdded, StepAdded>>;
+export type CheckHookPhase = Check<Same<Ipc.HookPhase, HookPhase>>;
+export type CheckFolderHooks = Check<Same<Ipc.FolderHooks, FolderHooks>>;
+export type CheckHooksView = Check<Same<Ipc.HooksView, HooksView>>;
+export type CheckPropertyOrigin = Check<Same<Ipc.PropertyOrigin, PropertyOrigin>>;
+export type CheckFolderProperty = Check<Same<Ipc.FolderProperty, FolderProperty>>;
+export type CheckDataLink = Check<Same<Ipc.DataLink, DataLink>>;
+export type CheckDataTable = Check<Same<Ipc.DataTable, DataTable>>;
+export type CheckDataSet = Check<Same<Ipc.DataSet, DataSet>>;
+export type CheckCasePreview = Check<Same<Ipc.CasePreview, CasePreview>>;
+export type CheckCaseOutcome = Check<Same<Ipc.CaseOutcome, CaseOutcome>>;
+export type CheckCasesOutcome = Check<Same<Ipc.CasesOutcome, CasesOutcome>>;
+export type CheckTemplateKind = Check<Same<Ipc.TemplateKind, TemplateKind>>;
+export type CheckTemplateParam = Check<Same<Ipc.TemplateParam, TemplateParam>>;
+export type CheckTemplateSummary = Check<Same<Ipc.TemplateSummary, TemplateSummary>>;
+export type CheckTemplateUse = Check<Same<Ipc.TemplateUse, TemplateUse>>;
+export type CheckTemplateView = Check<Same<Ipc.TemplateView, TemplateView>>;
+export type CheckValueOrigin = Check<Same<Ipc.ValueOrigin, ValueOrigin>>;
+export type CheckParamValue = Check<Same<Ipc.ParamValue, ParamValue>>;
+export type CheckInstanceView = Check<Same<Ipc.InstanceView, InstanceView>>;
+export type CheckTemplateCandidate = Check<Same<Ipc.TemplateCandidate, TemplateCandidate>>;
+export type CheckLiteral = Check<Same<Ipc.Literal, Literal>>;
 
 // Sans homologue généré (écrits seulement côté interface) :
 // - CommandName

@@ -16,7 +16,14 @@ import type {
   ResourceView,
 } from "@/types/ipc";
 
-import { buildTree, newRequest, runOf, testsView, type FakeWorkbench } from "./fakeWorkbench";
+import {
+  buildTree,
+  summaryOf,
+  newRequest,
+  runOf,
+  testsView,
+  type FakeWorkbench,
+} from "./fakeWorkbench";
 
 /** Opération d'un faux contrat. */
 export type FakeOperation = Pick<OperationView, "key" | "method" | "path" | "summary" | "tag">;
@@ -296,7 +303,13 @@ export function handleContracts(
     case "tree_load": {
       // Le référentiel de tests dépend des contrats présents (R1, R5).
       const nodes = buildTree(wb);
-      return { nodes, tests: testsView(nodes, new Set(fc.files.keys())), collapsed: wb.collapsed };
+      return {
+        nodes,
+        tests: testsView(nodes, new Set(fc.files.keys())),
+        collapsed: wb.collapsed,
+        templates: wb.templates.map(summaryOf),
+        sections: [...wb.sections],
+      };
     }
     case "contract_read":
       return view(fc, wb, path);

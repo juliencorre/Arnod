@@ -275,8 +275,8 @@ function acceptScript(): void {
               <strong>{{ STATUS_HEADLINES[current.status] }}</strong> {{ current.detail }}
             </p>
             <p v-if="current.status === 'notRun'" class="report__hint">
-              Les assertions et extractions de la requête sont reprises sans code : elle s'exécute
-              sans ce script.
+              Les assertions et extractions de la requête sont reprises sans code ; le script
+              s'exécute à chaque envoi, avant la requête ou après la réponse.
             </p>
           </div>
           <div v-if="pendingScript" class="report__actions">

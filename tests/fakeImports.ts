@@ -77,7 +77,7 @@ export function brunoReport(
         block: "tests",
         request: at("Commandes/creer-une-commande.yml"),
         detail:
-          "Aucun JavaScript n'est exécuté par Arnod : ce script n'a pas d'équivalent sans code.",
+          "Arnod exécute ce script à chaque envoi (bru, req, res, test, expect) ; il peut aussi être remplacé par une assertion sans code.",
         code: 'test("total cohérent", function () {\n  const o = res.getBody();\n  const sum = o.items.reduce(\n    (s, i) => s + i.price * i.qty, 0);\n  expect(o.total).to.equal(sum);\n});',
       },
       {
@@ -89,7 +89,7 @@ export function brunoReport(
         block: "script:pre-request",
         request: null,
         detail:
-          "Aucun JavaScript n'est exécuté par Arnod : ce script n'a pas d'équivalent sans code.",
+          "Arnod exécute ce script à chaque envoi (bru, req, res, test, expect) ; il peut aussi être remplacé par une assertion sans code.",
         code: 'bru.setVar("start", Date.now());',
       },
       {
@@ -101,7 +101,7 @@ export function brunoReport(
         block: "script:post-response",
         request: at("Authentification/obtenir-un-jeton.yml"),
         detail:
-          "Aucun JavaScript n'est exécuté par Arnod : ce script n'a pas d'équivalent sans code.",
+          "Arnod exécute ce script à chaque envoi (bru, req, res, test, expect) ; il peut aussi être remplacé par une assertion sans code.",
         code: 'bru.setEnvVar("token", res.body.access_token);',
       },
       {

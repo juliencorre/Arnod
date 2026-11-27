@@ -15,8 +15,9 @@ import BaseButton from "@/components/ui/BaseButton.vue";
 import { useGuard } from "@/composables/useGuard";
 import { formatDuration, formatFinished } from "@/lib/format";
 import { onTablistKeydown } from "@/lib/tablist";
+import { KIND_LABELS } from "@/lib/flow";
 import { useWorkbenchStore } from "@/stores/workbench";
-import type { AssertionResult, RunItem, RunItemStatus } from "@/types/ipc";
+import type { AssertionResult, CaseResult, HookPhase, RunItem, RunItemStatus } from "@/types/ipc";
 
 const props = defineProps<{ projectId: string }>();
 
@@ -204,6 +205,48 @@ const ignored = (item: RunItem): AssertionResult[] =>
   item.assertions.filter((a) => !a.passed && a.ignored);
 
 /** « — body.amount » : la première vérification en échec, à côté du nom. */
+/** Phases d'un Avant / Après (4.7-c). */
+const HOOK_LABELS: Record<HookPhase, string> = {
+  beforeAll: "Avant le dossier",
+  beforeEach: "Avant chaque test",
+  afterEach: "Après chaque test",
+  afterAll: "Après le dossier",
+};
+
+/** Une étape d'une autre nature qu'une requête s'ouvre dans son test ; sinon la requête. */
+function openItem(item: RunItem): void {
+  if (item.kind !== "request" && item.test !== null)
+    void workbench.openTest(props.projectId, item.test);
+  else if (item.kind === "template") void workbench.openFolder(props.projectId, item.path);
+  else if (!item.path.includes("#")) void workbench.openRequest(props.projectId, item.path);
+}
+
+/** Cas dépliés (4.7-b bis). */
+const openCases = ref<string[]>([]);
+
+function toggleCases(path: string): void {
+  openCases.value = openCases.value.includes(path)
+    ? openCases.value.filter((p) => p !== path)
+    : [...openCases.value, path];
+}
+
+function firstBadCase(item: RunItem): CaseResult | null {
+  return item.cases.find((c) => c.status !== "passed") ?? null;
+}
+
+function casesPassed(item: RunItem): number {
+  return item.cases.filter((c) => c.status === "passed").length;
+}
+
+/** Raison de l'échec d'un cas : sa première assertion en échec, ou son erreur. */
+function caseReason(found: CaseResult | null): string {
+  if (!found) return "";
+  if (found.error !== null) return found.error;
+  const check = found.assertions.find((a) => !a.passed && !a.ignored);
+  if (!check) return "en échec";
+  return `${check.target} ${check.message ?? ""}`.trim();
+}
+
 function firstFailure(item: RunItem): string | null {
   const first = failures(item)[0];
   return item.status === "failed" && first ? label(first) : null;
@@ -311,16 +354,29 @@ const EMPTY: Record<View, string> = {
                     :aria-label="`Étape ${item.step}`"
                     >{{ item.step }}</span
                   >
-                  <span class="run__method" :class="`run__method--${item.method.toLowerCase()}`">
+                  <span
+                    v-if="item.hook !== null"
+                    class="run__hook"
+                    :title="`${HOOK_LABELS[item.hook]} de ${item.folder ?? ''}`"
+                    >{{ HOOK_LABELS[item.hook] }}</span
+                  >
+                  <span
+                    v-if="item.kind === 'request'"
+                    class="run__method"
+                    :class="`run__method--${item.method.toLowerCase()}`"
+                  >
                     {{ item.method }}
                   </span>
-                  <button
-                    type="button"
-                    class="run__name"
-                    @click="workbench.openRequest(projectId, item.path)"
-                  >
+                  <span v-else class="run__kind">{{ KIND_LABELS[item.kind] }}</span>
+                  <button type="button" class="run__name" @click="openItem(item)">
                     {{ item.name }}
                   </button>
+                  <span v-if="item.cases.length > 0" class="run__info">
+                    {{ item.cases.length }} cas
+                  </span>
+                  <span v-else-if="item.detail && item.kind !== 'request'" class="run__info">
+                    {{ item.detail }}
+                  </span>
                   <button
                     v-if="item.test !== null && isBad(item)"
                     type="button"
@@ -342,6 +398,42 @@ const EMPTY: Record<View, string> = {
                   </span>
                 </div>
                 <p v-if="item.error" class="run__error">{{ item.error }}</p>
+                <!-- V4 (4.7-b bis) : le test compte une fois ; son détail par cas s'ouvre ici. -->
+                <template v-if="item.cases.length > 0">
+                  <p v-if="firstBadCase(item)" class="run__error">
+                    ✕ cas {{ firstBadCase(item)?.number }} ·
+                    {{
+                      firstBadCase(item)
+                        ?.values.map(([k, v]) => `${k} ${v}`)
+                        .join(" · ")
+                    }}
+                    —
+                    {{ caseReason(firstBadCase(item)) }}
+                  </p>
+                  <p class="run__cases-line">
+                    {{ casesPassed(item) }} cas réussis sur {{ item.cases.length }} ·
+                    <button
+                      type="button"
+                      class="run__link"
+                      :aria-expanded="openCases.includes(item.path)"
+                      @click="toggleCases(item.path)"
+                    >
+                      Voir les {{ item.cases.length }} cas
+                    </button>
+                  </p>
+                  <ul v-if="openCases.includes(item.path)" class="run__cases">
+                    <li v-for="c in item.cases" :key="c.number" class="run__case">
+                      <span :class="c.status === 'passed' ? 'run__case--ok' : 'run__case--ko'">{{
+                        c.status === "passed" ? "✓" : "✕"
+                      }}</span>
+                      cas {{ c.number }} · {{ c.values.map(([k, v]) => `${k} ${v}`).join(" · ") }}
+                      <span v-if="c.httpStatus !== null" class="run__info">{{ c.httpStatus }}</span>
+                      <span v-if="c.status !== 'passed'" class="run__error"
+                        >— {{ caseReason(c) }}</span
+                      >
+                    </li>
+                  </ul>
+                </template>
                 <ul v-if="failures(item).length + ignored(item).length > 0" class="run__checks">
                   <li v-for="check in failures(item)" :key="check.id" class="run__failure">
                     <span class="run__error">
@@ -637,6 +729,45 @@ const EMPTY: Record<View, string> = {
 
 .run__item--failed .run__mark,
 .run__item--error .run__mark {
+  color: var(--color-danger);
+}
+
+.run__kind,
+.run__hook {
+  flex: none;
+  padding: 0 0.375rem;
+  border-radius: var(--radius-sm);
+  font: 600 var(--text-caption) var(--font-mono);
+  text-transform: uppercase;
+  color: var(--color-family-jobs-text);
+  background: var(--color-family-jobs-bg);
+}
+
+.run__hook {
+  text-transform: none;
+  color: var(--color-family-data-text);
+  background: var(--color-family-data-bg);
+}
+
+.run__cases-line {
+  margin: 0;
+  padding-left: 2rem;
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+.run__cases {
+  margin: 0;
+  padding: 0 0 0 2rem;
+  list-style: none;
+  font-size: var(--text-small);
+}
+
+.run__case--ok {
+  color: var(--color-success);
+}
+
+.run__case--ko {
   color: var(--color-danger);
 }
 

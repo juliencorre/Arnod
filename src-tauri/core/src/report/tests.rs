@@ -25,6 +25,7 @@ fn item(path: &str, name: &str, status: ItemStatus, ms: u64) -> RunItem {
         test: None,
         step: None,
         extracted: Vec::new(),
+        flow: Default::default(),
     }
 }
 
@@ -111,6 +112,7 @@ fn view() -> RunView {
         cancelled: false,
         groups: run_groups("commandes", &items),
         tests: run_tests(&items),
+        ends: Vec::new(),
         items,
         contract: None,
         revision: 9,

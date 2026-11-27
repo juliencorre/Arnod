@@ -7,6 +7,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::*;
 use crate::environment::Variable;
+use crate::request::file;
 use crate::request::model::{Assertion, Request};
 use crate::secrets::MemorySecretStore;
 
@@ -644,6 +645,7 @@ fn r2_groupes_a_la_racine_du_projet() {
         test: None,
         step: None,
         extracted: Vec::new(),
+        flow: Default::default(),
     };
     let groups = run_groups(
         "",
@@ -831,11 +833,13 @@ fn forme_json_du_run_et_des_statuts() {
             test: Some("D".into()),
             step: Some(1),
             extracted: Vec::new(),
+            flow: Default::default(),
         }],
         contract: None,
         revision: 0,
         groups: Vec::new(),
         tests: Vec::new(),
+        ends: Vec::new(),
     };
     run.touch();
     let json = serde_json::to_value(&run).unwrap();
@@ -1107,6 +1111,7 @@ fn lot_e_unites_et_verdicts() {
         test: test.map(str::to_owned),
         step: None,
         extracted: Vec::new(),
+        flow: Default::default(),
     };
     let items = [
         item("libre.yml", None, ItemStatus::Passed),
