@@ -3209,15 +3209,18 @@ describe("Version 2 - Recherche Ctrl+K (1.5-a, 1.5-b)", () => {
       input?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     });
     await browser.$(".palette").waitForExist({ reverse: true, timeout: 5_000 });
-    await browser.waitUntil(
-      () =>
-        browser.execute(() =>
-          Array.from(document.querySelectorAll(".zone__tab")).some((t) =>
-            t.textContent.includes("Lister les commandes"),
-          ),
+    const opened = () =>
+      browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab")).some((t) =>
+          t.textContent.includes("Lister les commandes"),
         ),
-      { timeout: 10_000, timeoutMsg: "onglet « Lister les commandes » attendu" },
-    );
+      );
+    await browser.waitUntil(opened, {
+      timeout: 10_000,
+      timeoutMsg: "onglet « Lister les commandes » attendu",
+    });
+    expect(await opened()).toBe(true);
+    expect(await browser.$(".palette").isExisting()).toBe(false);
   });
 });
 
