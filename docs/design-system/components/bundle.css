@@ -38,6 +38,15 @@ select {
 }
 
 /*
+ * Texte indicatif d'un champ : color-subtle partout, opaque (le gris propre au moteur,
+ * #757575, tombait à 3,5:1 en thème sombre ; DI3).
+ */
+::placeholder {
+  color: var(--color-subtle);
+  opacity: 1;
+}
+
+/*
  * Case à cocher : la couleur d'accent et une coche foncée (7:1), comme l'interrupteur ; la case
  * native du système tirait sur le bleu.
  */
@@ -49,11 +58,50 @@ input[type="checkbox"] {
   width: 1rem;
   height: 1rem;
   margin: 0;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   appearance: none;
   cursor: pointer;
+}
+
+/* Bouton radio : même bord de contrôle à 3:1 que la case (DE4), point foncé une fois choisi. */
+input[type="radio"] {
+  display: inline-grid;
+  flex: none;
+  place-content: center;
+  box-sizing: border-box;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="radio"]:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+input[type="radio"]:checked::after {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-text);
+  content: "";
+}
+
+input[type="radio"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[type="radio"]:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 input[type="checkbox"]:checked {
@@ -80,6 +128,29 @@ input[type="checkbox"]:focus-visible,
 select:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -1px;
+}
+
+/*
+ * Champ de recherche : jamais le bouton natif d'effacement (⌫ sous WebKitGTK, bleu sous WebView2) ;
+ * les champs d'Arnod se vident par leur × ou par Échap (1.2-e, 4.1-g).
+ */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Mouvement réduit à la demande du système (AC8) : transitions et animations quasi immédiates. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Texte réservé aux lecteurs d'écran. */
@@ -207,7 +278,7 @@ select:focus-visible {
   width: 2.25rem;
   height: 1.25rem;
   padding: 0;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-pill);
   background: var(--color-chip);
   cursor: inherit;
@@ -349,6 +420,11 @@ select:focus-visible {
   color: var(--color-danger);
 }
 
+/* Ligne d'ajout d'un menu (« + Nouvel environnement »), comme « + Nouveau workspace ». */
+.menu__item--link {
+  color: var(--color-link);
+}
+
 .menu__check {
   width: 1rem;
   text-align: center;
@@ -471,6 +547,38 @@ select:focus-visible {
   font-weight: 600;
 }
 
+.dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* ✕ sans bord, cible de 24 × 24 px au moins (consignes de la maquette de référence). */
+.dialog__close {
+  display: grid;
+  place-items: center;
+  min-width: var(--control-sm);
+  min-height: var(--control-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.dialog__close:hover {
+  color: var(--color-text);
+  background: var(--color-chip);
+}
+
+.dialog__close:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
 .dialog__description {
   margin: -0.5rem 0 0;
   color: var(--color-muted);
@@ -527,8 +635,34 @@ select:focus-visible {
   text-decoration: underline;
 }
 
-.toast__action:focus-visible {
+.toast__action:focus-visible,
+.toast__close:focus-visible {
   outline: 2px solid var(--color-toast-action);
+}
+
+/* × sans bord, cible de 24 × 24 px (AC4). */
+.toast__close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-toast-text);
+  background: none;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.toast__close::before {
+  content: "✕";
+}
+
+.toast__close:hover {
+  opacity: 1;
 }
 
 /* src/components/ui/SectionHeading.vue */

@@ -15,7 +15,7 @@
  * le premier usage jusqu'au run d'un dossier : vérifications en échec, résultat par dossier et
  * statuts de la barre latérale gardés au redémarrage (docs/plan-fin-premier-usage.md).
  */
-import type { ChildProcess } from "node:child_process";
+import { type ChildProcess, execFileSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -210,6 +210,27 @@ async function clickText(selector: string, text: string): Promise<void> {
       );
       if (!target) throw new Error(`« ${label} » introuvable dans ${css}`);
       target.click();
+    },
+    selector,
+    text,
+  );
+}
+
+/**
+ * Clique un bouton qui ferme sa propre fenêtre (« Rattacher ») : le clic part après la réponse de
+ * WebDriver. Un clic WebDriver attend la suite de l'action ; si la fenêtre se ferme avant, la
+ * commande échoue (« no such window ») et la session perd sa fenêtre courante.
+ */
+async function clickClosing(selector: string, text: string): Promise<void> {
+  await browser.execute(
+    (css, label) => {
+      const target = Array.from(document.querySelectorAll<HTMLElement>(css)).find(
+        (element) => element.textContent.trim() === label,
+      );
+      if (!target) throw new Error(`« ${label} » introuvable dans ${css}`);
+      setTimeout(() => {
+        target.click();
+      }, 0);
     },
     selector,
     text,
@@ -725,7 +746,7 @@ describe("Fenêtres et zones", () => {
       input.value = `${input.value}?rattache=1`;
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    await browser.$(".content-window__bar").$("button=Rattacher").click();
+    await clickClosing(".content-window__bar button", "Rattacher");
     await waitForWindows(1);
     expect(readFileSync(listerFile, "utf8")).toContain("rattache=1");
     await browser.switchToWindow(mainWindow);
@@ -753,7 +774,7 @@ describe("Fenêtres et zones", () => {
     });
     await screenshot(browser, "08-barre-detachee");
 
-    await browser.$(".sidebar-window__footer").$("button=Rattacher").click();
+    await clickClosing(".sidebar-window__footer button", "Rattacher");
     await waitForWindows(1);
     await browser.switchToWindow(mainWindow);
     await browser.$("aside").waitForDisplayed();
@@ -786,17 +807,24 @@ describe("Fenêtres et zones", () => {
     await screenshot(browser, "08b-menu-environnement");
 
     await browser.$('[role="menuitem"]*=Gérer les environnements').click();
-    const dialog = browser.$("dialog[open]");
-    await dialog.waitForDisplayed();
-    // Aucun champ ne dépasse : le contenu suit la largeur de la fenêtre, sans défilement horizontal.
+    // 3.3-a (AM43) : la page des environnements, dans un onglet.
+    const page = browser.$(".envs");
+    await page.waitForDisplayed();
+    // Aucun champ ne dépasse : le contenu suit la largeur de la zone, sans défilement horizontal.
     const fits = await browser.execute(() => {
-      const body = document.querySelector("dialog[open] .dialog__body");
+      const body = document.querySelector(".envs");
       return body ? body.scrollWidth <= body.clientWidth : null;
     });
     expect(fits).toBe(true);
     await screenshot(browser, "08c-environnements");
-    await browser.keys("Escape");
-    await browser.$("dialog[open]").waitForExist({ reverse: true });
+    // 3.3-b (AM34) : « + Nouvel environnement » ouvre sa fenêtre de création.
+    await clickText(".envs__head-actions button", "+ Nouvel environnement");
+    await browser.$("#new-environment").waitForExist({ timeout: 5_000 });
+    await screenshot(browser, "08d-nouvel-environnement");
+    await clickText("dialog[open] button", "Annuler");
+    await browser.$("#new-environment").waitForExist({ reverse: true, timeout: 5_000 });
+    await clickHidden('[aria-label="Fermer Environnements"]');
+    await browser.$(".envs").waitForExist({ reverse: true, timeout: 5_000 });
   });
 });
 
@@ -909,7 +937,7 @@ describe("Contrats de services", () => {
     await name.waitForDisplayed({ timeout: 10_000 });
     expect(await name.getText()).toBe("Animalerie");
     expect(await browser.$(".contract__coverage").getText()).toBe("3 opérations · 0 avec requête");
-    expect(await browser.$(".contract-row__version").getText()).toBe("2.1.0");
+    expect(await browser.$(".contract-row__version").getText()).toBe("v2.1.0");
     expect(readFileSync(path.join(project(), "contracts", "animalerie.yaml"), "utf8")).toBe(
       animalerie(url),
     );
@@ -938,7 +966,9 @@ describe("Contrats de services", () => {
     expect(readFileSync(path.join(project(), "environments", "local.yml"), "utf8")).toContain(url);
 
     // Rangées sous le contrat, qui se déplie (RC7) ; aucune dans le référentiel de tests (RC6).
-    const operation = browser.$('aside [aria-label="Ouvrir GET /pets/{petId}"]');
+    const operation = browser.$(
+      'aside [aria-label="GET /pets/{petId}"], aside [aria-label^="GET /pets/{petId},"]',
+    );
     await operation.waitForExist({
       timeout: 10_000,
       timeoutMsg: "opération absente du contrat déplié",
@@ -973,7 +1003,9 @@ describe("Contrats de services", () => {
       timeout: 15_000,
       timeoutMsg: "run du contrat non réussi",
     });
-    expect(await browser.$(".run__title").getText()).toContain("Run du contrat « Animalerie »");
+    expect(await browser.$(".run__title").getText()).toContain(
+      "Contrats de service / Animalerie /",
+    );
     expect(await browser.$$(".run__item--passed").length).toBe(3);
   });
 
@@ -1142,10 +1174,10 @@ describe("Contrats de services", () => {
 
     // Rattacher : le résultat revient dans l'onglet de la requête (R4).
     await browser.switchToWindow(result);
-    await browser.$(".content-window__bar").$("button=Rattacher").click();
+    await clickClosing(".content-window__bar button", "Rattacher");
     await waitForWindows(2);
     await browser.switchToWindow(sidebar);
-    await browser.$(".sidebar-window__footer").$("button=Rattacher").click();
+    await clickClosing(".sidebar-window__footer button", "Rattacher");
     await waitForWindows(1);
     await browser.switchToWindow(mainWindow);
     await browser.waitUntil(async () => (await linked("state")).response, {
@@ -1263,7 +1295,9 @@ describe("Accueil, catalogue des étapes et Non classés", () => {
     expect(request).toContain("GET /sante");
 
     // Dans la barre latérale, l'essai est sous le contrat déduit, à son opération (RC8).
-    const operation = browser.$('aside [aria-label="Ouvrir GET /sante"]');
+    const operation = browser.$(
+      'aside [aria-label="GET /sante"], aside [aria-label^="GET /sante,"]',
+    );
     await operation.waitForExist({
       timeout: 10_000,
       timeoutMsg: "essai absent du contrat déduit",
@@ -1426,16 +1460,36 @@ describe("Premier usage : assertions, run et statuts", () => {
 
   const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
 
-  /** Ligne de l'arborescence (référentiel de tests) dont le nom est `name`. */
-  async function treeRow(name: string): Promise<{ status: string; count: string } | null> {
+  /**
+   * Ligne de l'arborescence (référentiel de tests) dont le nom est `name`. `countTone` : jeton de
+   * couleur du compteur (`success`, `danger`, `muted`), comparé à la couleur calculée.
+   */
+  async function treeRow(
+    name: string,
+  ): Promise<{ status: string; count: string; countTone: string } | null> {
     return browser.execute((label) => {
       const item = Array.from(document.querySelectorAll('aside [role="treeitem"]')).find(
         (row) => row.querySelector(".row__name")?.textContent.trim() === label,
       );
       if (!item) return null;
+      const count = item.querySelector(".row__count");
+      const tone = (el: Element | null): string => {
+        if (!el) return "";
+        const color = getComputedStyle(el).color;
+        for (const token of ["success", "danger", "muted"]) {
+          const probe = document.createElement("span");
+          probe.style.color = `var(--color-${token})`;
+          document.body.append(probe);
+          const same = getComputedStyle(probe).color === color;
+          probe.remove();
+          if (same) return token;
+        }
+        return color;
+      };
       return {
         status: item.querySelector(".row__status")?.textContent.trim() ?? "",
-        count: item.querySelector(".row__count")?.getAttribute("title") ?? "",
+        count: count?.getAttribute("title") ?? "",
+        countTone: tone(count),
       };
     }, name);
   }
@@ -1466,6 +1520,7 @@ describe("Premier usage : assertions, run et statuts", () => {
     | { kind: "url"; value: string }
     | { kind: "method"; value: string }
     | { kind: "click"; value: string }
+    | { kind: "responseTab"; value: string }
     | { kind: "addCheck"; target: string; operator: string }
     | { kind: "editorChecks" }
     | { kind: "state" };
@@ -1495,6 +1550,14 @@ describe("Premier usage : assertions, run et statuts", () => {
         if (action.kind === "click") {
           const found = button(action.value);
           if (!found) throw new Error(`bouton « ${action.value} » introuvable`);
+          found.click();
+        }
+        // Onglet du résultat (ses compteurs sont en pastille, comme ceux de l'éditeur).
+        if (action.kind === "responseTab") {
+          const found = Array.from(tab.querySelectorAll<HTMLElement>(".response__tab")).find((b) =>
+            b.textContent.trim().startsWith(action.value),
+          );
+          if (!found) throw new Error(`onglet du résultat « ${action.value} » introuvable`);
           found.click();
         }
         // Onglet « Vérifications » de l'éditeur (celui de la réponse a son propre onglet).
@@ -1535,7 +1598,14 @@ describe("Premier usage : assertions, run et statuts", () => {
   }
 
   async function createRequest(name: string): Promise<void> {
-    await rowAction("Commandes", "Nouvelle requête");
+    // Dossier ordinaire (vide) : « + » au survol, « Requête libre » (AM36) ; test : menu ⋯.
+    const plain = await browser.execute(
+      () => document.querySelector('aside button[aria-label="Ajouter dans Commandes"]') !== null,
+    );
+    if (plain) {
+      await clickHidden('aside button[aria-label="Ajouter dans Commandes"]');
+      await clickText('aside [role="menuitem"]', "Requête libre");
+    } else await rowAction("Commandes", "Nouvelle requête");
     await nameIt(name);
     await browser.waitUntil(async () => (await zoneTabs()).flat().includes(name), {
       timeout: 10_000,
@@ -1567,11 +1637,20 @@ describe("Premier usage : assertions, run et statuts", () => {
       timeoutMsg: "dossier « Commandes » attendu",
     });
     expect(existsSync(path.join(project(), "Commandes"))).toBe(true);
+    // 4.1-a bis (AM37) : un clic sur le dossier ouvre sa vue ; l'onglet est refermé ensuite.
+    await clickHidden('aside [role="treeitem"][data-path="Commandes"]');
+    await browser.$(".folder").waitForExist({ timeout: 10_000 });
+    expect(await browser.$(".folder__summary").getText()).toBe(
+      "dossier · 0 test · 0 test au total",
+    );
+    await screenshot(browser, "21b-vue-dossier");
+    await clickHidden('button[aria-label="Fermer Commandes"]');
+    await browser.$(".folder").waitForExist({ reverse: true, timeout: 10_000 });
 
     await createRequest("Lister les commandes");
     await inRequest("Lister les commandes", { kind: "url", value: `${url}/commandes` });
     await sendAndWait("Lister les commandes", "200");
-    await inRequest("Lister les commandes", { kind: "click", value: "Assertions (" });
+    await inRequest("Lister les commandes", { kind: "responseTab", value: "Assertions" });
     await inRequest("Lister les commandes", { kind: "click", value: "Proposer des assertions" });
     await inRequest("Lister les commandes", { kind: "editorChecks" });
     await browser.waitUntil(
@@ -1601,11 +1680,11 @@ describe("Premier usage : assertions, run et statuts", () => {
     await sendAndWait("Créer une commande", "201");
     const failed = await inRequest("Créer une commande", { kind: "state" });
     expect(failed.failures).toEqual(["✕ headers.Location"]);
-    expect(failed.verdict).toBe("Échec · 1 assertion(s)");
+    expect(failed.verdict).toBe("Échec · 1 assertion");
     expect((await treeRow("Créer une commande"))?.status).toBe("✕, en échec");
     await screenshot(browser, "19-verification-en-echec");
 
-    await inRequest("Créer une commande", { kind: "click", value: "Ignorer pour ce run" });
+    await inRequest("Créer une commande", { kind: "click", value: "Ignorer pour ce résultat" });
     await browser.waitUntil(
       async () => (await inRequest("Créer une commande", { kind: "state" })).verdict === "Réussie",
       { timeoutMsg: "verdict recalculé attendu" },
@@ -1627,7 +1706,7 @@ describe("Premier usage : assertions, run et statuts", () => {
     });
     expect(await progress.getText()).toBe("Test en échec à l'étape 1 · 0/2 étapes");
     expect(await browser.$(".run__meta").getText()).toMatch(
-      /^run #\d+ · Local · 8 en même temps · \d/,
+      /^run #\d+ · Local · 8 en même temps · \d.* · aujourd'hui \d\d:\d\d$/,
     );
     expect(await browser.$('.run__tab[aria-selected="true"]').getText()).toContain("Échecs");
     const failures = await browser.$$(".run__item").map((item) => item.getText());
@@ -1644,6 +1723,8 @@ describe("Premier usage : assertions, run et statuts", () => {
     expect(await browser.$(".run__group-count").getText()).toBe("0/2");
     // La barre latérale suit le run (R4, R6) ; l'étape non jouée garde son statut (lot E, R3).
     expect((await treeRow("Commandes"))?.count).toBe("1 réussie sur 2 exécutées (2 requêtes)");
+    // Un échec colore le compteur en rouge, jamais gris (ST2, R6).
+    expect((await treeRow("Commandes"))?.countTone).toBe("danger");
     expect((await treeRow("Créer une commande"))?.status).toBe("✕, en échec");
     await screenshot(browser, "20-run-dossier");
 
@@ -1652,6 +1733,7 @@ describe("Premier usage : assertions, run et statuts", () => {
       timeoutMsg: "échec ignoré attendu",
     });
     expect((await treeRow("Commandes"))?.count).toBe("2 réussies sur 2 exécutées (2 requêtes)");
+    expect((await treeRow("Commandes"))?.countTone).toBe("success");
   });
 
   it("au redémarrage, les statuts et le dernier run sont relus (ST4)", async () => {
@@ -1744,12 +1826,15 @@ describe("Lot A - Réponse : format, aperçu, filtre JSONPath (5.1-b bis)", () =
     await browser.waitUntil(async () => (await browser.$(".code").getText()).includes("MUG-NOIR"));
 
     await browser.$(".filter__input").setValue("$.items[*].sku");
+    // « $.items[*] », tapé en chemin, donne aussi deux résultats : on attend ceux de « .sku ».
+    const marks = async () => browser.$$(".tok--match").map((m) => m.getText());
     await browser.waitUntil(
-      async () => (await browser.$(".filter__count").getText()) === "2 résultats",
+      async () =>
+        (await browser.$(".filter__count").getText()) === "2 résultats" &&
+        (await marks()).join() === '"TSH-BLU-M","MUG-NOIR"',
       { timeoutMsg: "deux résultats attendus" },
     );
-    const marks = await browser.$$(".tok--match").map((m) => m.getText());
-    expect(marks).toEqual(['"TSH-BLU-M"', '"MUG-NOIR"']);
+    expect(await marks()).toEqual(['"TSH-BLU-M"', '"MUG-NOIR"']);
     await screenshot(browser, "a1-reponse-filtre");
 
     await browser.$(".filter__input").setValue("$.items[0");
@@ -2056,7 +2141,8 @@ describe("Lot B : saisie, texte et cURL", () => {
     expect(state.unknown).toContain("apiVersion est inconnue dans Local");
     expect(state.marked).toBe("{{apiVersion}}");
     expect(state.tabs).toContain("En-têtes 2");
-    expect(state.tabs.some((t) => t.startsWith("Corps ●"))).toBe(true);
+    // DE7 (lot I) : un compteur en pastille, plus de point « rempli » sur l'onglet Corps.
+    expect(state.tabs).toContain("Corps");
 
     await inEditor(essai, { kind: "click", value: "En-têtes" });
     await browser.waitUntil(
@@ -2126,7 +2212,16 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
 
   beforeAll(() => {
     cpSync(
-      path.join(import.meta.dirname, "..", "src-tauri", "src", "bruno", "fixtures", "boutique"),
+      path.join(
+        import.meta.dirname,
+        "..",
+        "src-tauri",
+        "core",
+        "src",
+        "bruno",
+        "fixtures",
+        "boutique",
+      ),
       source(),
       {
         recursive: true,
@@ -2152,6 +2247,7 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
     const done = (await invoke("import_run", {
       path: source(),
       target: { kind: "newProject", location: path.join(sandbox.home, "arnod"), workspaceId: null },
+      options: { environments: [], secretsLocal: true },
     })) as { projectId: string };
     await invoke("layout_open_selection", {
       content: { kind: "importReport", projectId: done.projectId },
@@ -2180,6 +2276,27 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
     expect(request).toContain("{{$randomUUID}}");
     expect(readFileSync(path.join(project(), "environments", "recette.yml"), "utf8")).not.toContain(
       "ne-pas-lire",
+    );
+  });
+
+  it("« Accepter sans ce script » retire le script du fichier (2.3-f, AM42)", async () => {
+    const file = path.join(project(), "Commandes", "creer-une-commande.yml");
+    expect(readFileSync(file, "utf8")).toContain("type: tests");
+    // Le rapport montre 5 éléments, puis « … N autres » : le script peut être plus loin.
+    if (await browser.$(".report__more").isExisting()) await clickText(".report__more", "autre");
+    await clickText(".report__item", "TESTS");
+    await browser.waitUntil(async () => await browser.$(".report__actions").isExisting(), {
+      timeout: 5_000,
+      timeoutMsg: "actions du script attendues",
+    });
+    await screenshot(browser, "c1b-script-a-reprendre");
+    await clickText(".report__actions button", "Accepter sans ce script");
+    await browser.waitUntil(() => !readFileSync(file, "utf8").includes("type: tests"), {
+      timeout: 5_000,
+      timeoutMsg: "script retiré du fichier attendu",
+    });
+    expect(await browser.$(".report__item[aria-pressed='true'] .report__status").getText()).toBe(
+      "repris",
     );
   });
 });
@@ -2535,16 +2652,24 @@ describe("Lot H - Réseau et authentification", () => {
       timeout: 10_000,
       timeoutMsg: "réglages du projet attendus",
     });
-    await browser.execute(() => {
-      const select = document.querySelector<HTMLSelectElement>("dialog[open] select");
-      if (!select) throw new Error("type introuvable");
-      select.value = "oauth2";
-      select.dispatchEvent(new Event("change"));
-    });
+    const choose = (type: string) =>
+      browser.execute((value) => {
+        const select = document.querySelector<HTMLSelectElement>("dialog[open] select");
+        if (!select) throw new Error("type introuvable");
+        const before = select.value;
+        select.value = value;
+        select.dispatchEvent(new Event("change"));
+        return before;
+      }, type);
+    const previous = await choose("oauth2");
     await browser.$("dialog[open] .oauth2").waitForExist({ timeout: 5_000 });
     expect(await settingsText()).toContain("URL du jeton");
     await screenshot(browser, "h3-reglages-projet");
+    // ER2 : les réglages s'enregistrent seuls ; le type d'origine est remis avant de fermer,
+    // pour que les tests suivants n'héritent pas d'un OAuth 2 vide.
+    await choose(previous);
     await clickText("dialog[open] button", "Fermer");
+    await browser.$("dialog[open]").waitForExist({ reverse: true, timeout: 10_000 });
   });
 });
 
@@ -2916,10 +3041,10 @@ describe("Lot J - Copier et déplacer (4.1-f, 4.1-g, 3.2-c)", () => {
     await browser.waitUntil(
       () =>
         browser.execute(() => {
-          // « Ouvrir POST /orders », ou « Créer la requête de POST /orders » si la requête écrite
+          // « POST /orders… », ou « POST /orders, créer la requête » si la requête écrite
           // n'est pas encore rangée sous l'opération : les deux ouvrent une requête liée.
           const open = document.querySelector<HTMLElement>(
-            '.crow__main[aria-label$=" POST /orders"]',
+            '.crow__main[aria-label="POST /orders"], .crow__main[aria-label^="POST /orders,"]',
           );
           if (open) {
             open.click();
@@ -2979,6 +3104,342 @@ describe("Lot L allégé - Mises à jour (1.6-g)", () => {
   });
 });
 
+describe("Version 1 - Apparence et raccourcis (1.6-f, 1.6-f bis)", () => {
+  async function openSection(label: string): Promise<void> {
+    await browser.execute(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ctrlKey: true }));
+    });
+    await browser.$(".preferences").waitForDisplayed({ timeoutMsg: "préférences attendues" });
+    await clickText(".preferences__section", label);
+  }
+
+  it("le thème se force en sombre, puis revient au système (1.6-f)", async () => {
+    await openSection("Apparence");
+    await browser.$(".appearance").waitForDisplayed({ timeoutMsg: "section Apparence attendue" });
+    await clickText(".appearance__theme", "Sombre");
+    await browser.waitUntil(
+      () => browser.execute(() => document.documentElement.dataset.theme === "dark"),
+      { timeoutMsg: "thème sombre forcé attendu" },
+    );
+    await clickText(".appearance__theme", "Comme le système");
+    await browser.waitUntil(
+      () => browser.execute(() => document.documentElement.dataset.theme === undefined),
+      { timeoutMsg: "thème du système attendu" },
+    );
+    await screenshot(browser, "v1-apparence");
+  });
+
+  it("le thème forcé et le zoom reviennent au redémarrage (1.6-f)", async () => {
+    await clickText(".appearance__theme", "Sombre");
+    await browser.execute(() => {
+      const zoom = document.querySelector<HTMLSelectElement>(".appearance select");
+      if (!zoom) throw new Error("liste du zoom introuvable");
+      zoom.value = "110";
+      zoom.dispatchEvent(new Event("change"));
+    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          document.querySelector(".appearance__theme--on")?.textContent.includes("Sombre"),
+        ),
+      { timeoutMsg: "« Sombre » choisi attendu" },
+    );
+    await browser.keys("Escape");
+    await restart();
+    await browser.waitUntil(
+      () => browser.execute(() => document.documentElement.dataset.theme === "dark"),
+      { timeoutMsg: "thème sombre attendu après le redémarrage" },
+    );
+    // Retour aux réglages du système pour la suite des parcours.
+    await openSection("Apparence");
+    await clickText(".appearance__theme", "Comme le système");
+    await browser.execute(() => {
+      const zoom = document.querySelector<HTMLSelectElement>(".appearance select");
+      if (!zoom) throw new Error("liste du zoom introuvable");
+      zoom.value = "100";
+      zoom.dispatchEvent(new Event("change"));
+    });
+    await browser.waitUntil(
+      () => browser.execute(() => document.documentElement.dataset.theme === undefined),
+      { timeoutMsg: "thème du système attendu" },
+    );
+    await browser.keys("Escape");
+    await browser.$("dialog[open]").waitForExist({ reverse: true, timeout: 5_000 });
+    await openSection("Raccourcis");
+  });
+
+  it("les raccourcis sont listés par usage, les fixes signalés (1.6-f bis)", async () => {
+    await browser.$(".shortcuts").waitForDisplayed({ timeoutMsg: "section Raccourcis attendue" });
+    const text = await browser.execute(
+      () => document.querySelector(".shortcuts")?.textContent.replace(/\s+/g, " ") ?? "",
+    );
+    expect(text).toContain("Requête et réponse");
+    expect(text).toContain("Ctrl+Entrée");
+    expect(text).toContain("fixe");
+    await screenshot(browser, "v1-raccourcis");
+    await browser.keys("Escape");
+    await browser.$("dialog[open]").waitForExist({ reverse: true, timeout: 5_000 });
+  });
+});
+
+describe("Version 2 - Recherche Ctrl+K (1.5-a, 1.5-b)", () => {
+  it("Ctrl+K trouve une requête par nom, Entrée l'ouvre", async () => {
+    await browser.execute(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }));
+    });
+    await browser.$(".palette__input").waitForDisplayed({ timeoutMsg: "palette attendue" });
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(".palette__input");
+      if (!input) throw new Error("champ de recherche introuvable");
+      input.value = "lister les comm";
+      input.dispatchEvent(new Event("input"));
+    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll(".palette__label")).some((l) =>
+            l.textContent.includes("Lister les commandes"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "« Lister les commandes » attendu dans les résultats" },
+    );
+    await screenshot(browser, "v2-recherche");
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(".palette__input");
+      input?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    await browser.$(".palette").waitForExist({ reverse: true, timeout: 5_000 });
+    const opened = () =>
+      browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab")).some((t) =>
+          t.textContent.includes("Lister les commandes"),
+        ),
+      );
+    await browser.waitUntil(opened, {
+      timeout: 10_000,
+      timeoutMsg: "onglet « Lister les commandes » attendu",
+    });
+    expect(await opened()).toBe(true);
+    expect(await browser.$(".palette").isExisting()).toBe(false);
+  });
+});
+
+describe("Version 2 - Étiquettes partagées (4.9-b)", () => {
+  const folder = () => path.join(sandbox.home, "arnod", "boutique-tests", "Etiquettes V2");
+
+  beforeAll(() => {
+    // Un dossier ordinaire (un sous-dossier, deux requêtes), écrit hors d'Arnod : le lot I le
+    // fait paraître dans l'arborescence.
+    mkdirSync(path.join(folder(), "archives"), { recursive: true });
+    writeFileSync(
+      path.join(folder(), "smoke.yml"),
+      "info:\n  name: Requête smoke\n  type: http\n  tags:\n    - smoke\nhttp:\n  method: GET\n  url: http://127.0.0.1:1/smoke\n",
+    );
+    writeFileSync(
+      path.join(folder(), "autre.yml"),
+      "info:\n  name: Autre requête\n  type: http\nhttp:\n  method: GET\n  url: http://127.0.0.1:1/autre\n",
+    );
+  });
+
+  it("une étiquette de dossier vaut pour ses requêtes ; le filtre estompe les autres", async () => {
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document.querySelector('aside [role="treeitem"][data-path="Etiquettes V2"]') !== null,
+        ),
+      { timeout: 15_000, timeoutMsg: "dossier « Etiquettes V2 » attendu dans l'arborescence" },
+    );
+    await clickHidden('aside [role="treeitem"][data-path="Etiquettes V2"]');
+    await browser.$(".folder__tags").waitForExist({ timeout: 10_000 });
+    await clickHidden(".folder__tags .tag__add");
+    await browser.$(".folder__tags .tag__input").setValue("régression");
+    await browser.keys("Enter");
+    await browser.waitUntil(
+      () => readFileSync(path.join(folder(), "folder.yml"), "utf8").includes("régression"),
+      { timeout: 10_000, timeoutMsg: "étiquette écrite dans folder.yml attendue" },
+    );
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll(".folder__row-tag")).some((t) =>
+            t.textContent.includes("régression"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "étiquette du dossier sur les lignes attendue" },
+    );
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".folder__filter-add");
+      if (!select) throw new Error("filtre d'étiquettes introuvable");
+      select.value = "smoke";
+      select.dispatchEvent(new Event("change"));
+    });
+    await browser.$(".folder__filter-summary").waitForExist({ timeout: 5_000 });
+    expect(await browser.$(".folder__filter-summary").getText()).toContain("1 test sur 2");
+    await screenshot(browser, "v2-etiquettes-dossier");
+    await clickHidden('button[aria-label="Fermer Etiquettes V2"]');
+  });
+});
+
+describe("Version 2 - Copier la commande (5.3-c)", () => {
+  it("le menu ⋯ d'un dossier copie arnod run avec l'environnement actif", async () => {
+    // « Etiquettes V2 » (écrit par le parcours précédent) : un dossier ordinaire du projet.
+    await browser.execute(() => {
+      const row = Array.from(document.querySelectorAll('aside li[role="presentation"]')).find(
+        (li) => li.querySelector(".row__name")?.textContent.trim() === "Etiquettes V2",
+      );
+      const more = row?.querySelector<HTMLElement>(".row__more");
+      if (!more) throw new Error("ligne « Etiquettes V2 » introuvable");
+      more.click();
+    });
+    await browser.$('[role="menuitem"]=Copier la commande').waitForExist({ timeout: 5_000 });
+    await screenshot(browser, "v2-copier-commande-menu");
+    await clickText('[role="menuitem"]', "Copier la commande");
+    const toast = browser.$(".toast__message");
+    await toast.waitForExist({ timeout: 10_000 });
+    // Presse-papiers accepté ou refusé par la WebView : la commande est donnée dans les deux cas.
+    const message = await toast.getText();
+    expect(
+      message.startsWith("✓ Commande copiée · elle utilise l'environnement") ||
+        message.includes('arnod run "Etiquettes V2" --env'),
+    ).toBe(true);
+    await screenshot(browser, "v2-copier-commande");
+  });
+});
+
+describe("Version 2 - Synchronisation (7.1-a, 7.1-b, 7.1-c, 7.1-d)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const bare = () => path.join(sandbox.home, "depots", "boutique-tests.git");
+  const smoke = "Etiquettes V2/smoke.yml";
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=Marc",
+        "-c",
+        "user.email=marc@exemple.fr",
+        "-c",
+        "init.defaultBranch=main",
+        ...args,
+      ],
+      { cwd, stdio: "pipe" },
+    ).toString();
+
+  /** Un collègue : un clone du dépôt où il change l'adresse de la requête smoke, puis envoie. */
+  function colleague(url: string): void {
+    const dir = path.join(sandbox.home, "collegue");
+    rmSync(dir, { recursive: true, force: true });
+    git(sandbox.home, "clone", "-q", "-b", "main", bare(), dir);
+    const file = path.join(dir, smoke);
+    writeFileSync(file, readFileSync(file, "utf8").replace(/url: .*\/smoke[^\n]*/, `url: ${url}`));
+    git(dir, "commit", "-q", "-am", "Adresse de la requête smoke");
+    git(dir, "push", "-q", "origin", "main");
+  }
+
+  async function statusIs(text: string): Promise<void> {
+    await browser.waitUntil(
+      async () => (await browser.$(".statusbar [role='status']").getText()) === text,
+      { timeout: 20_000, timeoutMsg: `barre d'état « ${text} » attendue` },
+    );
+  }
+
+  /** Ouvre le panneau et attend que la vérification voie `count` éléments à récupérer. */
+  async function openPanel(count: number): Promise<void> {
+    await clickHidden(".statusbar__sync");
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          (n) =>
+            document.querySelector("dialog[open] #sync-incoming")?.textContent.trim() ===
+            `À récupérer · ${String(n)}`,
+          count,
+        ),
+      { timeout: 20_000, timeoutMsg: `${String(count)} élément(s) à récupérer attendu(s)` },
+    );
+  }
+
+  beforeAll(() => {
+    mkdirSync(path.dirname(bare()), { recursive: true });
+    git(sandbox.home, "init", "-q", "--bare", "-b", "main", bare());
+  });
+
+  it("relie le projet à un dépôt, récupère la modification d'un collègue, règle un conflit", async () => {
+    await statusIs("Pas encore partagé");
+    await clickHidden(".statusbar__sync");
+    await browser.$("dialog[open] .link__forges").waitForDisplayed({ timeout: 10_000 });
+    await clickText("dialog[open] [role='radio']", "Autre URL Git");
+    await browser.execute((url) => {
+      const input = document.querySelector<HTMLInputElement>(
+        'dialog[open] input[aria-label="Adresse du dépôt"]',
+      );
+      if (!input) throw new Error("adresse du dépôt introuvable");
+      input.value = url;
+      input.dispatchEvent(new Event("input"));
+    }, bare());
+    await screenshot(browser, "v2-relier");
+    await clickText("dialog[open] button", "Relier et envoyer");
+    await statusIs("À jour avec l'équipe");
+    expect(git(bare(), "log", "--format=%s", "main")).toContain("Partage du projet");
+
+    // 7.1-b : la modification d'un collègue arrive, décrite en clair.
+    colleague("http://127.0.0.1:1/smoke-v2");
+    await openPanel(1);
+    const panel = await browser.$("dialog[open]").getText();
+    expect(panel).toContain("Requête smoke");
+    expect(panel).toContain("adresse modifiée");
+    expect(panel).toContain("Marc");
+    // Ce que seul le collègue a changé n'est pas « à envoyer ».
+    expect(panel).toContain("Mes modifications · 0");
+    await screenshot(browser, "v2-synchroniser");
+    await clickText("dialog[open] button", "Récupérer");
+    await statusIs("À jour avec l'équipe");
+    expect(readFileSync(path.join(project(), smoke), "utf8")).toContain("smoke-v2");
+    await clickHidden("dialog[open] .dialog__close");
+    // 7.1-d : la pastille du collègue dans la barre latérale.
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll("aside .row__author")).some((a) =>
+            a.textContent.includes("Marc"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "pastille de Marc attendue" },
+    );
+    await screenshot(browser, "v2-pastille");
+
+    // 7.1-c : la même adresse changée des deux côtés.
+    const file = path.join(project(), smoke);
+    writeFileSync(file, readFileSync(file, "utf8").replace("smoke-v2", "smoke-local"));
+    colleague("http://127.0.0.1:1/smoke-marc");
+    await openPanel(1);
+    await clickText("dialog[open] button", "Récupérer");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          document.querySelector("dialog[open] .dialog__title")?.textContent.includes("conflit"),
+        ),
+      { timeout: 20_000, timeoutMsg: "conflit attendu" },
+    );
+    // Rien n'est écrit avant de valider (R13).
+    expect(readFileSync(file, "utf8")).toContain("smoke-local");
+    expect(await browser.$("dialog[open]").getText()).toContain("Adresse");
+    await screenshot(browser, "v2-conflit");
+    await browser.execute(() => {
+      const radios = document.querySelectorAll<HTMLInputElement>(
+        'dialog[open] input[type="radio"]',
+      );
+      radios[1]?.click();
+    });
+    await clickText("dialog[open] button", "Valider la résolution");
+    await browser.waitUntil(() => readFileSync(file, "utf8").includes("smoke-marc"), {
+      timeout: 20_000,
+      timeoutMsg: "version de Marc écrite attendue",
+    });
+    await statusIs("À jour avec l'équipe");
+  });
+});
+
 describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
   const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
   const file = () => path.join(project(), "chrono-k.yml");
@@ -3019,6 +3480,31 @@ describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
     expect(labels).toContain("Attente du serveur");
     expect(labels).toContain("Réception");
     await screenshot(browser, "34-chronologie");
+  });
+
+  it("chaque envoi rejoint l'historique de la requête, comparé au précédent (5.1-c bis)", async () => {
+    await clickText(".request-tab button", "Envoyer");
+    // Pendant l'envoi, les onglets de la réponse laissent la place à « Envoi en cours… ».
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll('[role="tab"]')).some(
+            (t) => t.textContent.replace(/\s+/g, " ").trim() === "Historique 2",
+          ),
+        ),
+      { timeout: 15_000, timeoutMsg: "onglet « Historique 2 » attendu" },
+    );
+    await clickText('[role="tab"]', "Historique");
+    await browser.waitUntil(
+      () => browser.execute(() => document.querySelectorAll(".history__row").length >= 2),
+      { timeout: 15_000, timeoutMsg: "deux envois attendus dans l'historique" },
+    );
+    const compare = await browser.execute(
+      () => document.querySelector(".history__compare")?.textContent ?? "",
+    );
+    expect(compare).toContain("Comparé à");
+    await screenshot(browser, "v1-historique");
+    await clickText('[role="tab"]', "Corps");
   });
 
   it("un jeton saisi en clair est proposé en variable locale, rien n'est écrit avant (4.2-c)", async () => {
@@ -3190,6 +3676,309 @@ describe("Plan qualité, lot A - Corps choisi dans l'éditeur (IN1)", () => {
     });
     expect(received[0]?.type).toContain("application/json");
     expect(received[0]?.body).toBe('{"sku": "TSH-BLU-M"}');
+  });
+});
+
+describe("Version 4 - Tests en schéma, données, Avant / Après et templates", () => {
+  let server: Server;
+  let url = "";
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const rootFile = () => readFileSync(path.join(project(), "opencollection.yml"), "utf8");
+
+  beforeAll(async () => {
+    const names: Record<string, string> = { FR: "France", DE: "Allemagne", IT: "Italia" };
+    server = createServer((request, response) => {
+      const json = (status: number, body: unknown): void => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
+      const pays = /^\/pays\/([A-Z]{2})$/.exec(request.url ?? "");
+      if (request.method === "POST" && request.url === "/commandes") {
+        json(201, { id: "cmd_1" });
+      } else if (request.method === "GET" && request.url === "/commandes/cmd_1") {
+        json(200, { id: "cmd_1", statut: "payée" });
+      } else if (request.method === "GET" && pays?.[1] && names[pays[1]]) {
+        json(200, { code: pays[1], nom: names[pays[1]] });
+      } else json(404, { message: "absent" });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+
+    // Fichiers écrits hors d'Arnod, comme par Git : un test de deux étapes, une requête seule jouée
+    // par cas d'un jeu de données (CSV de données/), un dossier qui range un test.
+    const write = (file: string, text: string): void => {
+      mkdirSync(path.dirname(path.join(project(), file)), { recursive: true });
+      writeFileSync(path.join(project(), file), text);
+    };
+    write(
+      "Parcours V4/creer.yml",
+      `info:\n  name: Créer la commande\n  type: http\n  seq: 1\nhttp:\n  method: POST\n  url: ${url}/commandes\nruntime:\n  assertions:\n    - expression: res.status\n      operator: eq\n      value: "201"\n  actions:\n    - type: set-variable\n      phase: after-response\n      selector:\n        expression: res.body.id\n        method: jsonq\n      variable:\n        name: cmd.id\n        scope: runtime\n`,
+    );
+    write(
+      "Parcours V4/lire.yml",
+      `info:\n  name: Lire la commande\n  type: http\n  seq: 2\nhttp:\n  method: GET\n  url: ${url}/commandes/{{cmd.id}}\nruntime:\n  assertions:\n    - expression: res.body.statut\n      operator: eq\n      value: payée\n`,
+    );
+    write(
+      "lire-un-pays.yml",
+      `info:\n  name: Lire un pays\n  type: http\n  seq: 1\n  tags:\n    - "data:données/pays.csv"\nhttp:\n  method: GET\n  url: ${url}/pays/{{code}}\nruntime:\n  assertions:\n    - expression: res.body.nom\n      operator: eq\n      value: "{{attendu}}"\n`,
+    );
+    write("données/pays.csv", "code,attendu\nFR,France\nDE,Allemagne\nIT,Italie\n");
+    write(
+      "Suite V4/Achat/payer.yml",
+      `info:\n  name: Payer\n  type: http\n  seq: 1\nhttp:\n  method: GET\n  url: ${url}/pays/{{pays}}\nruntime:\n  assertions:\n    - expression: res.status\n      operator: eq\n      value: "200"\n`,
+    );
+  });
+
+  afterAll(async () => {
+    await closeServer(server);
+  });
+
+  /** Étapes de l'onglet du test : numéro, nom et dernier résultat. */
+  function steps() {
+    return browser.execute(() =>
+      Array.from(document.querySelectorAll(".test .step")).map((step) => ({
+        name: step.querySelector(".step__name")?.textContent.trim() ?? "",
+        mark: step.querySelector(".step__mark")?.textContent.trim() ?? "",
+      })),
+    );
+  }
+
+  /** Change la valeur d'un champ et émet l'événement que le composant écoute. */
+  async function fill(selector: string, value: string, event = "input"): Promise<void> {
+    await browser.execute(
+      (css, text, type) => {
+        const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(css);
+        if (!field) throw new Error(`champ « ${css} » introuvable`);
+        field.value = text;
+        field.dispatchEvent(new Event(type, { bubbles: true }));
+      },
+      selector,
+      value,
+      event,
+    );
+  }
+
+  /** Choisit une nature dans le sélecteur d'étape ouvert (choix à la pression du bouton). */
+  async function pick(label: string): Promise<void> {
+    await browser.$(".picker").waitForExist({ timeout: 5_000 });
+    await browser.execute((text) => {
+      const option = Array.from(document.querySelectorAll(".picker__option")).find(
+        (o) => o.querySelector(".picker__kind")?.textContent.trim() === text,
+      );
+      if (!option) throw new Error(`nature « ${text} » absente du sélecteur`);
+      option.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    }, label);
+  }
+
+  async function openFolder(name: string): Promise<void> {
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          (n) => document.querySelector(`aside [role="treeitem"][data-path="${n}"]`) !== null,
+          name,
+        ),
+      { timeout: 15_000, timeoutMsg: `dossier « ${name} » attendu dans l'arborescence` },
+    );
+    await clickHidden(`aside [role="treeitem"][data-path="${name}"]`);
+  }
+
+  it("une étape Script s'ajoute au test et lit vars, response et assert() (4.3-a, 4.3-c, 4.3-g)", async () => {
+    await restart();
+    const expand = browser.$('aside button[aria-label="Déplier boutique-tests"]');
+    if (await expand.isExisting()) await expand.click();
+    await openFolder("Parcours V4");
+    await browser.$(".test").waitForDisplayed({ timeout: 10_000 });
+    await browser.waitUntil(async () => (await steps()).length === 2, {
+      timeoutMsg: "deux étapes attendues",
+    });
+
+    await clickText(".test__quick .test__link", "+ Script");
+    await browser.$(".panel__code").waitForExist({ timeout: 10_000 });
+    await fill(
+      ".panel__code",
+      'assert(response.body.statut === "payée", "commande payée");\nvars.set("verifiee", vars["cmd.id"]);\n',
+    );
+    await browser.waitUntil(() => rootFile().includes("verifiee"), {
+      timeout: 10_000,
+      timeoutMsg: "schéma du test écrit dans opencollection.yml attendu",
+    });
+    expect((await steps()).map((s) => s.name)).toEqual([
+      "Créer la commande",
+      "Lire la commande",
+      "Nouveau script",
+    ]);
+    await screenshot(browser, "v4-etape-script");
+
+    await clickText(".test button", "Exécuter le test");
+    const progress = browser.$(".run__progress");
+    await browser.waitUntil(async () => (await progress.getText()).startsWith("Test réussi"), {
+      timeout: 15_000,
+      timeoutMsg: "test réussi attendu",
+    });
+    await clickText(".zone__tab-button", "Parcours V4");
+    await browser.waitUntil(async () => (await steps()).every((s) => s.mark.startsWith("✓")), {
+      timeout: 10_000,
+      timeoutMsg: "résultats des étapes attendus",
+    });
+    await screenshot(browser, "v4-test-liste");
+
+    await clickText(".test .step__name", "Lire la commande");
+    await browser.waitUntil(async () => (await browser.$(".panel").getText()).includes("cmd.id"), {
+      timeoutMsg: "entrée cmd.id de l'étape choisie attendue",
+    });
+    await screenshot(browser, "v4-etape-choisie");
+  });
+
+  it("le schéma montre le chemin suivi ; « + » sur un lien insère une étape, annulable (4.3-b, 4.3-d, 4.3-b bis, 4.3-b quater)", async () => {
+    await clickText(".test__mode", "Schéma");
+    await browser.$(".diagram").waitForDisplayed({ timeout: 10_000 });
+    expect(await browser.$$(".node").length).toBe(3);
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll(".node__mark")).every((m) =>
+            m.textContent.includes("✓"),
+          ),
+        ),
+      { timeoutMsg: "nœuds réussis attendus" },
+    );
+    await screenshot(browser, "v4-test-schema");
+
+    await clickHidden('.edge__plus[aria-label*="« Créer la commande » et « Lire la commande »"]');
+    await screenshot(browser, "v4-inserer");
+    await pick("Condition");
+    await browser.waitUntil(async () => (await browser.$$(".node").length) === 4, {
+      timeoutMsg: "étape insérée attendue",
+    });
+    await browser.$(".panel__new").waitForExist({ timeout: 5_000 });
+    await screenshot(browser, "v4-insere");
+    await clickText(".panel button", "Annuler l'insertion");
+    await browser.waitUntil(async () => (await browser.$$(".node").length) === 3, {
+      timeoutMsg: "insertion annulée attendue",
+    });
+    await clickText(".test__mode", "Liste");
+  });
+
+  it("un jeu de données joue la requête une fois par cas, avec le résultat de chaque cas (4.7-a, 4.7-b)", async () => {
+    await openTreeRequest("Lire un pays");
+    await clickText(".request-tab .editor__tab", "Données");
+    await browser.$(".data__table").waitForExist({ timeout: 10_000 });
+    expect(await browser.$$(".data__table tbody tr").length).toBe(3);
+    // Les colonnes du tableau sont les variables de la requête : aucune n'est inconnue.
+    await browser.pause(500);
+    expect(
+      await browser.execute(() =>
+        (document.querySelector(".request-tab")?.textContent ?? "").includes("est inconnue"),
+      ),
+    ).toBe(false);
+    await screenshot(browser, "v4-donnees");
+
+    await clickText(".request-tab .editor__line button", "Envoyer");
+    await browser.$(".cases").waitForExist({ timeout: 15_000 });
+    await browser.waitUntil(
+      async () => (await browser.$(".cases__head").getText()).includes("1 ✕"),
+      { timeout: 15_000, timeoutMsg: "un cas en échec attendu" },
+    );
+    expect(await browser.$(".cases__ok").getText()).toBe("2 ✓");
+    await screenshot(browser, "v4-cas");
+  });
+
+  it("les propriétés d'un dossier valent pour ses tests (4.8-a)", async () => {
+    await openFolder("Suite V4");
+    await browser.$(".folder").waitForDisplayed({ timeout: 10_000 });
+    await clickText(".folder__view", "Propriétés");
+    await clickText(".props button", "+ Propriété");
+    await fill('.props input[aria-label="Nom de la propriété"]', "pays");
+    await fill('.props input[aria-label="Valeur de la propriété"]', "FR");
+    await clickText(".props button", "Ajouter");
+    await browser.waitUntil(
+      () => readFileSync(path.join(project(), "Suite V4", "folder.yml"), "utf8").includes("pays"),
+      { timeout: 10_000, timeoutMsg: "propriété écrite dans folder.yml attendue" },
+    );
+    // Écrite dans request.variables du folder.yml, et montrée « défini ici ».
+    expect(readFileSync(path.join(project(), "Suite V4", "folder.yml"), "utf8")).toMatch(
+      /variables:[\s\S]*name: pays[\s\S]*value: FR/,
+    );
+    expect(await browser.$(".props").getText()).toContain("défini ici");
+    await screenshot(browser, "v4-proprietes");
+  });
+
+  it("« Avant le dossier » se joue une fois avant ses tests (4.7-c)", async () => {
+    await clickText(".folder__view", "Contenu");
+    await clickText(".folder button", "+ Avant / Après");
+    // Deux blocs : les phases d'avant en tête de la vue, celles d'après à la fin.
+    await browser.waitUntil(
+      () => browser.execute(() => document.querySelectorAll(".hooks__phase").length === 4),
+      { timeout: 5_000, timeoutMsg: "quatre phases d'Avant / Après attendues" },
+    );
+    await clickText(".hooks__phase:first-child button", "+ Étape");
+    await pick("Variable");
+    await browser.waitUntil(() => rootFile().includes("beforeAll"), {
+      timeout: 10_000,
+      timeoutMsg: "Avant du dossier écrit dans opencollection.yml attendu",
+    });
+    await clickText(".hooks__name", "Nouvelle variable");
+    await fill('.hooks__edit input[aria-label="Variable"]', "jeton", "change");
+    await browser.waitUntil(() => rootFile().includes("jeton"), {
+      timeout: 10_000,
+      timeoutMsg: "variable de l'Avant enregistrée attendue",
+    });
+    await fill('.hooks__edit input[aria-label="Valeur"]', "abc", "change");
+    await browser.waitUntil(() => rootFile().includes("abc"), {
+      timeout: 10_000,
+      timeoutMsg: "valeur de l'Avant enregistrée attendue",
+    });
+
+    await clickText(".folder button", "Exécuter le dossier");
+    await browser.waitUntil(
+      async () => (await browser.$(".run__progress").getText()).includes("réussi"),
+      { timeout: 15_000, timeoutMsg: "run du dossier réussi attendu" },
+    );
+    await openFolder("Suite V4");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          (document.querySelector(".hooks__result")?.textContent ?? "").includes("Réussi"),
+        ),
+      { timeout: 15_000, timeoutMsg: "Avant du dossier réussi attendu" },
+    );
+    expect(
+      await browser.execute(
+        () => document.querySelector(".hooks__content")?.textContent.trim() ?? "",
+      ),
+    ).toBe("jeton = abc");
+    await screenshot(browser, "v4-avant-apres");
+  });
+
+  it("« Plus » range les sections masquées ; un template se crée depuis un dossier (1.2-d bis, 4.8-b, 4.8-c, 4.8-d)", async () => {
+    await clickHidden('aside button[aria-label^="Plus de sections pour boutique-tests"]');
+    await browser.$(".more__list").waitForExist({ timeout: 5_000 });
+    expect(await browser.$(".more__list").getText()).toContain("Templates");
+    await screenshot(browser, "v4-plus");
+    await clickHidden('aside button[aria-label^="Plus de sections pour boutique-tests"]');
+
+    await clickText(".folder button", "Créer un template de ce dossier");
+    await browser.$(".tpl").waitForDisplayed({ timeout: 10_000 });
+    await browser.waitUntil(async () => (await browser.$(".tpl").getText()).includes("pays"), {
+      timeoutMsg: "paramètre « pays » détecté attendu",
+    });
+    await screenshot(browser, "v4-creer-template");
+    await clickText(".tpl button", "Créer");
+    await browser.$(".template").waitForDisplayed({ timeout: 10_000 });
+    await browser.waitUntil(() => existsSync(path.join(project(), "templates", "Suite V4")), {
+      timeoutMsg: "template rangé sous templates/ attendu",
+    });
+    expect(await browser.$("aside .templates").isExisting()).toBe(true);
+    await screenshot(browser, "v4-template");
+
+    await openFolder("Suite V4");
+    await browser.waitUntil(
+      async () =>
+        (await browser.$$(".instance").length) > 0 &&
+        (await browser.$(".instance").getText()).includes("pays"),
+      { timeout: 10_000, timeoutMsg: "utilisation du template attendue" },
+    );
+    await screenshot(browser, "v4-utilisation");
   });
 });
 

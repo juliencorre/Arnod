@@ -53,12 +53,15 @@ jobs:
       # `cargo test` tournent dans les jobs de build.
       - name: Design system à jour
         run: node scripts/design-system.mjs --check
+      # Règles de design écrites (lot I) : moteur de la skill Impeccable, vérifié par empreinte.
+      - name: Détecteur Impeccable
+        run: node scripts/impeccable-detect.mjs
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - name: cargo fmt
         working-directory: src-tauri
-        run: cargo fmt --check
+        run: cargo fmt --all --check
       # Audits des dépendances : vulnérabilités connues des paquets livrés (npm) et des crates.
       - name: npm audit
         run: npm audit --omit=dev --audit-level=high
@@ -129,6 +132,29 @@ jobs:
         working-directory: src-tauri
         run: cargo test --locked
 
+      # V2, lot D (Q3, R16) : la ligne de commande `arnod`. Sous Windows, livrée dans
+      # l'installeur (`bin\arnod.exe`, dossier ajouté au PATH de l'utilisateur, voir
+      # tauri.cli.conf.json) ; sous Linux, liée statiquement (musl) et jointe à la release.
+      - name: Ligne de commande (Windows)
+        if: runner.os == 'Windows'
+        working-directory: src-tauri
+        run: cargo build -p arnod-cli --release --locked
+
+      - name: Ligne de commande (Linux, liée statiquement)
+        if: runner.os == 'Linux'
+        working-directory: src-tauri
+        run: |
+          sudo apt-get install -y --no-install-recommends musl-tools
+          rustup target add x86_64-unknown-linux-musl
+          cargo build -p arnod-cli --release --locked --target x86_64-unknown-linux-musl
+          cli=target/x86_64-unknown-linux-musl/release/arnod-cli
+          # Aucune bibliothèque du système (R16), et elle démarre sans environnement.
+          file "$cli" | grep -q "static"
+          env -i "$cli" --version
+          mkdir -p ../dist-cli/arnod
+          cp "$cli" ../dist-cli/arnod/arnod
+          tar -C ../dist-cli/arnod -czf ../dist-cli/arnod-linux-x86_64.tar.gz arnod
+
       # Lot L (docs/plan-mvp-l-mises-a-jour.md) : avec la clé privée, chaque paquet reçoit sa
       # signature (.sig) pour la mise à jour par Arnod. Obligatoire pour un tag : une release non
       # signée ne s'installerait pas depuis Arnod. La clé n'est passée qu'aux tags (MA4,
@@ -140,13 +166,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
         run: |
+          config=()
+          if [ "$RUNNER_OS" = "Windows" ]; then config+=(--config src-tauri/tauri.cli.conf.json); fi
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            npm run tauri build -- --config src-tauri/tauri.updater.conf.json
+            npm run tauri build -- --config src-tauri/tauri.updater.conf.json "${config[@]}"
           elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY absent : une release doit être signée (README, « Publier une version »)."
             exit 1
           else
-            npm run tauri build
+            npm run tauri build -- "${config[@]}"
           fi
 
       - name: Signature du paquet
@@ -164,6 +192,13 @@ jobs:
           path: |
             ${{ matrix.path }}
             ${{ matrix.path }}.sig
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: arnod-linux-cli
+          path: dist-cli/arnod-linux-x86_64.tar.gz
           if-no-files-found: error
 
       - name: Test de fumée (AppImage sous Xvfb)

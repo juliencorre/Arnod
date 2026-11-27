@@ -8,6 +8,7 @@ use tauri::{Emitter, Manager, State, WebviewWindow};
 use uuid::Uuid;
 
 use crate::error::{CommandError, CommandErrorKind};
+use crate::history;
 use crate::request::assertions::{self, ResponseData};
 use crate::request::model::{Assertion, Example, Request};
 use crate::request::{example, file, inherit};
@@ -89,6 +90,13 @@ pub async fn request_send(
         .as_deref()
         .map(|path| inherit::resolve(&ctx.root, path))
         .unwrap_or_default();
+    // Scripts gardés dans le fichier, exécutés à l'envoi (`docs/plan-v4.md`, R10).
+    request.scripts = path
+        .as_deref()
+        .and_then(|path| crate::tree::resolve(&ctx.root, path).ok())
+        .and_then(|full| crate::request::file::read(&full).ok())
+        .map(|saved| saved.scripts)
+        .unwrap_or_default();
     bench.precheck(&ctx, &environment, &request, confirmed)?;
     if let Some(path) = path.as_deref() {
         let started = results.lock().map(|mut book| book.start(project, path));
@@ -100,6 +108,16 @@ pub async fn request_send(
         .send(&ctx, exec_id, &environment, request, confirmed)
         .await;
     if let Some(path) = path.as_deref() {
+        // 5.1-c bis : chaque réponse reçue rejoint l'historique de la requête, sur le poste
+        // (H1), avant la diffusion du résultat qui le fait relire.
+        if let Ok(outcome) = &sent {
+            let _ = history::record(
+                &ctx.data_dir,
+                project,
+                path,
+                history::entry_of(outcome, now_ms()),
+            );
+        }
         let finished = results.lock().map(|mut book| {
             let result = book.finish(project, path, &sent, now_ms());
             if sent.is_ok() {

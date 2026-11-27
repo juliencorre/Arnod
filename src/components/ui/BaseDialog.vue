@@ -3,15 +3,17 @@
  * Fenêtre modale sur l'élément `<dialog>` natif : focus piégé, fermeture par
  * Échap ou clic sur le fond. Le parent garde la main sur `open` : Échap et le
  * clic sur le fond émettent `close` sans fermer d'eux-mêmes. `wide` : une fenêtre
- * plus large, pour un contenu en deux colonnes (liste et formulaire).
+ * plus large, pour un contenu en deux colonnes (liste et formulaire). `closable` : un bouton
+ * ✕ « Fermer » dans l'en-tête, pour une fenêtre sans bouton de fin (préférences, ER4).
  */
-import { onMounted, useId, useTemplateRef, watch } from "vue";
+import { onBeforeUnmount, onMounted, useId, useTemplateRef, watch } from "vue";
 
 const props = defineProps<{
   open: boolean;
   title: string;
   description?: string;
   wide?: boolean;
+  closable?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -19,16 +21,43 @@ const dialog = useTemplateRef<HTMLDialogElement>("dialog");
 const titleId = useId();
 const descriptionId = useId();
 
+/** Élément qui avait le focus à l'ouverture : il le retrouve à la fermeture (AC2). */
+let returnFocus: HTMLElement | null = null;
+
+/**
+ * Rend le focus au déclencheur s'il est encore là et que le focus est resté dans la fenêtre ou
+ * retombé sur `body` : un parent qui retire la fenêtre (`v-if`) ne le laisse pas perdu.
+ */
+function restoreFocus(): void {
+  const target = returnFocus;
+  returnFocus = null;
+  if (!target?.isConnected) return;
+  const active = document.activeElement;
+  if (active === null || active === document.body || dialog.value?.contains(active) === true) {
+    target.focus();
+  }
+}
+
 function sync(open: boolean): void {
   const element = dialog.value;
   if (!element) return;
-  if (open && !element.open) element.showModal();
-  if (!open && element.open) element.close();
+  if (open && !element.open) {
+    returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    element.showModal();
+  }
+  if (!open && element.open) {
+    element.close();
+    restoreFocus();
+  }
 }
 
 watch(() => props.open, sync);
 onMounted(() => {
   sync(props.open);
+});
+onBeforeUnmount(() => {
+  if (dialog.value?.open === true) dialog.value.close();
+  restoreFocus();
 });
 
 function onClick(event: MouseEvent): void {
@@ -48,7 +77,13 @@ function onClick(event: MouseEvent): void {
     @click="onClick"
   >
     <div class="dialog__panel">
-      <h2 :id="titleId" class="dialog__title">{{ title }}</h2>
+      <div v-if="closable" class="dialog__head">
+        <h2 :id="titleId" class="dialog__title">{{ title }}</h2>
+        <button type="button" class="dialog__close" aria-label="Fermer" @click="emit('close')">
+          ✕
+        </button>
+      </div>
+      <h2 v-else :id="titleId" class="dialog__title">{{ title }}</h2>
       <p v-if="description" :id="descriptionId" class="dialog__description">
         {{ description }}
       </p>
@@ -104,6 +139,38 @@ function onClick(event: MouseEvent): void {
   margin: 0;
   font-size: var(--text-title);
   font-weight: 600;
+}
+
+.dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* ✕ sans bord, cible de 24 × 24 px au moins (consignes de la maquette de référence). */
+.dialog__close {
+  display: grid;
+  place-items: center;
+  min-width: var(--control-sm);
+  min-height: var(--control-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.dialog__close:hover {
+  color: var(--color-text);
+  background: var(--color-chip);
+}
+
+.dialog__close:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .dialog__description {

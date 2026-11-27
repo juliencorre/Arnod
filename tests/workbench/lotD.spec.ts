@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { Example } from "@/types/ipc";
 
+import { cssValue } from "../css";
 import type { FakeCore } from "../fakeCore";
 import { PETSTORE_OPERATIONS, PETSTORE_SOURCE } from "../fakeContracts";
 import { newRequest } from "../fakeWorkbench";
@@ -68,7 +69,12 @@ describe("filtrer le référentiel (1.2-e, F1 à F5)", () => {
   it("filtre par nom et adresse, dossiers dépliés, compte affiché ; Échap efface", async () => {
     ({ app } = await openProject(commandes));
     // Un dossier replié reste replié dans l'état enregistré, mais se déplie pendant le filtre.
-    await click(wrapper(), '.tree [role="treeitem"]', "commandes");
+    // Le chevron plie ; un clic sur le nom ouvre la vue du dossier (AM37, Q4).
+    const folder = wrapper()
+      .findAll('.tree [role="treeitem"]')
+      .find((item) => item.text().includes("commandes"));
+    await folder?.get(".row__chevron").trigger("click");
+    await flushPromises();
     expect(treeNames()).not.toContain("Changer le statut");
 
     await filterInput().setValue("stat");
@@ -164,6 +170,16 @@ describe("projet créé (1.2-d) et menu « + » (1.2-a ter)", () => {
         .findAll("main .start__action")
         .map((b) => b.text()),
     ).toEqual(["Importer…", "+ Contrat", "+ Test", "+ Environnement"]);
+    // DE6 : quatre colonnes sans colonne vide ; « + Environnement » sur une ligne.
+    const welcome = "src/components/zones/ProjectWelcome.vue";
+    expect(cssValue(welcome, ".start__cards", "grid-template-columns")).toBe(
+      "repeat(auto-fit, minmax(11rem, 1fr))",
+    );
+    expect(cssValue(welcome, ".start__action", "white-space")).toBe("nowrap");
+    // AM2 (1.2-d) : les textes des cartes « Décrire un contrat » et « Écrire un test ».
+    const start = wrapper().get("main .start").text();
+    expect(start).toContain("Vous y écrirez vos premiers tests.");
+    expect(start).toContain("Directement dans le référentiel de tests, sans contrat.");
 
     // Au clavier : Entrée sur l'en-tête déplie la section et montre sa ligne d'ajout.
     await toggles[1]?.trigger("click");
@@ -173,12 +189,15 @@ describe("projet créé (1.2-d) et menu « + » (1.2-a ter)", () => {
   it("les points de départ créent un contrat, un test, un environnement", async () => {
     const core = await emptyProject();
     await click(wrapper(), "main .start__action", "+ Contrat");
-    expect(wrapper().get("dialog[open] h2").text()).toBe("Nouveau contrat");
+    // AM7 (3.1-f) : « Nouveau contrat de service », « Créer le contrat ».
+    expect(wrapper().get("dialog[open] h2").text()).toBe("Nouveau contrat de service");
+    expect(wrapper().get('dialog[open] button[type="submit"]').text()).toBe("Créer le contrat");
     await click(wrapper(), "dialog[open] button", "Annuler");
 
     await click(wrapper(), "main .start__action", "+ Environnement");
-    expect(wrapper().get("dialog[open]").text()).toContain("Environnements");
-    await click(wrapper(), "dialog[open] button", "Fermer");
+    // AM34 (3.3-b) : la fenêtre de création ; l'environnement créé s'ouvre dans sa page (AM43).
+    expect(wrapper().get("dialog[open] h2").text()).toBe("Nouvel environnement");
+    await click(wrapper(), "dialog[open] button", "Annuler");
 
     await click(wrapper(), "main .start__action", "+ Test");
     expect(core.calls.find((c) => c.cmd === "tree_create_test")?.args).toMatchObject({
@@ -222,7 +241,7 @@ describe("réponses attendues dans l'arborescence (3.2-a3, E1 à E3)", () => {
 
   it("le nombre sur l'endpoint ; dépliée, les réponses par code (E1, E2)", async () => {
     await petstore();
-    const post = wrapper().get('[aria-label="Ouvrir POST /pets"]');
+    const post = wrapper().get('[aria-label="POST /pets"], [aria-label^="POST /pets,"]');
     expect(post.get(".crow__examples").text()).toBe("2");
     await click(wrapper(), '[aria-label="Déplier POST /pets"]');
     const rows = wrapper().findAll(".crow__example");
@@ -237,7 +256,7 @@ describe("réponses attendues dans l'arborescence (3.2-a3, E1 à E3)", () => {
   it("un clic ouvre l'endpoint sur la réponse choisie (E3)", async () => {
     const core = await petstore();
     await click(wrapper(), '[aria-label="Déplier POST /pets"]');
-    await click(wrapper(), '[aria-label="Ouvrir la réponse attendue 400 Erreur de validation"]');
+    await click(wrapper(), '[aria-label="400 Erreur de validation, réponse attendue"]');
     expect(core.calls.filter((c) => c.cmd === "layout_open_selection").at(-1)?.args).toEqual({
       content: { kind: "request", projectId: expect.any(String), path: "Petstore/creer.yml" },
     });

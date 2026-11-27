@@ -2,6 +2,8 @@ import { defineStore } from "pinia";
 import { computed, reactive, ref, watch, type ComputedRef } from "vue";
 
 import { events, ipc, IpcError } from "@/lib/ipc";
+import { targetOf } from "@/lib/url";
+import { useDatasetsStore } from "@/stores/datasets";
 import { contentKey, MAIN_WINDOW, useWindowsStore } from "@/stores/windows";
 import { useToastStore } from "@/stores/toasts";
 import type {
@@ -11,6 +13,7 @@ import type {
   DrawnValue,
   EnvironmentDoc,
   EnvironmentsView,
+  EnvironmentUsage,
   ProjectChange,
   RequestDoc,
   RequestResult,
@@ -24,6 +27,7 @@ import type {
   PathGeneralization,
   TransferredTrial,
   NetworkFailure,
+  NewEnvironment,
 } from "@/types/ipc";
 
 /** Attente après la dernière modification avant l'enregistrement automatique (EP1). */
@@ -149,6 +153,8 @@ export const useWorkbenchStore = defineStore("workbench", () => {
   const windows = useWindowsStore();
   const trees = ref<Record<string, TreeView>>({});
   const environments = ref<Record<string, EnvironmentsView>>({});
+  /** Environnement à montrer à la prochaine ouverture de la page des environnements (AM43). */
+  const environmentFocus = ref<{ projectId: string; name: string } | null>(null);
   const runs = ref<Record<string, RunView | null>>({});
   /** Dernière exécution de chaque requête, par projet (`docs/plan-fin-premier-usage.md`, R5). */
   const statuses = ref<Record<string, RequestStatuses>>({});
@@ -180,6 +186,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     })().finally(() => loading.delete(projectId));
     loading.set(projectId, load);
     return load;
+  }
+
+  /** Étiquettes d'un dossier (V2, lot B, ET1) : elles valent pour tout ce qu'il contient. */
+  async function setFolderTags(projectId: string, path: string, tags: string[]): Promise<void> {
+    await ipc.treeSetFolderTags(projectId, path, tags);
+    await refreshTree(projectId);
   }
 
   async function refreshTree(projectId: string): Promise<void> {
@@ -517,14 +529,37 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       await save(key).catch(() => undefined);
       editor.execId = crypto.randomUUID();
       const sending = canonical(editor.draft);
-      editor.outcome = await ipc.requestSend(
-        editor.projectId,
-        editor.execId,
-        environment,
-        editor.path,
-        editor.draft,
-        confirmed,
-      );
+      if (editor.draft.data) {
+        // V4 (4.7-b, R12) : une requête à jeu de données part une fois par cas ; la réponse
+        // montrée est celle du cas choisi.
+        const datasets = useDatasetsStore();
+        const cases = await ipc.requestSendCases(
+          editor.projectId,
+          editor.execId,
+          environment,
+          editor.path,
+          editor.draft,
+          confirmed,
+        );
+        datasets.setOutcome(key, cases);
+        const wanted = datasets.selected[key] ?? 1;
+        const shown = cases.cases.find((c) => c.number === wanted) ?? cases.cases[0];
+        if (shown && !shown.outcome) throw new Error(shown.error ?? "Cas non envoyé.");
+        editor.outcome = shown?.outcome ?? null;
+        statuses.value[editor.projectId] = {
+          ...(statuses.value[editor.projectId] ?? {}),
+          [editor.path]: { passed: cases.passed, at: Date.now() },
+        };
+      } else {
+        editor.outcome = await ipc.requestSend(
+          editor.projectId,
+          editor.execId,
+          environment,
+          editor.path,
+          editor.draft,
+          confirmed,
+        );
+      }
       editor.receivedAt = new Date();
       editor.sent = sending;
     } catch (caught) {
@@ -619,14 +654,23 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return windows.openSelection({ kind: "test", projectId, path }, preview);
   }
 
+  /** Ouvre la vue d'un dossier (4.1-a bis, AM37) : en aperçu d'un simple clic (Q4). */
+  function openFolder(projectId: string, path: string, preview = false): Promise<boolean> {
+    return windows.openSelection({ kind: "folder", projectId, path }, preview);
+  }
+
   /** Déplie un dossier replié de la barre latérale. */
   async function unfold(projectId: string, path: string): Promise<void> {
     if (trees.value[projectId]?.collapsed.includes(path)) await toggleFolder(projectId, path);
   }
 
   /** « Nouveau test » (NT1) : dossier et étape 1 créés, étape ouverte, curseur dans l'adresse. */
-  async function createTest(projectId: string, parent: string): Promise<string> {
-    const created = await ipc.treeCreateTest(projectId, parent);
+  async function createTest(
+    projectId: string,
+    parent: string,
+    name: string | null = null,
+  ): Promise<string> {
+    const created = await ipc.treeCreateTest(projectId, parent, name);
     await unfold(projectId, parent);
     await refreshTree(projectId);
     focusUrl.value = requestKey(projectId, created.step);
@@ -670,7 +714,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     for (let n = 2; draft.extractions.some((e) => e.name === name); n += 1) {
       name = `${base}${String(n)}`;
     }
-    draft.extractions.push({ name, source, enabled: true });
+    draft.extractions.push({ name, source, enabled: true, scope: "runtime" });
     return name;
   }
 
@@ -742,6 +786,18 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     await openRequest(projectId, copy);
   }
 
+  /** Réordonne le contenu du dossier `folder` dans l'ordre `order` (4.1-a ter, AM38). */
+  async function reorder(projectId: string, folder: string, order: string[]): Promise<void> {
+    await ipc.treeReorder(projectId, folder, order);
+    await refreshTree(projectId);
+  }
+
+  /** Duplique le dossier ou le test `path` à côté de lui (« (copie) », AM36). */
+  async function duplicateFolder(projectId: string, path: string): Promise<void> {
+    await ipc.treeBatch(projectId, [path], { kind: "duplicate" });
+    await refreshTree(projectId);
+  }
+
   async function move(projectId: string, path: string, targetFolder: string): Promise<void> {
     await saveUnder(projectId, path);
     const next = await ipc.treeMove(projectId, path, targetFolder);
@@ -749,8 +805,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     await refreshTree(projectId);
   }
 
-  async function remove(projectId: string, path: string, permanent: boolean): Promise<void> {
-    await ipc.treeDelete(projectId, path, permanent);
+  /**
+   * Met la requête, le dossier ou le test `path` à la corbeille, avec « Annuler » dans la
+   * notification (ER1) : le cœur le fait comme pour une sélection d'un élément (`tree_batch`).
+   */
+  async function remove(projectId: string, path: string, name: string): Promise<void> {
+    const done = await ipc.treeBatch(projectId, [path], { kind: "delete", permanent: false });
     for (const [key, editor] of Object.entries(editors)) {
       if (
         editor.projectId === projectId &&
@@ -760,6 +820,15 @@ export const useWorkbenchStore = defineStore("workbench", () => {
       }
     }
     await refreshTree(projectId);
+    useToastStore().show(`« ${name} » mis à la corbeille.`, {
+      action: {
+        label: "Annuler",
+        run: async () => {
+          await ipc.treeBatchUndo(done.undoToken);
+          await refreshTree(projectId);
+        },
+      },
+    });
   }
 
   /** Enregistre les requêtes modifiées sous `path` avant de le déplacer. */
@@ -788,12 +857,50 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     environments.value[projectId] = await ipc.environmentSave(projectId, env, previous);
   }
 
+  /** Crée un environnement (3.3-b, AM34) : le cœur reprend les variables et le range. */
+  async function createEnvironment(projectId: string, environment: NewEnvironment): Promise<void> {
+    environments.value[projectId] = await ipc.environmentCreate(projectId, environment);
+  }
+
+  /** Supprime l'environnement `name`, avec « Annuler » dans la notification (ER1). */
   async function deleteEnvironment(projectId: string, name: string): Promise<void> {
-    environments.value[projectId] = await ipc.environmentDelete(projectId, name);
+    const done = await ipc.environmentDelete(projectId, name);
+    environments.value[projectId] = done.view;
+    useToastStore().show(`Environnement « ${name} » supprimé.`, {
+      action: {
+        label: "Annuler",
+        run: async () => {
+          environments.value[projectId] = await ipc.environmentDeleteUndo(done.undoToken);
+        },
+      },
+    });
   }
 
   async function reorderEnvironments(projectId: string, names: string[]): Promise<void> {
     environments.value[projectId] = await ipc.environmentsReorder(projectId, names);
+  }
+
+  /**
+   * Ouvre la page des environnements du projet (3.3-a, AM43, Q7), sur l'environnement `focus`
+   * s'il est donné (sinon l'actif).
+   */
+  async function openEnvironments(projectId: string, focus: string | null = null): Promise<void> {
+    environmentFocus.value = focus === null ? null : { projectId, name: focus };
+    await windows.openSelection({ kind: "environments", projectId });
+  }
+
+  /** Dernier run de chaque environnement du projet (« Utilisation », AM43, Q8). */
+  function environmentUsage(projectId: string): Promise<EnvironmentUsage[]> {
+    return ipc.environmentUsage(projectId);
+  }
+
+  /** « Copier depuis un autre projet… » (AM43) : les environnements choisis sont ajoutés. */
+  async function copyEnvironments(
+    projectId: string,
+    fromProject: string,
+    names: string[],
+  ): Promise<void> {
+    environments.value[projectId] = await ipc.environmentCopy(projectId, fromProject, names);
   }
 
   async function setLocal(
@@ -845,6 +952,27 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     if (!editor?.draft) return;
     editor.draft.assertions = editor.draft.assertions.filter((a) => a.id !== check);
     await ignoreCheck(key, check);
+  }
+
+  /**
+   * « Copier la commande » (5.3-c, LC6) : `arnod run` du test ou du dossier, avec l'environnement
+   * actif du projet, citée par le cœur pour le terminal du poste.
+   */
+  async function copyCommand(projectId: string, path: string): Promise<void> {
+    const environment = activeEnvironment(projectId);
+    const command = await ipc.cliCommand(projectId, path, environment);
+    const toasts = useToastStore();
+    try {
+      await navigator.clipboard.writeText(command);
+    } catch {
+      toasts.show(`Copie impossible ; la commande : ${command}`, { tone: "error" });
+      return;
+    }
+    toasts.show(
+      environment === null
+        ? "✓ Commande copiée"
+        : `✓ Commande copiée · elle utilise l'environnement « ${environment} »`,
+    );
   }
 
   /** Exécute un dossier et ouvre l'onglet du run, là où suit la sélection. */
@@ -935,6 +1063,27 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     if (action === null) return "";
     const projectId = action.kind === "send" ? editors[action.key]?.projectId : action.projectId;
     return projectId ? (activeEnvironment(projectId) ?? "") : "";
+  }
+
+  /**
+   * Ce que la confirmation d'un environnement protégé cite (3.3-c, AM31) : la méthode et le
+   * chemin d'un envoi, et l'hôte visé, lus dans l'adresse avec les variables de l'environnement.
+   */
+  function pendingTarget(): { method: string | null; path: string | null; host: string | null } {
+    const action = pending.value;
+    const none = { method: null, path: null, host: null };
+    if (action === null) return none;
+    const projectId = action.kind === "send" ? editors[action.key]?.projectId : action.projectId;
+    if (!projectId) return none;
+    const view = environments.value[projectId];
+    const env = view?.environments.find((e) => e.name === view.active);
+    const values = Object.fromEntries((env?.variables ?? []).map((v) => [v.name, v.value]));
+    if (action.kind === "send") {
+      const draft = editors[action.key]?.draft;
+      if (!draft) return none;
+      return { method: draft.method, ...targetOf(draft.url, values) };
+    }
+    return { method: null, path: null, host: targetOf("{{baseUrl}}", values).host };
   }
 
   // --- Interconnexion (F11) --------------------------------------------------
@@ -1298,6 +1447,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     pending,
     loadProject,
     refreshTree,
+    setFolderTags,
     refreshEnvironments,
     peekEnvironments,
     isExpanded,
@@ -1305,6 +1455,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     collapse,
     toggleFolder,
     activeEnvironment,
+    copyCommand,
     openEditor,
     applyResult,
     loadResult,
@@ -1323,12 +1474,19 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     createFolder,
     rename,
     duplicate,
+    duplicateFolder,
+    reorder,
     move,
     remove,
     selectEnvironment,
     saveEnvironment,
     deleteEnvironment,
+    createEnvironment,
     reorderEnvironments,
+    openEnvironments,
+    copyEnvironments,
+    environmentUsage,
+    environmentFocus,
     setLocal,
     runFolder,
     runContract,
@@ -1337,6 +1495,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     confirmPending,
     dismissPending,
     pendingEnvironment,
+    pendingTarget,
     onProjectChange,
     subscribe,
     // Lot E : tests et étapes.
@@ -1344,6 +1503,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     focusUrl,
     loadTest,
     openTest,
+    openFolder,
     createTest,
     addStep,
     keepDrawn,
@@ -1368,6 +1528,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     // Lot J : copier et déplacer.
     followTransfer,
     reloadIn,
+    reloadOpened,
     // Lot K : secret en clair.
     holdSecret,
     // Sélection multiple.

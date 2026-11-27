@@ -7,8 +7,8 @@ export interface MenuItem {
   hint?: string;
   /** Raccourci affiché à droite (« Ctrl+N »). */
   shortcut?: string;
-  /** Action destructrice, affichée en rouge. */
-  tone?: "danger";
+  /** `danger` : action destructrice, en rouge ; `link` : ligne d'ajout, en couleur de lien. */
+  tone?: "danger" | "link";
   disabled?: boolean;
   /** Défini pour une entrée à cocher (`menuitemcheckbox`). */
   checked?: boolean;

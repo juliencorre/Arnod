@@ -70,7 +70,7 @@ describe("éditer et envoyer une requête", () => {
     expect(app.find("dialog[open]").exists()).toBe(true);
 
     core.workbench.nextSend = okOutcome();
-    await click(app, "dialog[open] button", "Envoyer quand même");
+    await click(app, "dialog[open] button", "Envoyer vers Local");
     const sends = core.calls.filter((c) => c.cmd === "request_send");
     expect(sends.map((s) => s.args.confirmed)).toEqual([false, true]);
     expect(app.get(".response").text()).toContain("200 OK");
@@ -262,9 +262,33 @@ describe("éditer et envoyer une requête", () => {
     }));
     await click(app, '[role="treeitem"]', "Payer");
     await click(app, ".editor__tab", "Auth");
-    expect(app.get(".note").text()).toBe(
-      "Reprend l'authentification du dossier « Paiements » : Bearer, jeton {{token}}.",
+    // AM35 (3.4-b) : une carte dit la nature, la source, où elle part et les valeurs lues.
+    const card = app.get(".inherited");
+    expect(card.get(".inherited__kind").text()).toBe("Bearer");
+    expect(card.get(".inherited__source").text()).toBe("réglée sur le dossier « Paiements »");
+    expect(card.findAll(".inherited__facts dd").map((d) => d.text())).toEqual([
+      "Authorization: Bearer ••••••••",
+      "token",
+    ]);
+    expect(card.find(".inherited__open").exists()).toBe(false);
+  });
+
+  it("auth héritée du projet : « du projet », libellé du cœur (inherit::project_source)", async () => {
+    ({ app } = await openProject((core) => {
+      const request = newRequest("Payer");
+      request.auth = { ...request.auth, type: "inherit" };
+      request.inherited.auth = {
+        source: "projet « boutique-tests »",
+        auth: { ...request.auth, type: "bearer", token: "{{token}}" },
+      };
+      core.workbench.requests.set("payer.yml", request);
+    }));
+    await click(app, '[role="treeitem"]', "Payer");
+    await click(app, ".editor__tab", "Auth");
+    expect(app.get(".inherited__source").text()).toContain(
+      "réglée sur le projet « boutique-tests »",
     );
+    expect(app.get(".inherited__open").text()).toBe("Ouvrir");
   });
 });
 
@@ -275,7 +299,7 @@ describe("réponses attendues (EP8, EP9)", () => {
     await click(app, '[role="treeitem"]', "Santé");
     await click(app, ".side__tab", "Réponses attendues");
     expect(app.get(".expected").text()).toContain("Aucune réponse attendue.");
-    await click(app, ".action", "+ Réponse");
+    await click(app, "button", "+ Réponse");
     await app.get(".grid input[type=number]").setValue("201");
     await app.findAll(".grid input")[1]?.setValue("Created");
     await app.findAll(".grid input")[2]?.setValue("Commande créée");

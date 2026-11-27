@@ -3,12 +3,18 @@
  * Corps de la réponse (`docs/plan-mvp-a-reponse.md`, écran 5.1-b bis) : format (détecté,
  * modifiable), mise en forme numérotée et colorée par le cœur, aperçu d'un HTML, copier,
  * enregistrer, effacer, et filtre JSONPath dont les valeurs trouvées sont surlignées.
+ *
+ * AM32 (4.2-b bis) : un clic sur une valeur propose « Extraire dans une variable », comme le
+ * filtre ; une valeur lue par une extraction de la requête est marquée « → nom ».
  */
 import { computed, nextTick, ref, watch } from "vue";
 
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import HtmlPreview from "@/components/workbench/HtmlPreview.vue";
 import ResponseFilter from "@/components/workbench/ResponseFilter.vue";
+import { useGuard } from "@/composables/useGuard";
+import { bodyPathOf } from "@/lib/sent";
+import { useInterfaceStore } from "@/stores/interface";
 import { useResponseStore } from "@/stores/response";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { BodyToken, ResponseFormat } from "@/types/ipc";
@@ -16,6 +22,7 @@ import type { BodyToken, ResponseFormat } from "@/types/ipc";
 const props = defineProps<{ editorKey: string }>();
 
 const store = useResponseStore();
+const shortcuts = useInterfaceStore();
 const workbench = useWorkbenchStore();
 const received = computed(() => workbench.editors[props.editorKey]?.outcome?.response ?? null);
 const view = computed(() => store.views[props.editorKey] ?? null);
@@ -23,6 +30,7 @@ const rendered = computed(() => view.value?.rendered ?? null);
 const format = computed(() => rendered.value?.format ?? "text");
 const filter = ref<{ focus: () => void } | null>(null);
 const code = ref<HTMLElement | null>(null);
+const root = ref<HTMLElement | null>(null);
 
 const FORMATS: { id: ResponseFormat; label: string }[] = [
   { id: "json", label: "JSON" },
@@ -91,9 +99,77 @@ watch(currentPath, async (path) => {
   code.value?.querySelector(".tok--current")?.scrollIntoView({ block: "nearest" });
 });
 
-/** Ctrl+F (Cmd+F) dans le corps : ouvre le filtre. */
+// --- Extraire depuis une valeur (AM32) ----------------------------------------------
+
+const guard = useGuard();
+const VALUE_KINDS = new Set(["string", "number", "literal"]);
+
+/** Valeur qui peut être extraite : une valeur JSON (pas une clé ni une ponctuation). */
+const extractable = (token: BodyToken): boolean =>
+  token.path !== undefined && VALUE_KINDS.has(token.kind);
+
+/** Nom de la variable qui lit chaque valeur du corps, par chemin canonique. */
+const extractedAt = computed(() => {
+  const names = new Map<string, string>();
+  for (const extraction of workbench.editors[props.editorKey]?.draft?.extractions ?? []) {
+    const path = bodyPathOf(extraction.source);
+    if (path !== null && extraction.enabled) names.set(path, extraction.name);
+  }
+  return names;
+});
+
+/** Variable qui lit la valeur `token`, s'il y en a une. */
+function extractedName(token: BodyToken): string | null {
+  return extractable(token) && token.path !== undefined
+    ? (extractedAt.value.get(token.path) ?? null)
+    : null;
+}
+
+/** Valeur cliquée et place de la proposition, dans le repère du corps. */
+const picked = ref<{ path: string; left: number; top: number } | null>(null);
+const pickAction = ref<HTMLButtonElement | null>(null);
+
+async function onCodeClick(event: MouseEvent): Promise<void> {
+  const target =
+    event.target instanceof Element ? event.target.closest<HTMLElement>("[data-path]") : null;
+  const frame = root.value?.getBoundingClientRect();
+  if (!target || !frame) {
+    picked.value = null;
+    return;
+  }
+  const box = target.getBoundingClientRect();
+  picked.value = {
+    path: target.dataset.path ?? "",
+    left: box.left - frame.left,
+    top: box.bottom - frame.top,
+  };
+  await nextTick();
+  pickAction.value?.focus();
+}
+
+function extractPicked(): void {
+  const path = picked.value?.path;
+  picked.value = null;
+  if (path) guard(() => store.extractAt(props.editorKey, path));
+  code.value?.focus();
+}
+
+function closePick(): void {
+  picked.value = null;
+  code.value?.focus();
+}
+
+/** La proposition se ferme quand le focus la quitte. */
+function onPickFocusOut(event: FocusEvent): void {
+  const next = event.relatedTarget;
+  const menu = event.currentTarget;
+  if (menu instanceof HTMLElement && next instanceof Node && menu.contains(next)) return;
+  picked.value = null;
+}
+
+/** Ctrl+F par défaut (Cmd+F) dans le corps : ouvre le filtre (1.6-f bis). */
 function onKeydown(event: KeyboardEvent): void {
-  if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "f") {
+  if (shortcuts.matches(event, "filterResponse")) {
     event.preventDefault();
     filter.value?.focus();
   }
@@ -101,7 +177,7 @@ function onKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <div class="body" @keydown="onKeydown">
+  <div ref="root" class="body" @keydown="onKeydown">
     <div class="body__bar">
       <select
         class="body__format"
@@ -175,18 +251,46 @@ function onKeydown(event: KeyboardEvent): void {
       role="tabpanel"
       aria-label="Corps de la réponse"
       tabindex="0"
+      @click="onCodeClick"
+      @scroll="picked = null"
     >
       <div v-for="(line, index) in rendered?.lines ?? []" :key="index" class="code__line">
         <span class="code__number" aria-hidden="true">{{ index + 1 }}</span>
         <span class="code__text"
-          ><span
-            v-for="(token, t) in line"
-            :key="t"
-            :class="['tok--' + token.kind, markOf(token)]"
-            >{{ token.text }}</span
+          ><template v-for="(token, t) in line" :key="t"
+            ><span
+              :class="[
+                'tok--' + token.kind,
+                markOf(token),
+                { 'tok--pickable': extractable(token) },
+              ]"
+              :data-path="extractable(token) ? token.path : undefined"
+              >{{ token.text }}</span
+            ><span v-if="extractedName(token)" class="tok__extracted"
+              >→ {{ extractedName(token) }}</span
+            ></template
           ></span
         >
       </div>
+    </div>
+    <div
+      v-if="picked"
+      class="body__pick"
+      role="menu"
+      aria-label="Valeur du corps"
+      :style="{ left: `${picked.left}px`, top: `${picked.top}px` }"
+      @keydown.esc.stop="closePick"
+      @focusout="onPickFocusOut"
+    >
+      <button
+        ref="pickAction"
+        type="button"
+        role="menuitem"
+        class="body__pick-item"
+        @click.stop="extractPicked"
+      >
+        Extraire dans une variable
+      </button>
     </div>
     <ResponseFilter
       v-if="format === 'json' || view?.expression"
@@ -198,6 +302,7 @@ function onKeydown(event: KeyboardEvent): void {
 
 <style scoped>
 .body {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -277,10 +382,58 @@ function onKeydown(event: KeyboardEvent): void {
   max-height: 28rem;
 }
 
+/* Une valeur se clique pour être extraite (AM32). */
+.tok--pickable {
+  cursor: pointer;
+}
+
+.tok--pickable:hover {
+  text-decoration: underline dotted;
+}
+
+.tok__extracted {
+  margin-left: 0.5rem;
+  padding: 0 0.375rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
+  color: var(--color-link);
+  background: var(--color-accent-soft);
+}
+
+.body__pick {
+  position: absolute;
+  z-index: 3;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+
+.body__pick-item {
+  display: block;
+  padding: 0.375rem 0.625rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.body__pick-item:hover {
+  background-color: var(--color-accent-soft);
+}
+
+.body__pick-item:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
 .code {
   padding: 0.5rem 0;
   overflow: auto;
-  font: var(--text-body) / 1.55 var(--font-mono);
+  font: var(--editor-font-size) / 1.55 var(--editor-font);
   color: var(--color-text);
 }
 

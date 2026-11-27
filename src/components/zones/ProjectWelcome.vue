@@ -10,16 +10,22 @@ import { computed, ref } from "vue";
 
 import ContractDialog from "@/components/contracts/ContractDialog.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
-import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
+import NewEnvironmentDialog from "@/components/workbench/NewEnvironmentDialog.vue";
 import { useContractAdd } from "@/composables/useContractAdd";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
 import { useImportStore } from "@/stores/imports";
 import { useNavigationStore } from "@/stores/navigation";
 import { useToastStore } from "@/stores/toasts";
+import { MORE_SECTIONS, useTemplatesStore } from "@/stores/templates";
 import { useWorkbenchStore } from "@/stores/workbench";
 
 const props = defineProps<{ projectId: string }>();
+const templates = useTemplatesStore();
+/** Sections disponibles et masquées (1.2-d bis). */
+const hiddenSections = computed(() =>
+  MORE_SECTIONS.filter((s) => !templates.sectionShown(props.projectId, s.id)),
+);
 
 const catalog = useCatalogStore();
 const workbench = useWorkbenchStore();
@@ -62,13 +68,13 @@ const STARTS: { id: Start; title: string; text: string; action: string }[] = [
   {
     id: "contract",
     title: "Décrire un contrat de service",
-    text: "Ses endpoints, le corps et les réponses attendus. Vous y écrirez vos premières requêtes.",
+    text: "Ses endpoints, le corps et les réponses attendus. Vous y écrirez vos premiers tests.",
     action: "+ Contrat",
   },
   {
     id: "test",
     title: "Écrire un test",
-    text: "Ses étapes dans le référentiel de tests, sans contrat.",
+    text: "Directement dans le référentiel de tests, sans contrat.",
     action: "+ Test",
   },
   {
@@ -85,6 +91,12 @@ function start(id: Start): void {
   else if (id === "test") void newTest();
   else creatingEnvironment.value = true;
 }
+
+/** L'environnement créé s'ouvre dans la page des environnements (3.3-a, AM43). */
+function onEnvironmentCreated(name: string): void {
+  creatingEnvironment.value = false;
+  void workbench.openEnvironments(props.projectId, name).catch(toasts.showError);
+}
 </script>
 
 <template>
@@ -99,6 +111,20 @@ function start(id: Start): void {
         <BaseButton class="start__action" @click="start(item.id)">{{ item.action }}</BaseButton>
       </li>
     </ul>
+    <!-- V4 (1.2-d bis, R21) : les autres sections, chacune avec sa raison d'être. -->
+    <section v-if="hiddenSections.length > 0" class="start__more" aria-label="Autres sections">
+      <h2 class="start__more-title">Autres sections · {{ hiddenSections.length }}</h2>
+      <ul class="start__more-list">
+        <li v-for="section in hiddenSections" :key="section.id" class="start__more-item">
+          <b>{{ section.title }}</b>
+          <span class="start__more-hint">{{ section.hint }}</span>
+          <BaseButton variant="link" @click="templates.showSection(projectId, section.id, true)"
+            >Afficher</BaseButton
+          >
+        </li>
+      </ul>
+      <p class="start__more-hint">Une section s'affiche seule à sa première utilisation.</p>
+    </section>
     <ContractDialog
       :mode="mode"
       :error="error"
@@ -106,12 +132,12 @@ function start(id: Start): void {
       @close="adding.close"
       @submit="adding.submit"
     />
-    <EnvironmentsDialog
+    <NewEnvironmentDialog
       v-if="creatingEnvironment"
       :open="creatingEnvironment"
       :project-id="projectId"
-      start-new
       @close="creatingEnvironment = false"
+      @created="onEnvironmentCreated"
     />
   </div>
   <div v-else-if="project" class="welcome">
@@ -129,6 +155,39 @@ function start(id: Start): void {
 </template>
 
 <style scoped>
+.start__more {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 1rem;
+}
+
+.start__more-title {
+  margin: 0;
+  font: 600 var(--text-caption) var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.start__more-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.start__more-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.start__more-hint {
+  flex: 1;
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
 .welcome {
   display: flex;
   flex-direction: column;
@@ -178,7 +237,8 @@ function start(id: Start): void {
 
 .start__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  /* auto-fit : les quatre cartes prennent toute la largeur, sans colonne vide (DE6). */
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: 1rem;
   margin: 0;
   padding: 0;
@@ -210,6 +270,8 @@ function start(id: Start): void {
 }
 
 .start__action {
+  align-self: flex-start;
   margin-top: 0.5rem;
+  white-space: nowrap;
 }
 </style>

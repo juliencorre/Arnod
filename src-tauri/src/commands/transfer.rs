@@ -1,7 +1,6 @@
 //! Domaine « copier ou déplacer » une requête (lot J, écrans 4.1-f et 4.1-g) : destinations,
 //! « Ce qui change », transfert et « Annuler ».
 
-use std::collections::VecDeque;
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -13,7 +12,7 @@ use crate::error::{CommandError, CommandErrorKind};
 use crate::layout::windows::Windows;
 use crate::state::AppState;
 use crate::tree::transfer::{self, Change, Mode, Target, Targets};
-use crate::tree::undo::Undo;
+use crate::tree::undo::{Undo, UndoBook};
 use crate::watch::Renamed;
 use crate::windows::{self, ProjectScope};
 
@@ -33,14 +32,7 @@ pub struct TransferDone {
 type Pending = (Vec<Uuid>, Undo);
 
 /// Transferts récents, à annuler (« Annuler » de la notification, Ctrl+Z).
-fn pending() -> &'static Mutex<VecDeque<(Uuid, Pending)>> {
-    static PENDING: std::sync::OnceLock<Mutex<VecDeque<(Uuid, Pending)>>> =
-        std::sync::OnceLock::new();
-    PENDING.get_or_init(|| Mutex::new(VecDeque::new()))
-}
-
-/// Nombre de transferts gardés pour « Annuler ».
-const KEPT: usize = 20;
+static PENDING: Mutex<UndoBook<Pending>> = Mutex::new(UndoBook::new());
 
 fn changed(window: &WebviewWindow, project: Uuid) {
     for scope in [ProjectScope::Tree, ProjectScope::Contracts] {
@@ -131,13 +123,10 @@ pub fn transfer_apply(
     if target != project {
         changed(&window, target);
     }
-    let undo_token = Uuid::new_v4();
-    if let Ok(mut map) = pending().lock() {
-        map.push_back((undo_token, (vec![project, target], undo)));
-        while map.len() > KEPT {
-            map.pop_front();
-        }
-    }
+    let undo_token = PENDING
+        .lock()
+        .map(|mut book| book.push((vec![project, target], undo)))
+        .unwrap_or_else(|_| Uuid::new_v4());
     Ok(TransferDone {
         project_id: target,
         path: done.path,
@@ -149,10 +138,10 @@ pub fn transfer_apply(
 /// « Annuler » un transfert : les fichiers reviennent comme avant.
 #[tauri::command]
 pub fn transfer_undo(window: WebviewWindow, undo_token: Uuid) -> Result<(), CommandError> {
-    let entry = pending().lock().ok().and_then(|mut map| {
-        let index = map.iter().position(|(token, _)| *token == undo_token)?;
-        map.remove(index).map(|(_, entry)| entry)
-    });
+    let entry = PENDING
+        .lock()
+        .ok()
+        .and_then(|mut book| book.take(undo_token));
     let Some((projects, undo)) = entry else {
         return Err(CommandError::new(
             CommandErrorKind::UndoExpired,

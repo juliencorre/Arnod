@@ -27,21 +27,30 @@ export const KIND_TAGS: Record<ImportItemKind, string> = {
 
 /** Suite donnée, à droite de la ligne. */
 export const STATUS_LABELS: Record<ImportItemStatus, string> = {
-  notRun: "non repris",
+  notRun: "exécuté à l'envoi",
   toFill: "à renseigner",
   toCheck: "à vérifier",
   skipped: "non importé",
   stored: "au coffre",
+  accepted: "repris",
+  replaced: "remplacé",
 };
 
 /** Phrase de tête de « Après · dans Arnod ». */
 export const STATUS_HEADLINES: Record<ImportItemStatus, string> = {
-  notRun: "Gardé dans le fichier, pas exécuté.",
+  notRun: "Gardé dans le fichier, exécuté à chaque envoi.",
   toFill: "Variable locale, à renseigner.",
   toCheck: "Repris, à vérifier.",
   skipped: "Non importé.",
   stored: "Rangé dans le coffre du système.",
+  accepted: "Repris sans ce script.",
+  replaced: "Remplacé par une assertion.",
 };
+
+/** Scripts Bruno (tests, avant la requête, après la réponse) : repris ou remplacés (AM42). */
+export function isScript(item: ImportReportItem): boolean {
+  return item.kind === "tests" || item.kind === "preRequest" || item.kind === "postResponse";
+}
 
 /** Contenu d'origine tel qu'il s'écrit dans le fichier `.bru` (« tests { … } »). */
 export function originalBlock(item: ImportReportItem): string | null {

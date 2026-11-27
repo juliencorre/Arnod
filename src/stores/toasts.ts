@@ -15,7 +15,10 @@ export interface Toast {
   action: ToastAction | null;
 }
 
-/** Durée d'affichage, prolongée tant que la notification est survolée ou a le focus. */
+/**
+ * Durée d'affichage d'une information, prolongée tant que la notification est survolée ou a le
+ * focus. Une erreur, elle, reste jusqu'à sa fermeture (ER7).
+ */
 export const TOAST_DURATION_MS = 6000;
 
 /**
@@ -34,6 +37,7 @@ export const useToastStore = defineStore("toasts", () => {
 
   function schedule(): void {
     clearTimer();
+    if (current.value?.tone === "error") return;
     timer = setTimeout(dismiss, TOAST_DURATION_MS);
   }
 

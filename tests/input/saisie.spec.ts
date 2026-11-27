@@ -3,7 +3,7 @@ import { emptyOAuth2 } from "@/lib/auth";
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { variableSegments } from "@/lib/variables";
+import { variableNames, variableSegments } from "@/lib/variables";
 import type { Pair, RequestDoc } from "@/types/ipc";
 
 import { installFakeCore } from "../fakeCore";
@@ -81,6 +81,14 @@ describe("variables inconnues soulignées (5.1-b ter)", () => {
     ]);
   });
 
+  it("liste les noms des variables d'un texte, sans doublon ni valeur dynamique (4.7-a)", () => {
+    expect(variableNames("{{baseUrl}}/pays/{{ code }}?q={{code}}&id={{$guid}}&x={{}}")).toEqual([
+      "baseUrl",
+      "code",
+    ]);
+    expect(variableNames("/sans/variable/{{")).toEqual([]);
+  });
+
   it("souligne et signale la variable inconnue de l'environnement actif, avec où elle est définie", async () => {
     let core;
     ({ app, core } = await openOrder());
@@ -120,7 +128,7 @@ describe("variables inconnues soulignées (5.1-b ter)", () => {
     expect(app.find("dialog").exists()).toBe(true);
   });
 
-  it("un nombre ou un point par onglet rempli", async () => {
+  it("DE7 : un compteur en pastille, une seule forme (plus de point « rempli »)", async () => {
     ({ app } = await openOrder());
     const tab = (label: string) => {
       const found = app?.findAll('[role="tab"]').find((t) => t.text().startsWith(label));
@@ -128,10 +136,8 @@ describe("variables inconnues soulignées (5.1-b ter)", () => {
       return found;
     };
     expect(tab("En-têtes").get(".editor__badge").text()).toBe("2");
-    expect(tab("Corps").find(".editor__dot").exists()).toBe(true);
-    expect(tab("Corps").text()).toContain("rempli");
-    expect(tab("Auth").find(".editor__dot").exists()).toBe(false);
-    expect(tab("Docs").find(".editor__dot").exists()).toBe(false);
+    expect(tab("Corps").text()).toBe("Corps");
+    expect(app.find(".editor__dot").exists()).toBe(false);
   });
 
   it("liste, grisés, les en-têtes ajoutés par Arnod à l'envoi", async () => {
@@ -295,6 +301,11 @@ describe("une commande cURL collée (2.1-a sexies)", () => {
       "https://api.boutique.dev/orders",
     );
     expect(app.get(".try__note").text()).toBe("Reconnu : une commande cURL.");
+    // AM5 (2.1-a sexies) : « REST · requête », repris de la commande.
+    expect(app.get(".nature-form__noun").text()).toBe("· requête");
+    expect(app.get(".nature-form__title").text()).toBe(
+      "repris de la commande, à vérifier avant l'envoi",
+    );
     expect(app.get('[role="radio"][aria-checked="true"]').text()).toBe("POST");
     const areas = app.findAll<HTMLTextAreaElement>("textarea").map((t) => t.element.value);
     expect(areas).toContain("Content-Type: application/json\nAuthorization: Bearer {{token}}");

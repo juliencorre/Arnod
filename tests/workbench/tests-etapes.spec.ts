@@ -4,11 +4,12 @@
  */
 import { clearMocks } from "@tauri-apps/api/mocks";
 import { flushPromises } from "@vue/test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AUTOSAVE_MS } from "@/stores/workbench";
 import type { RequestDoc } from "@/types/ipc";
 
+import { cssValue } from "../css";
 import { newRequest, okOutcome } from "../fakeWorkbench";
 import type { AppWrapper } from "../mountApp";
 import { click, openProject } from "./helpers";
@@ -32,7 +33,10 @@ describe("test = dossier d'étapes (4.2-a)", () => {
     let core;
     ({ app, core } = await openProject((c) => {
       const creer = c.workbench.requests.get("Clients/creer.yml");
-      if (creer) creer.extractions = [{ name: "client.id", source: "body.id", enabled: true }];
+      if (creer)
+        creer.extractions = [
+          { name: "client.id", source: "body.id", enabled: true, scope: "runtime" },
+        ];
       c.workbench.runStatus.set("Clients/creer.yml", "failed");
     }));
     // La fiole remplace le dossier dans la barre latérale.
@@ -61,11 +65,14 @@ describe("test = dossier d'étapes (4.2-a)", () => {
     expect(app.get(".test__summary").text()).toContain("en échec à l'étape 1");
   });
 
-  it("« + Étape » ajoute l'étape suivante et l'ouvre, curseur dans l'adresse", async () => {
+  it("« + Étape ▾ » › Requête ajoute l'étape suivante et l'ouvre, curseur dans l'adresse", async () => {
     let core;
     ({ app, core } = await openProject());
     await click(app, '[role="treeitem"]', "Clients");
     await click(app, ".test button", "+ Étape");
+    // V4 (4.3-e) : le choix de la nature, au clavier ; « REST » est la première.
+    await app.get(".picker__input").trigger("keydown", { key: "Enter" });
+    await flushPromises();
     expect(core.calls.find((c) => c.cmd === "tree_add_step")?.args).toMatchObject({
       test: "Clients",
     });
@@ -75,6 +82,26 @@ describe("test = dossier d'étapes (4.2-a)", () => {
     const chips = app.findAll(".steps__chip");
     expect(chips.map((c) => c.text())).toEqual(["1 · Créer", "2 · Lister", "3 · Étape 3"]);
     expect(app.get('.steps__chip[aria-current="step"]').text()).toBe("3 · Étape 3");
+  });
+
+  it("DE8 : l'étape ouverte est amenée dans la rangée, qui défile au lieu de passer à la ligne", async () => {
+    const reveal = vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(() => {});
+    ({ app } = await openProject());
+    await click(app, '[role="treeitem"]', "Clients");
+    await click(app, ".test button", "+ Étape");
+    await app.get(".picker__input").trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    const target = reveal.mock.contexts.at(-1) as HTMLElement | undefined;
+    expect(target?.textContent.trim()).toBe("3 · Étape 3");
+    expect(reveal.mock.calls.at(-1)?.[0]).toEqual({ block: "nearest", inline: "nearest" });
+    const file = "src/components/workbench/StepBar.vue";
+    expect(cssValue(file, ".steps__list", "flex-wrap")).toBe("nowrap");
+    expect(cssValue(file, ".steps__list", "overflow-x")).toBe("auto");
+    expect(cssValue(file, ".steps", "flex-wrap")).toBe("nowrap");
+    // DE7 : l'étape ouverte se marque d'un fond accent doux, pas d'un plein noir.
+    expect(cssValue(file, '.steps__chip[aria-current="step"]', "background")).toBe(
+      "var(--color-accent-soft)",
+    );
   });
 });
 
@@ -114,12 +141,14 @@ describe("extractions (4.2-b bis)", () => {
     }));
     await click(app, '[role="treeitem"]', "Créer");
     await click(app, ".editor__tab", "Variables");
-    await click(app, ".vars__button", "+ Variable");
+    await click(app, "button", "+ Variable");
     await app.get(".vars__name").setValue("client.id");
     await app.findAll(".vars__input")[1]?.setValue("body.id");
     await waitAutosave();
     const saved = core.workbench.requests.get("Clients/creer.yml");
-    expect(saved?.extractions).toEqual([{ name: "client.id", source: "body.id", enabled: true }]);
+    expect(saved?.extractions).toEqual([
+      { name: "client.id", source: "body.id", enabled: true, scope: "runtime" },
+    ]);
     expect(app.get(".editor__tab[aria-selected='true']").text()).toBe("Variables 1");
     // « Utilisée par » liste les requêtes qui lisent la variable.
     await flushPromises();
@@ -129,9 +158,13 @@ describe("extractions (4.2-b bis)", () => {
   it("montre la dernière valeur extraite et ce qui est parti dans « Envoyé »", async () => {
     ({ app } = await openProject((c) => {
       const creer = c.workbench.requests.get("Clients/creer.yml");
-      if (creer) creer.extractions = [{ name: "client.id", source: "body.id", enabled: true }];
+      if (creer)
+        creer.extractions = [
+          { name: "client.id", source: "body.id", enabled: true, scope: "runtime" },
+        ];
       c.workbench.nextSend = okOutcome({
         sent: {
+          environment: "Local",
           method: "POST",
           url: "https://api.test/clients",
           headers: [["Content-Type", "application/json"]],
@@ -144,8 +177,9 @@ describe("extractions (4.2-b bis)", () => {
             },
             { name: "$timestamp", value: "1794495731", source: null },
           ],
-          used: [{ name: "baseUrl", value: "https://api.test", runtime: false }],
+          used: [{ name: "baseUrl", value: "https://api.test", source: "environment" }],
           extracted: [{ name: "client.id", source: "body.id", value: "cus_7", message: null }],
+          oauth2: null,
         },
       });
     }));

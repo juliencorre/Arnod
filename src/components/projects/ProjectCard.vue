@@ -70,10 +70,6 @@ onMounted(() => {
   background: var(--color-surface);
 }
 
-.card--missing {
-  border-style: dashed;
-}
-
 .card__initial {
   display: grid;
   flex: none;

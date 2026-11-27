@@ -176,7 +176,7 @@ describe("corps de la réponse (5.1-b bis)", () => {
     await new Promise((resolve) => setTimeout(resolve, AUTOSAVE_MS + 50));
     await flushPromises();
     expect(core.workbench.requests.get("Clients/creer.yml")?.extractions).toEqual([
-      { name: "sku", source: "body.items[0].sku", enabled: true },
+      { name: "sku", source: "body.items[0].sku", enabled: true, scope: "runtime" },
     ]);
   });
 
@@ -235,5 +235,48 @@ describe("corps de la réponse (5.1-b bis)", () => {
     ]);
     for (const tool of tools) expect(tool.element.tagName).toBe("BUTTON");
     expect(app.get(".code").attributes("tabindex")).toBe("0");
+  });
+});
+
+describe("onglets de la réponse (5.1-b)", () => {
+  it("DE7 : les compteurs des onglets sont en pastille, sans parenthèses", async () => {
+    ({ app } = await sent());
+    const tabs = app.findAll(".response__tab").map((t) => t.text().replace(/\s+/g, " "));
+    // 5.1-c bis : l'historique compte l'envoi qui vient d'être reçu.
+    expect(tabs).toEqual([
+      "Corps",
+      "En-têtes 1",
+      "Assertions 1",
+      "Envoyé",
+      "Chronologie",
+      "Historique 1",
+    ]);
+    expect(app.findAll(".response__badge").map((b) => b.text())).toEqual(["1", "1", "1"]);
+  });
+
+  it("la liste des assertions ne s'affiche que sous son onglet", async () => {
+    ({ app } = await sent());
+    expect(app.find(".response__checks").exists()).toBe(false);
+    await click(app, ".response__tab", "En-têtes");
+    expect(app.find(".response__checks").exists()).toBe(false);
+    await click(app, ".response__tab", "Envoyé");
+    expect(app.find(".response__checks").exists()).toBe(false);
+    await click(app, ".response__tab", "Assertions");
+    expect(app.find(".response__checks").exists()).toBe(true);
+  });
+
+  it("un cookie reçu ajoute sa note sous les en-têtes, sans la liste des assertions", async () => {
+    ({ app } = await openProject((core) => {
+      respond(core, ORDER, "application/json");
+      const outcome = core.workbench.nextSend;
+      if ("kind" in outcome) throw new Error("envoi réussi attendu");
+      outcome.response.headers.push(["set-cookie", "session=abc; HttpOnly"]);
+    }));
+    await click(app, '[role="treeitem"]', "Créer");
+    await app.get(".editor__line").trigger("submit");
+    await flushPromises();
+    await click(app, ".response__tab", "En-têtes");
+    expect(app.get(".response").text()).toContain("Les cookies reçus rejoignent");
+    expect(app.find(".response__checks").exists()).toBe(false);
   });
 });

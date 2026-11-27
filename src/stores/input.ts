@@ -12,6 +12,7 @@ import type {
   PairsFormat,
   PairsText,
   RequestInput,
+  UnknownVariable,
 } from "@/types/ipc";
 
 /**
@@ -72,20 +73,25 @@ export const useInputStore = defineStore("input", () => {
   }
 
   /**
-   * Ajoute `name` aux variables partagées de l'environnement actif du projet, avec `value`
-   * (celle d'un autre environnement, ou vide).
+   * « Ajouter » des variables inconnues `variables` (ER6) : déclarées ensemble dans les variables
+   * partagées de l'environnement actif du projet, chacune avec la valeur qu'elle a dans un autre
+   * environnement, sinon vide. La requête n'est pas modifiée. Rend le nom de l'environnement.
    */
-  async function addVariable(projectId: string, name: string, value: string): Promise<string> {
+  async function declare(projectId: string, variables: UnknownVariable[]): Promise<string> {
     const view = workbench.environments[projectId];
     const env = view?.environments.find((e) => e.name === view.active);
     if (!env) throw new Error("Aucun environnement actif.");
+    const added = variables.map((variable) => ({
+      name: variable.name,
+      value: variable.definedIn.find((source) => source.value !== null)?.value ?? "",
+    }));
     await workbench.saveEnvironment(
       projectId,
       {
         name: env.name,
         color: env.color,
         protected: env.protected,
-        variables: [...env.variables, { name, value }],
+        variables: [...env.variables, ...added],
         locals: env.locals,
       },
       env.name,
@@ -195,7 +201,7 @@ export const useInputStore = defineStore("input", () => {
     inspect,
     forget,
     curl,
-    addVariable,
+    declare,
     toText,
     fromText,
     dynamicValues,

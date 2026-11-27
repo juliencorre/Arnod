@@ -242,6 +242,19 @@ export const useResponseStore = defineStore("response", () => {
     return name;
   }
 
+  /**
+   * « Extraire dans une variable » d'une valeur cliquée dans le corps (4.2-b bis, AM32) : le cœur
+   * relit le chemin canonique de la valeur comme une expression JSONPath et donne sa cible,
+   * comme pour une correspondance du filtre.
+   */
+  async function extractAt(key: string, path: string): Promise<string | null> {
+    const received = response(key);
+    if (!received) return null;
+    const result = await ipc.responseFilter(received.body, path);
+    const found = result.matches[0];
+    return found ? addExtraction(key, found) : null;
+  }
+
   return {
     views,
     view,
@@ -257,5 +270,6 @@ export const useResponseStore = defineStore("response", () => {
     clear,
     addAssertion,
     addExtraction,
+    extractAt,
   };
 });

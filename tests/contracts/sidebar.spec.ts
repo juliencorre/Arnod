@@ -138,9 +138,9 @@ describe("contrats et référentiel de tests (RC1, RC6)", () => {
     await click(wrapper(), ".crow__resource", "/pets");
     // La ligne de l'opération est son endpoint (lot D, Q4) : sans réponse attendue, pas de
     // nombre ; celle sans requête est estompée.
-    const get = wrapper().get('[aria-label="Ouvrir GET /pets"]');
+    const get = wrapper().get('[aria-label="GET /pets"], [aria-label^="GET /pets,"]');
     expect(get.find(".crow__examples").exists()).toBe(false);
-    const post = wrapper().get('[aria-label="Créer la requête de POST /pets"]');
+    const post = wrapper().get('[aria-label="POST /pets, créer la requête"]');
     expect(post.classes()).toContain("crow__main--empty");
     expect(post.get(".crow__hint").text()).toBe("Créer");
 
@@ -158,7 +158,7 @@ describe("ouvrir et créer depuis une opération (RC2 à RC4)", () => {
   it("un clic sur une opération ouvre son endpoint, mis en évidence (RC2)", async () => {
     const { core } = await setup();
     await expandPets();
-    await press('[aria-label="Ouvrir GET /pets"]');
+    await press('[aria-label="GET /pets"], [aria-label^="GET /pets,"]');
     expect(lastOpened(core)).toEqual({
       content: {
         kind: "request",
@@ -184,7 +184,7 @@ describe("ouvrir et créer depuis une opération (RC2 à RC4)", () => {
   it("une opération sans requête crée la sienne, l'ouvre et la range sous le contrat (RC3)", async () => {
     const { core } = await setup();
     await expandPets();
-    await press('[aria-label="Créer la requête de POST /pets"]');
+    await press('[aria-label="POST /pets, créer la requête"]');
 
     expect(core.calls.find((c) => c.cmd === "contract_generate")?.args).toEqual({
       project: BOUTIQUE_TESTS,
@@ -199,7 +199,9 @@ describe("ouvrir et créer depuis une opération (RC2 à RC4)", () => {
         path: "Petstore/animaux/creer-un-animal.yml",
       },
     });
-    expect(wrapper().find('[aria-label="Ouvrir POST /pets"]').exists()).toBe(true);
+    expect(wrapper().find('[aria-label="POST /pets"], [aria-label^="POST /pets,"]').exists()).toBe(
+      true,
+    );
     expect(testItems().some((t) => t.includes("Petstore"))).toBe(false);
   });
 
@@ -270,9 +272,9 @@ describe("agir sur une requête liée (RC5, R6)", () => {
     expect(opened.content.path).not.toBe("Petstore/animaux/a-lister.yml");
 
     await action("Deuxième page", "Mettre à la corbeille");
-    expect(core.calls.find((c) => c.cmd === "tree_delete")?.args).toMatchObject({
-      path: "Petstore/animaux/b-page-2.yml",
-      permanent: false,
+    expect(core.calls.find((c) => c.cmd === "tree_batch")?.args).toMatchObject({
+      paths: ["Petstore/animaux/b-page-2.yml"],
+      action: { kind: "delete", permanent: false },
     });
     expect(texts(".linked__name")).not.toContain("Deuxième page");
     expect(wrapper().get(".toast").text()).toContain("« Deuxième page » mis à la corbeille.");
@@ -292,12 +294,14 @@ describe("entre fenêtres (RC9)", () => {
     const { core } = await setup();
     await press('[aria-label="Déplier le contrat Petstore"]');
     await click(wrapper(), ".crow__resource", "/health");
-    expect(wrapper().find('[aria-label="Créer la requête de GET /health"]').exists()).toBe(true);
+    expect(wrapper().find('[aria-label="GET /health, créer la requête"]').exists()).toBe(true);
 
     core.workbench.requests.set("Petstore/sante.yml", linked("Santé du service", "GET /health"));
     await core.emit(EVENTS.project, change("tree"));
     await flushPromises();
-    expect(wrapper().find('[aria-label="Ouvrir GET /health"]').exists()).toBe(true);
+    expect(
+      wrapper().find('[aria-label="GET /health"], [aria-label^="GET /health,"]').exists(),
+    ).toBe(true);
     expect(testItems().some((t) => t.includes("Petstore"))).toBe(false);
   });
 
@@ -328,9 +332,12 @@ describe("statuts des requêtes liées (ST1, ST2)", () => {
       .find((r) => r.text().includes("/pets"));
     expect(pets?.get(".crow__count [aria-hidden='true']").text()).toBe("1/2");
     // La ligne de l'opération porte le statut de son endpoint (lot D, Q4).
-    expect(wrapper().get('[aria-label="Ouvrir GET /pets"]').get(".crow__mark").text()).toContain(
-      "✓",
-    );
+    expect(
+      wrapper()
+        .get('[aria-label="GET /pets"], [aria-label^="GET /pets,"]')
+        .get(".crow__mark")
+        .text(),
+    ).toContain("✓");
     await press('[aria-label="Déplier GET /pets"]');
     const marks = wrapper()
       .findAll(".linked")

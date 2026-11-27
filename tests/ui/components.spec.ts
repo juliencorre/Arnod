@@ -204,7 +204,7 @@ describe("ToastHost", () => {
 
     expect(wrapper.get('[role="status"]').attributes("aria-live")).toBe("polite");
     expect(wrapper.text()).toContain("Workspace « Recette sprint 42 » supprimé");
-    await wrapper.get("button").trigger("click");
+    await wrapper.get(".toast__action").trigger("click");
     await flushPromises();
 
     expect(run).toHaveBeenCalledOnce();
@@ -228,12 +228,18 @@ describe("ToastHost", () => {
     expect(wrapper.find(".toast").exists()).toBe(false);
   });
 
-  it("distingue les erreurs", async () => {
+  it("ER7 : une erreur reste affichée jusqu'à « Fermer la notification »", async () => {
     const wrapper = mount(ToastHost);
     useToastStore().showError(new Error("disque plein"));
     await flushPromises();
 
     expect(wrapper.get(".toast").classes()).toContain("toast--error");
-    expect(wrapper.find("button").exists()).toBe(false);
+    expect(wrapper.find(".toast__action").exists()).toBe(false);
+    vi.advanceTimersByTime(TOAST_DURATION_MS * 5);
+    await flushPromises();
+    expect(wrapper.find(".toast").exists()).toBe(true);
+    await wrapper.get('button[aria-label="Fermer la notification"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".toast").exists()).toBe(false);
   });
 });

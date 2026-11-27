@@ -262,7 +262,7 @@ function boutiqueTests(): FakeCore {
       method: "POST",
       url: "{{baseUrl}}/customers",
       seq: 1,
-      extractions: [{ name: "client.id", source: "body.id", enabled: true }],
+      extractions: [{ name: "client.id", source: "body.id", enabled: true, scope: "runtime" }],
       assertions: [check("s", "status", 201), check("d", "responseTime", 500)],
     }),
   );
@@ -320,7 +320,7 @@ function commandesLotE(): FakeCore {
         selected: 0,
         other: "",
       },
-      extractions: [{ name: "order.id", source: "body.id", enabled: true }],
+      extractions: [{ name: "order.id", source: "body.id", enabled: true, scope: "runtime" }],
       seq: 1,
     }),
   );
@@ -359,6 +359,7 @@ function commandesLotE(): FakeCore {
       },
     },
     sent: {
+      environment: "Recette fonctionnelle",
       method: "POST",
       url: "https://recette.boutique.dev/orders",
       headers: [["Content-Type", "application/json"]],
@@ -381,8 +382,12 @@ function commandesLotE(): FakeCore {
           source: "request.body.requestedAt",
         },
       ],
-      used: [{ name: "baseUrl", value: "https://recette.boutique.dev", runtime: false }],
+      used: [
+        { name: "baseUrl", value: "https://recette.boutique.dev", source: "environment" },
+        { name: "token", value: "••••••••", source: "local" },
+      ],
       extracted: [{ name: "order.id", source: "body.id", value: "ord_8F2kQ", message: null }],
+      oauth2: null,
     },
   });
   return core;
@@ -1371,7 +1376,7 @@ Object.assign(SCENARIOS, {
     setup: copierDeplacer,
     play: async (g: Gestes) => {
       await ouvrirCommandes(g);
-      await g.cliquer('[aria-label="Ouvrir POST /orders"]');
+      await g.cliquer('[aria-label="POST /orders"], [aria-label^="POST /orders,"]');
       await g.attendre(150);
       await g.cliquer(".trial-transfer button", "Transférer au référentiel de tests");
       await g.attendre(100);

@@ -87,10 +87,10 @@ describe("secret saisi en clair (4.2-c)", () => {
     });
   });
 
-  it("« Laisser dans le test » écrit la valeur telle quelle ; une référence n'est pas signalée", async () => {
+  it("« Laisser dans la requête » écrit la valeur telle quelle ; une référence n'est pas signalée", async () => {
     let core: FakeCore;
     ({ app, core } = await bearer("eyJhbGciOi.xyz"));
-    await click(app, ".secret button", "Laisser dans le test");
+    await click(app, ".secret button", "Laisser dans la requête");
     await settle();
     const kept = saved(core).at(-1)?.auth.token;
     await app.get('.auth input[type="text"]').setValue("{{jeton}}");

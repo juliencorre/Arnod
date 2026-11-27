@@ -471,7 +471,7 @@ const DIFFUSENT = new Set([
   "run_retry_failures",
   "run_ignore_check",
   "result_ignore_check",
-  "tree_delete",
+  "tree_batch",
   "contract_delete",
 ]);
 

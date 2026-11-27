@@ -21,24 +21,32 @@ import {
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import AssertionsEditor from "@/components/workbench/AssertionsEditor.vue";
+import DataEditor from "@/components/workbench/DataEditor.vue";
 import CookiesSection from "@/components/workbench/CookiesSection.vue";
 import AuthEditor from "@/components/workbench/AuthEditor.vue";
 import SecretNotice from "@/components/workbench/SecretNotice.vue";
 import BodyEditor from "@/components/workbench/BodyEditor.vue";
 import DynamicValuesMenu from "@/components/workbench/DynamicValuesMenu.vue";
-import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
 import TrialGeneralize from "@/components/workbench/TrialGeneralize.vue";
+import TeamHistory from "@/components/sync/TeamHistory.vue";
 import TrialTransfer from "@/components/workbench/TrialTransfer.vue";
 import TagsEditor from "@/components/workbench/TagsEditor.vue";
 import VariablesEditor from "@/components/workbench/VariablesEditor.vue";
+import { useGuard } from "@/composables/useGuard";
+import { manualAssertion } from "@/lib/assertions";
+import { onTablistKeydown } from "@/lib/tablist";
 import { pathParamNames } from "@/lib/url";
 import { KNOWN_VARIABLES, vVariables } from "@/lib/variables";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
 import { useInputStore } from "@/stores/input";
+import { useInterfaceStore } from "@/stores/interface";
+import { useDatasetsStore } from "@/stores/datasets";
+import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
+import { useSyncStore } from "@/stores/sync";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { CurlCopy, HttpMethod, Pair, RequestDoc, UnknownVariable } from "@/types/ipc";
 
@@ -47,11 +55,20 @@ const props = defineProps<{ editorKey: string }>();
 const editorRoot = useTemplateRef<HTMLElement>("editorRoot");
 
 const workbench = useWorkbenchStore();
+const shortcuts = useInterfaceStore();
 const contracts = useContractsStore();
 const catalog = useCatalogStore();
 const inputs = useInputStore();
+const sidebar = useSidebarStore();
+const datasets = useDatasetsStore();
 const toasts = useToastStore();
+const guard = useGuard();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
+const sync = useSyncStore();
+/** Projet relié à un dépôt : l'onglet « Équipe » montre l'historique (7.1-d). */
+const linked = computed(() =>
+  editor.value ? Boolean(sync.views[editor.value.projectId]?.remote) : false,
+);
 const request = computed<RequestDoc | null>(() => editor.value?.draft ?? null);
 const folder = computed(() => {
   const path = editor.value?.path ?? "";
@@ -189,16 +206,18 @@ function definedIn(variable: UnknownVariable): string {
 
 async function addVariable(variable: UnknownVariable): Promise<void> {
   if (!editor.value) return;
-  const value = variable.definedIn.find((source) => source.value !== null)?.value ?? "";
   try {
-    const env = await inputs.addVariable(editor.value.projectId, variable.name, value);
+    const env = await inputs.declare(editor.value.projectId, [variable]);
     toasts.show(`✓ Variable « ${variable.name} » ajoutée à ${env}.`);
   } catch (cause) {
     toasts.showError(cause);
   }
 }
 
-const managingEnvironments = ref(false);
+/** « Environnements… » : la page des environnements du projet (3.3-a, AM43). */
+function manageEnvironments(): void {
+  if (editor.value) void workbench.openEnvironments(editor.value.projectId).catch(toasts.showError);
+}
 
 // --- Copier en cURL (5.1-b quater) -------------------------------------------------
 
@@ -267,40 +286,75 @@ function onCurlFocusOut(event: FocusEvent): void {
   if (next) curlOpen.value = false;
 }
 
-/** Ctrl+Maj+C dans l'éditeur : copie la requête en cURL (code de la touche, pour l'AZERTY). */
+/**
+ * Raccourcis de l'éditeur, d'après les préférences du poste (1.6-f bis) : Ctrl+Maj+C copie la
+ * requête en cURL, Ctrl+Entrée l'envoie (par défaut ; code de la touche, pour l'AZERTY).
+ */
 function onKeydown(event: KeyboardEvent): void {
-  if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyC") {
+  if (shortcuts.matches(event, "copyCurl")) {
     event.preventDefault();
     void openCurl(true);
+  } else if (shortcuts.matches(event, "send")) {
+    event.preventDefault();
+    if (!editor.value?.sending) guard(() => workbench.send(props.editorKey));
   }
 }
 
 // --- Onglets ---------------------------------------------------------------------
 
 type Tab =
-  "params" | "body" | "headers" | "auth" | "docs" | "settings" | "variables" | "assertions";
+  | "params"
+  | "body"
+  | "headers"
+  | "auth"
+  | "docs"
+  | "settings"
+  | "variables"
+  | "assertions"
+  | "data"
+  | "team";
 const tab = ref<Tab>("params");
 /** Un nombre pour une liste, un point pour un onglet rempli d'une seule valeur. */
-const tabs = computed<{ id: Tab; label: string; count?: number; filled?: boolean }[]>(() => {
+/** Onglets ; un compteur en pastille, une seule forme (DE7, 5.1-b ter). */
+const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
   const r = request.value;
   const activeQuery = r?.params.filter((p) => p.kind === "query" && p.enabled).length ?? 0;
-  const settings = r ? Object.values(r.settings).some((value) => value !== null) : false;
   return [
     { id: "params", label: "Paramètres", count: activeQuery + pathNames.value.length },
-    { id: "body", label: "Corps", filled: r !== null && r.body.kind !== "none" },
+    { id: "body", label: "Corps" },
     { id: "headers", label: "En-têtes", count: r?.headers.filter((h) => h.enabled).length },
-    {
-      id: "auth",
-      label: "Auth",
-      filled: r !== null && r.auth.type !== "none" && r.auth.type !== "inherit",
-    },
-    { id: "docs", label: "Docs", filled: r !== null && r.docs.trim() !== "" },
-    { id: "settings", label: "Réglages", filled: settings },
+    { id: "auth", label: "Auth" },
+    { id: "docs", label: "Docs" },
+    { id: "settings", label: "Réglages" },
     { id: "variables", label: "Variables", count: r?.extractions.length },
     { id: "assertions", label: "Assertions", count: r?.assertions.length },
+    // V4 (4.7-a) : jeu de données, une ligne par cas.
+    { id: "data", label: "Données", count: datasets.sets[props.editorKey]?.rows.length },
+    // V2, lot F (7.1-d) : l'historique de l'équipe, quand le projet est relié.
+    ...(linked.value ? [{ id: "team" as const, label: "Équipe" }] : []),
   ];
 });
 // --- Lot E : modifié depuis l'envoi (écart 4.2-b), curseur dans l'adresse (4.1-b) ---------
+
+/**
+ * « Remplacer par une assertion… » du rapport d'import (AM42) : l'onglet « Assertions » s'ouvre
+ * sur une assertion ajoutée, sa cible prête à la saisie.
+ */
+watch(
+  [() => sidebar.assertionFocus, request],
+  async ([focus, draft]) => {
+    if (focus !== props.editorKey || !draft) return;
+    sidebar.consumeAssertionFocus(props.editorKey);
+    tab.value = "assertions";
+    draft.assertions = [...draft.assertions, manualAssertion()];
+    await nextTick();
+    const targets = editorRoot.value?.querySelectorAll<HTMLInputElement>(
+      '.assertions input[aria-label^="Cible de l"]',
+    );
+    targets?.[targets.length - 1]?.focus();
+  },
+  { immediate: true },
+);
 
 const changedSinceSent = computed(() => workbench.isChangedSinceSent(props.editorKey));
 const urlInput = useTemplateRef<HTMLInputElement>("urlInput");
@@ -320,6 +374,8 @@ watch(
 
 <template>
   <section v-if="request" ref="editorRoot" class="editor" aria-label="Requête" @keydown="onKeydown">
+    <!-- Titre pour les lecteurs d'écran : les sections de l'éditeur (h3) ont un parent (DI5). -->
+    <h2 class="visually-hidden">Requête {{ request.name }}</h2>
     <div class="editor__top">
       <p v-if="contract" class="editor__crumbs">
         <span>Contrats de service</span>
@@ -432,7 +488,7 @@ watch(
           </div>
         </div>
       </span>
-      <BaseButton v-if="editor?.sending" @click="workbench.cancelSend(editorKey)">
+      <BaseButton v-if="editor?.sending" @click="guard(() => workbench.cancelSend(editorKey))">
         Annuler
       </BaseButton>
       <BaseButton v-else variant="primary" type="submit" :disabled="request.url.trim() === ''">
@@ -453,7 +509,7 @@ watch(
           </button>
         </li>
       </ul>
-      <button type="button" class="link unknown__manage" @click="managingEnvironments = true">
+      <button type="button" class="link unknown__manage" @click="manageEnvironments">
         Environnements…
       </button>
     </div>
@@ -477,7 +533,12 @@ watch(
       </div>
     </div>
 
-    <div role="tablist" aria-label="Sections de la requête" class="editor__tabs">
+    <div
+      role="tablist"
+      aria-label="Sections de la requête"
+      class="editor__tabs"
+      @keydown="onTablistKeydown"
+    >
       <button
         v-for="t in tabs"
         :id="`tab-${t.id}`"
@@ -487,13 +548,11 @@ watch(
         class="editor__tab"
         :aria-selected="tab === t.id"
         :aria-controls="`panel-${t.id}`"
+        :tabindex="tab === t.id ? 0 : -1"
         @click="tab = t.id"
       >
         {{ t.label }}
         <span v-if="t.count" class="editor__badge">{{ t.count }}</span>
-        <span v-else-if="t.filled" class="editor__dot">
-          <span aria-hidden="true">●</span><span class="sr-only">, rempli</span>
-        </span>
       </button>
     </div>
 
@@ -578,7 +637,11 @@ watch(
       </div>
 
       <div v-else-if="tab === 'auth'" class="stack">
-        <AuthEditor v-model="request.auth" :inherited="request.inherited" />
+        <AuthEditor
+          v-model="request.auth"
+          :inherited="request.inherited"
+          :project-id="editor?.projectId"
+        />
         <!-- Lot K (4.2-c) : secret saisi en clair, proposé en variable locale. -->
         <SecretNotice :editor-key="editorKey" />
       </div>
@@ -603,6 +666,14 @@ watch(
         :extracted="editor.outcome?.sent?.extracted ?? null"
       />
 
+      <TeamHistory
+        v-else-if="tab === 'team' && editor"
+        :project-id="editor.projectId"
+        :path="editor.path"
+      />
+
+      <DataEditor v-else-if="tab === 'data'" :editor-key="editorKey" />
+
       <AssertionsEditor
         v-else
         v-model="request.assertions"
@@ -619,13 +690,6 @@ watch(
     <p v-if="request.preserved.length > 0" class="editor__preserved" role="note">
       Conservé dans le fichier sans être modifié par Arnod : {{ request.preserved.join(", ") }}.
     </p>
-    <EnvironmentsDialog
-      v-if="managingEnvironments && editor"
-      :open="managingEnvironments"
-      :project-id="editor.projectId"
-      :start-new="false"
-      @close="managingEnvironments = false"
-    />
     <DynamicValuesMenu :root="editorRoot" />
   </section>
 </template>
@@ -638,9 +702,13 @@ watch(
   min-width: 0;
 }
 
+/*
+ * Une seule rangée au-dessus de l'adresse (3.2-a) : le fil d'Ariane, « Délier », puis « ✓ Enregistré »
+ * à droite ; le nom du contrat se coupe s'il le faut.
+ */
 .editor__top {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.5rem;
@@ -648,9 +716,11 @@ watch(
 
 .editor__crumbs {
   display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
   align-items: baseline;
   gap: 0.5rem;
+  min-width: 0;
   margin: 0;
   font-size: var(--text-body);
   color: var(--color-muted);
@@ -662,13 +732,20 @@ watch(
 }
 
 .editor__contract {
+  min-width: 0;
   padding: 0;
+  overflow: hidden;
   border: 0;
   font: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--color-link);
   background: none;
   cursor: pointer;
-  overflow-wrap: anywhere;
+}
+
+.editor__crumbs > :not(.editor__contract) {
+  flex: none;
 }
 
 .editor__version {
@@ -682,8 +759,10 @@ watch(
 
 .editor__saved {
   display: flex;
+  flex: none;
   gap: 0.375rem;
   margin: 0;
+  white-space: nowrap;
   font-size: var(--text-body);
   color: var(--color-muted);
 }
@@ -921,7 +1000,7 @@ watch(
 
 .editor__meta {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 0.75rem;
 }
 
@@ -942,8 +1021,14 @@ watch(
 /* Zone étroite : les onglets passent à la ligne, aucun n'est caché. */
 .editor__tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--color-border);
+}
+
+.editor__tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .editor__tab {
@@ -963,12 +1048,6 @@ watch(
   border-bottom-color: var(--color-accent);
   font-weight: 600;
   color: var(--color-text);
-}
-
-.editor__dot {
-  margin-left: 0.25rem;
-  font-size: var(--text-caption);
-  color: var(--color-accent);
 }
 
 .editor__badge {
@@ -1066,7 +1145,7 @@ watch(
 
 .sent--added .sent__name,
 .sent--added .sent__value {
-  color: var(--color-subtle);
+  color: var(--color-muted);
 }
 
 .sent__source {

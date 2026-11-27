@@ -7,8 +7,17 @@
  * Pendant un filtre (docs/plan-mvp-d-barre-laterale.md, F2, F3), les dossiers sont dépliés sans
  * changer leur état enregistré, la partie trouvée du nom est surlignée et une requête trouvée
  * par son adresse le dit.
+ *
+ * Lot H (AC1) : une ligne n'est un arrêt de tabulation que si l'arbre la désigne
+ * (`TREE_TAB_STOP`) ; ⋯ n'en est pas un (Maj+F10 ou la touche Menu l'ouvrent). Droite déplie ou
+ * va au premier enfant, Gauche replie ou remonte au parent, F2 renomme, Suppr met à la corbeille.
+ * DE5 : un nom coupé a son infobulle.
+ *
+ * Lot E de l'alignement (AM36, AM39, 4.1-a, 5.2-d) : le menu ⋯ d'un dossier suit la maquette
+ * (« Dans le dossier « … » », raccourcis, « Dupliquer un test… », « Déplacer vers… ») ; au
+ * survol d'un dossier, ▶ lance son run et « + » y crée un test, une requête ou un sous-dossier.
  */
-import { computed, ref } from "vue";
+import { computed, inject, ref, useTemplateRef } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
@@ -16,13 +25,18 @@ import StatusCount from "@/components/workbench/StatusCount.vue";
 import StatusMark from "@/components/workbench/StatusMark.vue";
 import { SECTION_ICONS } from "@/components/ui/sectionIcons";
 import { countStatuses, requestPaths } from "@/lib/status";
+import { initial } from "@/lib/sync";
 import { highlight, matchedByUrl, type TreeFilter } from "@/lib/treeFilter";
 import { REQUEST_DRAG, dragged, startRequestDrag } from "@/lib/requestDrag";
+import { firstChildItem, parentItem, TREE_TAB_STOP } from "@/lib/treeKeyboard";
+import { vTitleIfCut } from "@/lib/truncate";
 import { useToastStore } from "@/stores/toasts";
 import { useSelectionStore } from "@/stores/selection";
 import { useTransferStore } from "@/stores/transfer";
 import { useWindowsStore } from "@/stores/windows";
+import { useSyncStore } from "@/stores/sync";
 import { useWorkbenchStore } from "@/stores/workbench";
+import type { FolderNode } from "@/lib/tree";
 import type { TreeNode } from "@/types/ipc";
 
 const props = defineProps<{
@@ -42,7 +56,16 @@ const isTest = computed(() => props.node.kind === "folder" && props.node.test);
 const emit = defineEmits<{ action: [id: string, node: TreeNode, target?: string] }>();
 
 const workbench = useWorkbenchStore();
+const sync = useSyncStore();
+/** V2, lot F (7.1-d, CF4) : collègue qui a changé la requête à la dernière récupération. */
+const receivedBy = computed(() =>
+  props.node.kind === "request" ? sync.receivedBy(props.projectId, props.node.path) : null,
+);
 const windows = useWindowsStore();
+const tabStop = inject(TREE_TAB_STOP, null);
+/** Seul arrêt de tabulation de l'arbre (hors arbre, chaque ligne en est un). */
+const isTabStop = computed(() => tabStop === null || tabStop.value === props.node.path);
+const menu = useTemplateRef<InstanceType<typeof BaseMenu>>("menu");
 
 const isOpen = computed(
   () =>
@@ -58,11 +81,11 @@ const byUrl = computed(
     (props.filter ?? null) !== null &&
     matchedByUrl(props.node, props.filter as TreeFilter),
 );
-/** Requête (ou test) affiché dans l'onglet actif de cette fenêtre. */
+/** Requête, test ou dossier affiché dans l'onglet actif de cette fenêtre. */
 const isSelected = computed(() => {
   const content = windows.activeTab?.content;
   return (
-    (content?.kind === "request" || content?.kind === "test") &&
+    (content?.kind === "request" || content?.kind === "test" || content?.kind === "folder") &&
     content.projectId === props.projectId &&
     content.path === props.node.path
   );
@@ -105,20 +128,32 @@ const items = computed<MenuItem[]>(() => {
       // Une requête nommée s'ajoute aussi, comme dans un dossier (R4 : libellés gardés).
       { id: "new-request", label: "Nouvelle requête" },
       { id: "run", label: "Exécuter le test", separatorBefore: true },
+      // V2, lot D (5.3-c) : la même exécution dans un terminal ou une chaîne d'intégration.
+      { id: "copy-command", label: "Copier la commande" },
       { id: "rename", label: "Renommer", separatorBefore: true },
       move,
       remove,
     ];
   }
   if (props.node.kind === "folder") {
+    // AM36 (4.1-a) : les entrées de la maquette, avec leurs raccourcis.
+    const tests = props.node.children.filter(
+      (child): child is FolderNode => child.kind === "folder" && child.test,
+    );
     return [
-      { id: "new-test", label: "Nouveau test" },
-      { id: "new-request", label: "Nouvelle requête" },
-      { id: "new-folder", label: "Nouveau dossier" },
-      { id: "run", label: "Exécuter le dossier", separatorBefore: true },
-      { id: "rename", label: "Renommer", separatorBefore: true },
-      move,
-      remove,
+      { id: "new-test", label: "Nouveau test", shortcut: "Ctrl+N" },
+      { id: "new-folder", label: "Nouveau dossier", shortcut: "Ctrl+Maj+N" },
+      {
+        id: "duplicate-test",
+        label: "Dupliquer un test…",
+        disabled: tests.length === 0,
+        children: tests.map((test) => ({ id: `duplicate-test:${test.path}`, label: test.name })),
+      },
+      { id: "rename", label: "Renommer", shortcut: "F2", separatorBefore: true },
+      { id: "move-to", label: "Déplacer vers…" },
+      { id: "run", label: "Exécuter les tests du dossier", separatorBefore: true },
+      { id: "copy-command", label: "Copier la commande" },
+      { id: "delete", label: "Supprimer le dossier", tone: "danger", separatorBefore: true },
     ];
   }
   return [
@@ -133,8 +168,17 @@ const items = computed<MenuItem[]>(() => {
 
 function onSelect(id: string): void {
   if (id.startsWith("move:")) emit("action", "move", props.node, id.slice(5));
+  else if (id.startsWith("duplicate-test:"))
+    emit("action", "duplicate-test", props.node, id.slice(15));
   else emit("action", id, props.node);
 }
+
+/** « + » au survol d'un dossier (AM36) : ce qui se crée dedans. */
+const ADD_ITEMS: MenuItem[] = [
+  { id: "new-test", label: "Nouveau test", shortcut: "Ctrl+N" },
+  { id: "new-request", label: "Requête libre" },
+  { id: "new-folder", label: "Nouveau dossier", shortcut: "Ctrl+Maj+N" },
+];
 
 // --- Lot J : copier, couper, coller, annuler et glisser ----------------------------
 
@@ -162,8 +206,64 @@ async function pasteHere(mode?: "copy" | "move"): Promise<void> {
   }
 }
 
-/** Ctrl+C, Ctrl+X, Ctrl+V et Ctrl+Z sur la ligne (code de la touche, pour l'AZERTY). */
+/**
+ * Touches de la ligne (AC1) : Droite, Gauche, F2, Suppr, Maj+F10 et la touche Menu ; puis
+ * Ctrl+C, Ctrl+X, Ctrl+V et Ctrl+Z (code de la touche, pour l'AZERTY).
+ */
 function onKeydown(event: KeyboardEvent): void {
+  if (onTreeKey(event)) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+  onClipboardKey(event);
+}
+
+/** Touches de l'arbre propres à la ligne ; `true` si la touche est prise. */
+function onTreeKey(event: KeyboardEvent): boolean {
+  // AM36 : sur un dossier, Ctrl+N et Ctrl+Maj+N créent dedans (code de la touche, pour l'AZERTY).
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    event.code === "KeyN" &&
+    props.node.kind === "folder" &&
+    !isTest.value
+  ) {
+    emit("action", event.shiftKey ? "new-folder" : "new-test", props.node);
+    return true;
+  }
+  if (event.altKey || event.ctrlKey || event.metaKey) return false;
+  const item = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  if (!item) return false;
+  const folder = props.node.kind === "folder";
+  // Pendant un filtre, les dossiers restent dépliés (F3) : Droite et Gauche ne font que naviguer.
+  const foldable = folder && (props.filter ?? null) === null;
+  if ((event.shiftKey && event.key === "F10") || event.key === "ContextMenu") {
+    menu.value?.open();
+    return true;
+  }
+  if (event.shiftKey) return false;
+  switch (event.key) {
+    case "ArrowRight":
+      if (foldable && !isOpen.value) void workbench.toggleFolder(props.projectId, props.node.path);
+      else if (folder) firstChildItem(item)?.focus();
+      return true;
+    case "ArrowLeft":
+      if (foldable && isOpen.value) void workbench.toggleFolder(props.projectId, props.node.path);
+      else parentItem(item)?.focus();
+      return true;
+    case "F2":
+      emit("action", "rename", props.node);
+      return true;
+    case "Delete":
+      emit("action", "delete", props.node);
+      return true;
+    default:
+      return false;
+  }
+}
+
+function onClipboardKey(event: KeyboardEvent): void {
   if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
   const node = props.node;
   const source = { projectId: props.projectId, path: node.path, name: node.name };
@@ -270,13 +370,17 @@ function onSpace(event: KeyboardEvent): void {
 }
 
 function activate(preview = true): void {
-  // Un test s'ouvre dans son onglet ; son chevron le replie (lot E, TE1).
+  // Un test s'ouvre dans son onglet ; un dossier, dans sa vue (AM37, Q4) ; leur chevron plie.
   if (isTest.value) void workbench.openTest(props.projectId, props.node.path, preview);
-  else if (props.node.kind === "folder") {
-    // Pendant un filtre, les dossiers restent dépliés (F3).
-    if (preview && (props.filter ?? null) === null)
-      void workbench.toggleFolder(props.projectId, props.node.path);
-  } else void workbench.openRequest(props.projectId, props.node.path, preview);
+  else if (props.node.kind === "folder")
+    void workbench.openFolder(props.projectId, props.node.path, preview);
+  else void workbench.openRequest(props.projectId, props.node.path, preview);
+}
+
+/** Le chevron plie ou déplie, sauf pendant un filtre, qui garde les dossiers dépliés (F3). */
+function toggleFromChevron(): void {
+  if ((props.filter ?? null) === null)
+    void workbench.toggleFolder(props.projectId, props.node.path);
 }
 </script>
 
@@ -297,6 +401,7 @@ function activate(preview = true): void {
         :aria-expanded="node.kind === 'folder' ? isOpen : undefined"
         :aria-selected="isSelected || picked"
         :aria-level="depth + 1"
+        :tabindex="isTabStop ? 0 : -1"
         :data-path="node.path"
         :draggable="node.kind === 'request'"
         @dragstart="onDragStart"
@@ -304,16 +409,12 @@ function activate(preview = true): void {
         @click="onClick"
         @keydown.space="onSpace"
         @dblclick="activate(false)"
-        @keydown.right="isTest && !isOpen && workbench.toggleFolder(projectId, node.path)"
-        @keydown.left="isTest && isOpen && workbench.toggleFolder(projectId, node.path)"
       >
         <template v-if="node.kind === 'folder'">
           <span class="row__lead" aria-hidden="true">
-            <span
-              class="row__chevron"
-              @click.stop="isTest && workbench.toggleFolder(projectId, node.path)"
-              >{{ isOpen ? "▾" : "▸" }}</span
-            >
+            <span class="row__chevron" @click.stop="toggleFromChevron">{{
+              isOpen ? "▾" : "▸"
+            }}</span>
             <svg v-if="isTest" class="row__flask" width="14" height="14" viewBox="0 0 16 16">
               <path v-for="(d, index) in FLASK" :key="index" :d="d" />
             </svg>
@@ -321,7 +422,7 @@ function activate(preview = true): void {
               <path d="M1.5 3.5h4l1.2 1.4h5.8v6.6h-11z" />
             </svg>
           </span>
-          <span class="row__name">{{ node.name }}</span>
+          <span v-title-if-cut class="row__name">{{ node.name }}</span>
           <StatusCount class="row__count" :count="folderCount" :fallback="node.requestCount" />
         </template>
         <template v-else>
@@ -332,7 +433,7 @@ function activate(preview = true): void {
             {{ node.method }}
           </span>
           <span v-if="step" class="row__step" :aria-label="`Étape ${step}`">{{ step }}</span>
-          <span class="row__name"
+          <span v-title-if-cut class="row__name"
             ><template v-for="(part, index) in nameParts" :key="index"
               ><mark v-if="part.hit" class="row__hit">{{ part.text }}</mark
               ><template v-else>{{ part.text }}</template></template
@@ -341,17 +442,67 @@ function activate(preview = true): void {
           <span v-if="byUrl" class="row__via">adresse</span>
           <span class="row__end">
             <span v-if="dirty" class="row__dirty" title="Modifiée, non enregistrée">●</span>
+            <span
+              v-if="receivedBy"
+              class="row__author"
+              :title="`Modifiée par ${receivedBy} à la dernière récupération`"
+              ><span aria-hidden="true">{{ initial(receivedBy) }}</span
+              ><span class="visually-hidden">modifiée par {{ receivedBy }}</span></span
+            >
             <span v-if="node.invalid" class="row__invalid" title="Fichier illisible">⚠</span>
             <StatusMark v-if="status" class="row__status" :status="status" />
           </span>
         </template>
       </button>
-      <BaseMenu :items="items" :label="`Actions pour ${node.name}`" align="end" @select="onSelect">
+      <!-- AM39 (5.2-d) et AM36 : ▶ et « + » au survol d'un dossier ; au clavier, le menu ⋯. -->
+      <template v-if="node.kind === 'folder' && !isTest">
+        <button
+          type="button"
+          class="row__tool"
+          tabindex="-1"
+          :aria-label="`Exécuter les tests de ${node.name}`"
+          :title="`Exécuter les tests de ${node.name}`"
+          @click="emit('action', 'run', node)"
+        >
+          ▶
+        </button>
+        <BaseMenu
+          :items="ADD_ITEMS"
+          :label="`Ajouter dans ${node.name}`"
+          align="end"
+          @select="(id) => emit('action', id, node)"
+        >
+          <template #trigger="{ attrs }">
+            <button
+              type="button"
+              class="row__tool"
+              v-bind="attrs"
+              tabindex="-1"
+              :aria-label="`Ajouter dans ${node.name}`"
+              :title="`Ajouter dans ${node.name}`"
+            >
+              +
+            </button>
+          </template>
+        </BaseMenu>
+      </template>
+      <BaseMenu
+        ref="menu"
+        :items="items"
+        :label="`Actions pour ${node.name}`"
+        :heading="
+          node.kind === 'folder' && !isTest ? `Dans le dossier « ${node.name} »` : undefined
+        "
+        align="end"
+        @select="onSelect"
+      >
         <template #trigger="{ attrs }">
+          <!-- Hors de l'ordre de tabulation (AC1) : Maj+F10 ou la touche Menu sur la ligne. -->
           <button
             type="button"
             class="row__more"
             v-bind="attrs"
+            tabindex="-1"
             :aria-label="`Actions pour ${node.name}`"
           >
             ⋯
@@ -391,7 +542,6 @@ function activate(preview = true): void {
 /* 4.1-a quater : élément de la sélection multiple. */
 .row--picked {
   background: var(--color-accent-soft);
-  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 /* Lot J : une requête glissée sera déposée ici. */
@@ -494,10 +644,10 @@ function activate(preview = true): void {
   background: var(--color-chip);
 }
 
+/* Couleur du compteur : StatusCount (vert, rouge, sinon neutre) ; ne pas la fixer ici. */
 .row__count {
   margin-left: auto;
   font-size: var(--text-small);
-  color: var(--color-muted);
 }
 
 .row__method {
@@ -529,7 +679,7 @@ function activate(preview = true): void {
 }
 
 .row__dirty {
-  font-size: 0.625rem;
+  font-size: 0.625rem; /* impeccable-disable-line design-system-font-size: glyphe ● de modification (exception R1 à R8) */
   color: var(--color-accent);
 }
 
@@ -537,12 +687,47 @@ function activate(preview = true): void {
   color: var(--color-danger);
 }
 
+/* Pastille de l'auteur d'un changement récupéré (7.1-d) : une initiale, jamais la couleur seule. */
+.row__author {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1rem;
+  height: 1rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-accent-soft);
+}
+
+/*
+ * ⋯ au survol, au focus de la ligne et sur la ligne ouverte (DE5, 1.2-a) ; caché, il rend sa
+ * largeur au nom.
+ */
+.row__tool,
 .row__more {
+  flex: none;
+  width: 0;
+  overflow: hidden;
   border: 0;
   background: none;
-  padding: 0.125rem 0.5rem;
+  padding: 0.125rem 0;
   color: var(--color-muted);
   cursor: pointer;
+  opacity: 0;
+}
+
+.row:hover .row__more,
+.row:hover .row__tool,
+.row:focus-within .row__more,
+.row:focus-within .row__tool,
+.row--selected .row__more,
+.row--selected .row__tool,
+.row__more[aria-expanded="true"],
+.row__tool[aria-expanded="true"] {
+  width: auto;
+  padding-inline: 0.5rem;
+  opacity: 1;
 }
 
 .children {

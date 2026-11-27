@@ -144,6 +144,22 @@ Cas RU1 à RU6, ST1 à ST4 et VT1 à VT4 de
 | ST1 à ST4 | Dans la barre latérale, ✓ ou ✕ par requête et « réussies / exécutées » par dossier ou ressource de contrat, gardés d'une session à l'autre.           |
 | VT1 à VT3 | Sous la réponse, chaque assertion en échec : « Ignorer pour ce run » (la requête n'est pas modifiée) ou « Retirer l'assertion ».                      |
 
+### Tests en schéma, données et templates (version 4)
+
+Cas SC1 à SC10, JS1 à JS3, JD1 à JD7, AV1 à AV4, PR1, PR2, TP1 à TP6, PL1 et PL2 de
+[`docs/plan-v4.md`](docs/plan-v4.md) (écrans 4.3, 4.7, 4.8, 3.2-d et 1.2-d bis).
+
+| ID         | Comportement                                                                                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SC1 à SC5  | Un test en liste : étapes numérotées (requête, condition, boucle, attente, variable, script, test existant, template), chacune dit où l'on va ensuite.          |
+| SC6 à SC10 | Le même test en schéma : palette, « + » sur un lien ou dépôt pour insérer une étape « à configurer », annulable ; après exécution, chemin suivi et valeurs.     |
+| JS1 à JS3  | Étape script : JavaScript isolé (QuickJS, 2 s, sans disque ni réseau) avec `vars`, `response` et `assert()` ; les scripts Bruno importés s'exécutent à l'envoi. |
+| JD1 à JD7  | Onglet « Données » : un tableau ou un fichier CSV du projet, la requête jouée une fois par cas, le résultat de chaque cas sous la réponse et dans le run.       |
+| AV1 à AV4  | Avant / Après d'un dossier : préparer une fois ou avant chaque test, nettoyer après, même en cas d'échec.                                                       |
+| PR1, PR2   | Propriétés d'un dossier, héritées par ses sous-dossiers, avec leur origine ; le plus proche l'emporte.                                                          |
+| TP1 à TP6  | Templates : créés depuis un dossier ou une requête au point, paramètres, contenu et utilisations ; une utilisation ne règle que les valeurs.                    |
+| PL1, PL2   | « Plus » : les sections masquées du projet ; une section s'affiche seule à sa première utilisation.                                                             |
+
 ### Barre latérale du projet
 
 Cas B1 à B6 de [`docs/plan-barre-laterale-projet.md`](docs/plan-barre-laterale-projet.md).
@@ -260,9 +276,10 @@ Les versions suivent [SemVer](https://semver.org/lang/fr/). `Develop` reçoit le
 
 1. **Passer à la nouvelle version** par une pull request vers `Develop` (`chore: version X.Y.Z`) :
    `npm version X.Y.Z --no-git-tag-version` (`package.json` et `package-lock.json`), puis
-   `version` dans `src-tauri/Cargo.toml` et `src-tauri/tauri.conf.json`, puis
-   `cargo update -p arnod --offline` dans `src-tauri/` (`Cargo.lock`).
-   `node scripts/check-version.mjs` vérifie que les six sources concordent ; `npm run check` et
+   `version` dans `src-tauri/Cargo.toml`, `src-tauri/core/Cargo.toml`, `src-tauri/cli/Cargo.toml`
+   et `src-tauri/tauri.conf.json`, puis dans `src-tauri/` (`Cargo.lock`) :
+   `cargo update -p arnod -p arnod-core -p arnod-cli --offline`.
+   `node scripts/check-version.mjs` vérifie que les dix sources concordent ; `npm run check` et
    la CI le lancent aussi.
 2. **Fusionner `Develop` dans `main`** avec un commit de merge.
 3. **Poser le tag sur `main`** et le pousser :
@@ -322,6 +339,42 @@ chmod +x Arnod_<version>_amd64.AppImage
 
 Aucun droit root n'est nécessaire. Sans FUSE (conteneurs, certaines distributions),
 lancer avec `APPIMAGE_EXTRACT_AND_RUN=1`.
+
+### Ligne de commande `arnod run`
+
+`arnod` joue les tests d'un projet hors de l'application, avec le même moteur
+([`docs/plan-v2.md`](docs/plan-v2.md), lot D). C'est un exécutable autonome : ni installation à
+part, ni droits administrateur, ni Docker.
+
+- **Windows** : livré avec l'application dans `%LOCALAPPDATA%\Arnod\bin\arnod.exe` ; l'installeur
+  ajoute ce dossier au `PATH` de l'utilisateur (un nouveau terminal le voit).
+- **Linux** : `arnod-linux-x86_64.tar.gz` de la release, un exécutable lié statiquement (aucune
+  bibliothèque du système, sans coffre) : `tar -xzf arnod-linux-x86_64.tar.gz && ./arnod --version`.
+
+Depuis le dossier du projet (celui qui contient `opencollection.yml`) :
+
+```sh
+arnod run "commandes/v2" --env "Recette fonctionnelle" --rapport junit,allure,html
+arnod run --etiquette smoke --env "Recette fonctionnelle"
+ARNOD_VAR_token=… arnod run "paiements"
+arnod run --help
+```
+
+Une ligne par test, un résumé, les rapports dans `rapports/` (`--rapports <dossier>` pour un autre)
+et un code de sortie : 0 tout a réussi, 1 au moins un test en échec, 2 commande invalide (projet,
+cible ou environnement introuvable, variable manquante). Une variable locale ou un secret se
+donne par `ARNOD_VAR_<nom>`, sinon la valeur du poste est prise ; rien n'est écrit hors du dossier
+des rapports. Dans Arnod, « Copier la commande » du menu ⋯ d'un test ou d'un dossier donne la
+commande avec l'environnement actif.
+
+### Travailler en équipe (Git)
+
+Un projet se relie à un dépôt GitHub, GitLab ou à une adresse Git depuis la barre d'état, en bas
+de la fenêtre ([`docs/plan-v2.md`](docs/plan-v2.md), lots E et F). Arnod récupère toujours avant
+d'envoyer, fusionne élément par élément ce qui ne se chevauche pas et ne demande un choix que pour
+un élément changé des deux côtés. Les secrets et l'état du poste ne voyagent jamais ; le jeton du
+compte est rangé dans le coffre du système. Les échanges passent par le proxy et les autorités
+configurés dans Arnod.
 
 ## Vérifications
 

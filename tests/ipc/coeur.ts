@@ -11,6 +11,8 @@ export type AddedOrigin = "auth" | "body" | "client";
 
 export type ApiKeyLocation = "header" | "query";
 
+export type Appearance = { theme: InterfaceTheme, zoom: number, editorFont: string | null, editorFontSize: number, };
+
 export type Assertion = { id: string, target: string, operator: AssertionOperator, value?: Scalar | null, origin: AssertionOrigin, enabled: boolean, };
 
 export type AssertionOperator = "equals" | "notEquals" | "exists" | "contains" | "notContains" | "lessThan" | "lessOrEqual" | "greaterThan" | "greaterOrEqual" | "in" | "notIn" | "between" | "startsWith" | "endsWith" | "length" | "matches" | "notMatches" | "isNull" | "isUndefined" | "isEmpty" | "isNotEmpty" | "isTruthy" | "isFalsy" | "isJson" | "isNumber" | "isText" | "isBoolean" | "isArray";
@@ -47,6 +49,14 @@ export type BodyToken = { text: string, kind: TokenKind, path?: string, };
 
 export type BodyVariant = { title: string, content: string, form: Array<Pair>, };
 
+export type CaseOutcome = { number: number, values: Array<[string, string]>, outcome: SendOutcome | null, error: string | null, };
+
+export type CasePreview = { method: string, url: string, values: Array<[string, string]>, };
+
+export type CaseResult = { number: number, values: Array<[string, string]>, status: RunItemStatus, httpStatus: number | null, durationMs: number | null, assertions: Array<AssertionResult>, error: string | null, };
+
+export type CasesOutcome = { cases: Array<CaseOutcome>, passed: boolean, };
+
 export type CatalogFile = { version: number, projects: Array<Project>, workspaces: Array<Workspace>, lastWorkspaceId: string | null, inboxProjectId?: string, };
 
 export type CatalogFileV1 = { projects: Array<Project>, workspaces: Array<Workspace>, defaultWorkspaceId: string, lastWorkspaceId: string, };
@@ -63,15 +73,17 @@ export type CertificateProblem = "unknownIssuer" | "expired" | "notYetValid" | "
 
 export type ClearSecret = { field: string, label: string, suggested: string, };
 
+export type CliShell = "powerShell" | "sh";
+
 export type CommandError = { kind: CommandErrorKind, message: string, failure?: NetworkFailure, };
 
-export type CommandErrorKind = "invalidName" | "nameTaken" | "folderNotEmpty" | "alreadyRegistered" | "notAProject" | "notFound" | "undoExpired" | "io" | "corruptState" | "newerVersion" | "unknownVariable" | "invalidRequest" | "network" | "timeout" | "cancelled" | "secretStore" | "protectedEnvironment" | "changedOnDisk";
+export type CommandErrorKind = "invalidName" | "nameTaken" | "folderNotEmpty" | "alreadyRegistered" | "notAProject" | "notFound" | "undoExpired" | "io" | "corruptState" | "newerVersion" | "unknownVariable" | "invalidRequest" | "network" | "timeout" | "cancelled" | "secretStore" | "protectedEnvironment" | "changedOnDisk" | "conflict";
 
 export type ConflictItem = { key: string, label: string, disk: string | null, draft: string | null, identical: boolean, suggested: ConflictSide | null, };
 
 export type ConflictSide = "disk" | "draft";
 
-export type ContentRef = { "kind": "request", projectId: string, path: string, } | { "kind": "run", projectId: string, } | { "kind": "contract", projectId: string, path: string, } | { "kind": "result" } | { "kind": "importReport", projectId: string, } | { "kind": "test", projectId: string, path: string, };
+export type ContentRef = { "kind": "request", projectId: string, path: string, } | { "kind": "run", projectId: string, } | { "kind": "contract", projectId: string, path: string, } | { "kind": "result" } | { "kind": "importReport", projectId: string, } | { "kind": "test", projectId: string, path: string, } | { "kind": "folder", projectId: string, path: string, } | { "kind": "environments", projectId: string, };
 
 export type ContentTab = { id: string, content: ContentRef, preview: boolean, };
 
@@ -103,11 +115,21 @@ export type CurlImport = { secrets: Array<CurlSecret>, ignored: Array<CurlIgnore
 
 export type CurlSecret = { name: string, value: string, header: string, };
 
-export type Definition = { format: number, id: string, version: string, name: string, title: string, description: string, family: StepFamily, publisher: string, engine: StepEngine, action: string, subject: StepSubject, detect: Array<StepRule>, form: Array<StepField>, };
+export type DataLink = { file: string, editable: boolean, };
+
+export type DataSet = { link: DataLink, error: string | null, columns: Array<string>, rows: Array<Array<string>>, };
+
+export type DataTable = { columns: Array<string>, rows: Array<Array<string>>, };
+
+export type Definition = { format: number, id: string, version: string, name: string, title: string, noun: string, description: string, family: StepFamily, publisher: string, engine: StepEngine, action: string, subject: StepSubject, detect: Array<StepRule>, form: Array<StepField>, };
 
 export type DetailRow = { label: string, value: string, };
 
 export type Detection = { nature: string, subject: string, values: { [key in string]: string }, curl?: CurlImport, };
+
+export type DiffLine = { part: DiffPart, added: boolean, text: string, };
+
+export type DiffPart = "status" | "header" | "body" | "assertion";
 
 export type DrawnValue = { name: string, value: string, source: string | null, };
 
@@ -115,7 +137,13 @@ export type DynamicValue = { name: string, description: string, example: string,
 
 export type EnvVariable = { name: string, value: string, };
 
+export type EnvironmentChoice = { from: string, to: string, };
+
+export type EnvironmentDeleted = { view: EnvironmentsView, undoToken: string, };
+
 export type EnvironmentDoc = { name: string, color: string, protected: boolean, variables: Array<EnvVariable>, locals: Array<string>, };
+
+export type EnvironmentUsage = { environment: string, number: number, folder: string, contract: string | null, startedAt: number, };
 
 export type EnvironmentView = { localVars: Array<LocalVarView>, name: string, color: string, protected: boolean, variables: Array<EnvVariable>, locals: Array<string>, };
 
@@ -131,9 +159,13 @@ export type ExampleRef = { index: number, status: number | null, name: string, }
 
 export type ExtractedValue = { name: string, source: string, value: string | null, message: string | null, };
 
-export type Extraction = { name: string, source: string, enabled: boolean, };
+export type Extraction = { name: string, source: string, enabled: boolean, scope: ExtractionScope, };
+
+export type ExtractionScope = "runtime" | "environment" | "request" | "folder" | "collection";
 
 export type FailureCause = "certificate" | "proxy" | "proxyAuth" | "dns" | "unreachable" | "timeout" | "tls" | "other";
+
+export type FileConflict = { item: SharedItem, author: string, at: number, elements: Array<SyncConflictElement>, merged: Array<SyncMergedElement>, ours: string | null, theirs: string | null, };
 
 export type Filed = { moved: Array<[string, string]>, left: Array<string>, contract: string, contractName: string, };
 
@@ -145,6 +177,18 @@ export type FilterMatch = { path: string, value: string, assertion: Assertion | 
 
 export type FilterResult = { matches: Array<FilterMatch>, total: number, error: string | null, };
 
+export type Flow = { onFailure: OnFailure, steps: Array<FlowStep>, };
+
+export type FlowCheck = { target: string, operator: AssertionOperator, value?: Scalar | null, };
+
+export type FlowStep = { id: string, name: string, next?: string, onFailure?: OnFailure, } & ({ "kind": "request", file: string, } | { "kind": "condition", check: FlowCheck, otherwise?: string, } | { "kind": "loop", count?: number, list?: string, item: string, until?: string, } | { "kind": "wait", file?: string, check: FlowCheck, intervalMs: number, attempts: number, } | { "kind": "variable", variable: string, value: string, } | { "kind": "script", code: string, } | { "kind": "test", test: string, } | { "kind": "template", template: string, values: { [key in string]: string }, });
+
+export type FlowStepInfo = { id: string, inputs: Array<StepInput>, extracts: Array<string>, available: Array<StepInput>, };
+
+export type FolderHooks = { beforeAll: Array<FlowStep>, beforeEach: Array<FlowStep>, afterEach: Array<FlowStep>, afterAll: Array<FlowStep>, };
+
+export type FolderProperty = { name: string, value: string, origin: PropertyOrigin, };
+
 export type FolderTarget = { path: string, current: boolean, };
 
 export type GenerateReport = { folder: string, created: Array<string>, skipped: Array<SkippedOperation>, baseUrl: BaseUrlSet | null, };
@@ -154,6 +198,20 @@ export type GhAsset = { name: string, browser_download_url: string, };
 export type GhRelease = { tag_name: string, name: string | null, body: string | null, html_url: string, draft: boolean, prerelease: boolean, published_at: string | null, assets: Array<GhAsset>, };
 
 export type HelloResponse = { message: string, timestampMs: number, };
+
+export type HistoryDiff = { previousId: string, lines: Array<DiffLine>, truncated: boolean, };
+
+export type HistoryEntry = { id: string, at: number, environment: string | null, status: number, statusText: string, totalMs: number, sizeBytes: number, passed: boolean, assertions: Array<AssertionResult>, headers: Array<[string, string]>, body: string, truncated: boolean, sent: HistorySent | null, };
+
+export type HistoryItem = { entry: HistoryEntry, previousAt: number | null, changes: Array<string>, };
+
+export type HistorySent = { method: string, url: string, headers: Array<[string, string]>, body: string | null, };
+
+export type HistoryView = { path: string, items: Array<HistoryItem>, max: number, };
+
+export type HookPhase = "beforeAll" | "beforeEach" | "afterEach" | "afterAll";
+
+export type HooksView = { folder: string, hooks: FolderHooks, requests: Array<StepView>, };
 
 export type HtmlNode = { "kind": "text", text: string, } | { "kind": "element", tag: string, children: Array<HtmlNode>, };
 
@@ -169,25 +227,37 @@ export type ImportFormat = "bruno" | "openCollection" | "openApi";
 
 export type ImportItemKind = "tests" | "preRequest" | "postResponse" | "env" | "auth" | "body" | "request" | "assertion" | "extraction" | "option";
 
-export type ImportItemStatus = "notRun" | "toFill" | "toCheck" | "skipped" | "stored";
+export type ImportItemStatus = "notRun" | "toFill" | "toCheck" | "skipped" | "stored" | "accepted" | "replaced";
+
+export type ImportOptions = { environments: Array<EnvironmentChoice>, secretsLocal: boolean, };
 
 export type ImportReport = { collection: string, format: ImportFormat, source: string, sourceFiles: number, projectId: string, projectName: string, folder: string | null, importedAt: number, counts: ImportCounts, items: Array<ImportReportItem>, examples: Array<ConversionExample>, };
 
 export type ImportReportItem = { kind: ImportItemKind, status: ImportItemStatus, name: string, place: string, file: string, block: string | null, request: string | null, detail: string, code: string | null, };
 
-export type ImportSource = { path: string, format: ImportFormat, name: string, counts: ImportCounts, files: number, };
+export type ImportSource = { path: string, format: ImportFormat, name: string, counts: ImportCounts, files: number, environments: Array<SourceEnvironment>, secrets: Array<string>, };
 
 export type ImportTarget = { "kind": "newProject", location: string | null, workspaceId: string | null, } | { "kind": "project", projectId: string, };
 
-export type Inherited = { auth: InheritedAuth | null, headers: Array<InheritedHeader>, settings: ResolvedSettings, };
+export type Inherited = { auth: InheritedAuth | null, headers: Array<InheritedHeader>, settings: ResolvedSettings, variables: Array<InheritedVariable>, };
 
 export type InheritedAuth = { auth: Auth, source: string, };
 
 export type InheritedHeader = { name: string, value: string, source: string, };
 
+export type InheritedVariable = { name: string, value: string, source: string, folder: string, };
+
 export type InstallState = { "state": "idle" } | { "state": "downloading", received: number, total: number | null, } | { "state": "ready", version: string, onExit: boolean, } | { "state": "failed", message: string, };
 
+export type InstanceView = { path: string, name: string, template: TemplateSummary | null, templatePath: string, values: Array<ParamValue>, content: Array<TreeNode>, };
+
+export type InterfaceTheme = "system" | "light" | "dark";
+
+export type InterfaceView = { appearance: Appearance, zooms: Array<number>, fonts: Array<string>, sizes: Array<number>, shortcuts: Array<ShortcutView>, };
+
 export type Jar = { cookies: Array<StoredCookie>, disabledDomains: Array<string>, };
+
+export type JournalEntry = { author: string, at: number, detail: string, message: string, before: string | null, after: string | null, };
 
 export type LayoutNode = { "kind": "zone" } & ZoneView | { "kind": "split", id: string, axis: Axis, ratio: number, first: LayoutNode, second: LayoutNode, };
 
@@ -195,7 +265,9 @@ export type LayoutPreset = "one" | "twoColumns" | "twoRows" | "three" | "four";
 
 export type LinkedView = { path: string, name: string, method: HttpMethod, examples: Array<ExampleRef>, };
 
-export type LocalData = { lastEnvironment: string | null, collapsed: Array<string>, locals: { [key in string]: Array<LocalVar> }, };
+export type Literal = { name: string, value: string, location: string, };
+
+export type LocalData = { lastEnvironment: string | null, collapsed: Array<string>, locals: { [key in string]: Array<LocalVar> }, sections: Array<string>, };
 
 export type LocalVar = { name: string, value: string | null, secret: boolean, };
 
@@ -205,6 +277,8 @@ export type ManualProxy = { url: string, noProxy: string, username: string, };
 
 export type MenuShortcut = "placement" | "sidebar";
 
+export type MissingSecrets = { environment: string, names: Array<string>, };
+
 export type NetworkFailure = { cause: FailureCause, title: string, explanation: string, notSent: boolean, host: string, port: number, proxy: string | null, connectTimeoutMs: number, elapsedMs: number, certificate: CertificateFailure | null, };
 
 export type NetworkPrefs = { format: number, proxy: ProxyPrefs, connectTimeoutMs: number, authorities: Array<StoredAuthority>, };
@@ -213,7 +287,11 @@ export type NetworkPrefsInput = { proxy: ProxyPrefs, proxyPassword: string | nul
 
 export type NetworkView = { proxy: ProxyPrefs, hasProxyPassword: boolean, system: SystemProxy, connectTimeoutMs: number, systemAuthorities: number, authorities: Array<AuthorityView>, };
 
+export type NewEnvironment = { name: string, baseUrl: string, copyFrom: string | null, after: string | null, protected: boolean, };
+
 export type OAuth2 = { accessTokenUrl: string, clientId: string, clientSecret: string, scope: string, credentials: CredentialsPlacement, tokenPlacement: TokenPlacement, tokenName: string, };
+
+export type OnFailure = "stop" | "continue";
 
 export type OperationNode = { key: string, method: string, path: string, summary: string | null, supported: boolean, requests: Array<LinkedView>, };
 
@@ -230,6 +308,8 @@ export type PairsFormat = "header" | "query";
 export type PairsText = { pairs: Array<Pair>, errors: Array<TextError>, };
 
 export type ParamKind = "query" | "path";
+
+export type ParamValue = { name: string, value: string, effective: string, origin: ValueOrigin, default: string, description: string, };
 
 export type PathGeneralization = { path: string, template: Template, contract: string, };
 
@@ -255,6 +335,8 @@ export type ProjectStatus = "ok" | "missing";
 
 export type ProjectView = { id: string, name: string, path: string, status: ProjectStatus, workspaceIds: Array<string>, };
 
+export type PropertyOrigin = { "kind": "here" } | { "kind": "folder", folder: string, } | { "kind": "project" } | { "kind": "environment", name: string, };
+
 export type ProposeInput = { status: number, durationMs: number, headers: Array<[string, string]>, body: string, };
 
 export type ProxyMode = "system" | "none" | "manual";
@@ -271,7 +353,7 @@ export type RenderedBody = { format: ResponseFormat, detected: ResponseFormat, l
 
 export type RequestConflict = { items: Array<ConflictItem>, modifiedAt: number | null, };
 
-export type RequestDoc = { name: string, description: string, tags: Array<string>, method: HttpMethod, url: string, params: Array<Pair>, headers: Array<Pair>, auth: Auth, body: Body, settings: RequestSettings, docs: string, assertions: Array<Assertion>, extractions: Array<Extraction>, seq?: number, examples: Array<Example>, contract?: ContractLink, preserved: Array<string>, inherited: Inherited, };
+export type RequestDoc = { name: string, description: string, tags: Array<string>, method: HttpMethod, url: string, params: Array<Pair>, headers: Array<Pair>, auth: Auth, body: Body, settings: RequestSettings, docs: string, assertions: Array<Assertion>, extractions: Array<Extraction>, seq?: number, examples: Array<Example>, contract?: ContractLink, data?: DataLink, preserved: Array<string>, inherited: Inherited, };
 
 export type RequestInput = { environment: string, known: Array<string>, unknown: Array<UnknownVariable>, added: Array<AddedHeader>, secrets: Array<ClearSecret>, };
 
@@ -297,23 +379,53 @@ export type RunChange = { projectId: string, run: RunView, origin: string, };
 
 export type RunGroup = { name: string, path: string, passed: number, failed: number, total: number, };
 
-export type RunItem = { path: string, name: string, method: HttpMethod, status: RunItemStatus, httpStatus: number | null, durationMs: number | null, slow: boolean, assertions: Array<AssertionResult>, error: string | null, test: string | null, step: number | null, extracted: Array<ExtractedValue>, };
+export type RunItem = { path: string, name: string, method: HttpMethod, status: RunItemStatus, httpStatus: number | null, durationMs: number | null, slow: boolean, assertions: Array<AssertionResult>, error: string | null, test: string | null, step: number | null, extracted: Array<ExtractedValue>, kind: StepKind, stepId: string | null, detail: string | null, branch: boolean | null, passes: number, hook: HookPhase | null, folder: string | null, cases: Array<CaseResult>, };
 
 export type RunItemStatus = "pending" | "running" | "passed" | "failed" | "error" | "cancelled" | "skipped";
 
 export type RunTest = { path: string, name: string, status: RunItemStatus, steps: number, passed: number, failedStep: number | null, };
 
-export type RunView = { id: string, number: number, folder: string, environment: string, concurrency: number, startedAt: number, finishedAt: number | null, finished: boolean, cancelled: boolean, items: Array<RunItem>, contract: string | null, revision: number, groups: Array<RunGroup>, tests: Array<RunTest>, };
+export type RunView = { id: string, number: number, folder: string, environment: string, concurrency: number, startedAt: number, finishedAt: number | null, finished: boolean, cancelled: boolean, items: Array<RunItem>, contract: string | null, revision: number, groups: Array<RunGroup>, tests: Array<RunTest>, ends: Array<TestEnd>, };
 
 export type Scalar = boolean | number | number | string;
 
+export type ScriptChoice = "accept" | "replace";
+
+export type ScriptResolved = { report: ImportReport, undoToken: string, };
+
+export type SearchGroup = { title: string, hits: Array<SearchHit>, total: number, };
+
+export type SearchHit = { kind: SearchKind, projectId: string, label: string, detail: string, method: string | null, path: string | null, contract: string | null, highlight: Array<[number, number]>, };
+
+export type SearchKind = "request" | "test" | "folder" | "operation" | "contract" | "environment" | "project";
+
+export type SearchResults = { text: string, address: boolean, groups: Array<SearchGroup>, };
+
 export type SendOutcome = { response: HttpResponse, assertions: Array<AssertionResult>, passed: boolean, slow: boolean, sent: Sent | null, };
 
-export type Sent = { method: string, url: string, headers: Array<[string, string]>, body: string | null, drawn: Array<DrawnValue>, used: Array<UsedVariable>, extracted: Array<ExtractedValue>, };
+export type Sent = { environment: string, method: string, url: string, headers: Array<[string, string]>, body: string | null, drawn: Array<DrawnValue>, used: Array<UsedVariable>, extracted: Array<ExtractedValue>, oauth2: SentToken | null, };
+
+export type SentToken = { tokenUrl: string, status: TokenStatus | null, };
+
+export type SharedItem = { key: string, kind: SharedItemKind, label: string, place: string, detail: string, author: string | null, at: number | null, };
+
+export type SharedItemKind = "step" | "request" | "endpoint" | "folder" | "contract" | "environment" | "project" | "other";
+
+export type ShortcutChange = { view: InterfaceView, conflict: ShortcutConflict | null, };
+
+export type ShortcutConflict = { keys: string, action: string, label: string, };
+
+export type ShortcutGroup = "request" | "window" | "project";
+
+export type ShortcutScope = "global" | "editor" | "response" | "sidebar" | "contract";
+
+export type ShortcutView = { id: string, label: string, group: ShortcutGroup, scope: ShortcutScope, keys: Array<string>, defaults: Array<string>, editable: boolean, };
 
 export type Side = "right" | "bottom";
 
 export type SkippedOperation = { operation: string, reason: string, };
+
+export type SourceEnvironment = { name: string, variables: Array<string>, };
 
 export type SpecKind = "openApi3" | "swagger2";
 
@@ -327,6 +439,8 @@ export type StartupTarget = "folder" | "releases" | "issue";
 
 export type StatusesChange = { projectId: string, statuses: { [key in string]: RequestStatus }, };
 
+export type StepAdded = { step: string, request: string | null, };
+
 export type StepCatalog = { source: StepCatalogSource, natures: Array<StepNature>, };
 
 export type StepCatalogSource = { name: string, updated: string, synced: boolean, };
@@ -339,15 +453,21 @@ export type StepField = { key: string, label: string, kind: StepFieldKind, defau
 
 export type StepFieldKind = "choice" | "text" | "multiline";
 
-export type StepNature = { origin: StepOrigin, format: number, id: string, version: string, name: string, title: string, description: string, family: StepFamily, publisher: string, engine: StepEngine, action: string, subject: StepSubject, detect: Array<StepRule>, form: Array<StepField>, };
+export type StepInput = { name: string, from: string | null, source: string, };
+
+export type StepKind = "request" | "condition" | "loop" | "wait" | "variable" | "script" | "test" | "template";
+
+export type StepNature = { origin: StepOrigin, format: number, id: string, version: string, name: string, title: string, noun: string, description: string, family: StepFamily, publisher: string, engine: StepEngine, action: string, subject: StepSubject, detect: Array<StepRule>, form: Array<StepField>, };
 
 export type StepOrigin = "builtin";
+
+export type StepPlacement = { "kind": "end" } | { "kind": "free" } | { "kind": "start" } | { "kind": "link", after: string, otherwise: boolean, };
 
 export type StepRule = { "kind": "url", schemes: Array<string>, methodField: string | null, } | { "kind": "keywords", words: Array<string>, } | { "kind": "prefix", text: string, } | { "kind": "suffix", text: string, } | { "kind": "curl" };
 
 export type StepSubject = { key: string, label: string, placeholder: string, };
 
-export type StepView = { path: string, name: string, method: HttpMethod | null, url: string, assertionCount: number, extractions: Array<string>, invalid: boolean, };
+export type StepView = { path: string, file: string, name: string, method: HttpMethod | null, url: string, assertionCount: number, extractions: Array<string>, assertions: Array<Assertion>, extracts: Array<Extraction>, invalid: boolean, };
 
 export type StepVisibleWhen = { key: string, in: Array<string>, };
 
@@ -355,13 +475,49 @@ export type StoredAuthority = { pem: string, addedAt: number, };
 
 export type StoredCookie = { name: string, value: string, domain: string, hostOnly: boolean, path: string, expiresAt: number | null, secure: boolean, httpOnly: boolean, receivedFrom: string, receivedAt: number, };
 
+export type SyncAccount = { forge: SyncForge, host: string, login: string, name: string, email: string, };
+
+export type SyncChoice = "ours" | "theirs" | "both";
+
+export type SyncConflictElement = { key: string, label: string, ours: string | null, theirs: string | null, both: boolean, };
+
+export type SyncConflicts = { projectId: string, conflicts: Array<FileConflict>, };
+
+export type SyncDeviceCode = { userCode: string, verificationUri: string, intervalSecs: number, expiresInSecs: number, };
+
+export type SyncForge = "github" | "gitlab" | "other";
+
+export type SyncLoginOptions = { githubBrowser: boolean, gitlabBrowser: boolean, };
+
+export type SyncMergedElement = { label: string, theirs: boolean, };
+
+export type SyncRemote = { url: string, forge: SyncForge, host: string, name: string, branch: string, };
+
+export type SyncRepository = { name: string, url: string, private: boolean, empty: boolean, };
+
+export type SyncView = { projectId: string, repository: boolean, remote: SyncRemote | null, account: SyncAccount | null, incoming: Array<SharedItem>, outgoing: Array<SharedItem>, conflicts: number, checkedAt: number | null, error: string | null, members: Array<string>, received: { [key in string]: string }, };
+
 export type SystemProxy = { http: string | null, https: string | null, noProxy: string, source: ProxySource | null, autoConfig: string | null, };
 
 export type Template = { path: string, params: Array<PathParam>, };
 
+export type TemplateCandidate = { name: string, value: string, origin: string, checked: boolean, };
+
+export type TemplateKind = "test" | "folder" | "tree";
+
+export type TemplateParam = { name: string, default: string, description: string, };
+
+export type TemplateSummary = { path: string, name: string, kind: TemplateKind, category: string, params: number, folders: number, tests: number, assertions: number, };
+
+export type TemplateUse = { path: string, name: string, values: { [key in string]: string }, };
+
+export type TemplateView = { parameters: Array<TemplateParam>, content: Array<TreeNode>, uses: Array<TemplateUse>, path: string, name: string, kind: TemplateKind, category: string, params: number, folders: number, tests: number, assertions: number, };
+
+export type TestEnd = { test: string, passed: boolean, reason: string | null, failedStep: string | null, };
+
 export type TestTarget = { path: string, name: string, steps: Array<string>, current: number | null, };
 
-export type TestView = { path: string, name: string, test: boolean, steps: Array<StepView>, };
+export type TestView = { path: string, name: string, test: boolean, steps: Array<StepView>, flow: Flow, info: Array<FlowStepInfo>, };
 
 export type TextError = { line: number, message: string, };
 
@@ -387,9 +543,9 @@ export type TransferredRequest = { path: string, name: string, };
 
 export type TransferredTrial = { test: string, step: string, };
 
-export type TreeNode = { "kind": "folder", name: string, path: string, children: Array<TreeNode>, requestCount: number, test: boolean, } | { "kind": "request", name: string, path: string, method: HttpMethod | null, assertionCount: number, invalid: boolean, contract: string | null, url: string, tags: Array<string>, };
+export type TreeNode = { "kind": "folder", name: string, path: string, children: Array<TreeNode>, requestCount: number, test: boolean, tags: Array<string>, template: string | null, } | { "kind": "request", name: string, path: string, method: HttpMethod | null, assertionCount: number, invalid: boolean, contract: string | null, url: string, tags: Array<string>, };
 
-export type TreeView = { nodes: Array<TreeNode>, tests: Array<TreeNode>, collapsed: Array<string>, };
+export type TreeView = { nodes: Array<TreeNode>, tests: Array<TreeNode>, collapsed: Array<string>, templates: Array<TemplateSummary>, sections: Array<string>, };
 
 export type TrialResult = { snapshot: CatalogSnapshot, projectId: string, path: string, contract: string, outcome: SendOutcome, };
 
@@ -403,7 +559,11 @@ export type UpdatePrefs = { automatic: boolean, channel: UpdateChannel, lastChec
 
 export type UpdatesView = { current: string, prefs: UpdatePrefs, latest: Release | null, checked: boolean, installable: boolean, install: InstallState, };
 
-export type UsedVariable = { name: string, value: string, runtime: boolean, };
+export type UsedSource = "environment" | "local" | "extracted";
+
+export type UsedVariable = { name: string, value: string, source: UsedSource, };
+
+export type ValueOrigin = { "kind": "here" } | { "kind": "property", folder: string, } | { "kind": "default" } | { "kind": "missing" };
 
 export type VariableSource = { environment: string, value: string | null, };
 
@@ -478,6 +638,7 @@ export type CheckExampleBodyKind = Check<Same<Ipc.ExampleBodyKind, ExampleBodyKi
 export type CheckResponseHeader = Check<Same<Ipc.ResponseHeader, ResponseHeader>>;
 export type CheckExample = Check<Same<Ipc.Example, Example>>;
 export type CheckInherited = Check<Same<Ipc.Inherited, Inherited>>;
+export type CheckInheritedVariable = Check<Same<Ipc.InheritedVariable, InheritedVariable>>;
 export type CheckAssertionOperator = Check<Same<Ipc.AssertionOperator, AssertionOperator>>;
 export type CheckAssertionOrigin = Check<Same<Ipc.AssertionOrigin, AssertionOrigin>>;
 export type CheckScalar = Check<Same<Ipc.Scalar, Scalar>>;
@@ -493,8 +654,13 @@ export type CheckEnvironmentDoc = Check<Same<Ipc.EnvironmentDoc, EnvironmentDoc>
 export type CheckLocalVarView = Check<Same<Ipc.LocalVarView, LocalVarView>>;
 export type CheckEnvironmentView = Check<Same<Ipc.EnvironmentView, EnvironmentView>>;
 export type CheckEnvironmentsView = Check<Same<Ipc.EnvironmentsView, EnvironmentsView>>;
+export type CheckEnvironmentUsage = Check<Same<Ipc.EnvironmentUsage, EnvironmentUsage>>;
+export type CheckNewEnvironment = Check<Same<Ipc.NewEnvironment, NewEnvironment>>;
+export type CheckEnvironmentDeleted = Check<Same<Ipc.EnvironmentDeleted, EnvironmentDeleted>>;
 export type CheckRunItemStatus = Check<Same<Ipc.RunItemStatus, RunItemStatus>>;
 export type CheckRunItem = Check<Same<Ipc.RunItem, RunItem>>;
+export type CheckCaseResult = Check<Same<Ipc.CaseResult, CaseResult>>;
+export type CheckTestEnd = Check<Same<Ipc.TestEnd, TestEnd>>;
 export type CheckRunGroup = Check<Same<Ipc.RunGroup, RunGroup>>;
 export type CheckRunView = Check<Same<Ipc.RunView, RunView>>;
 export type CheckRequestStatus = Check<Same<Ipc.RequestStatus, RequestStatus>>;
@@ -567,6 +733,9 @@ export type CheckCurlIgnored = Check<Same<Ipc.CurlIgnored, CurlIgnored>>;
 export type CheckCurlImport = Check<Same<Ipc.CurlImport, CurlImport>>;
 export type CheckImportFormat = Check<Same<Ipc.ImportFormat, ImportFormat>>;
 export type CheckImportSource = Check<Same<Ipc.ImportSource, ImportSource>>;
+export type CheckSourceEnvironment = Check<Same<Ipc.SourceEnvironment, SourceEnvironment>>;
+export type CheckImportOptions = Check<Same<Ipc.ImportOptions, ImportOptions>>;
+export type CheckEnvironmentChoice = Check<Same<Ipc.EnvironmentChoice, EnvironmentChoice>>;
 export type CheckImportTarget = Check<Same<Ipc.ImportTarget, ImportTarget>>;
 export type CheckImportItemKind = Check<Same<Ipc.ImportItemKind, ImportItemKind>>;
 export type CheckImportItemStatus = Check<Same<Ipc.ImportItemStatus, ImportItemStatus>>;
@@ -575,11 +744,16 @@ export type CheckConversionExample = Check<Same<Ipc.ConversionExample, Conversio
 export type CheckImportCounts = Check<Same<Ipc.ImportCounts, ImportCounts>>;
 export type CheckImportReport = Check<Same<Ipc.ImportReport, ImportReport>>;
 export type CheckImportDone = Check<Same<Ipc.ImportDone, ImportDone>>;
+export type CheckScriptChoice = Check<Same<Ipc.ScriptChoice, ScriptChoice>>;
+export type CheckScriptResolved = Check<Same<Ipc.ScriptResolved, ScriptResolved>>;
 export type CheckExtraction = Check<Same<Ipc.Extraction, Extraction>>;
+export type CheckExtractionScope = Check<Same<Ipc.ExtractionScope, ExtractionScope>>;
 export type CheckExtractedValue = Check<Same<Ipc.ExtractedValue, ExtractedValue>>;
 export type CheckDrawnValue = Check<Same<Ipc.DrawnValue, DrawnValue>>;
+export type CheckUsedSource = Check<Same<Ipc.UsedSource, UsedSource>>;
 export type CheckUsedVariable = Check<Same<Ipc.UsedVariable, UsedVariable>>;
 export type CheckSent = Check<Same<Ipc.Sent, Sent>>;
+export type CheckSentToken = Check<Same<Ipc.SentToken, SentToken>>;
 export type CheckRunTest = Check<Same<Ipc.RunTest, RunTest>>;
 export type CheckStepView = Check<Same<Ipc.StepView, StepView>>;
 export type CheckTestView = Check<Same<Ipc.TestView, TestView>>;
@@ -639,6 +813,72 @@ export type CheckClearSecret = Check<Same<Ipc.ClearSecret, ClearSecret>>;
 export type CheckBatchAction = Check<Same<Ipc.BatchAction, BatchAction>>;
 export type CheckBatchResult = Check<Same<Ipc.BatchResult, BatchResult>>;
 export type CheckInstallState = Check<Same<Ipc.InstallState, InstallState>>;
+export type CheckInterfaceTheme = Check<Same<Ipc.InterfaceTheme, InterfaceTheme>>;
+export type CheckAppearance = Check<Same<Ipc.Appearance, Appearance>>;
+export type CheckShortcutGroup = Check<Same<Ipc.ShortcutGroup, ShortcutGroup>>;
+export type CheckShortcutScope = Check<Same<Ipc.ShortcutScope, ShortcutScope>>;
+export type CheckShortcutView = Check<Same<Ipc.ShortcutView, ShortcutView>>;
+export type CheckInterfaceView = Check<Same<Ipc.InterfaceView, InterfaceView>>;
+export type CheckShortcutConflict = Check<Same<Ipc.ShortcutConflict, ShortcutConflict>>;
+export type CheckShortcutChange = Check<Same<Ipc.ShortcutChange, ShortcutChange>>;
+export type CheckHistorySent = Check<Same<Ipc.HistorySent, HistorySent>>;
+export type CheckHistoryEntry = Check<Same<Ipc.HistoryEntry, HistoryEntry>>;
+export type CheckHistoryItem = Check<Same<Ipc.HistoryItem, HistoryItem>>;
+export type CheckHistoryView = Check<Same<Ipc.HistoryView, HistoryView>>;
+export type CheckDiffPart = Check<Same<Ipc.DiffPart, DiffPart>>;
+export type CheckDiffLine = Check<Same<Ipc.DiffLine, DiffLine>>;
+export type CheckHistoryDiff = Check<Same<Ipc.HistoryDiff, HistoryDiff>>;
+export type CheckSearchKind = Check<Same<Ipc.SearchKind, SearchKind>>;
+export type CheckSearchHit = Check<Same<Ipc.SearchHit, SearchHit>>;
+export type CheckSearchGroup = Check<Same<Ipc.SearchGroup, SearchGroup>>;
+export type CheckSearchResults = Check<Same<Ipc.SearchResults, SearchResults>>;
+export type CheckCliShell = Check<Same<Ipc.CliShell, CliShell>>;
+export type CheckSyncForge = Check<Same<Ipc.SyncForge, SyncForge>>;
+export type CheckSyncAccount = Check<Same<Ipc.SyncAccount, SyncAccount>>;
+export type CheckSyncRemote = Check<Same<Ipc.SyncRemote, SyncRemote>>;
+export type CheckSharedItemKind = Check<Same<Ipc.SharedItemKind, SharedItemKind>>;
+export type CheckSharedItem = Check<Same<Ipc.SharedItem, SharedItem>>;
+export type CheckSyncView = Check<Same<Ipc.SyncView, SyncView>>;
+export type CheckSyncChoice = Check<Same<Ipc.SyncChoice, SyncChoice>>;
+export type CheckSyncConflictElement = Check<Same<Ipc.SyncConflictElement, SyncConflictElement>>;
+export type CheckSyncMergedElement = Check<Same<Ipc.SyncMergedElement, SyncMergedElement>>;
+export type CheckFileConflict = Check<Same<Ipc.FileConflict, FileConflict>>;
+export type CheckSyncConflicts = Check<Same<Ipc.SyncConflicts, SyncConflicts>>;
+export type CheckJournalEntry = Check<Same<Ipc.JournalEntry, JournalEntry>>;
+export type CheckSyncRepository = Check<Same<Ipc.SyncRepository, SyncRepository>>;
+export type CheckSyncDeviceCode = Check<Same<Ipc.SyncDeviceCode, SyncDeviceCode>>;
+export type CheckMissingSecrets = Check<Same<Ipc.MissingSecrets, MissingSecrets>>;
+export type CheckSyncLoginOptions = Check<Same<Ipc.SyncLoginOptions, SyncLoginOptions>>;
+export type CheckOnFailure = Check<Same<Ipc.OnFailure, OnFailure>>;
+export type CheckStepKind = Check<Same<Ipc.StepKind, StepKind>>;
+export type CheckFlowCheck = Check<Same<Ipc.FlowCheck, FlowCheck>>;
+export type CheckFlowStep = Check<Same<Ipc.FlowStep, FlowStep>>;
+export type CheckFlow = Check<Same<Ipc.Flow, Flow>>;
+export type CheckStepInput = Check<Same<Ipc.StepInput, StepInput>>;
+export type CheckFlowStepInfo = Check<Same<Ipc.FlowStepInfo, FlowStepInfo>>;
+export type CheckStepPlacement = Check<Same<Ipc.StepPlacement, StepPlacement>>;
+export type CheckStepAdded = Check<Same<Ipc.StepAdded, StepAdded>>;
+export type CheckHookPhase = Check<Same<Ipc.HookPhase, HookPhase>>;
+export type CheckFolderHooks = Check<Same<Ipc.FolderHooks, FolderHooks>>;
+export type CheckHooksView = Check<Same<Ipc.HooksView, HooksView>>;
+export type CheckPropertyOrigin = Check<Same<Ipc.PropertyOrigin, PropertyOrigin>>;
+export type CheckFolderProperty = Check<Same<Ipc.FolderProperty, FolderProperty>>;
+export type CheckDataLink = Check<Same<Ipc.DataLink, DataLink>>;
+export type CheckDataTable = Check<Same<Ipc.DataTable, DataTable>>;
+export type CheckDataSet = Check<Same<Ipc.DataSet, DataSet>>;
+export type CheckCasePreview = Check<Same<Ipc.CasePreview, CasePreview>>;
+export type CheckCaseOutcome = Check<Same<Ipc.CaseOutcome, CaseOutcome>>;
+export type CheckCasesOutcome = Check<Same<Ipc.CasesOutcome, CasesOutcome>>;
+export type CheckTemplateKind = Check<Same<Ipc.TemplateKind, TemplateKind>>;
+export type CheckTemplateParam = Check<Same<Ipc.TemplateParam, TemplateParam>>;
+export type CheckTemplateSummary = Check<Same<Ipc.TemplateSummary, TemplateSummary>>;
+export type CheckTemplateUse = Check<Same<Ipc.TemplateUse, TemplateUse>>;
+export type CheckTemplateView = Check<Same<Ipc.TemplateView, TemplateView>>;
+export type CheckValueOrigin = Check<Same<Ipc.ValueOrigin, ValueOrigin>>;
+export type CheckParamValue = Check<Same<Ipc.ParamValue, ParamValue>>;
+export type CheckInstanceView = Check<Same<Ipc.InstanceView, InstanceView>>;
+export type CheckTemplateCandidate = Check<Same<Ipc.TemplateCandidate, TemplateCandidate>>;
+export type CheckLiteral = Check<Same<Ipc.Literal, Literal>>;
 
 // Sans homologue généré (écrits seulement côté interface) :
 // - CommandName

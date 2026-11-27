@@ -15,6 +15,7 @@ import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from
 import NatureForm from "@/components/home/NatureForm.vue";
 import NaturePill from "@/components/steps/NaturePill.vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
+import { useGuard } from "@/composables/useGuard";
 import { IpcError } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
@@ -24,10 +25,15 @@ import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { CurlImport, Detection } from "@/types/ipc";
 
-withDefaults(defineProps<{ note?: string; headingLevel?: 2 | 3 }>(), {
-  note: "Sans projet : l'essai est gardé dans « Non classés ».",
-  headingLevel: 2,
-});
+/** `autofocus` : l'entrée a le focus au chargement, en tête de l'accueil (ER5). */
+const props = withDefaults(
+  defineProps<{ note?: string; headingLevel?: 2 | 3; autofocus?: boolean }>(),
+  {
+    note: "Sans projet : l'essai est gardé dans « Non classés ».",
+    headingLevel: 2,
+    autofocus: false,
+  },
+);
 const emit = defineEmits<{ open: [boolean] }>();
 
 const steps = useStepsStore();
@@ -36,6 +42,7 @@ const contracts = useContractsStore();
 const navigation = useNavigationStore();
 const workbench = useWorkbenchStore();
 const toasts = useToastStore();
+const guard = useGuard();
 const ids = { title: useId(), status: useId(), error: useId() };
 const input = useTemplateRef<HTMLInputElement>("input");
 
@@ -59,9 +66,11 @@ const placeholder = computed(() => {
 const status = computed(() => {
   if (!nature.value) return "";
   if (imported.value) return "Reconnu : une commande cURL.";
+  // « Une requête HTTP » devient « Reconnu : une requête HTTP. » (2.1-a ter).
+  const title = nature.value.title;
   return chosen.value === null
-    ? `Reconnu : ${nature.value.name} (${nature.value.title}).`
-    : `Nature choisie : ${nature.value.name}.`;
+    ? `Reconnu : ${title.charAt(0).toLocaleLowerCase("fr") + title.slice(1)}.`
+    : "Nature choisie : le formulaire s'ouvre en dessous.";
 });
 
 watch(
@@ -76,6 +85,7 @@ onMounted(() => {
   steps.load().catch((cause: unknown) => {
     toasts.showError(cause);
   });
+  if (props.autofocus) input.value?.focus();
 });
 
 // Le cœur reconnaît la nature ; une méthode en tête passe dans le formulaire.
@@ -183,8 +193,8 @@ async function send(): Promise<void> {
           Essayer une étape
         </component>
         <span class="try__hint">Arnod reconnaît la nature d'étape de ce que vous collez</span>
-        <span class="try__note" :class="{ 'try__note--found': imported }">
-          {{ imported ? status : note }}
+        <span class="try__note" :class="{ 'try__note--found': nature !== null }">
+          {{ nature ? status : note }}
         </span>
       </div>
       <div class="try__row">
@@ -217,7 +227,7 @@ async function send(): Promise<void> {
             ×
           </button>
         </div>
-        <BaseButton v-if="sending" @click="steps.cancel()">Annuler</BaseButton>
+        <BaseButton v-if="sending" @click="guard(() => steps.cancel())">Annuler</BaseButton>
         <BaseButton v-else type="submit" variant="primary">
           {{ nature?.action ?? "Essayer" }}
         </BaseButton>
@@ -230,6 +240,7 @@ async function send(): Promise<void> {
           :key="item.id"
           type="button"
           class="try__chip"
+          :class="{ 'try__chip--current': nature?.id === item.id }"
           :aria-pressed="chosen === item.id"
           :title="`${item.name} : ${item.title}`"
           @click="choose(item.id)"
@@ -240,7 +251,7 @@ async function send(): Promise<void> {
           Parcourir le catalogue…
         </BaseButton>
       </div>
-      <NatureForm v-if="nature" v-model="values" :nature="nature" />
+      <NatureForm v-if="nature" v-model="values" :nature="nature" :imported="imported !== null" />
       <div v-if="importNote" class="try__import" role="note">
         <p>{{ importNote.taken }}</p>
         <p v-for="line in importNote.secrets" :key="line" class="try__secret">
@@ -290,14 +301,18 @@ async function send(): Promise<void> {
 
 .try__row {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
 }
 
+/* Champ et bouton à la hauteur courante des contrôles (DE9). */
 .try__box {
   display: flex;
   flex: 1;
   align-items: center;
+  box-sizing: border-box;
   min-width: 0;
+  height: var(--control-md);
   border: 1.5px solid var(--color-text);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -338,8 +353,9 @@ async function send(): Promise<void> {
 
 .try__input {
   flex: 1;
+  align-self: stretch;
   min-width: 0;
-  padding: 0.625rem 0.75rem;
+  padding: 0 0.75rem;
   border: 0;
   font-family: var(--font-mono);
   font-size: var(--text-body);
@@ -357,7 +373,7 @@ async function send(): Promise<void> {
   border: 0;
   border-radius: var(--radius-sm);
   font: inherit;
-  font-size: 1rem;
+  font-size: 1rem; /* impeccable-disable-line design-system-font-size: glyphe × d'effacement (exception R1 à R8) */
   line-height: 1;
   color: var(--color-muted);
   background: none;
@@ -394,7 +410,8 @@ async function send(): Promise<void> {
   cursor: pointer;
 }
 
-.try__chip[aria-pressed="true"] {
+/* La nature reconnue ou choisie est cerclée (2.1-a sexies). */
+.try__chip--current {
   box-shadow: 0 0 0 1.5px var(--color-text);
 }
 

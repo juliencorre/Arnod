@@ -18,7 +18,8 @@
 
   /* Bordures */
   --color-border: #e6e2db;
-  --color-border-strong: #cfc9bf; /* Cases à cocher, séparateurs marqués */
+  --color-border-strong: #cfc9bf; /* Séparateurs marqués, survol d'un bouton */
+  --color-border-control: #8f8a83; /* Cases, interrupteurs, radios : 3:1 au moins (DE4) */
 
   /* Textes */
   --color-text: #1d1b18;
@@ -29,6 +30,7 @@
   --color-success-soft: #e7f4ec; /* Fond d'une vérification ou d'une ligne réussie */
   --color-danger: #b42318;
   --color-danger-soft: #fdeceb; /* Fond d'une vérification ou d'une ligne en échec */
+  --color-danger-inverse: #ff9b8a; /* Action destructrice sur une barre inversée (fond color-text) */
 
   /* Accent : bouton principal */
   --color-accent: #e8962e;
@@ -88,6 +90,9 @@
   --backdrop: rgb(29 27 24 / 32%);
 
   --font-mono: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+  /* Police et taille des éditeurs (Préférences → Apparence, 1.6-f), posées par le store `interface`. */
+  --editor-font: var(--font-mono);
+  --editor-font-size: var(--text-body);
 
   /* Tailles de texte : six tailles, 13 px par défaut (design system, « Typographie ») */
   --text-caption: 0.6875rem; /* Plus petite taille : compteurs, en-têtes de section, méthodes HTTP. */
@@ -130,7 +135,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --color-bg: #1a1917;
     --color-surface: #23211e;
     --color-sidebar: #201e1b;
@@ -139,6 +144,7 @@
 
     --color-border: #36322d;
     --color-border-strong: #4a453e;
+    --color-border-control: #7d7871;
 
     --color-text: #ede9e3;
     --color-muted: #b0a99e;
@@ -148,6 +154,7 @@
     --color-success-soft: #1f3327;
     --color-danger: #ff8a80;
     --color-danger-soft: #3d2321;
+    --color-danger-inverse: #b42318;
 
     --color-accent: #eda24c;
     --color-accent-hover: #f3b46a;
@@ -202,6 +209,89 @@
   }
 }
 
+/*
+ * Thème forcé (Préférences → Apparence, 1.6-f) : `data-theme` sur la racine, posé par le store
+ * `interface`. Le bloc sombre reprend celui du système, jeton pour jeton (tests/theme.spec.ts).
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #1a1917;
+  --color-surface: #23211e;
+  --color-sidebar: #201e1b;
+  --color-chip: #2e2b27;
+  --color-accent-soft: #3a2c1a;
+
+  --color-border: #36322d;
+  --color-border-strong: #4a453e;
+  --color-border-control: #7d7871;
+
+  --color-text: #ede9e3;
+  --color-muted: #b0a99e;
+  --color-subtle: #8a8378;
+  --color-link: #f0b46a;
+  --color-success: #6cc28b;
+  --color-success-soft: #1f3327;
+  --color-danger: #ff8a80;
+  --color-danger-soft: #3d2321;
+  --color-danger-inverse: #b42318;
+
+  --color-accent: #eda24c;
+  --color-accent-hover: #f3b46a;
+  --color-accent-text: #1d1b18;
+  --color-focus: #f0b46a;
+
+  --color-toast-bg: #3a3631;
+  --color-toast-text: #ede9e3;
+  --color-toast-action: #f0b46a;
+
+  --color-ws-gray: #8f887e;
+  --color-ws-orange: #eda24c;
+  --color-ws-blue: #6b9be6;
+  --color-ws-green: #5cb878;
+  --color-ws-purple: #a585e3;
+  --color-ws-red: #e8766c;
+  --color-ws-yellow: #e2c04a;
+  --color-ws-teal: #4bbab2;
+
+  --color-family-calls-bg: #1e2f41;
+  --color-family-calls-border: #3e6084;
+  --color-family-calls-text: #a9d6ff;
+  --color-family-data-bg: #113434;
+  --color-family-data-border: #216a6a;
+  --color-family-data-text: #90e2e1;
+  --color-family-messages-bg: #31293f;
+  --color-family-messages-border: #64547f;
+  --color-family-messages-text: #d9c6fe;
+  --color-family-jobs-bg: #3b2a17;
+  --color-family-jobs-border: #77562f;
+  --color-family-jobs-text: #f3c898;
+  --color-family-interface-bg: #3b2634;
+  --color-family-interface-border: #784e6a;
+  --color-family-interface-text: #f6bde2;
+  --color-family-code-bg: #402622;
+  --color-family-code-border: #814e46;
+  --color-family-code-text: #ffbeb2;
+  --color-family-files-bg: #2f3017;
+  --color-family-files-border: #606130;
+  --color-family-files-text: #d4d699;
+
+  --color-code-string: #6cc28b;
+  --color-code-number: #82b4f2;
+  --color-code-keyword: #c9a8f7;
+  --color-code-tag: #f2a08d;
+  --color-code-attr: #e2c04a;
+  --color-match: #45341a;
+
+  --shadow-popover: 0 8px 24px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
+  --shadow-dialog: 0 24px 64px rgb(0 0 0 / 55%);
+  --backdrop: rgb(0 0 0 / 55%);
+}
+
 html,
 body {
   margin: 0;
@@ -243,6 +333,15 @@ select {
 }
 
 /*
+ * Texte indicatif d'un champ : color-subtle partout, opaque (le gris propre au moteur,
+ * #757575, tombait à 3,5:1 en thème sombre ; DI3).
+ */
+::placeholder {
+  color: var(--color-subtle);
+  opacity: 1;
+}
+
+/*
  * Case à cocher : la couleur d'accent et une coche foncée (7:1), comme l'interrupteur ; la case
  * native du système tirait sur le bleu.
  */
@@ -254,11 +353,50 @@ input[type="checkbox"] {
   width: 1rem;
   height: 1rem;
   margin: 0;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   appearance: none;
   cursor: pointer;
+}
+
+/* Bouton radio : même bord de contrôle à 3:1 que la case (DE4), point foncé une fois choisi. */
+input[type="radio"] {
+  display: inline-grid;
+  flex: none;
+  place-content: center;
+  box-sizing: border-box;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="radio"]:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+input[type="radio"]:checked::after {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-text);
+  content: "";
+}
+
+input[type="radio"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[type="radio"]:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 input[type="checkbox"]:checked {
@@ -285,6 +423,29 @@ input[type="checkbox"]:focus-visible,
 select:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -1px;
+}
+
+/*
+ * Champ de recherche : jamais le bouton natif d'effacement (⌫ sous WebKitGTK, bleu sous WebView2) ;
+ * les champs d'Arnod se vident par leur × ou par Échap (1.2-e, 4.1-g).
+ */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Mouvement réduit à la demande du système (AC8) : transitions et animations quasi immédiates. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Texte réservé aux lecteurs d'écran. */

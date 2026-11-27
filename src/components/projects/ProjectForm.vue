@@ -10,7 +10,7 @@
  * unicité) sont vérifiées par le cœur : ses erreurs s'affichent sous le champ
  * concerné.
  */
-import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from "vue";
+import { computed, nextTick, ref, useId, useTemplateRef, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import BaseMenu from "@/components/ui/BaseMenu.vue";
@@ -118,10 +118,6 @@ watch(name, () => {
   errors.value.name = null;
 });
 
-onMounted(() => {
-  if (props.mode === "firstRun") nameInput.value?.focus();
-});
-
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -175,7 +171,7 @@ async function submit(): Promise<void> {
         type="text"
         autocomplete="off"
         spellcheck="false"
-        placeholder="boutique-tests"
+        placeholder="par exemple boutique-tests"
         :aria-invalid="errors.name !== null"
         :aria-describedby="errors.name ? ids.nameError : undefined"
       />
@@ -267,7 +263,7 @@ async function submit(): Promise<void> {
         {{
           creatingWorkspace && !selectedWorkspace
             ? `Il apparaîtra dans le sélecteur, après « ${ALL_PROJECTS} ».`
-            : `Un projet est toujours dans « ${ALL_PROJECTS} ». Un workspace est facultatif.`
+            : "Un workspace est facultatif ; vous pourrez ranger le projet plus tard."
         }}
       </p>
     </div>
@@ -278,15 +274,12 @@ async function submit(): Promise<void> {
       <BaseButton v-if="mode === 'dialog'" @click="emit('cancel')">Annuler</BaseButton>
       <BaseButton
         type="submit"
-        variant="primary"
+        :variant="mode === 'firstRun' ? 'secondary' : 'primary'"
         :class="{ 'actions__submit--wide': mode === 'firstRun' }"
         :disabled="!canSubmit"
       >
         Créer le projet
       </BaseButton>
-      <p v-if="mode === 'firstRun'" class="actions__note">
-        Vous pourrez toujours le ranger ou le déplacer plus tard.
-      </p>
     </div>
   </form>
 </template>
@@ -396,7 +389,7 @@ async function submit(): Promise<void> {
   padding: 0 0.125rem;
   border: none;
   font: inherit;
-  font-size: 1rem;
+  font-size: 1rem; /* impeccable-disable-line design-system-font-size: glyphe × de retrait (exception R1 à R8) */
   line-height: 1;
   color: var(--color-muted);
   background: none;
@@ -427,13 +420,6 @@ async function submit(): Promise<void> {
   gap: 0.5rem;
 }
 
-.actions__note {
-  margin: 0;
-  font-size: var(--text-body);
-  text-align: center;
-  color: var(--color-muted);
-}
-
 .actions {
   display: flex;
   justify-content: flex-end;
@@ -446,6 +432,5 @@ async function submit(): Promise<void> {
 
 .actions__submit--wide {
   width: 100%;
-  padding-block: 0.75rem;
 }
 </style>

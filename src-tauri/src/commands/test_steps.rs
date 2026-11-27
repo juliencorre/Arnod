@@ -37,9 +37,10 @@ pub fn tree_create_test(
     state: State<'_, AppState>,
     project: Uuid,
     parent: String,
+    name: Option<String>,
 ) -> Result<CreatedTest, CommandError> {
     let ctx = state.project_ctx(project)?;
-    let created = tree::create_test(&ctx.root, &parent)?;
+    let created = tree::create_test_named(&ctx.root, &parent, name.as_deref())?;
     tree_changed(&window, project);
     Ok(created)
 }

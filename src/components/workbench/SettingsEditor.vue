@@ -127,7 +127,7 @@ function choose(key: Key, value: number | boolean | null): void {
         </button>
       </div>
     </div>
-    <p class="hint">« Hérité » reprend le réglage du dossier, puis celui de la collection.</p>
+    <p class="hint">« Hérité » reprend le réglage du dossier, puis celui du projet.</p>
   </div>
 </template>
 

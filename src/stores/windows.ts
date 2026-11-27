@@ -81,6 +81,9 @@ export function sameContent(a: ContentRef, b: ContentRef): boolean {
   if (a.kind === "importReport" || b.kind === "importReport") {
     return a.kind === b.kind && a.projectId === b.projectId;
   }
+  if (a.kind === "environments" || b.kind === "environments") {
+    return a.kind === b.kind && a.projectId === b.projectId;
+  }
   return a.kind === b.kind && a.projectId === b.projectId && a.path === b.path;
 }
 
@@ -99,6 +102,10 @@ export function contentKey(content: ContentRef): string {
       return `${content.projectId}::import`;
     case "test":
       return `${content.projectId}::test::${content.path}`;
+    case "folder":
+      return `${content.projectId}::dossier::${content.path}`;
+    case "environments":
+      return `${content.projectId}::environnements`;
   }
 }
 

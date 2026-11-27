@@ -53,6 +53,17 @@ export function formatDayTime(timestampMs: number): string {
   return dayTimeFormatter.format(new Date(timestampMs));
 }
 
+const clockFormatter = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+/** Fin d'un run (5.2-f) : « aujourd'hui 10:42 » le jour même, sinon « 9 nov., 14:05 ». */
+export function formatFinished(timestampMs: number, nowMs: number = Date.now()): string {
+  const day = new Date(timestampMs);
+  const today = new Date(nowMs);
+  return day.toDateString() === today.toDateString()
+    ? `aujourd'hui ${clockFormatter.format(day)}`
+    : formatDayTime(timestampMs);
+}
+
 /**
  * Chemin découpé après chaque séparateur (« / » ou « \ »), pour ne le couper qu'entre deux
  * dossiers : « /home/a/b » donne « / », « home/ », « a/ », « b ».
@@ -80,4 +91,18 @@ export function formatAgo(timestampMs: number, nowMs: number = Date.now()): stri
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `il y a ${String(hours)} h`;
   return `il y a ${String(Math.floor(hours / 24))} j`;
+}
+
+const shortDayFormatter = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
+
+/** Envoi de l'historique (5.1-c bis) : « auj. 09:14 », « hier 17:20 », « 4 nov. 11:40 ». */
+export function formatSentAt(timestampMs: number, nowMs: number = Date.now()): string {
+  const day = new Date(timestampMs);
+  const today = new Date(nowMs);
+  const yesterday = new Date(nowMs);
+  yesterday.setDate(today.getDate() - 1);
+  const clock = clockFormatter.format(day);
+  if (day.toDateString() === today.toDateString()) return `auj. ${clock}`;
+  if (day.toDateString() === yesterday.toDateString()) return `hier ${clock}`;
+  return `${shortDayFormatter.format(day)} ${clock}`;
 }

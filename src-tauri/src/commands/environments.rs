@@ -1,15 +1,30 @@
 //! Domaine « environnements » : fichiers du projet et valeurs locales (N1 à N6).
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
+use serde::Serialize;
 use tauri::{Manager, State, WebviewWindow};
 use uuid::Uuid;
 
-use crate::environment::{self, Environment};
-use crate::error::CommandError;
+use crate::environment::{self, Environment, NewEnvironment};
+use crate::error::{CommandError, CommandErrorKind};
 use crate::state::AppState;
+use crate::tree::undo::UndoBook;
 use crate::windows::{self, ProjectScope};
-use crate::workbench::{EnvironmentsView, Workbench};
+use crate::workbench::{EnvironmentRestore, EnvironmentUsage, EnvironmentsView, Workbench};
+
+/// Environnements après une suppression, et le jeton de « Annuler » (ER1).
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentDeleted {
+    pub view: EnvironmentsView,
+    pub undo_token: Uuid,
+}
+
+/// Environnements supprimés récemment, à remettre : projet et ce qui a été retiré (secrets
+/// compris, en mémoire seulement).
+static DELETED: Mutex<UndoBook<(Uuid, EnvironmentRestore)>> = Mutex::new(UndoBook::new());
 
 #[tauri::command]
 pub fn environments_load(
@@ -80,23 +95,75 @@ pub fn environment_delete(
     bench: State<'_, Arc<Workbench>>,
     project: Uuid,
     name: String,
+) -> Result<EnvironmentDeleted, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    let restore = bench.delete_environment(&ctx, &name)?;
+    windows::project_changed(
+        window.app_handle(),
+        window.label(),
+        project,
+        ProjectScope::Environments,
+        None,
+    );
+    let undo_token = DELETED
+        .lock()
+        .map(|mut book| book.push((project, restore)))
+        .unwrap_or_else(|_| Uuid::new_v4());
+    Ok(EnvironmentDeleted {
+        view: bench.environments(&ctx),
+        undo_token,
+    })
+}
+
+/// « Annuler » la suppression d'un environnement : fichiers, place, valeurs locales et secrets.
+#[tauri::command]
+pub fn environment_delete_undo(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
+    undo_token: Uuid,
 ) -> Result<EnvironmentsView, CommandError> {
-    let run = || {
-        let ctx = state.project_ctx(project)?;
-        bench.delete_environment(&ctx, &name)?;
-        Ok(bench.environments(&ctx))
+    let entry = DELETED
+        .lock()
+        .ok()
+        .and_then(|mut book| book.take(undo_token));
+    let Some((project, restore)) = entry else {
+        return Err(CommandError::new(
+            CommandErrorKind::UndoExpired,
+            "Cette suppression ne peut plus être annulée.",
+        ));
     };
-    let result = run();
-    if result.is_ok() {
-        windows::project_changed(
-            window.app_handle(),
-            window.label(),
-            project,
-            ProjectScope::Environments,
-            None,
-        );
-    }
-    result
+    let ctx = state.project_ctx(project)?;
+    bench.restore_environment(&ctx, &restore)?;
+    windows::project_changed(
+        window.app_handle(),
+        window.label(),
+        project,
+        ProjectScope::Environments,
+        None,
+    );
+    Ok(bench.environments(&ctx))
+}
+
+/// Crée un environnement depuis la fenêtre « Nouvel environnement » (3.3-b, AM34).
+#[tauri::command]
+pub fn environment_create(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
+    project: Uuid,
+    environment: NewEnvironment,
+) -> Result<EnvironmentsView, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    environment::create(&ctx.root, &environment)?;
+    windows::project_changed(
+        window.app_handle(),
+        window.label(),
+        project,
+        ProjectScope::Environments,
+        None,
+    );
+    Ok(bench.environments(&ctx))
 }
 
 #[tauri::command]
@@ -153,4 +220,38 @@ pub fn local_set(
         );
     }
     result
+}
+
+/// « Copier depuis un autre projet… » (3.3-a, AM43) : environnements du projet `from_project`
+/// ajoutés à `project`, sans valeurs locales ni secrets.
+#[tauri::command]
+pub fn environment_copy(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
+    project: Uuid,
+    from_project: Uuid,
+    names: Vec<String>,
+) -> Result<EnvironmentsView, CommandError> {
+    let ctx = state.project_ctx(project)?;
+    let from = state.project_ctx(from_project)?;
+    environment::copy_from(&ctx.root, &from.root, &names)?;
+    windows::project_changed(
+        window.app_handle(),
+        window.label(),
+        project,
+        ProjectScope::Environments,
+        None,
+    );
+    Ok(bench.environments(&ctx))
+}
+
+/// Dernier run de chaque environnement du projet (3.3-a, AM43, « Utilisation »).
+#[tauri::command]
+pub fn environment_usage(
+    state: State<'_, AppState>,
+    bench: State<'_, Arc<Workbench>>,
+    project: Uuid,
+) -> Result<Vec<EnvironmentUsage>, CommandError> {
+    Ok(bench.environment_usage(&state.project_ctx(project)?))
 }

@@ -63,7 +63,12 @@ export interface Activity {
  * cours, un test dont une étape est jouée, le run d'un projet tant qu'il n'est pas fini.
  */
 export function isRunning(content: ContentRef, activity: Activity): boolean {
-  if (content.kind === "result" || content.kind === "contract" || content.kind === "importReport")
+  if (
+    content.kind === "result" ||
+    content.kind === "contract" ||
+    content.kind === "importReport" ||
+    content.kind === "environments"
+  )
     return false;
   const run = activity.run(content.projectId);
   const live = run && !run.finished ? run : null;
@@ -82,6 +87,13 @@ export function isRunning(content: ContentRef, activity: Activity): boolean {
         activity.sending(content.projectId, content.path) ||
         (live?.items.some((item) => item.path === content.path && item.status === "running") ??
           false)
+      );
+    case "folder":
+      // Vue d'un dossier (AM37) : une de ses requêtes est jouée par le run en cours.
+      return (
+        live?.items.some(
+          (item) => item.path.startsWith(`${content.path}/`) && item.status === "running",
+        ) ?? false
       );
   }
 }

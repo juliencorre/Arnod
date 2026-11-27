@@ -15,6 +15,7 @@ import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import ZoneLayout from "@/components/zones/ZoneLayout.vue";
 import ZoneView from "@/components/zones/ZoneView.vue";
 import { useTabActions } from "@/composables/useTabActions";
+import { useInterfaceStore } from "@/stores/interface";
 import { contentProject, useWindowsStore } from "@/stores/windows";
 import { useWorkbenchStore } from "@/stores/workbench";
 
@@ -22,6 +23,7 @@ import { useWorkbenchStore } from "@/stores/workbench";
 defineProps<{ projectId?: string | null }>();
 
 const windows = useWindowsStore();
+const shortcuts = useInterfaceStore();
 const tabs = useTabActions();
 const workbench = useWorkbenchStore();
 
@@ -79,7 +81,7 @@ function onShortcut(event: KeyboardEvent): boolean {
     else windows.cancelTabSwitcher();
     return true;
   }
-  if (ctrl && !event.altKey && !event.shiftKey && event.code === "KeyJ") {
+  if (shortcuts.matches(event, "togglePlacement")) {
     event.preventDefault();
     void windows.togglePlacement();
     return true;
@@ -102,7 +104,7 @@ function onBlur(): void {
 function onKeydown(event: KeyboardEvent): void {
   // Déjà traité, par exemple par une séparation focalisée.
   if (event.defaultPrevented || resizeAround(event) || onShortcut(event)) return;
-  if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "w") {
+  if (shortcuts.matches(event, "closeTab")) {
     const tab = windows.activeTab;
     if (!tab) return;
     event.preventDefault();

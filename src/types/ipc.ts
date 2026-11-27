@@ -54,7 +54,7 @@ export type CommandName =
   | "tree_rename"
   | "tree_move"
   | "tree_duplicate"
-  | "tree_delete"
+  | "tree_reorder"
   | "request_read"
   | "request_save"
   | "request_send"
@@ -68,6 +68,11 @@ export type CommandName =
   | "environment_select"
   | "environment_save"
   | "environment_delete"
+  | "environment_delete_undo"
+  | "environment_create"
+  // Lot G de l'alignement : page des environnements (3.3-a, AM43).
+  | "environment_copy"
+  | "environment_usage"
   | "environments_reorder"
   | "local_set"
   | "run_start"
@@ -83,6 +88,7 @@ export type CommandName =
   | "contract_import_file"
   | "contract_save"
   | "contract_delete"
+  | "contract_delete_undo"
   | "contract_generate"
   | "contract_run"
   | "steps_catalog"
@@ -105,11 +111,44 @@ export type CommandName =
   | "import_detect"
   | "import_run"
   | "import_report"
+  // Lot F de l'alignement : scripts Bruno repris (2.3-f, AM42).
+  | "import_script"
+  | "import_script_undo"
   // Lot E : tests et étapes (docs/plan-mvp-e-tests-etapes.md).
   | "test_read"
   | "tree_create_test"
   | "tree_add_step"
   | "request_variable_users"
+  | "flow_save"
+  | "flow_add_step"
+  | "flow_remove_step"
+  | "flow_step_operation"
+  | "hooks_remove_step"
+  | "hooks_read"
+  | "hooks_save"
+  | "hooks_add_step"
+  | "folder_properties"
+  | "folder_set_properties"
+  | "data_read"
+  | "data_save"
+  | "data_import"
+  | "data_remove"
+  | "data_parse"
+  | "data_open"
+  | "data_case"
+  | "request_send_cases"
+  | "template_list"
+  | "template_categories"
+  | "template_read"
+  | "template_save_params"
+  | "template_candidates"
+  | "template_create"
+  | "template_use"
+  | "template_instance"
+  | "template_set_values"
+  | "template_literals"
+  | "template_from_request"
+  | "sections_show"
   // Essais : chemins généralisés et transfert au référentiel (2.2-b, 2.2-c).
   | "trial_generalization"
   | "trial_generalize"
@@ -161,7 +200,40 @@ export type CommandName =
   | "updates_download"
   | "updates_cancel"
   | "updates_install"
-  | "window_quit_ready";
+  | "window_quit_ready"
+  // Version 1 (docs/plan-v1.md) : apparence, raccourcis, historique des envois.
+  | "interface_load"
+  | "interface_save_appearance"
+  | "interface_set_shortcut"
+  | "interface_reset_shortcuts"
+  | "history_load"
+  | "history_diff"
+  | "history_clear"
+  | "history_restore"
+  // Version 2, lot A : recherche Ctrl+K.
+  | "search_query"
+  // Version 2, lot B : étiquettes partagées.
+  | "tree_set_folder_tags"
+  // Version 2, lot D : « Copier la commande ».
+  | "cli_command"
+  // Version 2, lots E et F : synchronisation Git.
+  | "sync_status"
+  | "sync_check"
+  | "sync_login_options"
+  | "sync_connect_start"
+  | "sync_connect_wait"
+  | "sync_connect_cancel"
+  | "sync_token"
+  | "sync_repositories"
+  | "sync_create_repository"
+  | "sync_link"
+  | "sync_pull_push"
+  | "sync_conflicts"
+  | "sync_resolve"
+  | "sync_abandon"
+  | "sync_journal"
+  | "sync_missing_secrets"
+  | "sync_secrets_later";
 
 /**
  * Nature d'une erreur de commande.
@@ -188,7 +260,8 @@ export type CommandErrorKind =
   | "cancelled" // Exécution annulée par l'utilisateur.
   | "secretStore" // Le coffre du système est indisponible.
   | "protectedEnvironment" // Envoi sur un environnement protégé sans confirmation.
-  | "changedOnDisk"; // Fichier modifié hors d'Arnod depuis sa lecture, rien n'est écrasé (lot I).
+  | "changedOnDisk" // Fichier modifié hors d'Arnod depuis sa lecture, rien n'est écrasé (lot I).
+  | "conflict"; // Synchronisation : un élément changé des deux côtés attend un choix (V2, E et F).
 
 /**
  * Erreur renvoyée par une commande Rust qui échoue : la promesse d'`invoke` est
@@ -330,6 +403,10 @@ export type TreeNode =
       requestCount: number;
       /** Test : au moins une requête et aucun sous-dossier (docs/plan-mvp-e-tests-etapes.md, R1). */
       test: boolean;
+      /** Étiquettes du dossier (`folder.yml`) : elles valent pour tout ce qu'il contient (V2, R4). */
+      tags: string[];
+      /** Utilisation d'un template : son chemin (étiquette `template:`, V4, R17). */
+      template: string | null;
     }
   | {
       kind: "request";
@@ -343,7 +420,10 @@ export type TreeNode =
       contract: string | null;
       /** Adresse, pour le filtre (docs/plan-mvp-d-barre-laterale.md, R1) ; vide si illisible. */
       url: string;
-      /** Étiquettes, sans celle du lien au contrat (R1). */
+      /**
+       * Étiquettes effectives, sans celle du lien au contrat (R1) : les siennes, puis celles de
+       * ses dossiers parents (V2, R4).
+       */
       tags: string[];
     };
 
@@ -356,6 +436,10 @@ export interface TreeView {
    */
   tests: TreeNode[];
   collapsed: string[];
+  /** Templates du projet (V4, lot F) : la section « Templates » s'affiche dès qu'il y en a un. */
+  templates: TemplateSummary[];
+  /** Sections affichées depuis « Plus » (V4, R21). */
+  sections: string[];
 }
 
 /** Emplacement d'un paramètre : adresse (`?nom=valeur`) ou chemin (`:nom`). */
@@ -473,6 +557,18 @@ export interface Inherited {
   auth: { auth: Auth; source: string } | null;
   headers: { name: string; value: string; source: string }[];
   settings: ResolvedSettings;
+  /** Propriétés des dossiers puis variables de la collection, de la plus proche (V4, R15). */
+  variables: InheritedVariable[];
+}
+
+/** Propriété d'un dossier ou variable de la collection reprise par une requête (V4, R15). */
+export interface InheritedVariable {
+  name: string;
+  value: string;
+  /** « dossier « v2 » » ou « projet « Boutique » ». */
+  source: string;
+  /** Dossier qui la définit ; vide pour la collection. */
+  folder: string;
 }
 
 /** Opérateurs d'OpenCollection et de Bruno (`Operator` en Rust). */
@@ -547,6 +643,8 @@ export interface RequestDoc {
   examples: Example[];
   /** Opération du contrat liée (étiquette `contract:` du fichier, C7). */
   contract?: ContractLink;
+  /** Jeu de données lié (étiquette `data:` ou `data-file:`, V4, R11). */
+  data?: DataLink;
   /** Parties du fichier conservées sans être gérées par Arnod (scripts, variables…). */
   preserved: string[];
   /** Héritage, calculé à la lecture ; ignoré à l'enregistrement. */
@@ -647,6 +745,46 @@ export interface EnvironmentsView {
   active: string;
 }
 
+/**
+ * Utilisation d'un environnement (3.3-a, AM43, `EnvironmentUsage`) : le dernier run fait dessus
+ * parmi ceux que le cœur garde.
+ */
+export interface EnvironmentUsage {
+  environment: string;
+  /** Numéro du run dans le projet (0 : run gardé par une version précédente). */
+  number: number;
+  /** Dossier exécuté (`""` : tout le projet). */
+  folder: string;
+  /** Contrat exécuté, sinon `null`. */
+  contract: string | null;
+  /** Début du run, en millisecondes depuis l'époque Unix. */
+  startedAt: number;
+}
+
+/**
+ * Nouvel environnement, depuis la fenêtre « Nouvel environnement » (3.3-b, AM34). Équivalent
+ * Rust : `environment::NewEnvironment`.
+ */
+export interface NewEnvironment {
+  name: string;
+  /** Adresse de base, qui devient la variable `baseUrl` ; vide : aucune. */
+  baseUrl: string;
+  /** Environnement dont les variables partagées et les noms des locales sont repris. */
+  copyFrom: string | null;
+  /** Environnement après lequel il prend place ; `null` : en tête de la chaîne. */
+  after: string | null;
+  protected: boolean;
+}
+
+/**
+ * Environnements après une suppression, et le jeton de « Annuler » (`environment_delete_undo`,
+ * ER1). Équivalent Rust : `commands::environments::EnvironmentDeleted`.
+ */
+export interface EnvironmentDeleted {
+  view: EnvironmentsView;
+  undoToken: string;
+}
+
 export type RunItemStatus =
   | "pending"
   | "running"
@@ -673,6 +811,44 @@ export interface RunItem {
   step: number | null;
   /** Valeurs extraites par la ligne, masquées. */
   extracted: ExtractedValue[];
+  /** Nature de l'étape (V4) ; une requête pour une ligne d'avant la V4. */
+  kind: StepKind;
+  /** Identifiant de l'étape dans le schéma de son test. */
+  stepId: string | null;
+  /** Résumé court : « oui », « 3 tours », « 9/12 », « 3 essais », « 12 cas ». */
+  detail: string | null;
+  /** Branche prise par une condition. */
+  branch: boolean | null;
+  /** Passages de l'étape (boucle, attente, Avant chaque test, cas). */
+  passes: number;
+  /** Phase d'un Avant / Après (R13) et son dossier. */
+  hook: HookPhase | null;
+  folder: string | null;
+  /** Résultat de chaque cas d'un jeu de données (R12). */
+  cases: CaseResult[];
+}
+
+/** Résultat d'un cas d'un jeu de données dans un run (4.7-b bis, R12). */
+export interface CaseResult {
+  /** Numéro du cas, à partir de 1. */
+  number: number;
+  /** Valeurs du cas, masquées. */
+  values: [string, string][];
+  status: RunItemStatus;
+  httpStatus: number | null;
+  durationMs: number | null;
+  assertions: AssertionResult[];
+  error: string | null;
+}
+
+/** Fin d'un test joué par son schéma (V4, R5). */
+export interface TestEnd {
+  test: string;
+  passed: boolean;
+  /** « Fin en échec », « Avant en échec »… */
+  reason: string | null;
+  /** Identifiant de l'étape qui a arrêté le test. */
+  failedStep: string | null;
 }
 
 /** Résultat d'un groupe de requêtes d'un run (`RunGroup`, R2). */
@@ -708,6 +884,8 @@ export interface RunView {
   groups: RunGroup[];
   /** Verdict de chaque test (lot E, R4). */
   tests: RunTest[];
+  /** Fin de chaque test joué par son schéma (V4, R5). */
+  ends: TestEnd[];
 }
 
 /** Dernière exécution d'une requête (`RequestStatus`, R4). */
@@ -756,7 +934,11 @@ export type ContentRef =
   /** Dernier rapport d'import d'un projet (docs/plan-mvp-c-import-bruno.md, 2.3-f). */
   | { kind: "importReport"; projectId: string }
   /** Test du projet, dossier d'étapes (docs/plan-mvp-e-tests-etapes.md, TE2). */
-  | { kind: "test"; projectId: string; path: string };
+  | { kind: "test"; projectId: string; path: string }
+  /** Vue d'un dossier du référentiel, son contenu dans l'ordre d'exécution (4.1-a bis, AM37). */
+  | { kind: "folder"; projectId: string; path: string }
+  /** Environnements d'un projet (3.3-a, AM43) : la page qui remplace la fenêtre de gestion. */
+  | { kind: "environments"; projectId: string };
 
 /** Onglet de contenu d'une zone (`Tab`). */
 export interface ContentTab {
@@ -1086,6 +1268,8 @@ export interface StepNature {
   version: string;
   name: string;
   title: string;
+  /** Ce que l'étape manipule, en un mot, après le nom : « REST · requête » (2.1-a ter). */
+  noun: string;
   description: string;
   family: StepFamily;
   publisher: string;
@@ -1298,6 +1482,37 @@ export interface ImportSource {
   counts: ImportCounts;
   /** Fichiers `.bru` lus. */
   files: number;
+  /** Environnements de la collection (Bruno), dans son ordre (2.3-b, AM41). */
+  environments: SourceEnvironment[];
+  /**
+   * Variables partagées dont le nom ressemble à un secret (jeton, mot de passe, clé d'API…) :
+   * avec `secretsLocal`, elles deviennent des variables locales, valeur au coffre.
+   */
+  secrets: string[];
+}
+
+/** Environnement d'une collection, tel que l'import le reprendra (2.3-b, AM41). */
+export interface SourceEnvironment {
+  name: string;
+  /** Noms de ses variables actives, partagées et locales. */
+  variables: string[];
+}
+
+/** Choix de la fenêtre « Importer » (2.3-b, AM41). Équivalent Rust : `import::ImportOptions`. */
+export interface ImportOptions {
+  /**
+   * Environnement du projet qui reçoit chaque environnement de la collection ; un environnement
+   * sans choix garde son nom (complété s'il existe, sinon créé).
+   */
+  environments: EnvironmentChoice[];
+  /** Valeurs qui ressemblent à des secrets en variables locales, au coffre du système. */
+  secretsLocal: boolean;
+}
+
+/** Un environnement de la collection (`from`) et celui du projet qui le reçoit (`to`). */
+export interface EnvironmentChoice {
+  from: string;
+  to: string;
 }
 
 /** Destination d'un import (`ImportTarget`). */
@@ -1318,8 +1533,12 @@ export type ImportItemKind =
   | "extraction"
   | "option";
 
-/** Suite à donner à un élément du rapport (`ItemStatus`). */
-export type ImportItemStatus = "notRun" | "toFill" | "toCheck" | "skipped" | "stored";
+/**
+ * Suite à donner à un élément du rapport (`ItemStatus`) ; `accepted` et `replaced` : script
+ * retiré du fichier, sans lui ou remplacé par une assertion (AM42).
+ */
+export type ImportItemStatus =
+  "notRun" | "toFill" | "toCheck" | "skipped" | "stored" | "accepted" | "replaced";
 
 /** Élément signalé par l'import, avec son fichier d'origine. */
 export interface ImportReportItem {
@@ -1384,6 +1603,15 @@ export interface ImportDone {
   contract: string | null;
 }
 
+/** Suite donnée à un script Bruno du rapport (2.3-f, AM42). Équivalent Rust : `ScriptChoice`. */
+export type ScriptChoice = "accept" | "replace";
+
+/** Réponse de `import_script` : le rapport à jour et le jeton de « Annuler ». */
+export interface ScriptResolved {
+  report: ImportReport;
+  undoToken: string;
+}
+
 // ---------------------------------------------------------------------------
 // Lot E : tests et étapes (docs/plan-mvp-e-tests-etapes.md)
 // ---------------------------------------------------------------------------
@@ -1395,7 +1623,16 @@ export interface Extraction {
   /** `body.id`, `headers.Location`, `status`, ou `request.body.ref` pour une valeur envoyée. */
   source: string;
   enabled: boolean;
+  /** Portée de la variable, `variable.scope` de l'action (4.2-b bis, AM44). */
+  scope: ExtractionScope;
 }
+
+/**
+ * Portée d'une variable extraite (`ExtractionScope`) : `runtime` (le test) ou `environment`
+ * (gardée aussi en variable locale de l'environnement de l'envoi) ; `request`, `folder` et
+ * `collection`, écrites par Bruno ou à la main, sont gardées et appliquées comme `runtime`.
+ */
+export type ExtractionScope = "runtime" | "environment" | "request" | "folder" | "collection";
 
 /** Valeur extraite à un envoi (`ExtractedValue`). */
 export interface ExtractedValue {
@@ -1415,16 +1652,23 @@ export interface DrawnValue {
   source: string | null;
 }
 
+/**
+ * D'où vient une variable lue par un envoi (`UsedSource`, AM29) : variable partagée de
+ * l'environnement, variable locale de cet environnement, ou valeur extraite (variable d'exécution).
+ */
+export type UsedSource = "environment" | "local" | "extracted";
+
 /** Variable lue par un envoi (`UsedVariable`) ; un secret est masqué. */
 export interface UsedVariable {
   name: string;
   value: string;
-  /** Variable d'exécution (valeur extraite), et non de l'environnement. */
-  runtime: boolean;
+  source: UsedSource;
 }
 
 /** Ce qui est parti (`Sent`, VD2). */
 export interface Sent {
+  /** Environnement de l'envoi, sur la ligne d'état de la réponse (5.1-b, AM28). */
+  environment: string;
   method: string;
   url: string;
   headers: [string, string][];
@@ -1432,6 +1676,14 @@ export interface Sent {
   drawn: DrawnValue[];
   used: UsedVariable[];
   extracted: ExtractedValue[];
+  /** Jeton OAuth 2 ajouté à l'envoi, s'il y en a un (3.4-b, AM35). */
+  oauth2: SentToken | null;
+}
+
+/** Jeton OAuth 2 d'un envoi (`SentToken`), jamais sa valeur. */
+export interface SentToken {
+  tokenUrl: string;
+  status: TokenStatus | null;
 }
 
 /** Verdict d'un test dans un run (`RunTest`, R4). */
@@ -1448,12 +1700,17 @@ export interface RunTest {
 /** Étape d'un test (`StepView`). */
 export interface StepView {
   path: string;
+  /** Nom du fichier dans le dossier du test : l'étape requête du schéma qui le joue (V4). */
+  file: string;
   name: string;
   method: HttpMethod | null;
   url: string;
   assertionCount: number;
   /** Variables extraites par l'étape. */
   extractions: string[];
+  /** Assertions actives et extractions, pour le panneau de l'étape (4.3-c). */
+  assertions: Assertion[];
+  extracts: Extraction[];
   invalid: boolean;
 }
 
@@ -1463,7 +1720,12 @@ export interface TestView {
   name: string;
   /** Le dossier est un test ; sinon il range des dossiers. */
   test: boolean;
+  /** Requêtes du test, celles de ses attentes comprises. */
   steps: StepView[];
+  /** Schéma réconcilié (V4, R2) ; vide pour un dossier qui n'est pas un test. */
+  flow: Flow;
+  /** Ce que chaque étape du schéma lit et extrait (4.3-a, 4.3-c). */
+  info: FlowStepInfo[];
 }
 
 /** Réponse de `tree_create_test` (`CreatedTest`, NT1). */
@@ -1931,3 +2193,544 @@ export type InstallState =
   | { state: "ready"; version: string; onExit: boolean }
   /** Échec du téléchargement ou de l'installation, message prêt à afficher. */
   | { state: "failed"; message: string };
+
+// --- Version 1 : apparence et raccourcis (1.6-f, 1.6-f bis, docs/plan-v1.md) --------
+
+/** Thème de l'interface (`interface::Theme`) : celui du système, ou forcé. */
+export type InterfaceTheme = "system" | "light" | "dark";
+
+/** Apparence du poste (`interface::Appearance`). */
+export interface Appearance {
+  theme: InterfaceTheme;
+  /** Zoom de l'interface, en pour cent. */
+  zoom: number;
+  /** Police des éditeurs ; `null` : la police à chasse fixe du système. */
+  editorFont: string | null;
+  /** Taille du texte des éditeurs, en pixels. */
+  editorFontSize: number;
+}
+
+/** Groupe de la liste des raccourcis (`interface::ShortcutGroup`). */
+export type ShortcutGroup = "request" | "window" | "project";
+
+/** Où agit une combinaison (`interface::ShortcutScope`). */
+export type ShortcutScope = "global" | "editor" | "response" | "sidebar" | "contract";
+
+/** Raccourci d'une action (`interface::ShortcutView`). */
+export interface ShortcutView {
+  id: string;
+  label: string;
+  group: ShortcutGroup;
+  scope: ShortcutScope;
+  /** Combinaisons en vigueur, canoniques (`Ctrl+Shift+K`) ; vide : aucun raccourci. */
+  keys: string[];
+  defaults: string[];
+  /** Se change dans les préférences. */
+  editable: boolean;
+}
+
+/** Préférences d'interface et valeurs proposées (`interface::InterfaceView`). */
+export interface InterfaceView {
+  appearance: Appearance;
+  zooms: number[];
+  fonts: string[];
+  sizes: number[];
+  shortcuts: ShortcutView[];
+}
+
+/** Action qui tient déjà une combinaison (`interface::ShortcutConflict`). */
+export interface ShortcutConflict {
+  keys: string;
+  action: string;
+  label: string;
+}
+
+/** Issue d'un changement de raccourci (`commands::interface::ShortcutChange`). */
+export interface ShortcutChange {
+  view: InterfaceView;
+  /** Présent : rien n'a changé, l'action citée tient la combinaison. */
+  conflict: ShortcutConflict | null;
+}
+
+// --- Version 1 : historique des envois (5.1-c bis) ---------------------------------
+
+/** Ce qui est parti, masqué (`history::HistorySent`). */
+export interface HistorySent {
+  method: string;
+  url: string;
+  headers: [string, string][];
+  body: string | null;
+}
+
+/** Envoi gardé sur le poste (`history::HistoryEntry`). */
+export interface HistoryEntry {
+  id: string;
+  /** Réception, en ms depuis l'époque Unix. */
+  at: number;
+  environment: string | null;
+  status: number;
+  statusText: string;
+  totalMs: number;
+  sizeBytes: number;
+  passed: boolean;
+  assertions: AssertionResult[];
+  headers: [string, string][];
+  body: string;
+  /** Corps coupé (5 Mo à l'envoi, 256 Ko dans l'historique). */
+  truncated: boolean;
+  sent: HistorySent | null;
+}
+
+/** Envoi comparé au précédent (`history::HistoryItem`). */
+export interface HistoryItem {
+  entry: HistoryEntry;
+  /** Heure de l'envoi précédent, `null` pour le plus ancien. */
+  previousAt: number | null;
+  /** Ce qui a changé depuis, en français ; vide : rien de notable. */
+  changes: string[];
+}
+
+/** Historique d'une requête, du plus récent au plus ancien (`history::HistoryView`). */
+export interface HistoryView {
+  path: string;
+  items: HistoryItem[];
+  /** Envois gardés au plus. */
+  max: number;
+}
+
+/** Partie d'une différence (`history::DiffPart`). */
+export type DiffPart = "status" | "header" | "body" | "assertion";
+
+/** Ligne ajoutée ou retirée (`history::DiffLine`). */
+export interface DiffLine {
+  part: DiffPart;
+  added: boolean;
+  text: string;
+}
+
+/** Différences d'un envoi avec le précédent (`history::HistoryDiff`). */
+export interface HistoryDiff {
+  previousId: string;
+  lines: DiffLine[];
+  truncated: boolean;
+}
+
+// --- Version 2, lot A : recherche Ctrl+K (1.5-a, 1.5-b, docs/plan-v2.md) -------------
+
+/** Nature d'un résultat de la recherche (`search::SearchKind`) : ce qu'il ouvre. */
+export type SearchKind =
+  | "request"
+  | "test"
+  | "folder"
+  /** Opération d'un contrat : son endpoint (`path`), sinon son contrat (`contract`). */
+  | "operation"
+  | "contract"
+  | "environment"
+  | "project";
+
+/** Un résultat (`search::SearchHit`). */
+export interface SearchHit {
+  kind: SearchKind;
+  projectId: string;
+  label: string;
+  /** Où il se trouve : « boutique-tests · paiements ». */
+  detail: string;
+  method: string | null;
+  /** Ce qui s'ouvre : requête, test, dossier, contrat, endpoint d'une opération. */
+  path: string | null;
+  /** Contrat d'une opération, ouvert quand elle n'a pas d'endpoint. */
+  contract: string | null;
+  /** Passages du libellé à surligner, en caractères `[début, fin)`. */
+  highlight: [number, number][];
+}
+
+/** Un groupe de résultats (`search::SearchGroup`), au plus 8 montrés. */
+export interface SearchGroup {
+  title: string;
+  hits: SearchHit[];
+  total: number;
+}
+
+/** Résultats d'une saisie (`search::SearchResults`). */
+export interface SearchResults {
+  text: string;
+  /** Recherche par adresse (`POST /orders`, URL) plutôt que par nom. */
+  address: boolean;
+  groups: SearchGroup[];
+}
+
+// --- Version 2, lot D : ligne de commande (docs/plan-v2.md, LC6) ---
+
+/**
+ * Terminal pour lequel « Copier la commande » cite les valeurs (`command::Shell`) ; absent, le
+ * cœur prend celui du système (PowerShell sous Windows, sh ailleurs).
+ */
+export type CliShell = "powerShell" | "sh";
+
+// --- Version 2, lots E et F : synchronisation Git (docs/plan-v2.md, 7.1-a à 7.1-e) ---
+
+/** Forge d'un dépôt (`sync::forge::Forge`). */
+export type SyncForge = "github" | "gitlab" | "other";
+
+/** Compte relié (`sync::state::Account`) ; son jeton est au coffre. */
+export interface SyncAccount {
+  forge: SyncForge;
+  host: string;
+  login: string;
+  name: string;
+  /** Adresse des envois (Q11). */
+  email: string;
+}
+
+/** Dépôt distant relié (`sync::SyncRemote`). */
+export interface SyncRemote {
+  /** Adresse du dépôt, sans identifiant (R9). */
+  url: string;
+  forge: SyncForge;
+  host: string;
+  /** `acme/boutique-tests`. */
+  name: string;
+  branch: string;
+}
+
+/** Nature d'un élément partagé (`sync::describe::ItemKind`). */
+export type SharedItemKind =
+  "step" | "request" | "endpoint" | "folder" | "contract" | "environment" | "project" | "other";
+
+/** Élément partagé changé, décrit en clair (`sync::describe::SharedItem`, R14). */
+export interface SharedItem {
+  /** Clé pour le choisir, jamais affichée. */
+  key: string;
+  kind: SharedItemKind;
+  label: string;
+  /** Où il se range (« commandes / v2 »). */
+  place: string;
+  /** Ce qui a changé (« 2 assertions modifiées »). */
+  detail: string;
+  author: string | null;
+  at: number | null;
+}
+
+/** État de la synchronisation d'un projet (`sync::SyncView`). */
+export interface SyncView {
+  projectId: string;
+  repository: boolean;
+  /** `null` : « Pas encore partagé ». */
+  remote: SyncRemote | null;
+  account: SyncAccount | null;
+  incoming: SharedItem[];
+  outgoing: SharedItem[];
+  conflicts: number;
+  checkedAt: number | null;
+  error: string | null;
+  members: string[];
+  /** Éléments changés par un collègue à la dernière récupération : chemin → auteur (CF4). */
+  received: Record<string, string>;
+}
+
+/** Version gardée pour un élément en conflit (`sync::merge::Choice`). */
+export type SyncChoice = "ours" | "theirs" | "both";
+
+/** Élément changé des deux côtés (`sync::merge::Element`). */
+export interface SyncConflictElement {
+  key: string;
+  label: string;
+  ours: string | null;
+  theirs: string | null;
+  /** « Garder les deux » possible (ligne d'une liste). */
+  both: boolean;
+}
+
+/** Élément pris sans question (`sync::merge::Auto`, CF2). */
+export interface SyncMergedElement {
+  label: string;
+  /** `true` : la version du collègue. */
+  theirs: boolean;
+}
+
+/** Fichier en conflit (`sync::FileConflict`, 7.1-c). */
+export interface FileConflict {
+  item: SharedItem;
+  author: string;
+  at: number;
+  elements: SyncConflictElement[];
+  merged: SyncMergedElement[];
+  ours: string | null;
+  theirs: string | null;
+}
+
+/** Conflits de la récupération en attente (`sync::SyncConflicts`). */
+export interface SyncConflicts {
+  projectId: string;
+  conflicts: FileConflict[];
+}
+
+/** Entrée de l'historique d'un élément (`sync::JournalEntry`, CF5). */
+export interface JournalEntry {
+  author: string;
+  at: number;
+  detail: string;
+  message: string;
+  before: string | null;
+  after: string | null;
+}
+
+/** Dépôt d'un compte (`sync::forge::Repository`). */
+export interface SyncRepository {
+  name: string;
+  url: string;
+  private: boolean;
+  empty: boolean;
+}
+
+/** Code à saisir dans le navigateur (`sync::forge::DeviceCode`). */
+export interface SyncDeviceCode {
+  userCode: string;
+  verificationUri: string;
+  intervalSecs: number;
+  expiresInSecs: number;
+}
+
+/** Secrets à renseigner après une récupération (`commands::sync::MissingSecrets`, R15). */
+export interface MissingSecrets {
+  environment: string;
+  names: string[];
+}
+
+/** Connexion par le navigateur disponible, par forge (`commands::sync::SyncLoginOptions`). */
+export interface SyncLoginOptions {
+  githubBrowser: boolean;
+  gitlabBrowser: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Version 4 (docs/plan-v4.md) : tests en schéma, scripts, jeux de données, templates
+// ---------------------------------------------------------------------------
+
+/** Ce que fait un test quand une étape échoue (4.2-a, 4.3-c, R5). */
+export type OnFailure = "stop" | "continue";
+
+/** Nature d'une étape (`StepKind`). */
+export type StepKind =
+  "request" | "condition" | "loop" | "wait" | "variable" | "script" | "test" | "template";
+
+/** Condition d'une étape (R6) : cible (`status`, `body.…`, `vars.nom`), opérateur, valeur. */
+export interface FlowCheck {
+  target: string;
+  operator: AssertionOperator;
+  value?: Scalar | null;
+}
+
+/**
+ * Étape d'un schéma (`Step` en Rust, 4.3-a) : `next` vaut une étape, `end` ou `fail` ; absent,
+ * l'étape suivante de la liste.
+ */
+export type FlowStep = {
+  id: string;
+  /** Nom affiché ; vide pour une requête (son nom est celui de la requête). */
+  name: string;
+  next?: string;
+  onFailure?: OnFailure;
+} & (
+  | { kind: "request"; file: string }
+  | { kind: "condition"; check: FlowCheck; otherwise?: string }
+  | { kind: "loop"; count?: number; list?: string; item: string; until?: string }
+  | { kind: "wait"; file?: string; check: FlowCheck; intervalMs: number; attempts: number }
+  | { kind: "variable"; variable: string; value: string }
+  | { kind: "script"; code: string }
+  | { kind: "test"; test: string }
+  | { kind: "template"; template: string; values: Record<string, string> }
+);
+
+/** Schéma d'un test (`Flow`, R1). */
+export interface Flow {
+  onFailure: OnFailure;
+  steps: FlowStep[];
+}
+
+/** Entrée d'une étape : une variable qu'elle lit, et l'étape qui la donne (4.3-c). */
+export interface StepInput {
+  name: string;
+  from: string | null;
+  /** `body.id`, « valeur », « élément de la boucle ». */
+  source: string;
+}
+
+/** Ce qu'une étape lit et extrait (4.3-a). */
+export interface FlowStepInfo {
+  id: string;
+  inputs: StepInput[];
+  extracts: string[];
+  /** Données disponibles à ce point (4.3-b quater) : extraites ou posées par les étapes d'avant. */
+  available: StepInput[];
+}
+
+/** Où insérer une étape (4.3-b bis) : fin de liste, libre, au départ, ou sur un lien. */
+export type StepPlacement =
+  | { kind: "end" }
+  | { kind: "free" }
+  | { kind: "start" }
+  | { kind: "link"; after: string; otherwise: boolean };
+
+/** Étape ajoutée (`flow_add_step`) et la requête créée pour elle. */
+export interface StepAdded {
+  step: string;
+  request: string | null;
+}
+
+/** Phase d'un Avant / Après de dossier (4.7-c, R13). */
+export type HookPhase = "beforeAll" | "beforeEach" | "afterEach" | "afterAll";
+
+/** Avant / Après d'un dossier (`FolderHooks`). */
+export interface FolderHooks {
+  beforeAll: FlowStep[];
+  beforeEach: FlowStep[];
+  afterEach: FlowStep[];
+  afterAll: FlowStep[];
+}
+
+/** Avant / Après d'un dossier et les requêtes de ses étapes (4.7-c). */
+export interface HooksView {
+  folder: string;
+  hooks: FolderHooks;
+  requests: StepView[];
+}
+
+/** Origine d'une propriété de dossier (4.8-a). */
+export type PropertyOrigin =
+  | { kind: "here" }
+  | { kind: "folder"; folder: string }
+  | { kind: "project" }
+  | { kind: "environment"; name: string };
+
+/** Propriété d'un dossier, avec son origine (4.8-a). */
+export interface FolderProperty {
+  name: string;
+  value: string;
+  origin: PropertyOrigin;
+}
+
+/** Jeu de données d'une requête (`DataLink`, R11). */
+export interface DataLink {
+  /** Fichier CSV, relatif au projet (`données/…`). */
+  file: string;
+  /** Tableau modifiable dans Arnod ; sinon fichier relu à chaque envoi, jamais écrit. */
+  editable: boolean;
+}
+
+/** Tableau d'un jeu de données : une colonne par variable, une ligne par cas. */
+export interface DataTable {
+  columns: string[];
+  rows: string[][];
+}
+
+/** Jeu de données lu (4.7-a) ; un fichier illisible donne sa raison. */
+export interface DataSet {
+  link: DataLink;
+  error: string | null;
+  columns: string[];
+  rows: string[][];
+}
+
+/** Requête d'un cas, résolue et masquée (4.7-a). */
+export interface CasePreview {
+  method: string;
+  url: string;
+  values: [string, string][];
+}
+
+/** Envoi d'un cas d'un jeu de données (4.7-b). */
+export interface CaseOutcome {
+  number: number;
+  values: [string, string][];
+  outcome: SendOutcome | null;
+  error: string | null;
+}
+
+/** Envoi de tous les cas (4.7-b, R12) : réussi si chaque cas réussit. */
+export interface CasesOutcome {
+  cases: CaseOutcome[];
+  passed: boolean;
+}
+
+/** Nature d'un template, déduite de son contenu (R16). */
+export type TemplateKind = "test" | "folder" | "tree";
+
+/** Paramètre d'un template (4.8-c) : sans valeur par défaut, il est obligatoire. */
+export interface TemplateParam {
+  name: string;
+  default: string;
+  description: string;
+}
+
+/** Template de la barre latérale. */
+export interface TemplateSummary {
+  path: string;
+  name: string;
+  kind: TemplateKind;
+  /** Dossier de rangement sous `templates/`. */
+  category: string;
+  params: number;
+  folders: number;
+  tests: number;
+  assertions: number;
+}
+
+/** Utilisation d'un template (4.8-c). */
+export interface TemplateUse {
+  path: string;
+  name: string;
+  values: Record<string, string>;
+}
+
+/** Template ouvert dans un onglet (4.8-c). */
+export interface TemplateView extends TemplateSummary {
+  parameters: TemplateParam[];
+  content: TreeNode[];
+  uses: TemplateUse[];
+}
+
+/** Origine de la valeur d'un paramètre dans une utilisation (4.8-d). */
+export type ValueOrigin =
+  | { kind: "here" }
+  | { kind: "property"; folder: string }
+  | { kind: "default" }
+  | { kind: "missing" };
+
+/** Valeur d'un paramètre dans une utilisation (4.8-d). */
+export interface ParamValue {
+  name: string;
+  /** Valeur saisie ici, vide sinon. */
+  value: string;
+  /** Valeur qui part. */
+  effective: string;
+  origin: ValueOrigin;
+  default: string;
+  description: string;
+}
+
+/** Utilisation ouverte dans un onglet (4.8-d). */
+export interface InstanceView {
+  path: string;
+  name: string;
+  template: TemplateSummary | null;
+  templatePath: string;
+  values: ParamValue[];
+  content: TreeNode[];
+}
+
+/** Variable proposée comme paramètre à la création d'un template (4.8-b). */
+export interface TemplateCandidate {
+  name: string;
+  value: string;
+  origin: string;
+  checked: boolean;
+}
+
+/** Valeur écrite d'un endpoint, proposée comme paramètre (3.2-d). */
+export interface Literal {
+  name: string;
+  value: string;
+  /** `body.items[0].sku`, `query.limit`. */
+  location: string;
+}

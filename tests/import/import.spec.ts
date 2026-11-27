@@ -19,6 +19,14 @@ afterEach(() => {
 });
 
 const BRUNO = "/home/julien/bruno/boutique-api";
+/** Choix par défaut de la fenêtre (AM41) : chaque environnement garde son nom, secrets au coffre. */
+const OPTIONS = {
+  environments: [
+    { from: "Local", to: "Local" },
+    { from: "Recette", to: "Recette" },
+  ],
+  secretsLocal: true,
+};
 
 async function clickButton(app: AppWrapper, selector: string, text: string): Promise<void> {
   const found = app.findAll(`${selector} button`).find((b) => b.text().trim() === text);
@@ -52,7 +60,7 @@ describe("importer (2.3-a)", () => {
     );
     expect(open.get(".import__folder code").text()).toBe("/home/julien/arnod/Boutique API");
     expect(open.text()).toContain("3 variables secrètes");
-    expect(open.text()).toContain("3 scripts gardés dans les fichiers, pas exécutés.");
+    expect(open.text()).toContain("3 scripts gardés dans les fichiers, exécutés à l'envoi.");
     expect(core.commands()).not.toContain("import_run");
 
     await clickButton(wrapper, "dialog[open]", "Importer");
@@ -60,6 +68,7 @@ describe("importer (2.3-a)", () => {
     expect(core.calls.find((c) => c.cmd === "import_run")?.args).toEqual({
       path: BRUNO,
       target: { kind: "newProject", location: null, workspaceId: null },
+      options: OPTIONS,
     });
     expect(wrapper.find("dialog[open]").exists()).toBe(false);
     expect(core.calls.find((c) => c.cmd === "layout_open_selection")?.args).toEqual({
@@ -106,6 +115,8 @@ describe("importer (2.3-a)", () => {
       name: "partenaires-v2",
       counts: { ...brunoSource().counts, requests: 0 },
       files: 0,
+      environments: [],
+      secrets: [],
     };
     core.imports.picked = path;
     wrapper = await mountApp();
@@ -179,11 +190,16 @@ describe("reprendre l'existant (2.3-b)", () => {
     expect(dialog(app).text()).toContain(
       "Un nouveau dossier « Boutique API » dans Référentiel de tests.",
     );
+    // AM6 (2.3-b) : « 10 vérifications deviendront des assertions sans code ».
+    expect(dialog(app).text().replace(/\s+/g, " ")).toContain(
+      "10 vérifications deviendront des assertions sans code",
+    );
     await clickButton(app, "dialog[open]", "Importer");
 
     expect(core.calls.find((c) => c.cmd === "import_run")?.args).toEqual({
       path: BRUNO,
       target: { kind: "project", projectId: BOUTIQUE_TESTS },
+      options: OPTIONS,
     });
     expect(core.calls.filter((c) => c.cmd === "tree_load").length).toBeGreaterThan(1);
     expect(app.get(".report h1").text()).toContain("dans boutique-tests, dossier « Boutique API »");
@@ -204,6 +220,7 @@ describe("reprendre l'existant (2.3-b)", () => {
     expect(core.calls.find((c) => c.cmd === "import_run")?.args).toEqual({
       path: BRUNO,
       target: { kind: "newProject", location: null, workspaceId: BOUTIQUE },
+      options: OPTIONS,
     });
   });
 });
@@ -229,9 +246,11 @@ describe("rapport d'import (2.3-f)", () => {
     expect(rows).toHaveLength(5);
     expect(rows[0]?.text()).toContain("TESTS");
     expect(rows[0]?.text()).toContain("Créer une commande");
-    expect(rows[0]?.text()).toContain("non repris");
+    expect(rows[0]?.text()).toContain("exécuté à l'envoi");
     expect(app.get(".report__code").text()).toContain('tests {\n  test("total cohérent"');
-    expect(app.get(".report__after-box").text()).toContain("Gardé dans le fichier, pas exécuté.");
+    expect(app.get(".report__after-box").text()).toContain(
+      "Gardé dans le fichier, exécuté à chaque envoi.",
+    );
     expect(app.findAll(".report__example")).toHaveLength(4);
     expect(app.get(".zone__name").text()).toBe("Rapport d'import · Boutique API");
 

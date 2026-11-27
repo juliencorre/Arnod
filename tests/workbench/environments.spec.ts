@@ -45,24 +45,47 @@ describe("environnements du projet", () => {
     });
   });
 
-  it("crée un environnement depuis la fenêtre de gestion", async () => {
+  it("AM9 (3.3-0) : le menu de la pastille s'intitule « Environnements · <projet> »", async () => {
+    ({ app } = await openProject());
+    await click(app, '[aria-label="Environnement de boutique-tests : Local"]');
+    expect(app.get(".menu__heading").text()).toBe("Environnements · boutique-tests");
+    // AM17 (1.2-a bis) : « + Nouvel environnement » en couleur de lien.
+    const create = app
+      .findAll('[role="menuitem"]')
+      .find((i) => i.text() === "+ Nouvel environnement");
+    expect(create?.classes()).toContain("menu__item--link");
+  });
+
+  it("crée un environnement depuis la page des environnements", async () => {
     let core;
     ({ app, core } = await openProject());
     await click(app, '[aria-label="Environnement de boutique-tests : Local"]');
     await click(app, '[role="menuitem"]', "Gérer les environnements…");
-    expect(app.find("dialog[open]").exists()).toBe(true);
-    await click(app, "dialog[open] button", "+ Nouvel environnement");
+    expect(app.find(".envs").exists()).toBe(true);
+    await click(app, ".envs button", "+ Nouvel environnement");
+    // AM34 (3.3-b) : la fenêtre de création s'ouvre au-dessus de la gestion.
+    const form = app.get("#new-environment");
+    await form.get("input[type='text']").setValue("Nouvel environnement");
+    await form.trigger("submit");
+    await flushPromises();
     expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local", "Nouvel environnement"]);
   });
 
-  it("« + Nouvel environnement » du menu ouvre la gestion sur un nouvel environnement", async () => {
+  it("« + Nouvel environnement » du menu crée l'environnement et l'ouvre dans sa page", async () => {
     let core;
     ({ app, core } = await openProject());
     await click(app, '[aria-label="Environnement de boutique-tests : Local"]');
     await click(app, '[role="menuitem"]', "+ Nouvel environnement");
     await flushPromises();
     expect(app.find("dialog[open]").exists()).toBe(true);
+    const form = app.get("#new-environment");
+    await form.get("input[type='text']").setValue("Nouvel environnement");
+    await form.trigger("submit");
+    await flushPromises();
     expect(core.workbench.envs.map((e) => e.name)).toEqual(["Local", "Nouvel environnement"]);
+    expect(app.get(".envs .envs__item[aria-current='true'] .envs__item-name").text()).toBe(
+      "Nouvel environnement",
+    );
   });
 
   it("enregistre une valeur locale comme secret sans l'afficher", async () => {
@@ -73,10 +96,12 @@ describe("environnements du projet", () => {
     }));
     await click(app, `[aria-label="Plus d'actions sur boutique-tests"]`);
     await click(app, '[role="menuitem"]', "Gérer les environnements…");
-    const input = app.get('dialog[open] input[aria-label="Valeur de token"]');
+    // 3.3-a (AM43, Q10) : une valeur locale saisie va au coffre quand on quitte le champ.
+    const input = app.get('.envs input[aria-label="Valeur de token"]');
     expect((input.element as HTMLInputElement).type).toBe("password");
     await input.setValue("abc123");
-    await click(app, "dialog[open] button", "Enregistrer comme secret");
+    await input.trigger("change");
+    await flushPromises();
     expect(core.calls.find((c) => c.cmd === "local_set")?.args).toMatchObject({
       environment: "Local",
       name: "token",

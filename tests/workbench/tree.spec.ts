@@ -86,9 +86,9 @@ describe("arborescence du projet", () => {
     await row?.get(".row__more").trigger("click");
     await flushPromises();
     await click(app, '[role="menuitem"]', "Mettre à la corbeille");
-    expect(core.calls.find((c) => c.cmd === "tree_delete")?.args).toMatchObject({
-      path: "sante.yml",
-      permanent: false,
+    expect(core.calls.find((c) => c.cmd === "tree_batch")?.args).toMatchObject({
+      paths: ["sante.yml"],
+      action: { kind: "delete", permanent: false },
     });
     expect(app.get(".toast").text()).toContain("« Santé » mis à la corbeille.");
   });

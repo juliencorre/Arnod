@@ -82,3 +82,35 @@ export function suggestTags(
     create: q === "" || exists ? null : query.trim(),
   };
 }
+
+/** La liste `tags` contient chacune des étiquettes `wanted` (sans casse ni accents). */
+export function hasTags(tags: readonly string[], wanted: readonly string[]): boolean {
+  const own = new Set(tags.map(foldTag));
+  return wanted.every((tag) => own.has(foldTag(tag)));
+}
+
+/**
+ * Tests d'un nœud et ceux qui portent les étiquettes `wanted` (V2, 4.9-b) : un test (dossier
+ * d'étapes) compte si l'une de ses étapes les porte (une étape hérite des étiquettes de son test),
+ * une requête hors test compte pour elle-même. Comptage d'affichage, sur les étiquettes
+ * effectives fournies par le cœur.
+ */
+export function taggedTests(
+  node: TreeNode,
+  wanted: readonly string[],
+): { matching: number; total: number } {
+  if (node.kind === "request") {
+    return { matching: hasTags(node.tags, wanted) ? 1 : 0, total: 1 };
+  }
+  if (node.test) {
+    const hit = node.children.some((c) => c.kind === "request" && hasTags(c.tags, wanted));
+    return { matching: hit ? 1 : 0, total: 1 };
+  }
+  return node.children.reduce(
+    (sum, child) => {
+      const part = taggedTests(child, wanted);
+      return { matching: sum.matching + part.matching, total: sum.total + part.total };
+    },
+    { matching: 0, total: 0 },
+  );
+}

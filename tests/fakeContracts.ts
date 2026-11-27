@@ -16,7 +16,14 @@ import type {
   ResourceView,
 } from "@/types/ipc";
 
-import { buildTree, newRequest, runOf, testsView, type FakeWorkbench } from "./fakeWorkbench";
+import {
+  buildTree,
+  summaryOf,
+  newRequest,
+  runOf,
+  testsView,
+  type FakeWorkbench,
+} from "./fakeWorkbench";
 
 /** Opération d'un faux contrat. */
 export type FakeOperation = Pick<OperationView, "key" | "method" | "path" | "summary" | "tag">;
@@ -29,6 +36,9 @@ export interface FakeContract {
   source: string;
   operations: FakeOperation[];
 }
+
+/** Contrats supprimés, à remettre par « Annuler » (ER1) : jeton → faux cœur, chemin, contrat. */
+const deletedContracts = new Map<string, [FakeContracts, string, FakeContract]>();
 
 export interface FakeContracts {
   /** Contrats par chemin (`contracts/petstore.yaml`). */
@@ -293,7 +303,13 @@ export function handleContracts(
     case "tree_load": {
       // Le référentiel de tests dépend des contrats présents (R1, R5).
       const nodes = buildTree(wb);
-      return { nodes, tests: testsView(nodes, new Set(fc.files.keys())), collapsed: wb.collapsed };
+      return {
+        nodes,
+        tests: testsView(nodes, new Set(fc.files.keys())),
+        collapsed: wb.collapsed,
+        templates: wb.templates.map(summaryOf),
+        sections: [...wb.sections],
+      };
     }
     case "contract_read":
       return view(fc, wb, path);
@@ -324,9 +340,21 @@ export function handleContracts(
       fc.files.set(path, { ...contract, operations: current.operations });
       return view(fc, wb, path);
     }
-    case "contract_delete":
+    case "contract_delete": {
+      const removed = fc.files.get(path);
       fc.files.delete(path);
+      const token = `contrat-${String(deletedContracts.size + 1)}`;
+      if (removed) deletedContracts.set(token, [fc, path, removed]);
+      return token;
+    }
+    case "contract_delete_undo": {
+      const entry =
+        deletedContracts.get(String(args.undoToken)) ??
+        fail("undoExpired", "Cette suppression ne peut plus être annulée.");
+      deletedContracts.delete(String(args.undoToken));
+      entry[0].files.set(entry[1], entry[2]);
       return null;
+    }
     case "contract_generate":
       return generate(
         fc,

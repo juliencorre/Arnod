@@ -11,8 +11,8 @@ import type { Timeline } from "@/types/ipc";
 
 const props = defineProps<{
   timeline: Timeline;
-  /** Une assertion de durée porte sur le total : le dire sous le total. */
-  durationCheck: boolean;
+  /** Assertion de durée évaluée (« responseTime inférieur à 500 ms ») : elle porte sur le total. */
+  durationCheck: string | null;
 }>();
 
 interface Row {
@@ -71,7 +71,7 @@ function bar(index: number): Record<string, string> {
       Connexion réutilisée : ni DNS ni connexion pour cet envoi.
     </p>
     <p v-if="durationCheck" class="timeline__note">
-      L'assertion de durée (responseTime) porte sur ce total.
+      L'assertion « {{ durationCheck }} » porte sur ce total.
     </p>
   </div>
 </template>

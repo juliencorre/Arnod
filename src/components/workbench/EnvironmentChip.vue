@@ -9,7 +9,9 @@ import { computed, ref } from "vue";
 
 import BaseMenu from "@/components/ui/BaseMenu.vue";
 import type { MenuItem } from "@/components/ui/menu";
-import EnvironmentsDialog from "@/components/workbench/EnvironmentsDialog.vue";
+import LockIcon from "@/components/ui/LockIcon.vue";
+import NewEnvironmentDialog from "@/components/workbench/NewEnvironmentDialog.vue";
+import { envHost, envSwatch } from "@/lib/environments";
 import { useCatalogStore } from "@/stores/catalog";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -27,7 +29,7 @@ const active = computed(
   () => view.value?.environments.find((e) => e.name === view.value?.active) ?? null,
 );
 
-const managing = ref(false);
+/** Fenêtre « Nouvel environnement » ouverte depuis le menu (AM34). */
 const creating = ref(false);
 
 const MANAGE = "::gerer";
@@ -35,14 +37,10 @@ const CREATE = "::nouveau";
 
 /** Couleur d'un environnement, en jeton du thème. */
 function swatch(env: EnvironmentView | null): string {
-  return `var(--color-ws-${env?.color ?? "gray"})`;
+  return envSwatch(env?.color);
 }
 
-/** Adresse de base, sans le schéma : de quoi reconnaître l'environnement. */
-function host(env: EnvironmentView): string | undefined {
-  const base = env.variables.find((v) => v.name === "baseUrl")?.value.trim() ?? "";
-  return base === "" ? undefined : base.replace(/^[a-z]+:\/\//i, "").replace(/\/$/, "");
-}
+const host = envHost;
 
 const items = computed<MenuItem[]>(() => [
   ...(view.value?.environments ?? []).map((env) => ({
@@ -55,13 +53,21 @@ const items = computed<MenuItem[]>(() => [
     detail: host(env),
   })),
   { id: MANAGE, label: "Gérer les environnements…", shortcut: "Ctrl+Maj+E", separatorBefore: true },
-  { id: CREATE, label: "+ Nouvel environnement" },
+  { id: CREATE, label: "+ Nouvel environnement", tone: "link" },
 ]);
 
-/** Ouvre la gestion des environnements, ou la création d'un nouveau. */
+/**
+ * Ouvre la page des environnements (3.3-a, AM43, Q7), ou la fenêtre de création ; l'environnement
+ * créé s'ouvre ensuite dans la page.
+ */
 function manage(create = false): void {
-  creating.value = create;
-  managing.value = true;
+  if (create) creating.value = true;
+  else void workbench.openEnvironments(props.projectId).catch(toasts.showError);
+}
+
+function onCreated(name: string): void {
+  creating.value = false;
+  void workbench.openEnvironments(props.projectId, name).catch(toasts.showError);
 }
 
 async function onSelect(id: string): Promise<void> {
@@ -84,7 +90,7 @@ defineExpose({ manage });
     v-if="view && active"
     :items="items"
     :label="`Environnements de ${projectName}`"
-    :heading="`Environnement · ${projectName}`"
+    :heading="`Environnements · ${projectName}`"
     :align="compact ? 'end' : 'start'"
     @select="onSelect"
   >
@@ -95,21 +101,23 @@ defineExpose({ manage });
         type="button"
         class="chip"
         :class="{ 'chip--compact': compact }"
-        :aria-label="`Environnement de ${projectName} : ${active.name}`"
+        :aria-label="`Environnement de ${projectName} : ${active.name}${active.protected ? ' (protégé)' : ''}`"
         :title="open ? undefined : `Environnement du projet : ${active.name}`"
       >
         <span class="chip__swatch" :style="{ background: swatch(active) }" aria-hidden="true" />
         <span class="chip__name">{{ active.name }}</span>
+        <!-- AM31 : un environnement protégé porte son cadenas sur la pastille. -->
+        <LockIcon v-if="active.protected" class="chip__lock" />
         <span class="chip__caret" aria-hidden="true">▾</span>
       </button>
     </template>
   </BaseMenu>
-  <EnvironmentsDialog
-    v-if="managing"
-    :open="managing"
+  <NewEnvironmentDialog
+    v-if="creating"
+    :open="creating"
     :project-id="projectId"
-    :start-new="creating"
-    @close="managing = false"
+    @close="creating = false"
+    @created="onCreated"
   />
 </template>
 
@@ -166,7 +174,11 @@ defineExpose({ manage });
 
 .chip__caret {
   flex: none;
-  font-size: 0.625rem;
+  font-size: 0.625rem; /* impeccable-disable-line design-system-font-size: glyphe ▾ du menu (exception R1 à R8) */
+  color: var(--color-muted);
+}
+
+.chip__lock {
   color: var(--color-muted);
 }
 </style>

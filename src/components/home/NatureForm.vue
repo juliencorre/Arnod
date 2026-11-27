@@ -11,7 +11,8 @@ import NaturePill from "@/components/steps/NaturePill.vue";
 import { engineLabel, fieldValue, isVisible } from "@/lib/steps";
 import type { StepField, StepNature } from "@/types/ipc";
 
-const props = defineProps<{ nature: StepNature }>();
+/** `imported` : le formulaire reprend une commande collée (cURL). */
+const props = defineProps<{ nature: StepNature; imported?: boolean }>();
 const values = defineModel<Record<string, string>>({ required: true });
 
 const baseId = useId();
@@ -55,7 +56,14 @@ const origin = computed(() => {
   <div class="nature-form" role="group" :aria-label="`Formulaire de la nature ${nature.name}`">
     <div class="nature-form__head">
       <NaturePill :name="nature.name" :family="nature.family" />
-      <span class="nature-form__title">{{ nature.title }}</span>
+      <span class="nature-form__noun">· {{ nature.noun }}</span>
+      <span class="nature-form__title">
+        {{
+          imported
+            ? "repris de la commande, à vérifier avant l'envoi"
+            : "ce qu'il faut pour l'exécuter"
+        }}
+      </span>
     </div>
     <div class="nature-form__fields">
       <div
@@ -127,6 +135,11 @@ const origin = computed(() => {
   display: flex;
   align-items: center;
   gap: 0.625rem;
+}
+
+.nature-form__noun {
+  margin-left: -0.375rem;
+  font-weight: 600;
 }
 
 .nature-form__title {

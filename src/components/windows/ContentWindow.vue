@@ -7,6 +7,7 @@ import { computed, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
 import ConfirmProtectedDialog from "@/components/workbench/ConfirmProtectedDialog.vue";
+import EnvironmentChip from "@/components/workbench/EnvironmentChip.vue";
 import ZoneArea from "@/components/zones/ZoneArea.vue";
 import { useDrafts } from "@/composables/useDrafts";
 import { ipc } from "@/lib/ipc";
@@ -29,6 +30,7 @@ const crumbs = computed<string[]>(() => {
   const project = catalog.projectById(content.projectId)?.name ?? "projet";
   if (content.kind === "run") return [project, "Run"];
   if (content.kind === "importReport") return [project, "Rapport d'import"];
+  if (content.kind === "environments") return [project, "Environnements"];
   if (content.kind === "contract") {
     const name =
       contracts.open[contractKey(content.projectId, content.path)]?.view?.name ??
@@ -44,6 +46,11 @@ const crumbs = computed<string[]>(() => {
 });
 
 const follow = computed(() => windows.me?.follow ?? true);
+/** Projet du contenu actif : sa pastille d'environnement précède « Rattacher » (1.4-h). */
+const projectId = computed(() => {
+  const content = windows.activeTab?.content;
+  return content && "projectId" in content ? content.projectId : null;
+});
 
 watch(
   crumbs,
@@ -84,8 +91,10 @@ watch(
         "
         @click="windows.setFollow(!follow)"
       >
-        {{ follow ? "⇆ Suit la sélection" : "Épinglée" }}
+        <template v-if="follow">⇆ Suit la sélection</template>
+        <template v-else><span aria-hidden="true">●</span> Épinglée</template>
       </button>
+      <EnvironmentChip v-if="projectId" :project-id="projectId" compact />
       <BaseButton @click="drafts.reattach()">Rattacher</BaseButton>
     </header>
     <main class="content-window__main">
@@ -144,6 +153,13 @@ watch(
   color: var(--color-text);
   background: var(--color-surface);
   cursor: pointer;
+}
+
+/* « Épinglée » : pastille accent doux avec ● (1.4-g, 1.4-h). */
+.content-window__follow[aria-pressed="false"] {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  background: var(--color-accent-soft);
 }
 
 .content-window__follow[aria-pressed="true"] {

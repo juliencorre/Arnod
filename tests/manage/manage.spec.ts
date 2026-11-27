@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { useNavigationStore } from "@/stores/navigation";
 
+import { cssValue } from "../css";
 import { type FakeCore, installFakeCore } from "../fakeCore";
 import {
   AUTH_SSO,
@@ -77,6 +78,19 @@ describe("gérer les workspaces (2d, O11)", () => {
     expect(list.get('[aria-current="true"]').text()).toContain("Boutique");
     expect(wrapper.get<HTMLInputElement>("main form input").element.value).toBe("Boutique");
     expect(useNavigationStore().titleSubject).toBe("Workspaces");
+  });
+
+  it("AM15 (1.1-d) : ajout à gauche, pastille dans le champ du nom, explication à droite", async () => {
+    installFakeCore(richSnapshot());
+    wrapper = await mountApp();
+    await openManage(wrapper);
+    // La pastille et le nom partagent le même champ.
+    const field = wrapper.get("main .detail__field");
+    expect(field.find(".detail__input").exists()).toBe(true);
+    expect(field.find('[class*="dot"]').exists()).toBe(true);
+    const file = "src/components/manage/WorkspacesTab.vue";
+    expect(cssValue(file, ".list__add", "align-self")).toBe("flex-start");
+    expect(cssValue(file, ".detail__delete", "flex-wrap")).toBe("nowrap");
   });
 
   it("renomme et change la couleur ; plus de rôle « par défaut »", async () => {

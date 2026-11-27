@@ -24,7 +24,7 @@ const workspace = computed(() => catalog.workspaceById(props.workspaceId));
 const items = computed<MenuItem[]>(() => {
   const others = catalog.workspaces.filter((w) => w.id !== props.workspaceId);
   return [
-    { id: "open", label: "Ouvrir" },
+    { id: "open", label: "Ouvrir", disabled: props.project.status === "missing" },
     {
       id: "add",
       label: "Ajouter à un autre workspace",

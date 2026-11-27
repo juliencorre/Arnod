@@ -211,8 +211,13 @@ function style(): Record<string, string> {
   cursor: pointer;
 }
 
+/* Cible de 24 × 24 px au moins (AC4, WCAG 2.5.8). */
 .tag__remove {
-  padding: 0 0.125rem;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
   color: var(--color-muted);
 }
 

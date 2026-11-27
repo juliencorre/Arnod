@@ -2,7 +2,7 @@
 //! depuis leurs opérations et run du contrat (docs/plan-contrats-services.md).
 
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tauri::{Manager, State, WebviewWindow};
@@ -13,6 +13,7 @@ use crate::contract::file::{self, ContractSource, ContractSummary, ContractView,
 use crate::error::{CommandError, CommandErrorKind};
 use crate::layout::windows::Windows;
 use crate::state::AppState;
+use crate::tree::undo::{Undo, UndoBook};
 use crate::windows::{self, ProjectScope};
 use crate::workbench::{RunView, Workbench};
 
@@ -201,12 +202,36 @@ pub fn contract_delete(
     project: Uuid,
     path: String,
     permanent: bool,
-) -> Result<(), CommandError> {
-    file::delete(&root(&state, project)?, &path, permanent)?;
+) -> Result<Uuid, CommandError> {
+    let undo = file::delete(&root(&state, project)?, &path, permanent)?;
     let _ = windows::apply(window.app_handle(), |w: &mut Windows| {
         w.close_path(project, &path);
         Ok(())
     });
+    changed(&window, project, &[ProjectScope::Contracts], Some(&path));
+    Ok(DELETED
+        .lock()
+        .map(|mut book| book.push((project, path, undo)))
+        .unwrap_or_else(|_| Uuid::new_v4()))
+}
+
+/// Contrats supprimés récemment, à remettre (« Annuler », ER1) : projet, chemin et texte.
+static DELETED: Mutex<UndoBook<(Uuid, String, Undo)>> = Mutex::new(UndoBook::new());
+
+/// « Annuler » la suppression d'un contrat : son fichier revient tel qu'il était.
+#[tauri::command]
+pub fn contract_delete_undo(window: WebviewWindow, undo_token: Uuid) -> Result<(), CommandError> {
+    let entry = DELETED
+        .lock()
+        .ok()
+        .and_then(|mut book| book.take(undo_token));
+    let Some((project, path, undo)) = entry else {
+        return Err(CommandError::new(
+            CommandErrorKind::UndoExpired,
+            "Cette suppression ne peut plus être annulée.",
+        ));
+    };
+    undo.apply()?;
     changed(&window, project, &[ProjectScope::Contracts], Some(&path));
     Ok(())
 }

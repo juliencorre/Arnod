@@ -1,49 +1,37 @@
-//! Cœur natif d'Arnod.
+//! Application Arnod (Tauri).
 //!
 //! L'interface (WebView) ne contient aucune logique métier : elle appelle
 //! les commandes typées définies dans [`commands`]. Les commandes faillibles
-//! renvoient une [`error::CommandError`]. Les règles des projets et workspaces
-//! vivent dans [`catalog`], leur persistance dans [`storage`] et [`manifest`],
-//! l'état partagé dans [`state`].
+//! renvoient une [`error::CommandError`]. Le travail se fait dans le cœur
+//! (`arnod-core`, sans Tauri) : règles des projets et workspaces dans [`catalog`],
+//! persistance dans [`storage`] et [`manifest`], état partagé dans [`state`].
 
-pub mod bruno;
-pub mod catalog;
-pub mod commands;
-pub mod contract;
-pub mod curl;
-pub mod environment;
-pub mod error;
-pub mod http;
-pub mod import;
-pub mod input;
-pub mod instance;
-pub mod layout;
-pub mod local;
-pub mod manifest;
-// Lot H - Réseau et authentification.
-mod menu;
-pub mod network;
-pub mod opencollection;
-pub mod quit;
-pub mod request;
-pub mod response;
-pub mod results;
-pub mod secrets;
-pub mod startup;
-pub mod state;
-pub mod statuses;
-pub mod steps;
-pub mod storage;
-pub mod tree;
-pub mod trial;
+// Le cœur sans Tauri (`core/`, crate `arnod-core`, V2 lot C) : modèle, fichiers, envoi, établi,
+// recherche. Ses modules sont repris ici sous leur nom pour que `crate::tree`, `crate::workbench`…
+// restent valables dans l'application.
 #[cfg(test)]
-mod ts_contract;
+pub(crate) use arnod_core::ts_contract;
+pub use arnod_core::{
+    bruno, catalog, command, contract, curl, dataset, environment, error, flow, history, http,
+    import, input, layout, local, manifest, network, opencollection, request, response, results,
+    script, search, secrets, startup, state, statuses, steps, storage, sync, template, tree, trial,
+    workbench,
+};
+
+pub mod commands;
+pub mod instance;
+pub mod interface;
+mod menu;
+pub mod quit;
 #[cfg(test)]
 mod ts_mirror;
 pub mod updates;
-pub mod watch;
+/// Surveillance des projets : règles dans le cœur, branchement aux fenêtres ici (`app`).
+pub mod watch {
+    pub use arnod_core::watch::*;
+    pub mod app;
+}
 pub mod windows;
-pub mod workbench;
 
 use std::sync::{Arc, Mutex};
 
@@ -58,6 +46,15 @@ use crate::windows::WindowsState;
 use crate::workbench::Workbench;
 
 /// Point d'entrée de l'application, appelé par `main.rs`.
+/// Lance les runs de l'établi sur le runtime de Tauri ([`workbench::Spawner`]).
+struct TauriSpawner;
+
+impl workbench::Spawner for TauriSpawner {
+    fn spawn(&self, task: workbench::Task) {
+        tauri::async_runtime::spawn(task);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -67,6 +64,7 @@ pub fn run() {
         // (aucune permission WebView ; clé publique dans `tauri.conf.json`).
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(commands::updates::UpdatesState::default())
+        .manage(commands::search::SearchCache::default())
         .menu(menu::build)
         .on_menu_event(menu::handle_event)
         .setup(|app| {
@@ -104,7 +102,12 @@ pub fn run() {
             bench.network().attach(&data_dir);
             // Avancement des runs et statuts des requêtes diffusés aux fenêtres (R3, R4).
             bench.set_notifier(Arc::new(windows::EventNotifier::new(app.handle().clone())));
+            // Les runs tournent sur le runtime de Tauri (lot C : le cœur ne le connaît pas).
+            bench.set_spawner(Arc::new(TauriSpawner));
             app.manage(bench);
+            // V2, lots E et F : récupérations en attente d'un choix, connexions aux forges.
+            app.manage(Arc::new(sync::SyncBook::default()));
+            app.manage(commands::sync::SyncLogins::default());
             app.manage(WindowsState::load(data_dir));
             app.manage(Mutex::new(ResultBook::default()));
             app.manage(Mutex::new(quit::QuitGate::default()));
@@ -179,6 +182,7 @@ pub fn run() {
             commands::contracts::contract_import_file,
             commands::contracts::contract_save,
             commands::contracts::contract_delete,
+            commands::contracts::contract_delete_undo,
             commands::contracts::contract_generate,
             commands::contracts::contract_run,
             commands::tree::tree_load,
@@ -188,7 +192,7 @@ pub fn run() {
             commands::tree::tree_rename,
             commands::tree::tree_move,
             commands::tree::tree_duplicate,
-            commands::tree::tree_delete,
+            commands::tree::tree_reorder,
             commands::requests::request_read,
             commands::requests::request_save,
             commands::requests::request_send,
@@ -202,6 +206,10 @@ pub fn run() {
             commands::environments::environment_select,
             commands::environments::environment_save,
             commands::environments::environment_delete,
+            commands::environments::environment_delete_undo,
+            commands::environments::environment_create,
+            commands::environments::environment_copy,
+            commands::environments::environment_usage,
             commands::environments::environments_reorder,
             commands::environments::local_set,
             commands::runs::run_start,
@@ -231,11 +239,43 @@ pub fn run() {
             commands::import::import_detect,
             commands::import::import_run,
             commands::import::import_report,
+            commands::import::import_script,
+            commands::import::import_script_undo,
             // Lot E : tests et étapes.
             commands::test_steps::test_read,
             commands::test_steps::tree_create_test,
             commands::test_steps::tree_add_step,
             commands::test_steps::request_variable_users,
+            commands::flows::flow_save,
+            commands::flows::flow_add_step,
+            commands::flows::flow_remove_step,
+            commands::flows::flow_step_operation,
+            commands::flows::hooks_remove_step,
+            commands::flows::hooks_read,
+            commands::flows::hooks_save,
+            commands::flows::hooks_add_step,
+            commands::flows::folder_properties,
+            commands::flows::folder_set_properties,
+            commands::datasets::data_read,
+            commands::datasets::data_save,
+            commands::datasets::data_import,
+            commands::datasets::data_remove,
+            commands::datasets::data_parse,
+            commands::datasets::data_open,
+            commands::datasets::data_case,
+            commands::datasets::request_send_cases,
+            commands::templates::template_list,
+            commands::templates::template_categories,
+            commands::templates::template_read,
+            commands::templates::template_save_params,
+            commands::templates::template_candidates,
+            commands::templates::template_create,
+            commands::templates::template_use,
+            commands::templates::template_instance,
+            commands::templates::template_set_values,
+            commands::templates::template_literals,
+            commands::templates::template_from_request,
+            commands::templates::sections_show,
             // Essais : chemins généralisés et transfert au référentiel (2.2-b et 2.2-c).
             commands::trial::trial_generalization,
             commands::trial::trial_generalize,
@@ -291,6 +331,39 @@ pub fn run() {
             commands::batch::tree_batch_undo,
             commands::batch::run_selection,
             commands::window::window_quit_ready,
+            // Version 1 (docs/plan-v1.md) : apparence et raccourcis puis historique des envois.
+            commands::interface::interface_load,
+            commands::interface::interface_save_appearance,
+            commands::interface::interface_set_shortcut,
+            commands::interface::interface_reset_shortcuts,
+            commands::history::history_load,
+            commands::history::history_diff,
+            commands::history::history_clear,
+            commands::history::history_restore,
+            // Version 2 (lot A) : recherche Ctrl+K.
+            commands::search::search_query,
+            // Version 2 (lot B) : étiquettes partagées.
+            commands::tree::tree_set_folder_tags,
+            // Version 2 (lot D) : « Copier la commande ».
+            commands::cli::cli_command,
+            // Version 2 (lots E et F) : synchronisation Git.
+            commands::sync::sync_status,
+            commands::sync::sync_check,
+            commands::sync::sync_login_options,
+            commands::sync::sync_connect_start,
+            commands::sync::sync_connect_wait,
+            commands::sync::sync_connect_cancel,
+            commands::sync::sync_token,
+            commands::sync::sync_repositories,
+            commands::sync::sync_create_repository,
+            commands::sync::sync_link,
+            commands::sync::sync_pull_push,
+            commands::sync::sync_conflicts,
+            commands::sync::sync_resolve,
+            commands::sync::sync_abandon,
+            commands::sync::sync_journal,
+            commands::sync::sync_missing_secrets,
+            commands::sync::sync_secrets_later,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

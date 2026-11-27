@@ -31,8 +31,7 @@ use crate::workbench::{Notifier, RunView};
 /// Étiquette de la fenêtre principale.
 pub const MAIN_LABEL: &str = MAIN;
 
-/// Fichier des fenêtres, dans les données locales (Z8).
-pub const WINDOWS_FILE: &str = "windows.json";
+pub use crate::layout::windows::WINDOWS_FILE;
 
 /// Événements diffusés aux fenêtres (F11).
 pub mod events {
@@ -62,6 +61,9 @@ pub mod events {
     /// Lot L : version trouvée et installation (`UpdatesView`), à chaque étape et au plus une
     /// fois par pour cent téléchargé (`docs/plan-mvp-l-mises-a-jour.md`, R8).
     pub const UPDATES: &str = "arnod://mise-a-jour";
+    /// Version 1 : préférences d'interface du poste (`InterfaceView`), après chaque changement :
+    /// thème, police des éditeurs et raccourcis suivent dans toutes les fenêtres.
+    pub const INTERFACE: &str = "arnod://interface";
 }
 
 /// Statuts des requêtes d'un projet, diffusés à chaque changement (R4, R5).
@@ -105,6 +107,11 @@ impl<R: Runtime> Notifier for EventNotifier<R> {
                 statuses: statuses.clone(),
             },
         );
+    }
+
+    /// Valeur extraite gardée dans un environnement (AM44) : toutes les fenêtres le relisent.
+    fn environments_changed(&self, project_id: Uuid) {
+        project_changed(&self.app, "", project_id, ProjectScope::Environments, None);
     }
 }
 
@@ -364,6 +371,8 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>, window: WindowState) {
                 .min_inner_size(min_width, 360.0)
                 // Glisser-déposer HTML (onglets, projets), comme la fenêtre principale.
                 .disable_drag_drop_handler()
+                // Ctrl+ +, Ctrl+ − et Ctrl+0 agrandissent le contenu (AC7), comme la principale.
+                .zoom_hotkeys_enabled(true)
                 // Montrée prête (`window_ready`), ou au plus tard après 300 ms (lot G, 0.3-a).
                 .visible(false);
         if let Some(bounds) = window.bounds {
@@ -607,6 +616,58 @@ pub fn paths_changed<R: Runtime>(
 mod tests {
     use super::*;
     use crate::layout::Content;
+
+    /// Portées de `arnod://projet` : union miroir de `ProjectScope` (`src/types/ipc.ts`).
+    #[test]
+    fn portees_du_projet_concordantes() {
+        use crate::ts_contract::{serialized_name, union_members};
+        use std::collections::BTreeSet;
+        let names: BTreeSet<String> = [
+            ProjectScope::Tree,
+            ProjectScope::Request,
+            ProjectScope::Environments,
+            ProjectScope::Contracts,
+        ]
+        .into_iter()
+        .map(serialized_name)
+        .collect();
+        assert_eq!(union_members("ProjectScope"), names);
+    }
+
+    /// Forme JSON de `arnod://statuts` (diffusé à chaque envoi et run).
+    #[test]
+    fn changement_des_statuts_forme_json() {
+        let change = StatusesChange {
+            project_id: Uuid::nil(),
+            statuses: crate::statuses::Statuses::from([(
+                "D/a.yml".to_owned(),
+                crate::statuses::RequestStatus {
+                    passed: false,
+                    at: 7,
+                },
+            )]),
+        };
+        assert_eq!(
+            serde_json::to_value(change).unwrap(),
+            serde_json::json!({
+                "projectId": Uuid::nil().to_string(),
+                "statuses": { "D/a.yml": { "passed": false, "at": 7 } }
+            })
+        );
+    }
+
+    /// AC7 : la fenêtre principale accepte le zoom au clavier ; les fenêtres détachées le
+    /// reçoivent de leur constructeur (`zoom_hotkeys_enabled`).
+    #[test]
+    fn ac7_zoom_au_clavier_dans_la_fenetre_principale() {
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(
+            conf.pointer("/app/windows/0/zoomHotkeysEnabled"),
+            Some(&serde_json::Value::Bool(true))
+        );
+        assert!(include_str!("windows.rs").contains(".zoom_hotkeys_enabled(true)"));
+    }
 
     #[test]
     fn enregistre_et_recharge_windows_json() {

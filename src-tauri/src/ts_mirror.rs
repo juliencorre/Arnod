@@ -132,6 +132,11 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::import::SourceFormat>();
     v.visit::<crate::import::ImportSource>();
     v.visit::<crate::import::ImportTarget>();
+    v.visit::<crate::import::SourceEnvironment>();
+    v.visit::<crate::import::ImportOptions>();
+    v.visit::<crate::import::EnvironmentChoice>();
+    v.visit::<crate::import::ScriptChoice>();
+    v.visit::<crate::import::ScriptResolved>();
     v.visit::<crate::import::ImportReport>();
     v.visit::<crate::import::ImportDone>();
     v.visit::<crate::input::added::AddedOrigin>();
@@ -183,6 +188,25 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::network::proxy::ProxySource>();
     v.visit::<crate::network::proxy::SystemProxy>();
     v.visit::<crate::network::tls::CertificateProblem>();
+    // Version 4 (docs/plan-v4.md).
+    v.visit::<crate::flow::Flow>();
+    v.visit::<crate::flow::FolderHooks>();
+    v.visit::<crate::flow::StepKind>();
+    v.visit::<crate::flow::HookPhase>();
+    v.visit::<crate::flow::edit::Placement>();
+    v.visit::<crate::flow::edit::FlowStepInfo>();
+    v.visit::<crate::flow::edit::StepAdded>();
+    v.visit::<crate::flow::edit::HooksView>();
+    v.visit::<crate::flow::edit::FolderProperty>();
+    v.visit::<crate::dataset::DataTable>();
+    v.visit::<crate::dataset::DataSet>();
+    v.visit::<crate::workbench::CasesOutcome>();
+    v.visit::<crate::template::TemplateSummary>();
+    v.visit::<crate::template::TemplateView>();
+    v.visit::<crate::template::InstanceView>();
+    v.visit::<crate::template::TemplateCandidate>();
+    v.visit::<crate::template::Literal>();
+    v.visit::<crate::commands::datasets::CasePreview>();
     v.visit::<crate::request::assertions::AssertionResult>();
     v.visit::<crate::request::dynamic::DynamicValue>();
     v.visit::<crate::request::extract::ExtractedValue>();
@@ -284,8 +308,13 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::workbench::LocalVarView>();
     v.visit::<crate::workbench::EnvironmentView>();
     v.visit::<crate::workbench::EnvironmentsView>();
+    v.visit::<crate::commands::environments::EnvironmentDeleted>();
+    v.visit::<crate::environment::NewEnvironment>();
+    v.visit::<crate::workbench::EnvironmentUsage>();
     v.visit::<crate::workbench::SendOutcome>();
     v.visit::<crate::workbench::UsedVariable>();
+    v.visit::<crate::workbench::UsedSource>();
+    v.visit::<crate::workbench::SentToken>();
     v.visit::<crate::workbench::Sent>();
     v.visit::<crate::workbench::ItemStatus>();
     v.visit::<crate::workbench::RunItem>();
@@ -293,6 +322,20 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::workbench::RunGroup>();
     v.visit::<crate::workbench::RunView>();
     v.visit::<crate::workbench::ProjectLastRun>();
+    v.visit::<crate::interface::InterfaceView>();
+    v.visit::<crate::commands::interface::ShortcutChange>();
+    v.visit::<crate::history::HistoryView>();
+    v.visit::<crate::history::HistoryDiff>();
+    v.visit::<crate::search::SearchResults>();
+    v.visit::<crate::command::Shell>();
+    v.visit::<crate::sync::SyncView>();
+    v.visit::<crate::sync::SyncConflicts>();
+    v.visit::<crate::sync::JournalEntry>();
+    v.visit::<crate::sync::forge::Repository>();
+    v.visit::<crate::sync::forge::DeviceCode>();
+    v.visit::<crate::sync::merge::Choice>();
+    v.visit::<crate::commands::sync::MissingSecrets>();
+    v.visit::<crate::commands::sync::SyncLoginOptions>();
 }
 
 /// Contenu attendu de `tests/ipc/coeur.ts`.
@@ -407,6 +450,8 @@ fn samples() -> String {
         nodes,
         tests,
         collapsed: Vec::new(),
+        templates: Vec::new(),
+        sections: Vec::new(),
     };
     let mut request = file::read(&root.join("Clients/lister.yml")).unwrap();
     request.inherited = inherit::resolve(root, "Clients/lister.yml");

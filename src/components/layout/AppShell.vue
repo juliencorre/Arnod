@@ -14,6 +14,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from "vue";
 
 import AppSidebar from "@/components/layout/AppSidebar.vue";
+import SearchPalette from "@/components/layout/SearchPalette.vue";
 import SharedDialogs from "@/components/layout/SharedDialogs.vue";
 import WorkspaceSwitcher from "@/components/layout/WorkspaceSwitcher.vue";
 import ManageScreen from "@/components/manage/ManageScreen.vue";
@@ -21,13 +22,23 @@ import AllProjects from "@/components/projects/AllProjects.vue";
 import ProjectView from "@/components/projects/ProjectView.vue";
 import StepsCatalog from "@/components/steps/StepsCatalog.vue";
 import WorkspaceHome from "@/components/workspaces/WorkspaceHome.vue";
+import ConflictDialog from "@/components/sync/ConflictDialog.vue";
+import LinkDialog from "@/components/sync/LinkDialog.vue";
+import MissingSecrets from "@/components/sync/MissingSecrets.vue";
+import StatusBar from "@/components/sync/StatusBar.vue";
+import SyncPanel from "@/components/sync/SyncPanel.vue";
 import SplitHandle from "@/components/zones/SplitHandle.vue";
+import { useFocusRescue } from "@/composables/useFocusRescue";
+import { useInterfaceStore } from "@/stores/interface";
 import { useNavigationStore } from "@/stores/navigation";
 import { useWindowsStore } from "@/stores/windows";
 
 const navigation = useNavigationStore();
 const windows = useWindowsStore();
+const shortcuts = useInterfaceStore();
 const body = useTemplateRef<HTMLElement>("body");
+const main = useTemplateRef<HTMLElement>("main");
+useFocusRescue(main);
 
 const allView = computed(() => (navigation.view.kind === "all" ? navigation.view : null));
 const workspaceView = computed(() =>
@@ -43,10 +54,9 @@ const sidebarPossible = computed(
 /** Barre latérale affichée : possible et pas masquée (Ctrl+\, 1.4-j). */
 const withSidebar = computed(() => sidebarPossible.value && !windows.sidebarHidden);
 
-/** Ctrl+\ masque ou affiche la barre latérale (1.4-j). */
+/** Ctrl+\ par défaut masque ou affiche la barre latérale (1.4-j, 1.6-f bis). */
 function onKeydown(event: KeyboardEvent): void {
-  if (event.defaultPrevented || !(event.ctrlKey || event.metaKey)) return;
-  if (event.altKey || event.shiftKey || event.code !== "Backslash") return;
+  if (event.defaultPrevented || !shortcuts.matches(event, "toggleSidebar")) return;
   event.preventDefault();
   void windows.toggleSidebar();
 }
@@ -148,7 +158,9 @@ const detachHover = ref(false);
           </button>
           <WorkspaceSwitcher />
         </div>
-        <main class="shell__main">
+        <!-- Version 2, lot E (7.1-e) : secrets à renseigner après une récupération. -->
+        <MissingSecrets />
+        <main ref="main" class="shell__main" tabindex="-1">
           <AllProjects v-if="allView" :highlight-project-id="allView.highlightProjectId" />
           <WorkspaceHome v-else-if="workspaceView" :workspace-id="workspaceView.workspaceId" />
           <ProjectView
@@ -161,7 +173,15 @@ const detachHover = ref(false);
         </main>
       </div>
     </div>
+    <!-- Version 2, lot E (SY4) : barre d'état, synchronisation du projet courant. -->
+    <StatusBar />
     <SharedDialogs />
+    <!-- Version 2, lot A (1.5) : recherche Ctrl+K. -->
+    <SearchPalette />
+    <!-- Version 2, lots E et F (7.1-a à 7.1-c) : relier, synchroniser, régler un conflit. -->
+    <SyncPanel />
+    <LinkDialog />
+    <ConflictDialog />
   </div>
 </template>
 
@@ -214,6 +234,11 @@ const detachHover = ref(false);
   transition:
     margin 0.2s,
     box-shadow 0.2s;
+}
+
+/* Reçoit le focus perdu (AC2) sans contour : seul un contrôle montre le focus. */
+.shell__main:focus {
+  outline: none;
 }
 
 .shell__main {

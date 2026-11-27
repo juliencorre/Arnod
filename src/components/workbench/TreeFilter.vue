@@ -80,10 +80,6 @@ defineExpose({
   font-size: var(--text-body);
 }
 
-.tree-filter__input::-webkit-search-cancel-button {
-  appearance: none;
-}
-
 .tree-filter__count {
   position: absolute;
   right: 1.75rem;

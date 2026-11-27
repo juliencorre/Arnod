@@ -34,7 +34,7 @@ const focused = ref(false);
       </p>
     </div>
     <div class="first-run__column">
-      <TryStep @open="focused = $event" />
+      <TryStep autofocus @open="focused = $event" />
       <template v-if="!focused">
         <p class="first-run__or" aria-hidden="true"><span>ou</span></p>
         <div class="first-run__cards">
@@ -63,7 +63,7 @@ const focused = ref(false);
       <div v-else class="first-run__compact">
         <span>Pas encore de projet ?</span>
         <BaseButton @click="dialogs.openNewProject(null)">Créer un projet…</BaseButton>
-        <BaseButton @click="imports.open(null, null)">⇩ Importer…</BaseButton>
+        <BaseButton @click="imports.open(null, null)">⇩ Importer l'existant…</BaseButton>
         <span class="first-run__compact-note">
           Un projet = un dossier sur votre poste, partagé avec l'équipe.
         </span>

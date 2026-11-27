@@ -29,13 +29,29 @@ leur contrat selon `docs/plan-requetes-dans-contrats.md` (sections « Contrats d
 `docs/plan-qualite-interface.md` (échelles du design system appliquées au code et à la maquette).
 Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
-Livré ensuite : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots A à L).
+Livré ensuite : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots A à L), puis la
+version 1 de la maquette selon `docs/plan-v1.md` (apparence, raccourcis modifiables, historique des
+envois ; section « Apparence, raccourcis et historique »).
+
+**Prochain** : version 2 selon `docs/plan-v2.md` (recherche Ctrl+K, étiquettes partagées, ligne de
+commande `arnod run`, synchronisation Git ; lots A à F en `claude/v2-<lot>`). Lots A à F livrés
+(sections « Recherche », « Étiquettes partagées », « Ligne de commande », « Synchronisation ») ;
+reste Q2 : enregistrer les applications OAuth d'Arnod pour la connexion par le navigateur.
+
+Livré ensuite : version 4 selon `docs/plan-v4.md` (tests en schéma, étape script, jeux de données,
+Avant / Après et propriétés des dossiers, templates, « Plus » ; scripts Bruno exécutés ; sans
+l'import Postman, 2.3-d) : sections « Tests en schéma », « Scripts », « Jeux de données »,
+« Avant / Après et propriétés » et « Templates ».
 
 **Travail en cours** : qualité du MVP selon `docs/plan-qualite-mvp.md` (lots 0 et A à K en trois
 vagues, règles R1 à R14), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
 `docs/audit-2026-11-mvp/preuves/`). Lot 0 livré : la maquette redessinée est la référence
 (`docs/maquette-consignes-qualite.md`). Un lot = une branche `claude/qualite-<lot>` et une pull
 request ; chaque constat se corrige avec son test de preuve, qui échoue avant et passe après (R1).
+En parallèle, alignement du code sur la maquette selon `docs/plan-alignement-maquette.md` (écarts
+`aligner: code` de `maquette-etat.yml`, cas AM1 à AM44, lots A à G en `claude/alignement-<lot>`,
+entrelacés avec les lots I, J et T25 du plan de qualité, ordre au § 8). Le lot G retire les deux
+derniers écarts : plus aucun écran n'a d'écart `aligner: code`.
 
 ## Architecture
 
@@ -49,15 +65,24 @@ request ; chaque constat se corrige avec son test de preuve, qui échoue avant e
   cœur (`events`, `EVENTS`).
 - Les commandes Rust vivent dans `src-tauri/src/commands/`, un fichier par domaine
   (`hello.rs`, plus tard `http.rs`, `mocks.rs`...).
+- Le travail vit dans le cœur sans Tauri, `src-tauri/core/` (crate `arnod-core`, V2 lot C) : il
+  ne dépend ni de Tauri ni d'une fenêtre (un test le vérifie), l'application et la ligne de
+  commande s'en servent. Une tâche de fond de l'établi passe par `workbench::Spawner` (runtime de
+  Tauri dans l'application) ; un changement à diffuser par `workbench::Notifier`. Une commande, une
+  fenêtre, un menu ou une mise à jour restent dans l'application (`src-tauri/src/`), qui reprend
+  les modules du cœur sous leur nom (`crate::tree`, `crate::workbench`…). Un type sérialisé du
+  cœur dérive ts-rs sous la feature `ts` (`cfg_attr(feature = "ts", …)`), activée par les tests
+  de l'application.
 - Les types échangés sont écrits à la main dans `src/types/ipc.ts` et doivent refléter
   exactement la sérialisation serde (`#[serde(rename_all = "camelCase")]`). Vérifié (MA1) : chaque
   type sérialisé porte `#[cfg_attr(test, derive(ts_rs::TS))]` (ts-rs, dépendance de test
-  seulement) et, s'il s'appelle autrement côté interface, `#[cfg_attr(test, ts(rename = "…"))]` ;
+  seulement ; `feature = "ts"` dans le cœur) et, s'il s'appelle autrement côté interface,
+  `#[cfg_attr(test, ts(rename = "…"))]` ;
   un champ `skip_serializing_if = "Option::is_none"` prend `ts(optional)`. `src-tauri/src/ts_mirror.rs`
   génère `tests/ipc/coeur.ts` (comparé par vue-tsc à `ipc.ts`) et `tests/ipc/echantillons.json`
   (sorties du vrai cœur que le faux cœur doit rendre à l'identique) ; après un changement :
   `ARNOD_IPC_ECRIRE=1 cargo test --lib ts_mirror`.
-- Une commande qui peut échouer renvoie `Result<T, CommandError>` (`src-tauri/src/error.rs`) :
+- Une commande qui peut échouer renvoie `Result<T, CommandError>` (`src-tauri/core/src/error.rs`) :
   `kind` donne la nature de l'erreur, `message` un texte en français prêt à afficher. Côté
   interface, `IpcError` reprend `kind` (ou `null` si la cause n'est pas une `CommandError`) et
   `message`. Une nouvelle nature s'ajoute à `CommandErrorKind` en Rust, dans `src/types/ipc.ts`
@@ -92,12 +117,18 @@ src/                    Frontend Vue
   lib/url.ts            Paramètres de chemin d'une adresse, pour l'affichage
   lib/steps.ts          Libellés des natures d'étape (familles, moteurs, règles), pour l'affichage
   lib/status.ts         Comptage d'affichage des statuts (✓ / ✕, « réussies / exécutées »)
+  lib/shortcuts.ts      Raccourcis : touche pressée sous forme canonique, affichage, défauts
+  lib/flow.ts           Libellés, résumés et marques des étapes d'un test (V4), pour l'affichage
+  lib/flowLayout.ts     Disposition du schéma d'un test : nœuds, liens, renvois (pur)
   stores/               catalog (instantané), navigation (onglet, vue, titre), toasts (notifications),
                         windows (fenêtres, zones, onglets de contenu), workbench (par projet :
                         arborescence, environnements, run, statuts ; par onglet : brouillon,
                         réponse),
                         contracts (contrats par projet, contrats ouverts), steps (catalogue des
-                        étapes, reconnaissance, essai)
+                        étapes, reconnaissance, essai), interface (apparence, raccourcis),
+                        history (historique des envois), search (recherche Ctrl+K), sync
+                        (synchronisation Git), flows (schémas, Avant / Après, propriétés),
+                        datasets (jeux de données), templates (templates, « Plus »)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions),
                         brouillons avant fermeture ou sortie (useDrafts)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification,
@@ -111,6 +142,9 @@ src/                    Frontend Vue
   components/projects/  Vues des projets (premier lancement...)
   components/home/      « Essayer une étape » (TryStep) et formulaire déclaratif d'une nature
   components/steps/     Catalogue des étapes, pastille de nature (couleur de sa famille)
+  components/flow/      Test en liste (FlowList) et en schéma (FlowDiagram), choix de la nature
+                        (StepPicker), panneau de l'étape (StepPanel)
+  components/templates/ Section Templates, « Plus », template, utilisation, création
   components/workspaces/ Vues des workspaces
   components/workbench/ Arborescence, éditeur, réponse, environnements, run, statuts (StatusMark,
                         StatusCount)
@@ -120,45 +154,69 @@ tests/                  Tests Vitest (happy-dom, mockIPC, faux cœur fakeCore.ts
                         miroir des types généré par le cœur (ts_mirror.rs) ; perf/ : banc de
                         l'interface (scripts/perf-interface.mjs)
 e2e/                    Tests e2e sur l'application réelle (tauri-driver, WebdriverIO)
-src-tauri/              Cœur Rust
+src-tauri/              Application Tauri (espace de travail Cargo : l'application et core/)
   tauri.conf.json       Fenêtre, CSP, bundles (NSIS currentUser, AppImage)
   capabilities/         Permissions de la WebView
   src/lib.rs            Builder Tauri, plugins dialog et updater, état, enregistrement des
-                        commandes
-  src/error.rs          CommandError, erreur commune des commandes
-  src/catalog/          Règles des projets et workspaces (pur : ni Tauri, ni disque)
-  src/storage.rs        Lecture / écriture atomique d'arnod.json
-  src/request/          Requête : modèle, fichier, résolution des variables, vérifications,
-                        héritage des dossiers (inherit.rs), réponse attendue (example.rs)
-  src/tree/             Arborescence d'un projet sur disque (dossiers, requêtes, corbeille), copier
-                        et déplacer (transfer.rs), annulation (undo.rs)
-  src/environment.rs    Environnements d'un projet (fichiers, chaîne, protection)
-  src/local.rs          Données locales d'un projet (hors dépôt : local.json)
-  src/secrets.rs        Coffre des secrets (trait SecretStore, keyring du système)
-  src/http.rs           Envoi HTTP (reqwest), délai, annulation, troncature à 5 Mo
-  src/workbench.rs      Établi : envoi, variables, environnements actifs, runs (numéro, groupes,
-                        révision), statuts, notificateur des événements
-  src/results.rs        Derniers résultats des envois, partagés entre fenêtres (pur)
-  src/statuses.rs       Statut de la dernière exécution de chaque requête (statuses.json)
-  src/layout/           Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
-  src/contract/         Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
-                        file.rs range les contrats dans contracts/ du projet ; deduce.rs déduit
-                        un contrat des essais
-  src/steps/            Catalogue des étapes (pur) : définitions (REST intégrée dans steps/rest.json),
-                        validation, reconnaissance, valeurs du formulaire, requête HTTP d'un essai
-  src/trial.rs          Essai sans projet : contrat déduit et « Essai N » dans « Non classés »
+                        commandes ; reprend les modules du cœur sous leur nom (crate::tree…)
   src/windows.rs        windows.json, fenêtres natives, focus, fermetures, événements arnod://
+  src/watch/app.rs      Surveillance des projets branchée aux fenêtres (le reste dans core/)
+  src/interface.rs      Préférences d'interface du poste : apparence, raccourcis (interface.json)
   src/quit.rs           Sortie d'Arnod : réponses des fenêtres à arnod://quitter (pur)
   src/instance.rs       Instance unique : verrou arnod.lock du dossier de données
-  src/opencollection/   Format OpenCollection 1.0.0 : schéma embarqué, YAML, requêtes, racine
-                        (opencollection.yml, extensions.arnod), conversion de l'ancien format
-  src/manifest.rs       Dossier d'un projet et sa racine opencollection.yml
   src/updates.rs        Mises à jour : version du canal, manifeste latest.json, état de
                         l'installation (pur)
-  src/state.rs          AppState : catalogue + stockage + annulation (app.manage)
   src/menu.rs           Menu natif (Fichier > Quitter, Fenêtre > Dispositions, détacher, rattacher)
   src/commands/         Commandes, un fichier par domaine
+  src/ts_mirror.rs      Miroir des types IPC (tests), sur les types de l'application et du cœur
   tests/                Tests d'intégration (application Tauri simulée : mises à jour)
+  steps/rest.json       Définition de la nature REST, embarquée par le cœur
+  core/                 Cœur sans Tauri (crate arnod-core, V2 lot C) : application et ligne de
+                        commande s'en servent
+    src/error.rs        CommandError, erreur commune des commandes
+    src/catalog/        Règles des projets et workspaces (pur : ni Tauri, ni disque)
+    src/storage.rs      Lecture / écriture atomique d'arnod.json
+    src/state.rs        AppState : catalogue + stockage + annulation (app.manage)
+    src/request/        Requête : modèle, fichier, résolution des variables, vérifications,
+                        héritage des dossiers (inherit.rs), réponse attendue (example.rs)
+    src/tree/           Arborescence d'un projet sur disque (dossiers, requêtes, corbeille), copier
+                        et déplacer (transfer.rs), annulation (undo.rs)
+    src/environment.rs  Environnements d'un projet (fichiers, chaîne, protection)
+    src/local.rs        Données locales d'un projet (hors dépôt : local.json)
+    src/secrets.rs      Coffre des secrets (trait SecretStore, keyring du système)
+    src/http.rs         Envoi HTTP (reqwest), délai, annulation, troncature à 5 Mo
+    src/workbench.rs    Établi : envoi, variables, environnements actifs, runs (numéro, groupes,
+                        révision, Spawner), statuts, notificateur des événements
+    src/results.rs      Derniers résultats des envois, partagés entre fenêtres (pur)
+    src/statuses.rs     Statut de la dernière exécution de chaque requête (statuses.json)
+    src/history.rs      Historique des envois de chaque requête (projects/<id>/history/)
+    src/search/         Recherche Ctrl+K : par nom, par adresse, groupes (pur)
+    src/layout/         Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
+    src/contract/       Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
+                        file.rs range les contrats dans contracts/ du projet ; deduce.rs déduit
+                        un contrat des essais
+    src/steps/          Catalogue des étapes (pur) : définitions (REST dans ../steps/rest.json),
+                        validation, reconnaissance, valeurs du formulaire, requête HTTP d'un essai
+    src/trial.rs        Essai sans projet : contrat déduit et « Essai N » dans « Non classés »
+    src/opencollection/ Format OpenCollection 1.0.0 : schéma embarqué, YAML, requêtes, racine
+                        (opencollection.yml, extensions.arnod), conversion de l'ancien format
+    src/manifest.rs     Dossier d'un projet et sa racine opencollection.yml
+    src/watch/          Fichiers modifiés hors d'Arnod : registre, surveillant, conflits
+    src/report/         Rapports d'un run : JUnit, Allure, HTML (pur)
+    src/flow/           Schéma d'un test et Avant / Après (V4) : modèle, réconciliation, contrôle,
+                        moteur (engine.rs), stockage dans extensions.arnod (store.rs), édition
+    src/script/         Scripts JavaScript (QuickJS, rquickjs) : étape script, scripts Bruno
+    src/dataset/        Jeux de données : CSV lu et écrit à la main, cas d'un envoi
+    src/template/       Templates : création, paramètres, utilisations, contenu à jouer
+    src/sync/           Synchronisation Git (feature sync) : dépôt (git.rs), transport HTTP sur le
+                        réseau du poste, forges, fusion, descriptions en clair, sync.json
+    src/command/        Commande `arnod run` d'un test ou d'un dossier, citée pour le terminal (pur)
+    src/network/, input/, curl/, bruno/, import.rs, response/, startup.rs : voir leurs sections
+  cli/                  Ligne de commande (crate arnod-cli, binaire arnod-cli livré sous le nom
+                        arnod) : arguments, cible, sortie, run en lecture seule ; tests/ de bout
+                        en bout contre un serveur local
+  windows/              Crochets de l'installeur NSIS (bin dans le PATH de l'utilisateur)
+  tauri.cli.conf.json   Configuration ajoutée au build Windows de la CI : bin\arnod.exe, crochets
 docs/                   Plans, modèle de plan, maquettes, captures du README, schéma
                         OpenCollection 1.0.0 (docs/opencollection/), design system
                         (docs/design-system/)
@@ -166,6 +224,9 @@ scripts/                Mesure de taille, concordance des versions, tests de fum
                         manifeste des mises à jour (updater-manifest.mjs), état de
                         la maquette (check-maquette.mjs, maquette-sync.py, maquette-couleurs.py),
                         design system (design-system.mjs), aperçu Playwright (apercu.mjs)
+.claude/skills/impeccable/ Skill de design Impeccable (npx impeccable install) ; .impeccable/ :
+                        exceptions de son détecteur
+PRODUCT.md, DESIGN.md   Contexte produit (à la main) ; design system au format DESIGN.md (généré)
 .github/                Modèles d'issue et de pull request, Dependabot
   workflows/            CI de build Windows et Linux, contrôle des titres de pull request
 ```
@@ -176,12 +237,15 @@ scripts/                Mesure de taille, concordance des versions, tests de fum
 npm ci                      # dépendances frontend (Node 22.23.4+, 24.22.1+ ou 26.12.1+)
 npm run tauri dev           # application en développement (Vite sur le port 1420)
 npm run tauri build         # build release : NSIS sous Windows, AppImage sous Linux
+cd src-tauri && cargo run -p arnod-cli -- run "Clients" --projet <dossier>  # arnod run (lot D)
 
 npm run check               # avant chaque commit : tout ce que vérifie la CI hors build
 npm test                    # Vitest
 npm run build:e2e           # binaire debug pour les tests e2e (Linux)
 xvfb-run -a npm run test:e2e # e2e sur l'application réelle (voir e2e/README.md)
 node scripts/apercu.mjs requete --maquette 5.1-b  # aperçu Playwright sur le faux cœur, comparé à la maquette
+npm run design:detect       # détecteur Impeccable sur les sources (aussi dans npm run check et la CI)
+node scripts/impeccable-apercu.mjs [scénario…] [--sombre]  # détecteur sur l'aperçu rendu (hors CI)
 npm run lint                # ESLint
 npm run typecheck           # vue-tsc
 npm run format              # Prettier (écriture) ; format:check pour vérifier
@@ -220,8 +284,9 @@ Linux : installer d'abord les dépendances système
   sections de `.github/pull_request_template.md`.
 - Chaque tâche est relue avant commit ; `npm run check` passe avant chaque commit.
 - Une version se publie par un tag `vX.Y.Z` sur `main` (README, « Publier une version ») : la CI
-  crée la release. Jamais de release créée à la main ; `scripts/check-version.mjs` garde les six
-  sources de version concordantes.
+  crée la release. Jamais de release créée à la main ; `scripts/check-version.mjs` garde les dix
+  sources de version concordantes (dont le cœur et la ligne de commande, `src-tauri/core/` et
+  `src-tauri/cli/`).
 - Tests : règles dans `cargo test` (vrais dossiers temporaires pour le stockage), parcours
   d'interface dans Vitest avec le faux cœur `tests/fakeCore.ts`, parcours complets sur
   l'application réelle dans `e2e/` (à étendre à chaque nouvelle fonctionnalité visible).
@@ -244,9 +309,10 @@ Linux : installer d'abord les dépendances système
   les composants. Tout nouveau jeton est défini pour les deux thèmes, en `#rrggbb`, et reçoit sa
   note d'usage dans `scripts/design-system.mjs` ; `tests/theme.spec.ts` vérifie les contrastes.
 - Police système uniquement : la CSP interdit les polices distantes des maquettes.
-- Hors périmètre actuel : SOAP (et donc WSDL), mocks, scripts, CLI, signature de code. Les
+- Hors périmètre actuel : SOAP (et donc WSDL), mocks, étapes IHM, signature de code. Les
   requêtes HTTP sont livrées (premier usage), les contrats OpenAPI aussi ; les secrets vont dans le
-  coffre du système, jamais dans le projet.
+  coffre du système, jamais dans le projet. Un script (V4) ne s'exécute que dans QuickJS
+  (`script/`), sans disque ni réseau : jamais par `eval` dans la WebView.
 - Un test Rust qui construit une application Tauri, même simulée (`tauri::test`), vit dans
   `src-tauri/tests/` (test d'intégration) : sous Windows, seuls ces binaires de test reçoivent le
   manifeste Common Controls v6 (`build.rs`, `tests-manifest.xml`) ; un test unitaire qui le fait
@@ -295,6 +361,10 @@ Référence : `docs/plan-suivi-maquette.md` (règles R1 à R9).
   request ou son plan, ses captures e2e et ses écarts avec le code (`aligner` : maquette, code ou
   à décider ; une liste quand un écran diffère sur plusieurs points). Une pull request qui livre, modifie ou écarte un écran le met à jour ;
   `scripts/check-maquette.mjs` le vérifie (`npm run check`, CI).
+- La feuille de route (0.1-a) est générée depuis la section `feuille_de_route` de
+  `maquette-etat.yml` : chaque fonction cite ses pages ou écrans et son état s'en déduit (page :
+  écrans de la même version). Une fonction nouvelle ou réécrite se change là, jamais dans la
+  maquette ; seule une fonction sans écran donne son état.
 - Une capture citée existe dans `e2e/arnod.e2e.ts` (`screenshot(browser, "…")`) : un écran livré
   visible gagne une capture e2e. La maquette est régénérée depuis le fichier après fusion
   (`scripts/maquette-sync.py`, toutes les pages ou celles dont on donne le code).
@@ -327,7 +397,7 @@ plan quand elle est livrée.
   la touche, pour l'AZERTY). Tests : aides `tests/switcher.ts`.
 - Sections d'un projet dans la barre latérale : `SectionHeading` (icône `SectionIcon`, nom, nombre,
   « + »). Les icônes des sections à venir sont déjà dans `components/ui/sectionIcons.ts`.
-- Les règles vivent dans `src-tauri/src/catalog/`, module pur sans dépendance à Tauri ni au
+- Les règles vivent dans `src-tauri/core/src/catalog/`, module pur sans dépendance à Tauri ni au
   disque, testé règle par règle (`catalog/tests.rs`). L'interface affiche l'état et ne fait que
   des filtres et comptages d'affichage.
 - Une commande qui modifie le catalogue passe par `AppState::mutate` (ou `mutate_undoable`) :
@@ -349,7 +419,7 @@ plan quand elle est livrée.
 
 Référence : `docs/plan-fenetres-zones.md` (cas F1 à F14, règles Z1 à Z8).
 
-- La disposition vit dans le cœur : `src-tauri/src/layout/` (pur, testé dans `layout/tests.rs`)
+- La disposition vit dans le cœur : `src-tauri/core/src/layout/` (pur, testé dans `layout/tests.rs`)
   tient les onglets, les zones, l'arbre des séparations et les fenêtres ; `windows.rs` l'enregistre
   dans `windows.json` (même dossier qu'`arnod.json`, écriture atomique) et crée ou ferme les
   fenêtres natives. Chaque commande `layout_*` ou `window_*` renvoie l'état de toutes les fenêtres
@@ -381,7 +451,7 @@ Référence : `docs/plan-contrats-services.md` (cas C1 à C12, règles R1 à R12
   `contracts/` à la racine du projet. Ce dossier est réservé comme `environments/` : absent de
   l'arborescence, refusé comme nom de dossier racine. Un texte qui n'est pas un contrat lisible
   n'est jamais écrit.
-- Les règles vivent dans `src-tauri/src/contract/` : `parse`, `sample`, `generate` et
+- Les règles vivent dans `src-tauri/core/src/contract/` : `parse`, `sample`, `generate` et
   `conformance` sont purs, `file` touche au disque ; tests règle par règle dans
   `contract/tests.rs`. Pas de dépendance ajoutée : la validation couvre un sous-ensemble de JSON
   Schema (pas `pattern` ni `format`).
@@ -411,7 +481,7 @@ conservé dans `docs/opencollection/` et embarqué dans le cœur.
 - Ce qui est propre à Arnod va seulement dans `extensions.arnod` de `opencollection.yml`
   (identifiant, ordre et protection des environnements) et dans les étiquettes `info.tags` d'une
   requête (lien au contrat). Identifiants et origines des vérifications ne sont pas écrits.
-- `src-tauri/src/opencollection/` fait la correspondance avec le modèle de l'interface
+- `src-tauri/core/src/opencollection/` fait la correspondance avec le modèle de l'interface
   (`request/model.rs`, qui n'est plus écrit tel quel). Enregistrer fusionne les champs gérés dans
   le fichier existant : scripts, variables et actions (signalés par `preserved`), la partie
   `request` des exemples, les autres authentifications et corps sont conservés.
@@ -489,14 +559,16 @@ l'étude `docs/etude-catalogue-etapes.md` (catalogue synchronisé, non implémen
 
 Référence : `docs/plan-mvp-a-reponse.md` (lot A, cas F1 à F8, règles R1 à R10), écran `5.1-b bis`.
 
-- Le cœur met en forme et filtre (`src-tauri/src/response/`, pur) : format détecté d'après
+- Le cœur met en forme et filtre (`src-tauri/core/src/response/`, pur) : format détecté d'après
   `content-type` (`response_render`), aperçu HTML en arbre de balises sûres sans attribut
   (`response_preview`, ni `v-html` ni cadre), filtre JSONPath RFC 9535 (`response_filter`, crate
   `serde_json_path`) dont une expression invalide revient en français dans `FilterResult.error`.
 - Chaque valeur JSON mise en forme et chaque correspondance portent le même chemin canonique
   (`$.items[0].sku`) : l'interface surligne en comparant des chemins, jamais en relisant le JSON.
 - Une correspondance porte la vérification qu'elle donne (`FilterMatch.assertion`, cible
-  `body.…` sans joker) ; le store `response` l'ajoute au brouillon, qui s'enregistre seul.
+  `body.…` sans joker) ; le store `response` l'ajoute au brouillon, qui s'enregistre seul. Un clic
+  sur une valeur du corps propose « Extraire dans une variable » : `response.extractAt` relit son
+  chemin canonique par `response_filter` (AM32) ; la valeur extraite est marquée « → nom ».
 - Enregistrer passe par `response_save` (sélecteur natif appelé depuis Rust) ; effacer par
   `response_clear` (`ResultBook::clear`, diffusé par `arnod://resultat`). Un corps tronqué à 5 Mo
   est signalé à la copie et à l'enregistrement.
@@ -559,16 +631,26 @@ Référence : `docs/plan-mvp-c-import-bruno.md` (cas IM1 à IM6, règles R1 à R
 - Les fichiers d'origine ne sont jamais écrits : une collection Bruno devient un nouveau projet
   (`AppState::create_project_with`, dossier retiré en cas d'échec) ou un nouveau dossier, au nom
   libre, d'un projet (réglages de la collection dans son `folder.yml`, environnements complétés).
-- `src-tauri/src/bruno/` : `parse` (analyseur `.bru` écrit à la main, blocs inconnus gardés bruts),
+- `src-tauri/core/src/bruno/` : `parse` (analyseur `.bru` écrit à la main, blocs inconnus gardés bruts),
   `read` (disque, `.env`), `convert` (pur : fichiers OpenCollection validés contre le schéma et
   rapport) ; tests sur la collection d'exemple `bruno/fixtures/boutique/`. Un bloc ou une option
   sans équivalent est signalé, jamais inventé.
 - Correspondances fixes : `vars:post-response` → action `set-variable` `after-response` (sélecteur
-  `jsonq`, expression de Bruno telle quelle) ; scripts et `tests` → `runtime.scripts`, jamais
-  exécutés ; `{{$…}}` gardé ; `vars:secret` et `{{process.env.X}}` → variables locales sans valeur,
+  `jsonq`, expression de Bruno telle quelle) ; scripts et `tests` → `runtime.scripts`, exécutés
+  à chaque envoi depuis la V4 (« Scripts ») ; `{{$…}}` gardé ; `vars:secret` et `{{process.env.X}}` → variables locales sans valeur,
   une valeur lue dans `.env` va au coffre.
 - Rapport : `ImportReport` gardé sur le poste (`projects/<id>/import.json`), montré dans l'onglet
-  `importReport` (`ImportReportTab`) ; chaque élément signalé cite son fichier et son bloc d'origine.
+  `importReport` (`ImportReportTab`, rouvert par « Rapport d'import » du menu ⋯ du projet) ; chaque
+  élément signalé cite son fichier et son bloc d'origine.
+- « Importer… » d'« Ajouter un projet » passe par l'import unique (AM40). Fenêtre « Importer »
+  (AM41) : `ImportSource.environments` et `secrets` (noms qui ressemblent à un secret,
+  `import::looks_secret`) ; `ImportOptions` (`environments` : cible de chaque environnement,
+  `secretsLocal`) est appliqué par le cœur (`import::apply_options`) avant l'écriture.
+- Script Bruno du rapport (AM42) : `import_script` (`accept` ou `replace`) le retire du fichier où
+  l'import l'a gardé (`runtime.scripts` d'une requête, `request.scripts` d'un `folder.yml` ou de la
+  racine) et marque l'élément `accepted` ou `replaced` ; `import_script_undo` le remet.
+  « Remplacer par une assertion… » ouvre la requête sur une assertion ajoutée
+  (`sidebar.openNewAssertion`, servie par `RequestEditor`).
 
 ## Tests, étapes et variables
 
@@ -587,12 +669,18 @@ MV1, MV2 ; règles R1 à R12), maquettes 4.2-a, 4.2-b bis, 5.1-h, 4.1-b.
   (`Request.extractions`, source `body.id`, `headers.Nom`, `status`, `request.body.…` écrite
   `req.…`) ; les autres actions restent conservées (`preserved`). Valeurs extraites : variables
   d'exécution, passées aux étapes suivantes du test, puis gardées par projet pour la session
-  (`Workbench::runtime_variables`), jamais écrites dans un environnement ; elles priment sur lui.
+  (`Workbench::runtime_variables`) ; elles priment sur l'environnement. Portée (`Extraction.scope`,
+  `variable.scope`, AM44) : « le test » (`runtime`) ou « l'environnement » (`environment` : la
+  valeur devient aussi une variable locale, poste, de l'environnement de l'envoi, déclarée au
+  besoin, jamais une variable partagée) ; `request`, `folder`, `collection` sont gardées et
+  appliquées comme `runtime`.
 - **Valeurs dynamiques** `{{$nom}}` (noms de Bruno, `request/dynamic.rs`, sans crate ajoutée) :
   tirées par `resolve.rs` à chaque occurrence, jamais inconnues (un nom inconnu part tel quel).
   `SendOutcome.sent` porte ce qui est parti (masqué), les valeurs tirées (avec leur source si elles
   forment seules une valeur envoyée), les variables lues et les valeurs extraites (onglet « Envoyé »,
-  `SentPanel.vue`) ; « Garder » ajoute l'extraction de la valeur envoyée.
+  `SentPanel.vue`) ; « Garder » ajoute l'extraction de la valeur envoyée. `Sent.environment` donne
+  l'environnement de l'envoi (ligne d'état de la réponse) et `UsedVariable.source` l'origine de
+  chaque variable (`environment`, `local`, `extracted`), calculées par le cœur (AM28, AM29).
 - Le cœur garde la requête envoyée avec le résultat (`RequestResult.request`) ; le store compare le
   brouillon (JSON aux clés triées) pour « modifié, pas encore envoyé » et « Revenir à la version
   envoyée » (`isChangedSinceSent`, `revertToSent`).
@@ -676,6 +764,9 @@ règles R1 à R15), écrans 1.6-e, 5.1-i, 3.4-a, 3.4-g.
 - Cookies : magasin par projet et environnement (`network::cookies`), persistants dans
   `projects/<id>/cookies.json` (poste), de session en mémoire ; jamais ajoutés si la requête a son
   propre en-tête `Cookie` ; valeurs `HttpOnly` masquées.
+- Authentification héritée (3.4-b, AM35) : « Type » propose « Hériter » ; la carte de
+  `AuthEditor` lit le jeton par `network.tokenStatus` (sans toucher aux réglages ouverts) et
+  `Sent.oauth2` (`SentToken`, jamais la valeur) donne la section « Jeton OAuth 2 » de l'onglet Envoyé.
 - Préférences : `PreferencesDialog` (Ctrl+, et `arnod://preferences` du menu Fichier, adressé à
   une fenêtre) ; une section de plus s'ajoute à `SECTIONS` et au type `PreferencesSection` du
   store `network`.
@@ -707,7 +798,7 @@ CL3 ; règles R1 à R8), écrans 1.3-a, 1.3-b, 1.3-c et 1.4-j.
 Référence : `docs/plan-mvp-i-fichiers-externes.md` (lot I : cas FE1 à FE7, règles R1 à R12), écran
 `4.1-e`.
 
-- `src-tauri/src/watch/` : un observateur `notify` par projet ouvert (`Watchers`, démarré par
+- `src-tauri/core/src/watch/` (branché aux fenêtres par `src-tauri/src/watch/app.rs`) : un observateur `notify` par projet ouvert (`Watchers`, démarré par
   `tree_load`, arrêté quand le projet est oublié ou introuvable), un fil qui regroupe les événements
   300 ms, un registre de l'état connu (empreinte de chaque YAML / JSON, dossiers). `.git/`, éléments
   cachés, `*.tmp` et `*~` sont ignorés.
@@ -743,6 +834,22 @@ règles R1 à R8), écrans 0.3-a, 0.3-b, 0.3-b bis, 0.3-b ter.
 - Fenêtres créées cachées (`visible: false`, `.visible(false)` des détachées) : `App.vue` appelle
   `window_ready` après le premier rendu ; `windows::show_later` les montre après 300 ms sinon, avec
   le squelette (`StartupSkeleton`), jamais un écran « Chargement… ».
+
+## Dossiers
+
+Référence : `docs/plan-alignement-maquette.md`, lot E (AM36 à AM39 ; décisions Q3, Q4), écrans
+4.1-a, 4.1-a bis, 4.1-a ter et 5.2-d.
+
+- Un clic sur un dossier ordinaire ouvre sa vue (contenu `folder`, `FolderTab.vue`, en aperçu) ;
+  son chevron le plie. La vue compte pour l'affichage sur `TreeNode` (`lib/tree.ts` :
+  `folderSummary`, `testCount`) et les statuts ; « + Test » nomme le test sur place
+  (`tree_create_test` avec `name`).
+- Ordre d'un dossier : rang (`info.seq` d'une requête, du `folder.yml` d'un dossier), puis les
+  dossiers avant les requêtes, puis le nom (`tree::read`). `tree_reorder` écrit les rangs de 1 à n
+  (`folder.yml` créé conforme au besoin) ; ⋮⋮ se glisse ou se déplace par ↑ ↓, et un dépôt sur le
+  milieu d'un sous-dossier l'y range (`tree_move`).
+- Menu ⋯ d'un dossier selon 4.1-a (« Dans le dossier « … » », Ctrl+N et Ctrl+Maj+N sur la ligne,
+  « Dupliquer un test… », « Déplacer vers… » par la fenêtre de la sélection) ; ▶ et « + » au survol.
 
 ## Copier et déplacer
 
@@ -838,6 +945,44 @@ Référence : écran 4.1-a quater.
   Maj+clic dans l'ordre affiché, Ctrl+Espace ou Maj+Espace au clavier), `SelectionBar.vue` (monté
   par `SharedDialogs`, Échap vide la sélection).
 
+## Ergonomie et clavier
+
+Référence : `docs/plan-qualite-mvp.md`, lot J (T29 à T31 : ER1, ER2, ER5 à ER8, IN7, IN8, AC2 à
+AC4, AC7, AC8 ; décision Q5).
+
+- Toute suppression se rattrape par « Annuler » dans sa notification : requête, dossier ou test
+  par `tree_batch` (une sélection d'un élément, `workbench.remove`), contrat par
+  `contract_delete_undo`, environnement par `environment_delete_undo` (fichiers, place dans la
+  chaîne, valeurs locales et secrets, gardés en mémoire seulement). Les annulations d'un domaine
+  vivent dans un `tree::undo::UndoBook` (20 au plus, un jeton ne sert qu'une fois).
+- Une notification d'erreur reste jusqu'à sa fermeture (✕) ; l'action d'une notification rend sa
+  promesse à `runAction`, qui notifie son échec.
+- Un bouton branché sur une action asynchrone du store passe par `useGuard()` : un refus du cœur
+  est notifié, jamais muet. Une erreur d'envoi propose son action (`ResponsePanel`).
+- « + Nouvel environnement » ouvre `NewEnvironmentDialog` (3.3-b, AM34) ; le cœur crée et range
+  l'environnement (`environment_create` : variables partagées et noms des locales repris, jamais
+  les valeurs locales ni les secrets, `baseUrl`, place dans la chaîne).
+- Environnements et réglages du projet s'enregistrent seuls (`useAutosave`, `SaveState`) : fermer,
+  Échap ou changer d'élément enregistre d'abord ce qui attend ; un échec garde la fenêtre ouverte.
+- Environnements (3.3-a, AM43) : une page en onglet (contenu `environments`, `EnvironmentsTab`,
+  ouverte par `workbench.openEnvironments`, Ctrl+Maj+E, la pastille, « Environnements… ») ; un
+  seul tableau Variable, Valeur, Portée (partagée : dans le projet ; locale : valeur au coffre,
+  sauf une valeur déjà en clair sur le poste) ; ⋮⋮ réordonne la chaîne (glisser, ↑ ↓) ;
+  « Copier depuis un autre projet… » (`environment_copy`, sans valeurs locales ni secrets) ;
+  « Utilisation » : dernier run de l'environnement (`environment_usage`).
+- Ajouter une ligne : un `BaseButton` « + Nom » ; la retirer : `RowRemoveButton` (×, 24 px).
+- Arbre du référentiel (T25, AC1) : un seul arrêt de tabulation (`TREE_TAB_STOP`, fourni par
+  `TreePanel` : dernière ligne focalisée, sinon celle de l'onglet actif, sinon la première) ;
+  haut, bas, Début, Fin dans `lib/treeKeyboard.ts` ; Droite, Gauche, F2, Suppr, Maj+F10 et la
+  touche Menu dans `TreeRow`. ⋯ est hors de l'ordre de tabulation et ne paraît qu'au survol ou au
+  focus. Un nom coupé a son infobulle (`v-title-if-cut`, `lib/truncate.ts`, DE5) ; la ligne d'une
+  opération est nommée par son texte visible, puis ses marques (AC9).
+- Toute liste d'onglets (`role="tablist"`) prend `onTablistKeydown` (`lib/tablist.ts`) et un
+  `tabindex` itinérant (0 sur l'onglet choisi, -1 sinon). Toute cible fait 24 × 24 px au moins.
+- Focus : `BaseDialog` rend le focus à l'élément qui l'avait à l'ouverture ; `useFocusRescue`
+  (monté par `AppShell`) le pose sur l'onglet actif quand une vue ou un onglet nouveau l'a laissé
+  sur `body`. Zoom au clavier (Ctrl+molette, Ctrl+=, Ctrl+-) et `prefers-reduced-motion` suivis.
+
 ## Brouillons, sortie et instance unique
 
 Référence : `docs/plan-qualite-mvp.md`, lot C (T9 à T12 : IN2 à IN6, IN9, ES8 ; règles R6, R11 ;
@@ -861,3 +1006,239 @@ décision Q1).
 - Instance unique (`instance.rs`) : verrou du système sur `arnod.lock` dans le dossier de
   données, tenu jusqu'à la sortie. Une seconde instance attend 5 s (relance après une mise à
   jour), puis ne charge rien, ferme sa fenêtre cachée, le dit par un message natif et s'arrête.
+
+## Impeccable
+
+Référence : `docs/audit-impeccable-2026-11.md` (constats DI1 à DI7) et `docs/plan-qualite-mvp.md`
+(T36, Q12).
+
+- Skill de design du dépôt (`.claude/skills/impeccable/`, version épinglée, installée par
+  `npx impeccable install --providers=claude --project --no-hooks`) : ni crochet ni mode `live`.
+  Elle lit `PRODUCT.md` (écrit à la main, sans choix visuel) et `DESIGN.md` (généré par
+  `scripts/design-system.mjs` depuis `src/styles.css`, jamais modifié à la main). Mode d'Arnod :
+  Operate ; `bolder`, `delight` et `overdrive` ne servent pas.
+- Détecteur : `scripts/impeccable-detect.mjs` dans `npm run check` et la CI. Un constat se corrige,
+  ou son exception se déclare à côté de la valeur (`/* impeccable-disable-line <règle>: raison */`) ;
+  une exception qui ne sert plus fait échouer. Le passage sur l'aperçu rendu
+  (`scripts/impeccable-apercu.mjs`, deux thèmes) se relance à chaque lot qui touche l'interface.
+- Une notification prend les jetons `--color-toast-*` ; la barre de la sélection multiple est
+  inversée (fond `--color-text`, « Supprimer » en `--color-danger-inverse`, Q2 du plan
+  d'alignement) ; une sélection est un fond `--color-accent-soft`, jamais une barre sur le côté ;
+  un texte estompé l'est par sa couleur, jamais par l'opacité.
+
+## Apparence, raccourcis et historique
+
+Référence : `docs/plan-v1.md` (version 1 : cas AP1 à AP4, RC1 à RC6, H1 à H5 ; règles R1 à R8, H1
+à H6), écrans 1.6-f, 1.6-f bis et 5.1-c bis.
+
+- Préférences d'interface du poste dans `interface.json` (dossier de données, écriture atomique) :
+  `src-tauri/src/interface.rs` (pur pour les règles) valide l'apparence (valeurs proposées
+  seulement) et les raccourcis (`normalize`, `assign` : réservés, conflits par portée). Commandes
+  `interface_*` ; chaque changement est appliqué aux fenêtres depuis Rust (thème de la fenêtre
+  native, `set_zoom`, sans permission) et diffusé par `arnod://interface`.
+- Thème forcé : `data-theme` sur la racine, posé par le store `interface` ;
+  `:root[data-theme="dark"]` reprend chaque jeton du thème sombre du système (vérifié par
+  `tests/theme.spec.ts`) : un nouveau jeton sombre s'écrit dans les deux blocs. Police des
+  éditeurs : `var(--editor-font)` et `var(--editor-font-size)` (corps, contrats, envoyé,
+  historique).
+- Raccourcis : un composant ne compare jamais `ctrlKey` et une touche lui-même pour une action
+  de la liste ; il demande `useInterfaceStore().matches(event, "<action>")`. Une action nouvelle
+  s'ajoute à `interface::ACTIONS` et à `DEFAULT_SHORTCUTS` (`src/lib/shortcuts.ts`, comparés par un
+  test Rust). Ctrl+Tab et Ctrl+0…9 sont fixes.
+- Historique : `request_send` garde chaque réponse reçue (`history::record`, 20 par requête, corps
+  coupé à 256 Ko) dans `projects/<id>/history/<chemin encodé>.json`, jamais dans le projet ;
+  `Workbench::rename_status` et `remove_status` le font suivre. Le cœur compare chaque envoi au
+  précédent (`changes`) et donne les différences (`history_diff`) ; « Effacer » se rattrape par
+  `history_restore`. Interface : `HistoryPanel.vue` (onglet « Historique » de la réponse, horloge
+  de la ligne d'état), store `history`.
+
+## Recherche
+
+Référence : `docs/plan-v2.md`, lot A (cas RH1 à RH6, règles R1 à R3), écrans 1.5-a et 1.5-b.
+
+- Le cœur cherche (`src-tauri/core/src/search/`, pur) : par nom (mots dans le libellé ou l'adresse,
+  sans casse ni accents, `#étiquette`, méthode en capitales) ou par adresse (`POST /orders`,
+  modèle `{id}`, URL complète : un segment variable du contrat vaut tout segment, un segment
+  variable saisi ne vaut qu'un segment variable) ; groupes et rangs stables, 8 par groupe.
+- `search_query` (`commands/search.rs`) lit les projets du workspace (tous pour « Tous les
+  projets ») à l'ouverture de la palette (`refresh`) et les garde (`SearchCache`) ; les
+  frappes suivantes ne relisent rien.
+- Interface : `SearchPalette.vue` (montée par `AppShell`, motif combobox, Entrée, Ctrl+Entrée
+  dans une autre zone, Échap rend le focus), store `search` (150 ms après la dernière frappe, une
+  réponse dépassée est ignorée) ; raccourci « Rechercher » (Ctrl+K) des raccourcis modifiables.
+
+## Étiquettes partagées
+
+Référence : `docs/plan-v2.md`, lot B (cas ET1 à ET4, règle R4), écran 4.9-b.
+
+- Un dossier porte des étiquettes (`info.tags` de son `folder.yml`, `TreeNode::Folder.tags`,
+  écrites par `tree_set_folder_tags`, `folder.yml` créé conforme au besoin) ; elles valent pour
+  tout ce qu'il contient. `tree::read` donne à chaque requête ses étiquettes **effectives**
+  (`TreeNode::Request.tags` : les siennes, puis celles des dossiers parents, sans doublon) : le
+  filtre du référentiel, la recherche et les propositions de 4.9-a les prennent. Le fichier d'une
+  requête ne garde que les siennes (`RequestDoc.tags`).
+- Vue d'un dossier (`FolderTab.vue`) : « Étiquettes du dossier » (`TagsEditor`), étiquettes de
+  chaque ligne, filtre par étiquettes (`lib/tags.ts` : `hasTags`, `taggedTests`, comptages
+  d'affichage) ; une ligne hors filtre est estompée par sa couleur (`--color-subtle`).
+
+## Ligne de commande
+
+Référence : `docs/plan-v2.md`, lot D (cas LC1 à LC6, règles R5 à R8, R16 ; décisions Q3, Q5),
+écrans 5.3-a, 5.3-c et 4.9-d.
+
+- `src-tauri/cli/` (crate `arnod-cli`) : `arnod run [CIBLE]` et ses options (`--env`,
+  `--etiquette`, `--parallele`, `--rapport`, `--rapports`, `--projet`, `--confirmer`), arguments
+  lus à la main (`args.rs`, aide et erreurs en français), cible (`select.rs` : dossier, test, requête, étiquettes effectives ; la plus proche
+  proposée), sortie (`output.rs`), run (`run.rs`). Même moteur que l'application : l'établi du
+  cœur, en lecture seule (`Workbench::set_read_only` : ni statuts, ni dernier run, ni valeur
+  gardée dans l'environnement ; `Network::read_prefs` sans cookies écrits) ; rien n'est écrit hors
+  du dossier des rapports (R5). Le projet se lit sans écriture (`project.rs` : identifiant de
+  `extensions.arnod`, un projet au format précédent est refusé).
+- Variables (R6) : `ARNOD_VAR_<nom>` (`Workbench::set_overrides`, masquées sauf une variable
+  partagée), puis `local.json` et le coffre du poste (`ARNOD_DONNEES` ou le dossier de données de
+  l'application) ; une variable locale de l'environnement utilisée sans valeur arrête la commande
+  avant tout envoi. Codes de sortie (R7) : 0, 1 (échec ou erreur), 2 (commande invalide).
+- Rapports (`core/src/report/`, pur, R8) : un cas par test ou requête jouée seule
+  (`report::cases`), JUnit au schéma d'Ant, Allure au modèle « TestResult » (schéma dans
+  `report/allure-result.schema.json`, validé en test), HTML autonome sans script.
+- Livraison (Q3, R16) : le binaire s'appelle `arnod-cli` dans `target/` (l'application y a déjà
+  `arnod`). Windows : `bin\arnod.exe` de l'installeur (`tauri.cli.conf.json`, ajoutée au build
+  de la CI ; crochet `windows/installer-hooks.nsh` : `bin` ajouté au PATH de l'utilisateur, retiré
+  à la désinstallation, jamais un PATH tronqué). Linux : lié statiquement (cible
+  `x86_64-unknown-linux-musl`, cœur sans la feature `coffre`), `arnod-linux-x86_64.tar.gz` joint
+  à la release. `scripts/smoke-windows.ps1` vérifie `arnod --version` et le PATH.
+- « Copier la commande » (LC6) : menu ⋯ d'un test ou d'un dossier, `cli_command` (règle dans
+  `core/src/command/`, valeurs citées pour PowerShell ou sh), environnement actif.
+
+## Synchronisation
+
+Référence : `docs/plan-v2.md`, lots E et F (cas SY1 à SY8, CF1 à CF5, règles R9 à R15 ; décisions
+Q1, Q2, Q6, Q8, Q10, Q11), écrans 7.1-a à 7.1-e.
+
+- `src-tauri/core/src/sync/` (feature `sync` du cœur, absente de la ligne de commande) : libgit2
+  par `git2` (`vendored-libgit2`, sans HTTPS ni SSH propres). Le transport « smart HTTP »
+  (`transport.rs`) passe par `Network::raw` (proxy, autorités internes) sur le runtime du cœur ;
+  le jeton du compte, au coffre (`arnod-git:<hôte>:<compte>`), part en en-tête `Authorization`,
+  jamais dans `.git/config` (R9). Les opérations sont synchrones : une commande les lance sur un
+  fil sans runtime (`commands::sync::detached`).
+- Récupérer (`sync::pull`) : la fusion se calcule en mémoire, fichier par fichier, sur la version
+  commune, la mienne (dossier de travail) et celle de l'équipe (`merge.rs`, bâtie sur
+  `watch::conflict` : une requête élément par élément, « garder les deux » pour une ligne de
+  liste ; tout autre fichier en entier, Q8). Un conflit attend dans `SyncBook` sans rien écrire
+  (R13) ; réglé, les fichiers sont écrits comme toute écriture d'Arnod puis diffusés comme des
+  fichiers modifiés (les onglets se rechargent), la branche avance (avance rapide, ou commit de
+  fusion s'il y avait des envois en attente).
+- Envoyer (`sync::send`) : les éléments choisis, avec un message, au nom du compte relié (Q11) ;
+  un envoi refusé parce que l'équipe a avancé récupère puis renvoie, jamais de force (R11).
+  « Mes modifications » se comparent à la version commune, jamais à celle de l'équipe.
+- `describe.rs` (pur) décrit un fichier changé en élément partagé, en clair (R14) ; l'interface
+  n'affiche jamais un chemin ni un commit. `sync.json` (poste, R10) garde compte, branche,
+  dernière vérification, changements reçus (pastilles) et secrets remis « à plus tard » (R15).
+- Interface : store `sync` (vérification au démarrage, toutes les 5 minutes et au retour sur la
+  fenêtre, Q6 ; `arnod://synchro`), `components/sync/` : `StatusBar` (montée par `AppShell`),
+  `SyncPanel` (7.1-b), `LinkDialog` (7.1-a), `ConflictDialog` (7.1-c), `MissingSecrets` (7.1-e),
+  `TeamHistory` (onglet « Équipe » de l'éditeur, 7.1-d) ; pastilles dans `TreeRow` et `FolderTab`.
+  Une récupération enregistre d'abord les brouillons (`useDrafts`).
+- Connexion par le navigateur (flux « device ») seulement si `ARNOD_GITHUB_CLIENT_ID` ou
+  `ARNOD_GITLAB_CLIENT_ID` sont fournis à la construction (Q2) ; sinon, jeton personnel.
+
+## Tests en schéma
+
+Référence : `docs/plan-v4.md`, lots A à C (cas SC1 à SC10 ; règles R1 à R8), écrans 4.3-a à 4.3-e.
+
+- Le schéma d'un test vit dans `extensions.arnod.tests.<chemin du test>` de `opencollection.yml`
+  (`onFailure`, `steps` : identifiant, nom, nature, `next`) ; un test joué comme la liste de ses
+  requêtes n'y est pas écrit (R1). `flow/reconcile.rs` le recolle au dossier à la lecture (R2) ;
+  `flow/store.rs` le fait suivre aux renommages, déplacements et copies faits dans Arnod (R4 :
+  `follow`, `copy`, appelés par `tree` et `tree_batch`).
+- Natures fermées (`StepKind`) : requête, condition, boucle, attente, variable, script, test
+  existant, template ; SOAP (V5) et IHM (V6) n'existent pas encore. Une requête d'attente ou
+  d'Avant / Après appartient à son étape (R14, `Extensions::owned_files`) : absente de
+  l'arborescence, jamais jouée seule.
+- Le cœur joue (`flow/engine.rs`, trait `Runner`, branché par `workbench/run.rs`) : une étape à la
+  fois dans l'ordre des renvois, condition lue sur la dernière réponse ou `vars.nom` avec les
+  opérateurs des assertions, limites `MAX_LOOP`, `MAX_ATTEMPTS`, `MAX_DEPTH`, `MAX_STEPS` (R7).
+  `RunItem.stepId` relie une ligne du run à son étape ; `RunView.ends` donne la fin de chaque
+  test (réussi, raison, étape) : le rapport et `arnod run` la prennent pour verdict.
+  « Ignorer pour ce run » d'une étape qui avait arrêté le test retire cette fin : le test se lit
+  alors sur ses lignes, les étapes suivantes restent « non jouées ».
+- Édition par le cœur (`flow/edit.rs`) : `flow_add_step` (place `start`, `link`, `end` ou `free`,
+  les liens sont reconnectés, R3), `flow_remove_step`, `flow_save` (brouillon du store `flows`,
+  enregistré par `useAutosave`). `TestTab.vue` : « Liste » (`FlowList`, ⋮⋮ réordonne) ou
+  « Schéma » (`FlowDiagram`, disposition par `lib/flowLayout.ts`), « + Étape ▾ »
+  (`StepPicker`, combobox), « + » sur un lien, dépôt depuis la palette, panneau `StepPanel`,
+  « Annuler l'insertion · Ctrl+Z », « Si une étape échoue » (Arrêter le test, Continuer).
+- Une étape requête prend l'identifiant de son fichier (`request_id`) : un schéma linéaire n'est
+  pas écrit, sa relecture redonne le même. Une variable sans nom, un test existant ou un template
+  à choisir s'enregistrent « à configurer » ; l'étape échoue à l'exécution
+  (`reconcile::incomplete`). Insérée, elle propose « Service » (contrats du projet)
+  et « Opération » (`flow_step_operation` : la requête de l'opération, jamais liée au contrat), les
+  données disponibles à ce point (`FlowStepInfo.available`, aussi connues de `request_input` par
+  `tree::extracted_before`) et l'enchaînement reconnecté. « Parcourir le catalogue… » de la
+  palette ouvre le catalogue des étapes.
+
+## Scripts
+
+Référence : `docs/plan-v4.md`, lot C (cas JS1 à JS3 ; règles R9, R10), écran 4.3-g.
+
+- `src-tauri/core/src/script/` : QuickJS (crate `rquickjs`) sans module, sans disque ni réseau ;
+  `TIMEOUT` 2 s (gestionnaire d'interruption) et `MEMORY_LIMIT` 32 Mo. Les données entrent en
+  JSON (`__input`) et ressortent par `__output()` : `prelude.js` (`vars`, `vars.set`, `response`,
+  `assert`, `console`), puis `bruno.js` pour un script Bruno (`bru`, `req`, `res`, `test`,
+  `expect`, messages en français). Un script tourne sur `spawn_blocking`, jamais sur le fil du
+  runtime.
+- Étape script : `script::run_step` ; une exception ou un `assert` faux fait échouer l'étape, les
+  variables posées passent aux étapes suivantes. Scripts Bruno gardés à l'import
+  (`runtime.scripts`, `request.scripts` des dossiers et de la racine, `Request.inherited.scripts`) :
+  `script::run_bruno` avant la requête (racine, dossiers, requête), puis après la réponse et en
+  `tests` (requête, dossiers, racine) ; un `test(…)` devient une assertion du résultat.
+
+## Jeux de données
+
+Référence : `docs/plan-v4.md`, lot D (cas JD1 à JD7 ; règles R11, R12), écrans 4.7-a à 4.7-b bis.
+
+- Un jeu de données est un CSV du projet lié à la requête par l'étiquette `data:<fichier>`
+  (tableau modifiable, rangé dans `données/`, dossier réservé comme `contracts/`) ou
+  `data-file:<fichier>` (relu à chaque envoi, jamais écrit). `dataset/` lit et écrit le CSV à la
+  main (séparateur `,`, `;` ou tabulation reconnu, `MAX_CASES`).
+- Envoi : `request_send_cases` joue la requête une fois par cas (valeurs du cas en tête des
+  variables, R15) ; le run la compte pour une ligne (`RunItem.cases`). Les colonnes du tableau
+  sont des variables connues de `request_input`. Une étape d'un test ne lit
+  jamais de jeu de données : une boucle répète.
+- Interface : onglet « Données » de l'éditeur (`DataEditor.vue`, store `datasets`, `data_*`),
+  coller depuis un tableur, cas choisi et requête du cas (`data_case`) ; `CasesBar.vue` sous la
+  réponse ; « Voir les N cas » dans `RunPanel`.
+
+## Avant / Après et propriétés
+
+Référence : `docs/plan-v4.md`, lot E (cas AV1 à AV4, PR1, PR2 ; règles R13 à R15), écrans 4.7-c,
+4.7-c bis et 4.8-a.
+
+- Avant / Après d'un dossier : `extensions.arnod.folders.<chemin>` (`beforeAll`, `beforeEach`,
+  `afterEach`, `afterAll`), des étapes comme celles d'un test. Le run les groupe (R13) : « Avant le
+  dossier » une fois avant ses tests directs (en échec : tests « non joués », comptés en échec),
+  « Avant / Après chaque test » autour de chacun, « Après » joué même après un échec ;
+  `RunItem.hook` et `RunItem.folder` les désignent. Commandes `hooks_*`, `FolderHooks.vue`.
+- Propriétés : `request.variables` du `folder.yml` (`folder_properties`, `folder_set_properties`,
+  `FolderProperties.vue`), avec leur origine (ici, dossier parent, projet, environnement). Ordre à
+  l'envoi (R15) : cas, variables d'exécution, valeurs du template, propriétés du plus proche au
+  plus lointain, environnement, collection.
+
+## Templates
+
+Référence : `docs/plan-v4.md`, lots F et G (cas TP1 à TP6, PL1, PL2 ; règles R16 à R21), écrans
+4.8-a à 4.8-d, 3.2-d et 1.2-d bis.
+
+- Un template est un dossier sous `templates/` (réservé) marqué `arnod:template`, ses paramètres
+  sont les `request.variables` de son `folder.yml` (sans défaut : obligatoire) ; une utilisation est
+  un dossier marqué `template:<chemin>` dont les `request.variables` sont les valeurs. Le cœur la
+  joue avec le contenu du template (`template::effective_values`), jamais une copie.
+- `template_create` : paramètres proposés par `template_candidates` (variables lues par les tests,
+  propriétés cochées, environnement non coché), dossier remplacé par une utilisation ou gardé ;
+  `template_from_request` (3.2-d, « Transférer vers les templates » de `TrialTransfer.vue`) fait
+  des valeurs écrites en dur (`template_literals`) des paramètres.
+- Interface : `TemplatesSection`, `TemplateTab` (paramètres, contenu, utilisations), `InstanceTab`
+  (valeurs seulement), `CreateTemplateDialog` ; `FolderTab` montre l'un ou l'autre selon le chemin.
+- « Plus » (`MoreSections.vue`, R21) : les sections masquées du projet avec « Afficher »
+  (`sections_show`, `local.json` du poste) ; une section s'affiche seule à sa première
+  utilisation. Seule « Templates » existe dans cette version (Q7).

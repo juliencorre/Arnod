@@ -1,0 +1,839 @@
+<script setup lang="ts">
+/**
+ * Vue d'un dossier du référentiel (4.1-a bis, AM37 ; décisions Q3 et Q4 du plan d'alignement) :
+ * fil d'Ariane, « dossier · N tests et M sous-dossiers · T tests au total », « + Test »,
+ * « + Sous-dossier », « ▶ Exécuter le dossier », puis le contenu dans l'ordre d'exécution :
+ * #, Type, Nom, Contenu, Résultat. Un test ou un sous-dossier se nomme sur place (« Entrée pour
+ * créer »). Les nombres sont des comptages d'affichage sur l'arborescence fournie par le cœur.
+ *
+ * AM38 (4.1-a ter) : ⋮⋮ réordonne les lignes (glisser, ou ↑ ↓ sur la poignée) ; déposer un
+ * élément sur le milieu d'un sous-dossier l'y range. Le cœur écrit les rangs (`tree_reorder`).
+ *
+ * V2, lot B (4.9-b, `docs/plan-v2.md`, ET1 à ET3) : les étiquettes du dossier (elles valent pour
+ * tout ce qu'il contient, R4), celles de chaque ligne (effectives, fournies par le cœur), et un
+ * filtre par étiquettes : « 6 tests sur 28 · les autres sont estompés ».
+ */
+import { computed, nextTick, ref, useId, useTemplateRef, watch } from "vue";
+
+import CreateTemplateDialog from "@/components/templates/CreateTemplateDialog.vue";
+import InstanceTab from "@/components/templates/InstanceTab.vue";
+import TemplateTab from "@/components/templates/TemplateTab.vue";
+import BaseButton from "@/components/ui/BaseButton.vue";
+import TagsEditor from "@/components/workbench/TagsEditor.vue";
+import FolderHooks from "@/components/zones/FolderHooks.vue";
+import FolderProperties from "@/components/zones/FolderProperties.vue";
+import { useGuard } from "@/composables/useGuard";
+import { countLabel } from "@/lib/format";
+import { countStatuses, requestPaths } from "@/lib/status";
+import { initial } from "@/lib/sync";
+import { foldTag, hasTags, tagCounts, taggedTests } from "@/lib/tags";
+import { findFolder, folderSummary, testCount, type FolderNode } from "@/lib/tree";
+import { onTablistKeydown } from "@/lib/tablist";
+import { useFlowsStore } from "@/stores/flows";
+import { useSyncStore } from "@/stores/sync";
+import { isTemplatePath } from "@/stores/templates";
+import { useWorkbenchStore } from "@/stores/workbench";
+import type { TreeNode } from "@/types/ipc";
+
+const props = defineProps<{ projectId: string; path: string }>();
+const sync = useSyncStore();
+const flows = useFlowsStore();
+
+// --- V4 (docs/plan-v4.md) : Avant / Après, propriétés, template ----------------------------
+
+/** Onglet de la vue : contenu (et Avant / Après, 4.7-c) ou propriétés (4.8-a). */
+const view = ref<"content" | "properties">("content");
+const hooks = computed(() => flows.hooks[flows.folderKey(props.projectId, props.path)] ?? null);
+const hasHooks = computed(() => {
+  const found = hooks.value?.hooks;
+  return (
+    found !== undefined &&
+    found.beforeAll.length +
+      found.beforeEach.length +
+      found.afterEach.length +
+      found.afterAll.length >
+      0
+  );
+});
+/** Avant / Après montrés : il y en a, ou « + Avant / Après » les a ouverts. */
+const showHooks = ref(false);
+const propertyCount = computed(
+  () =>
+    (flows.properties[flows.folderKey(props.projectId, props.path)] ?? []).filter(
+      (p) => p.origin.kind === "here",
+    ).length,
+);
+watch(
+  () => [props.projectId, props.path] as const,
+  () => {
+    void flows.loadProperties(props.projectId, props.path).catch(() => undefined);
+  },
+  { immediate: true },
+);
+/** Tests directs du dossier : ses tests, ses requêtes libres et ses utilisations (R13). */
+const directTests = computed(
+  () =>
+    (folder.value?.children ?? []).filter(
+      (c) => c.kind === "request" || c.test || c.template !== null,
+    ).length,
+);
+const creatingTemplate = ref(false);
+
+const workbench = useWorkbenchStore();
+const guard = useGuard();
+const titleId = useId();
+const handleHintId = useId();
+const tagsLabelId = useId();
+const filterLabelId = useId();
+
+const folder = computed<FolderNode | null>(() =>
+  findFolder(workbench.trees[props.projectId]?.tests ?? [], props.path),
+);
+const crumbs = computed(() => ["Référentiel de tests", ...props.path.split("/").slice(0, -1)]);
+const name = computed(() => props.path.split("/").at(-1) ?? props.path);
+
+/** « dossier · 2 tests, 1 requête libre et 1 sous-dossier · 5 tests au total » (sans les zéros). */
+const summary = computed(() => {
+  const current = folder.value;
+  if (!current) return "";
+  const counts = folderSummary(current);
+  const parts = [countLabel(counts.tests, "test", "tests")];
+  if (counts.requests > 0)
+    parts.push(countLabel(counts.requests, "requête libre", "requêtes libres"));
+  if (counts.folders > 0) parts.push(countLabel(counts.folders, "sous-dossier", "sous-dossiers"));
+  const last = parts.pop() ?? "";
+  const listed = parts.length > 0 ? `${parts.join(", ")} et ${last}` : last;
+  return `dossier · ${listed} · ${countLabel(counts.total, "test", "tests")} au total`;
+});
+
+type Kind = "request" | "test" | "folder";
+const kindOf = (node: TreeNode): Kind =>
+  node.kind === "request" ? "request" : node.test ? "test" : "folder";
+
+/**
+ * Colonne « Contenu » : étapes d'un test, tests d'un dossier (« 12 tests · 4 smoke » pendant un
+ * filtre) ; rien pour une requête.
+ */
+function content(node: TreeNode): string {
+  if (node.kind === "request") return "—";
+  if (node.test) return countLabel(node.children.length, "étape", "étapes");
+  const tests = countLabel(testCount(node), "test", "tests");
+  if (filter.value.length === 0) return tests;
+  return `${tests} · ${String(taggedTests(node, filter.value).matching)} ${filter.value.join(" ")}`;
+}
+
+/** Colonne « Résultat » : dernière exécution, « réussies/exécutées » pour un dossier. */
+function result(node: TreeNode): { text: string; tone: "ok" | "ko" | "none" } {
+  const counts = countStatuses(requestPaths(node), workbench.statuses[props.projectId]);
+  if (counts.executed === 0) return { text: "—", tone: "none" };
+  if (kindOf(node) === "folder") {
+    return {
+      text: `${String(counts.passed)}/${String(counts.executed)}`,
+      tone: counts.passed === counts.executed ? "ok" : "ko",
+    };
+  }
+  return counts.passed === counts.executed
+    ? { text: "✓ Réussi", tone: "ok" }
+    : { text: "✕ Échec", tone: "ko" };
+}
+
+function open(node: TreeNode): void {
+  if (node.kind === "request") void workbench.openRequest(props.projectId, node.path);
+  else if (node.test) void workbench.openTest(props.projectId, node.path);
+  else void workbench.openFolder(props.projectId, node.path);
+}
+
+// --- Étiquettes (V2, lot B, 4.9-b) ------------------------------------------------------
+
+/** Étiquettes du dossier, modifiées sur place ; le cœur les écrit dans `folder.yml`. */
+const folderTags = ref<string[]>([]);
+watch(
+  () => folder.value?.tags,
+  (tags) => {
+    folderTags.value = [...(tags ?? [])];
+  },
+  { immediate: true },
+);
+watch(
+  folderTags,
+  (next) => {
+    const saved = folder.value?.tags ?? [];
+    if (next.join("\u0000") === saved.join("\u0000")) return;
+    guard(() => workbench.setFolderTags(props.projectId, props.path, [...next]));
+  },
+  { deep: true },
+);
+
+/** Étiquettes du filtre de la vue (ET3) ; les lignes qui ne les portent pas sont estompées. */
+const filter = ref<string[]>([]);
+/** Étiquettes qu'on peut ajouter au filtre : celles du dossier et de ce qu'il contient. */
+const filterChoices = computed(() => {
+  const chosen = new Set(filter.value.map(foldTag));
+  return tagCounts(folder.value?.children ?? [])
+    .map((t) => t.tag)
+    .filter((tag) => !chosen.has(foldTag(tag)));
+});
+
+function addFilter(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  if (select.value !== "") filter.value = [...filter.value, select.value];
+  select.value = "";
+}
+
+function removeFilter(tag: string): void {
+  filter.value = filter.value.filter((t) => t !== tag);
+}
+
+/** « 6 tests sur 28 · les autres sont estompés ». */
+const filterSummary = computed(() => {
+  const current = folder.value;
+  if (!current || filter.value.length === 0) return "";
+  const { matching, total } = taggedTests(current, filter.value);
+  return `${String(matching)} ${matching > 1 ? "tests" : "test"} sur ${String(total)} · les autres sont estompés`;
+});
+
+/** Étiquettes montrées sur une ligne : effectives pour une requête, du dossier sinon. */
+function rowTags(node: TreeNode): string[] {
+  return node.tags;
+}
+
+/** La ligne répond au filtre ; sans filtre, toutes. */
+function matches(node: TreeNode): boolean {
+  if (filter.value.length === 0) return true;
+  if (node.kind === "request") return hasTags(node.tags, filter.value);
+  return taggedTests(node, filter.value).matching > 0;
+}
+
+// --- Réordonner et ranger (AM38) --------------------------------------------------------
+
+const ROW_DRAG = "application/x-arnod-ligne";
+const table = useTemplateRef<HTMLElement>("table");
+/** Ligne survolée pendant un glisser, et où irait l'élément. */
+const dropping = ref<{ path: string; where: "before" | "after" | "into" } | null>(null);
+let dragged: string | null = null;
+
+/** Nouvel ordre : `path` retiré, puis remis à la place `index` (dans la liste sans lui). */
+function moved(path: string, index: number): string[] {
+  const order = (folder.value?.children ?? []).map((child) => child.path).filter((p) => p !== path);
+  order.splice(Math.max(0, Math.min(index, order.length)), 0, path);
+  return order;
+}
+
+async function focusHandle(path: string): Promise<void> {
+  await nextTick();
+  table.value
+    ?.querySelector<HTMLElement>(`.folder__handle[data-path="${CSS.escape(path)}"]`)
+    ?.focus();
+}
+
+/** ↑ ↓ sur la poignée : la ligne monte ou descend d'un rang (R12, équivalent du glisser). */
+function onHandleKey(event: KeyboardEvent, node: TreeNode, index: number): void {
+  const delta = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
+  if (delta === 0) return;
+  event.preventDefault();
+  const count = folder.value?.children.length ?? 0;
+  const target = index + delta;
+  if (target < 0 || target >= count) return;
+  guard(async () => {
+    await workbench.reorder(props.projectId, props.path, moved(node.path, target));
+    await focusHandle(node.path);
+  });
+}
+
+function onDragStart(event: DragEvent, node: TreeNode): void {
+  dragged = node.path;
+  event.dataTransfer?.setData(ROW_DRAG, node.path);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+
+/** Place du dépôt dans la ligne : avant, après, ou dans un sous-dossier (son milieu). */
+function placeOf(event: DragEvent, node: TreeNode): "before" | "after" | "into" {
+  const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const ratio = box.height > 0 ? (event.clientY - box.top) / box.height : 0.5;
+  if (kindOf(node) === "folder" && ratio > 0.25 && ratio < 0.75) return "into";
+  return ratio < 0.5 ? "before" : "after";
+}
+
+function onDragOver(event: DragEvent, node: TreeNode): void {
+  if (dragged === null || dragged === node.path) return;
+  event.preventDefault();
+  dropping.value = { path: node.path, where: placeOf(event, node) };
+}
+
+function onDrop(event: DragEvent, node: TreeNode, index: number): void {
+  const source = dragged ?? event.dataTransfer?.getData(ROW_DRAG) ?? null;
+  const where = dropping.value?.where ?? "before";
+  dropping.value = null;
+  dragged = null;
+  if (source === null || source === "" || source === node.path) return;
+  event.preventDefault();
+  if (where === "into") {
+    guard(() => workbench.move(props.projectId, source, node.path));
+    return;
+  }
+  const from = folder.value?.children.findIndex((child) => child.path === source) ?? -1;
+  // Index dans la liste sans l'élément glissé.
+  const at = (where === "before" ? index : index + 1) - (from >= 0 && from < index ? 1 : 0);
+  guard(() => workbench.reorder(props.projectId, props.path, moved(source, at)));
+}
+
+function onDragEnd(): void {
+  dragged = null;
+  dropping.value = null;
+}
+
+// --- Nom saisi sur place (« Entrée pour créer ») -----------------------------------------
+
+const creating = ref<"test" | "folder" | null>(null);
+const newName = ref("");
+const error = ref<string | null>(null);
+const field = useTemplateRef<HTMLInputElement>("field");
+
+async function startCreate(kind: "test" | "folder"): Promise<void> {
+  creating.value = kind;
+  newName.value = "";
+  error.value = null;
+  await nextTick();
+  field.value?.focus();
+}
+
+async function submitCreate(): Promise<void> {
+  const kind = creating.value;
+  const wanted = newName.value.trim();
+  if (kind === null) return;
+  if (wanted === "") {
+    error.value = kind === "test" ? "Donnez un nom au test." : "Donnez un nom au sous-dossier.";
+    return;
+  }
+  try {
+    if (kind === "test") await workbench.createTest(props.projectId, props.path, wanted);
+    else await workbench.createFolder(props.projectId, props.path, wanted);
+    creating.value = null;
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : String(caught);
+  }
+}
+
+function cancelCreate(): void {
+  creating.value = null;
+  error.value = null;
+}
+</script>
+
+<template>
+  <TemplateTab v-if="isTemplatePath(path)" :project-id="projectId" :path="path" />
+  <InstanceTab v-else-if="folder?.template" :project-id="projectId" :path="path" />
+  <section v-else-if="folder" class="folder" :aria-labelledby="titleId">
+    <header class="folder__head">
+      <nav class="folder__crumbs" aria-label="Fil d'Ariane">
+        <template v-for="(crumb, index) in crumbs" :key="index"
+          ><span>{{ crumb }}</span
+          ><span class="folder__sep" aria-hidden="true"> / </span></template
+        ><span class="folder__crumb--current">{{ name }}</span>
+      </nav>
+      <div class="folder__title-row">
+        <h2 :id="titleId" class="folder__title">{{ name }}</h2>
+        <span class="folder__spacer" />
+        <BaseButton variant="link" @click="creatingTemplate = true">
+          ◇ Créer un template de ce dossier
+        </BaseButton>
+        <BaseButton @click="startCreate('test')">+ Test</BaseButton>
+        <BaseButton @click="startCreate('folder')">+ Sous-dossier</BaseButton>
+        <BaseButton @click="guard(() => workbench.runFolder(projectId, path))">
+          ▶ Exécuter le dossier
+        </BaseButton>
+      </div>
+      <p class="folder__summary">{{ summary }}</p>
+      <div class="folder__tags">
+        <span :id="tagsLabelId" class="folder__tags-label">Étiquettes du dossier</span>
+        <TagsEditor v-model="folderTags" :project-id="projectId" :labelledby="tagsLabelId" />
+      </div>
+      <div class="folder__filter" role="group" :aria-labelledby="filterLabelId">
+        <span :id="filterLabelId" class="folder__tags-label">Filtrer par étiquettes</span>
+        <span v-for="tag in filter" :key="tag" class="folder__chip">
+          {{ tag }}
+          <button
+            type="button"
+            class="folder__chip-remove"
+            :aria-label="`Retirer ${tag} du filtre`"
+            @click="removeFilter(tag)"
+          >
+            ×
+          </button>
+        </span>
+        <select
+          v-if="filterChoices.length > 0"
+          class="folder__filter-add"
+          aria-label="Ajouter une étiquette au filtre"
+          @change="addFilter"
+        >
+          <option value="">+ Étiquette</option>
+          <option v-for="tag in filterChoices" :key="tag" :value="tag">{{ tag }}</option>
+        </select>
+        <span v-if="filterSummary" class="folder__filter-summary" role="status">{{
+          filterSummary
+        }}</span>
+      </div>
+    </header>
+
+    <div
+      class="folder__views"
+      role="tablist"
+      aria-label="Vue du dossier"
+      @keydown="onTablistKeydown"
+    >
+      <button
+        type="button"
+        role="tab"
+        class="folder__view"
+        :aria-selected="view === 'content'"
+        :tabindex="view === 'content' ? 0 : -1"
+        @click="view = 'content'"
+      >
+        Contenu
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="folder__view"
+        :aria-selected="view === 'properties'"
+        :tabindex="view === 'properties' ? 0 : -1"
+        @click="view = 'properties'"
+      >
+        Propriétés<span v-if="propertyCount > 0" class="folder__count"> {{ propertyCount }}</span>
+      </button>
+    </div>
+    <FolderProperties v-if="view === 'properties'" :project-id="projectId" :path="path" />
+    <FolderHooks
+      v-if="view === 'content'"
+      v-show="hasHooks || showHooks"
+      :project-id="projectId"
+      :path="path"
+      side="before"
+      :tests="directTests"
+    />
+    <p :id="handleHintId" class="visually-hidden">
+      Flèches haut et bas pour déplacer la ligne ; glisser pour réordonner, ou déposer sur un
+      sous-dossier pour l'y ranger.
+    </p>
+    <table v-show="view === 'content'" ref="table" class="folder__table">
+      <thead>
+        <tr>
+          <th scope="col" class="folder__grip"><span class="visually-hidden">Ordre</span></th>
+          <th scope="col" class="folder__num">#</th>
+          <th scope="col">Type</th>
+          <th scope="col">Nom</th>
+          <th scope="col">Contenu</th>
+          <th scope="col">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          v-for="(node, index) in folder.children"
+          :key="node.path"
+          class="folder__row"
+          :class="[
+            dropping?.path === node.path && `folder__row--${dropping.where}`,
+            !matches(node) && 'folder__row--faded',
+          ]"
+          @dragover="onDragOver($event, node)"
+          @dragleave="dropping = null"
+          @drop="onDrop($event, node, index)"
+        >
+          <td class="folder__grip">
+            <button
+              type="button"
+              class="folder__handle"
+              draggable="true"
+              :data-path="node.path"
+              :aria-label="`Déplacer ${node.name}`"
+              :aria-describedby="handleHintId"
+              @dragstart="onDragStart($event, node)"
+              @dragend="onDragEnd"
+              @keydown="onHandleKey($event, node, index)"
+            >
+              ⋮⋮
+            </button>
+          </td>
+          <td class="folder__num">{{ index + 1 }}</td>
+          <td>
+            <span
+              v-if="node.kind === 'request'"
+              class="folder__method"
+              :class="node.method && `folder__method--${node.method.toLowerCase()}`"
+              >{{ node.method }}</span
+            >
+            <span v-else class="folder__kind">{{
+              kindOf(node) === "test" ? "test" : "dossier"
+            }}</span>
+          </td>
+          <td>
+            <button type="button" class="folder__name" @click="open(node)">{{ node.name }}</button>
+            <span v-for="tag in rowTags(node)" :key="tag" class="folder__row-tag">{{ tag }}</span>
+            <span
+              v-if="node.kind === 'request' && sync.receivedBy(projectId, node.path)"
+              class="folder__author"
+              :title="`Modifiée par ${sync.receivedBy(projectId, node.path)} à la dernière récupération`"
+              ><span aria-hidden="true">{{
+                initial(sync.receivedBy(projectId, node.path) ?? "")
+              }}</span
+              ><span class="visually-hidden"
+                >modifiée par {{ sync.receivedBy(projectId, node.path) }}</span
+              ></span
+            >
+          </td>
+          <td class="folder__muted">{{ content(node) }}</td>
+          <td :class="`folder__result folder__result--${result(node).tone}`">
+            {{ result(node).text }}
+          </td>
+        </tr>
+        <tr v-if="creating" class="folder__row folder__row--new">
+          <td class="folder__grip" />
+          <td class="folder__num">{{ folder.children.length + 1 }}</td>
+          <td>
+            <span class="folder__kind">{{ creating === "test" ? "test" : "dossier" }}</span>
+          </td>
+          <td colspan="3">
+            <form class="folder__create" novalidate @submit.prevent="submitCreate">
+              <input
+                ref="field"
+                v-model="newName"
+                type="text"
+                autocomplete="off"
+                :aria-label="
+                  creating === 'test' ? 'Nom du nouveau test' : 'Nom du nouveau sous-dossier'
+                "
+                :placeholder="creating === 'test' ? 'Nom du test' : 'Nom du sous-dossier'"
+                :aria-invalid="error !== null"
+                @keydown.esc.prevent="cancelCreate"
+              />
+              <span class="folder__hint">Entrée pour créer · Échap pour annuler</span>
+            </form>
+            <p v-if="error" class="folder__error" role="alert">{{ error }}</p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <FolderHooks
+      v-if="view === 'content' && (hasHooks || showHooks)"
+      :project-id="projectId"
+      :path="path"
+      side="after"
+      :tests="directTests"
+    />
+    <p v-if="folder.children.length === 0 && !creating" class="folder__empty">
+      Dossier vide : « + Test » y crée un test, « + Sous-dossier » un dossier.
+    </p>
+    <p class="folder__note">
+      L'ordre de la liste est l'ordre d'exécution : « Avant » en tête, « Après » à la fin. Glissez
+      ⋮⋮ pour réordonner, ou déposez un élément sur un sous-dossier pour l'y ranger.
+      <BaseButton v-if="!hasHooks && !showHooks" variant="link" @click="showHooks = true"
+        >+ Avant / Après</BaseButton
+      >
+    </p>
+    <CreateTemplateDialog
+      :open="creatingTemplate"
+      :project-id="projectId"
+      :folder="path"
+      :summary="summary"
+      @close="creatingTemplate = false"
+    />
+  </section>
+  <p v-else class="folder__empty">Ce dossier n'existe plus.</p>
+</template>
+
+<style scoped>
+.folder__views {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.folder__view {
+  min-height: var(--control-md);
+  padding: 0 0.75rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font: inherit;
+  color: var(--color-muted);
+  background: none;
+  cursor: pointer;
+}
+
+.folder__view[aria-selected="true"] {
+  border-bottom-color: var(--color-accent);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.folder__view:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.folder__count {
+  color: var(--color-muted);
+}
+
+.folder__tags,
+.folder__filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+}
+
+.folder__tags-label {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+.folder__chip,
+.folder__row-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
+  background-color: var(--color-chip);
+}
+
+.folder__row-tag {
+  margin-left: 0.375rem;
+  color: var(--color-muted);
+}
+
+.folder__chip-remove {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: var(--color-muted);
+  background: none;
+  cursor: pointer;
+}
+
+.folder__chip-remove:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.folder__filter-add {
+  min-height: var(--control-sm);
+}
+
+.folder__filter-summary {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+/* Pastille de l'auteur d'un changement récupéré (7.1-d) : une initiale. */
+.folder__author {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1rem;
+  height: 1rem;
+  margin-left: 0.375rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
+  font-weight: 600;
+  background: var(--color-accent-soft);
+}
+
+/* Estompée par la couleur, jamais par l'opacité (Impeccable). */
+.folder__row--faded,
+.folder__row--faded :is(.folder__name, .folder__method, .folder__kind, .folder__result) {
+  color: var(--color-subtle);
+}
+
+.folder {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  font-size: var(--text-body);
+}
+
+.folder__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.folder__crumbs {
+  color: var(--color-muted);
+}
+
+.folder__crumb--current {
+  color: var(--color-text);
+}
+
+.folder__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.folder__title {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: 600;
+}
+
+.folder__spacer {
+  flex: 1;
+}
+
+.folder__summary,
+.folder__note,
+.folder__empty {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.folder__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.folder__table th {
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  font: 600 var(--text-caption) / 1.4 var(--font-mono);
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.folder__table td {
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.folder__num {
+  width: 2rem;
+  color: var(--color-muted);
+}
+
+.folder__grip {
+  width: 1.5rem;
+}
+
+.folder__handle {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  color: var(--color-muted);
+  cursor: grab;
+}
+
+.folder__handle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+/* Où irait la ligne glissée : un trait avant ou après, un cadre pour « ranger dans ». */
+.folder__row--before td {
+  box-shadow: inset 0 2px 0 var(--color-accent);
+}
+
+.folder__row--after td {
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+.folder__row--into td {
+  background-color: var(--color-accent-soft);
+}
+
+.folder__method {
+  font: 700 var(--text-caption) var(--font-mono);
+}
+
+.folder__method--get {
+  color: var(--color-success);
+}
+
+.folder__method--post,
+.folder__method--put,
+.folder__method--patch {
+  color: var(--color-link);
+}
+
+.folder__method--delete {
+  color: var(--color-danger);
+}
+
+.folder__kind {
+  font: var(--text-small) var(--font-mono);
+  color: var(--color-muted);
+}
+
+.folder__name {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.folder__name:hover {
+  text-decoration: underline;
+}
+
+.folder__name:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.folder__muted {
+  color: var(--color-muted);
+}
+
+.folder__result--ok {
+  color: var(--color-success);
+}
+
+.folder__result--ko {
+  color: var(--color-danger);
+}
+
+.folder__result--none {
+  color: var(--color-muted);
+}
+
+.folder__create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.folder__create input {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.folder__hint {
+  font-size: var(--text-small);
+  color: var(--color-muted);
+}
+
+.folder__error {
+  margin: 0.25rem 0 0;
+  color: var(--color-danger);
+}
+</style>

@@ -4,7 +4,7 @@
  */
 import { clearMocks } from "@tauri-apps/api/mocks";
 import { flushPromises } from "@vue/test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useNavigationStore } from "@/stores/navigation";
 
@@ -366,6 +366,23 @@ describe("actions d'un workspace (S4)", () => {
     await flushPromises();
 
     expect(actionLabels(wrapper)[3]).toContain("Supprimer « Mes projets »");
+  });
+
+  it("AM14 (1.1-b bis) : les actions s'ouvrent à côté du sélecteur, sans le recouvrir", async () => {
+    installFakeCore(boutiqueSnapshot());
+    wrapper = await mountApp();
+    await openSwitcher(wrapper);
+    // Sélecteur de 0 à 343 px ; ligne du workspace de 15 à 336 px.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const list = this.classList.contains("switcher__list");
+      return list ? new DOMRect(0, 40, 343, 186) : new DOMRect(15, 110, 321, 32);
+    });
+    await switcherItem(wrapper, "Mes projets").get(".switcher__more").trigger("click");
+    await flushPromises();
+    const left = parseFloat((wrapper.get(".switcher__context").element as HTMLElement).style.left);
+    expect(left).toBeGreaterThanOrEqual(343);
   });
 
   it("Renommer ouvre une fenêtre : nom pris refusé sous le champ, puis enregistré", async () => {

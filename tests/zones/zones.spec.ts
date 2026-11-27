@@ -2,6 +2,7 @@ import { clearMocks } from "@tauri-apps/api/mocks";
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import SplitHandle from "@/components/zones/SplitHandle.vue";
 import { TAB_DRAG_TYPE } from "@/lib/dnd";
 
 import { newRequest } from "../fakeWorkbench";
@@ -132,6 +133,11 @@ describe("zones (F2 à F5, F14, Z1)", () => {
 
     const handle = app.get('[role="separator"][aria-label="Largeur des zones"]');
     expect(handle.attributes("aria-valuenow")).toBe("50");
+    // AM21 (1.4-b) : la bulle nomme les zones par leur onglet actif.
+    const zonesHandle = app
+      .findAllComponents(SplitHandle)
+      .find((h) => h.props("label") === "Largeur des zones");
+    expect(zonesHandle?.props("names")).toEqual(["Lister", "Santé"]);
     await handle.trigger("keydown", { key: "ArrowRight" });
     await flushPromises();
     expect(core.calls.filter((c) => c.cmd === "layout_resize").at(-1)?.args.ratio).toBeCloseTo(

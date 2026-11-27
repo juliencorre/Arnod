@@ -9,6 +9,42 @@ import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
+  Appearance,
+  CasePreview,
+  CasesOutcome,
+  DataSet,
+  DataTable,
+  Flow,
+  FolderHooks,
+  FolderProperty,
+  HookPhase,
+  HooksView,
+  InstanceView,
+  Literal,
+  StepAdded,
+  StepKind,
+  StepPlacement,
+  TemplateCandidate,
+  TemplateParam,
+  TemplateSummary,
+  TemplateView,
+  HistoryDiff,
+  HistoryEntry,
+  HistoryView,
+  SearchResults,
+  CliShell,
+  JournalEntry,
+  MissingSecrets,
+  SyncAccount,
+  SyncChoice,
+  SyncConflicts,
+  SyncDeviceCode,
+  SyncForge,
+  SyncLoginOptions,
+  SyncRepository,
+  SyncView,
+  InterfaceView,
+  ShortcutChange,
   ConflictSide,
   FilesChange,
   RequestConflict,
@@ -30,8 +66,11 @@ import type {
   WindowBounds,
   WindowContext,
   WindowsSnapshot,
+  EnvironmentDeleted,
   EnvironmentDoc,
   EnvironmentsView,
+  EnvironmentUsage,
+  NewEnvironment,
   HelloResponse,
   Assertion,
   Example,
@@ -54,9 +93,12 @@ import type {
   PairsText,
   RequestInput,
   ImportDone,
+  ImportOptions,
   ImportReport,
   ImportSource,
   ImportTarget,
+  ScriptChoice,
+  ScriptResolved,
   TreeView,
   ProjectCreated,
   ProjectCreateInput,
@@ -117,6 +159,7 @@ const COMMAND_ERROR_KINDS: Record<CommandErrorKind, true> = {
   secretStore: true,
   protectedEnvironment: true,
   changedOnDisk: true,
+  conflict: true,
 };
 
 /** Indique si la cause d'un rejet est une `CommandError` renvoyée par le cœur natif. */
@@ -266,8 +309,9 @@ export const ipc = {
   treeDuplicate: (project: string, path: string): Promise<string> =>
     call<string>("tree_duplicate", { project, path }),
 
-  treeDelete: (project: string, path: string, permanent: boolean): Promise<void> =>
-    call<null>("tree_delete", { project, path, permanent }).then(() => undefined),
+  /** Réordonne le contenu d'un dossier : rang de 1 à n dans l'ordre `order` (AM38). */
+  treeReorder: (project: string, folder: string, order: string[]): Promise<void> =>
+    call<null>("tree_reorder", { project, folder, order }).then(() => undefined),
 
   // --- Requêtes ------------------------------------------------------------
 
@@ -328,8 +372,28 @@ export const ipc = {
   ): Promise<EnvironmentsView> =>
     call<EnvironmentsView>("environment_save", { project, environment, previous }),
 
-  environmentDelete: (project: string, name: string): Promise<EnvironmentsView> =>
-    call<EnvironmentsView>("environment_delete", { project, name }),
+  /** Supprime un environnement ; rend les environnements et le jeton de « Annuler » (ER1). */
+  environmentDelete: (project: string, name: string): Promise<EnvironmentDeleted> =>
+    call<EnvironmentDeleted>("environment_delete", { project, name }),
+  /** « Annuler » la suppression : fichiers, place, valeurs locales et secrets reviennent. */
+  environmentDeleteUndo: (undoToken: string): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environment_delete_undo", { undoToken }),
+
+  /** Crée un environnement (3.3-b, AM34) : variables reprises, place dans la chaîne. */
+  environmentCreate: (project: string, environment: NewEnvironment): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environment_create", { project, environment }),
+
+  /** « Copier depuis un autre projet… » (3.3-a, AM43) : sans valeurs locales ni secrets. */
+  environmentCopy: (
+    project: string,
+    fromProject: string,
+    names: string[],
+  ): Promise<EnvironmentsView> =>
+    call<EnvironmentsView>("environment_copy", { project, fromProject, names }),
+
+  /** Dernier run de chaque environnement du projet (3.3-a, AM43, « Utilisation »). */
+  environmentUsage: (project: string): Promise<EnvironmentUsage[]> =>
+    call<EnvironmentUsage[]>("environment_usage", { project }),
 
   environmentsReorder: (project: string, names: string[]): Promise<EnvironmentsView> =>
     call<EnvironmentsView>("environments_reorder", { project, names }),
@@ -357,8 +421,12 @@ export const ipc = {
     call<ContractView | null>("contract_import_file", { project, replace }),
   contractSave: (project: string, path: string, text: string): Promise<ContractView> =>
     call<ContractView>("contract_save", { project, path, text }),
-  contractDelete: (project: string, path: string, permanent: boolean): Promise<void> =>
-    call<null>("contract_delete", { project, path, permanent }).then(() => undefined),
+  /** Met un contrat à la corbeille ; rend le jeton de « Annuler » (ER1). */
+  contractDelete: (project: string, path: string, permanent: boolean): Promise<string> =>
+    call<string>("contract_delete", { project, path, permanent }),
+  /** « Annuler » la suppression d'un contrat : son fichier revient tel qu'il était. */
+  contractDeleteUndo: (undoToken: string): Promise<void> =>
+    call<null>("contract_delete_undo", { undoToken }).then(() => undefined),
   contractGenerate: (
     project: string,
     path: string,
@@ -398,11 +466,17 @@ export const ipc = {
   importDetect: (path: string): Promise<ImportSource> =>
     call<ImportSource>("import_detect", { path }),
   /** Importe dans un nouveau projet ou dans un projet existant. */
-  importRun: (path: string, target: ImportTarget): Promise<ImportDone> =>
-    call<ImportDone>("import_run", { path, target }),
+  importRun: (path: string, target: ImportTarget, options: ImportOptions): Promise<ImportDone> =>
+    call<ImportDone>("import_run", { path, target, options }),
   /** Dernier rapport d'import d'un projet. */
   importReport: (projectId: string): Promise<ImportReport | null> =>
     call<ImportReport | null>("import_report", { projectId }),
+  /** Reprend un script Bruno du rapport : retiré du fichier, sans lui ou par une assertion (AM42). */
+  importScript: (projectId: string, index: number, choice: ScriptChoice): Promise<ScriptResolved> =>
+    call<ScriptResolved>("import_script", { projectId, index, choice }),
+  /** « Annuler » un script repris : il revient dans son fichier. */
+  importScriptUndo: (undoToken: string): Promise<ImportReport> =>
+    call<ImportReport>("import_script_undo", { undoToken }),
   runStart: (
     project: string,
     folder: string,
@@ -579,12 +653,176 @@ export const ipc = {
     call<TestView>("test_read", { project, path }),
 
   /** « Nouveau test » : dossier du test et son étape 1 (NT1). */
-  treeCreateTest: (project: string, parent: string): Promise<CreatedTest> =>
-    call<CreatedTest>("tree_create_test", { project, parent }),
+  /** « Nouveau test » sous `parent`, nommé `name` (vue du dossier, AM37) ou par défaut. */
+  treeCreateTest: (
+    project: string,
+    parent: string,
+    name: string | null = null,
+  ): Promise<CreatedTest> => call<CreatedTest>("tree_create_test", { project, parent, name }),
 
   /** « + Étape » : étape suivante du test ; renvoie son chemin (NT2). */
   treeAddStep: (project: string, test: string): Promise<string> =>
     call<string>("tree_add_step", { project, test }),
+
+  // --- Version 4 (docs/plan-v4.md) : tests en schéma, données, templates ---------------
+  /** Enregistre le schéma d'un test (R1, R3) ; rend l'onglet du test. */
+  flowSave: (project: string, path: string, flow: Flow): Promise<TestView> =>
+    call<TestView>("flow_save", { project, path, flow }),
+  /** Ajoute une étape sur un lien ou en fin de liste (4.3-e, 4.3-b bis). */
+  flowAddStep: (
+    project: string,
+    path: string,
+    kind: StepKind,
+    placement: StepPlacement,
+    name: string | null = null,
+  ): Promise<StepAdded> =>
+    call<StepAdded>("flow_add_step", { project, path, kind, placement, name }),
+  /** Retire une étape (« Supprimer l'étape », « Annuler l'insertion ») ; rend le test. */
+  flowRemoveStep: (project: string, path: string, step: string): Promise<TestView> =>
+    call<TestView>("flow_remove_step", { project, path, step }),
+  /** Étape requête insérée : la requête d'une opération d'un contrat, sans lien (4.3-b quater). */
+  flowStepOperation: (
+    project: string,
+    path: string,
+    step: string,
+    contract: string,
+    operation: string,
+    environment: string | null,
+  ): Promise<TestView> =>
+    call<TestView>("flow_step_operation", {
+      project,
+      path,
+      step,
+      contract,
+      operation,
+      environment,
+    }),
+  hooksRemoveStep: (
+    project: string,
+    path: string,
+    phase: HookPhase,
+    step: string,
+  ): Promise<HooksView> => call<HooksView>("hooks_remove_step", { project, path, phase, step }),
+  /** Avant / Après d'un dossier (4.7-c). */
+  hooksRead: (project: string, path: string): Promise<HooksView> =>
+    call<HooksView>("hooks_read", { project, path }),
+  hooksSave: (project: string, path: string, hooks: FolderHooks): Promise<HooksView> =>
+    call<HooksView>("hooks_save", { project, path, hooks }),
+  hooksAddStep: (
+    project: string,
+    path: string,
+    phase: HookPhase,
+    kind: StepKind,
+    name: string | null = null,
+  ): Promise<HooksView> => call<HooksView>("hooks_add_step", { project, path, phase, kind, name }),
+  /** Propriétés d'un dossier et leur origine (4.8-a). */
+  folderProperties: (
+    project: string,
+    path: string,
+    environment: string,
+  ): Promise<FolderProperty[]> =>
+    call<FolderProperty[]>("folder_properties", { project, path, environment }),
+  folderSetProperties: (
+    project: string,
+    path: string,
+    properties: { name: string; value: string }[],
+    environment: string,
+  ): Promise<FolderProperty[]> =>
+    call<FolderProperty[]>("folder_set_properties", { project, path, properties, environment }),
+  /** Jeu de données d'une requête (4.7-a). */
+  dataRead: (project: string, path: string): Promise<DataSet | null> =>
+    call<DataSet | null>("data_read", { project, path }),
+  dataSave: (project: string, path: string, table: DataTable): Promise<DataSet> =>
+    call<DataSet>("data_save", { project, path, table }),
+  /** « Fichier CSV… » : sélecteur natif (4.7-a bis) ; `null` si l'utilisateur annule. */
+  dataImport: (project: string, path: string): Promise<DataSet | null> =>
+    call<DataSet | null>("data_import", { project, path }),
+  dataRemove: (project: string, path: string): Promise<void> =>
+    call<undefined>("data_remove", { project, path }),
+  /** Lignes d'un texte collé depuis un tableur (JD2). */
+  dataParse: (text: string): Promise<string[][]> => call<string[][]>("data_parse", { text }),
+  dataOpen: (project: string, path: string): Promise<void> =>
+    call<undefined>("data_open", { project, path }),
+  /** Requête d'un cas, résolue et masquée (4.7-a). */
+  dataCase: (
+    project: string,
+    path: string,
+    request: RequestDoc,
+    environment: string,
+    caseNumber: number,
+  ): Promise<CasePreview> =>
+    call<CasePreview>("data_case", { project, path, request, environment, case: caseNumber }),
+  /** Envoie les cas d'un jeu de données (4.7-b, R12). */
+  requestSendCases: (
+    project: string,
+    execId: string,
+    environment: string,
+    path: string,
+    request: RequestDoc,
+    confirmed: boolean,
+    cases: number[] | null = null,
+  ): Promise<CasesOutcome> =>
+    call<CasesOutcome>("request_send_cases", {
+      project,
+      execId,
+      environment,
+      path,
+      request,
+      confirmed,
+      cases,
+    }),
+  /** Templates du projet (R16). */
+  templateList: (project: string): Promise<TemplateSummary[]> =>
+    call<TemplateSummary[]>("template_list", { project }),
+  templateCategories: (project: string): Promise<string[]> =>
+    call<string[]>("template_categories", { project }),
+  templateRead: (project: string, path: string): Promise<TemplateView> =>
+    call<TemplateView>("template_read", { project, path }),
+  templateSaveParams: (
+    project: string,
+    path: string,
+    params: TemplateParam[],
+  ): Promise<TemplateView> => call<TemplateView>("template_save_params", { project, path, params }),
+  /** Paramètres proposés à la création d'un template (4.8-b, R18). */
+  templateCandidates: (
+    project: string,
+    folder: string,
+    environment: string,
+  ): Promise<TemplateCandidate[]> =>
+    call<TemplateCandidate[]>("template_candidates", { project, folder, environment }),
+  templateCreate: (
+    project: string,
+    folder: string,
+    name: string,
+    category: string,
+    params: TemplateParam[],
+    replace: boolean,
+  ): Promise<TemplateView> =>
+    call<TemplateView>("template_create", { project, folder, name, category, params, replace }),
+  /** « Utiliser dans un dossier… » (4.8-d) : chemin de l'utilisation. */
+  templateUse: (project: string, template: string, folder: string, name: string): Promise<string> =>
+    call<string>("template_use", { project, template, folder, name }),
+  templateInstance: (project: string, path: string): Promise<InstanceView> =>
+    call<InstanceView>("template_instance", { project, path }),
+  templateSetValues: (
+    project: string,
+    path: string,
+    values: Record<string, string>,
+  ): Promise<InstanceView> => call<InstanceView>("template_set_values", { project, path, values }),
+  /** Valeurs écrites d'un endpoint (3.2-d, R19). */
+  templateLiterals: (project: string, path: string): Promise<Literal[]> =>
+    call<Literal[]>("template_literals", { project, path }),
+  templateFromRequest: (
+    project: string,
+    path: string,
+    name: string,
+    category: string,
+    params: string[],
+  ): Promise<TemplateView> =>
+    call<TemplateView>("template_from_request", { project, path, name, category, params }),
+  /** « Afficher » une section depuis « Plus » (1.2-d bis, R21). */
+  sectionsShow: (project: string, section: string, shown: boolean): Promise<string[]> =>
+    call<string[]>("sections_show", { project, section, shown }),
 
   /** Requêtes du projet, hors `path`, qui lisent l'une des variables `names` (EX5). */
   requestVariableUsers: (project: string, path: string, names: string[]): Promise<VariableUser[]> =>
@@ -788,6 +1026,120 @@ export const ipc = {
   /** Réponse à `arnod://quitter` : `saved` faux abandonne la sortie d'Arnod. */
   windowQuitReady: (saved: boolean): Promise<void> =>
     call<null>("window_quit_ready", { saved }).then(() => undefined),
+
+  // --- Version 1 (docs/plan-v1.md) : apparence, raccourcis (1.6-f, 1.6-f bis) ---
+  /** Préférences d'interface ; la fenêtre prend son thème et son zoom. */
+  interfaceLoad: (): Promise<InterfaceView> => call<InterfaceView>("interface_load"),
+  /** Thème, zoom et police des éditeurs ; appliqués et diffusés à toutes les fenêtres. */
+  interfaceSaveAppearance: (appearance: Appearance): Promise<InterfaceView> =>
+    call<InterfaceView>("interface_save_appearance", { appearance }),
+  /**
+   * Donne `keys` à l'action (`null` : retire son raccourci). Un conflit revient sans rien
+   * changer, sauf `replace`.
+   */
+  interfaceSetShortcut: (
+    action: string,
+    keys: string | null,
+    replace: boolean,
+  ): Promise<ShortcutChange> =>
+    call<ShortcutChange>("interface_set_shortcut", { action, keys, replace }),
+  /** « Rétablir les raccourcis par défaut ». */
+  interfaceResetShortcuts: (): Promise<InterfaceView> =>
+    call<InterfaceView>("interface_reset_shortcuts"),
+
+  // --- Version 1 : historique des envois (5.1-c bis) ---
+  /** Envois gardés de la requête, chacun comparé au précédent. */
+  historyLoad: (project: string, path: string): Promise<HistoryView> =>
+    call<HistoryView>("history_load", { project, path }),
+  /** Différences d'un envoi avec le précédent. */
+  historyDiff: (project: string, path: string, id: string): Promise<HistoryDiff> =>
+    call<HistoryDiff>("history_diff", { project, path, id }),
+  /** « Effacer » l'historique de la requête. */
+  historyClear: (project: string, path: string): Promise<HistoryView> =>
+    call<HistoryView>("history_clear", { project, path }),
+  /** « Annuler » après « Effacer » : les envois effacés reviennent. */
+  historyRestore: (project: string, path: string, entries: HistoryEntry[]): Promise<HistoryView> =>
+    call<HistoryView>("history_restore", { project, path, entries }),
+
+  // --- Version 2, lot A : recherche Ctrl+K (1.5-a, 1.5-b) ---
+  /**
+   * Résultats de `text` dans les projets du workspace (`null` : tous les projets). `refresh` relit
+   * les projets (à l'ouverture de la recherche) ; sinon le cœur reprend ceux qu'il a lus.
+   */
+  searchQuery: (workspace: string | null, text: string, refresh: boolean): Promise<SearchResults> =>
+    call<SearchResults>("search_query", { workspace, text, refresh }),
+
+  // --- Version 2, lot B : étiquettes partagées (4.9-b) ---
+  /** Étiquettes d'un dossier : elles valent pour tout ce qu'il contient. */
+  treeSetFolderTags: (project: string, path: string, tags: string[]): Promise<void> =>
+    call<null>("tree_set_folder_tags", { project, path, tags }).then(() => undefined),
+
+  // --- Version 2, lot D : ligne de commande (5.3-c) ---
+  /**
+   * Commande `arnod run` d'un test ou d'un dossier (`path`), avec l'environnement donné, citée
+   * pour le terminal du poste (`shell` absent) ; refusée (`notFound`) si le dossier n'existe plus.
+   */
+  cliCommand: (
+    project: string,
+    path: string,
+    environment: string | null,
+    shell: CliShell | null = null,
+  ): Promise<string> => call<string>("cli_command", { project, path, environment, shell }),
+
+  // --- Version 2, lots E et F : synchronisation Git (7.1-a à 7.1-e) ---
+  /** État de la synchronisation du projet, sans réseau. */
+  syncStatus: (project: string): Promise<SyncView> => call<SyncView>("sync_status", { project }),
+  /** Vérifie ce qui arrive des collègues (Q6), sans rien écrire dans le projet. */
+  syncCheck: (project: string): Promise<SyncView> => call<SyncView>("sync_check", { project }),
+  syncLoginOptions: (): Promise<SyncLoginOptions> => call<SyncLoginOptions>("sync_login_options"),
+  /** Connexion par le navigateur : ouvre la page de la forge, rend le code à saisir. */
+  syncConnectStart: (forge: SyncForge, host: string): Promise<SyncDeviceCode> =>
+    call<SyncDeviceCode>("sync_connect_start", { forge, host }),
+  /** Attend la validation dans le navigateur ; le jeton va au coffre. */
+  syncConnectWait: (forge: SyncForge, host: string): Promise<SyncAccount> =>
+    call<SyncAccount>("sync_connect_wait", { forge, host }),
+  syncConnectCancel: (forge: SyncForge, host: string): Promise<void> =>
+    call<null>("sync_connect_cancel", { forge, host }).then(() => undefined),
+  /** Jeton personnel saisi, vérifié par la forge puis rangé au coffre. */
+  syncToken: (
+    forge: SyncForge,
+    host: string,
+    token: string,
+    login: string | null,
+  ): Promise<SyncAccount> => call<SyncAccount>("sync_token", { forge, host, token, login }),
+  syncRepositories: (account: SyncAccount, query: string): Promise<SyncRepository[]> =>
+    call<SyncRepository[]>("sync_repositories", { account, query }),
+  syncCreateRepository: (account: SyncAccount, name: string): Promise<SyncRepository> =>
+    call<SyncRepository>("sync_create_repository", { account, name }),
+  /** « Relier et envoyer » (7.1-a). */
+  syncLink: (
+    project: string,
+    url: string,
+    branch: string,
+    account: SyncAccount | null,
+  ): Promise<SyncView> => call<SyncView>("sync_link", { project, url, branch, account }),
+  /** Récupérer (`push` faux), récupérer puis envoyer, ou envoyer seulement (`pull` faux). */
+  syncPullPush: (
+    project: string,
+    items: string[],
+    message: string,
+    pull: boolean,
+    push: boolean,
+  ): Promise<SyncView> => call<SyncView>("sync_pull_push", { project, items, message, pull, push }),
+  syncConflicts: (project: string): Promise<SyncConflicts> =>
+    call<SyncConflicts>("sync_conflicts", { project }),
+  /** « Valider la résolution » : chemin → élément → version gardée. */
+  syncResolve: (
+    project: string,
+    choices: Record<string, Record<string, SyncChoice>>,
+  ): Promise<SyncView> => call<SyncView>("sync_resolve", { project, choices }),
+  syncAbandon: (project: string): Promise<SyncView> => call<SyncView>("sync_abandon", { project }),
+  syncJournal: (project: string, path: string): Promise<JournalEntry[]> =>
+    call<JournalEntry[]>("sync_journal", { project, path }),
+  syncMissingSecrets: (project: string): Promise<MissingSecrets[]> =>
+    call<MissingSecrets[]>("sync_missing_secrets", { project }),
+  syncSecretsLater: (project: string, environment: string, names: string[]): Promise<void> =>
+    call<null>("sync_secrets_later", { project, environment, names }).then(() => undefined),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
@@ -810,6 +1162,10 @@ export const EVENTS = {
   updates: "arnod://mise-a-jour",
   // Plan qualité, lot C : sortie demandée, chaque fenêtre enregistre puis répond (R6).
   quit: "arnod://quitter",
+  // Version 1 : préférences d'interface du poste (thème, police, raccourcis).
+  interface: "arnod://interface",
+  // Version 2, lot E : état de la synchronisation d'un projet.
+  sync: "arnod://synchro",
 } as const;
 
 /** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
@@ -888,6 +1244,17 @@ export const events = {
   /** Lot L : version trouvée et installation, à chaque étape du téléchargement (R8). */
   onUpdates: (handler: (view: UpdatesView) => void): Promise<UnlistenFn> =>
     listen<UpdatesView>(EVENTS.updates, (event) => {
+      handler(event.payload);
+    }),
+
+  /** Version 1 : préférences d'interface changées dans n'importe quelle fenêtre. */
+  onInterface: (handler: (view: InterfaceView) => void): Promise<UnlistenFn> =>
+    listen<InterfaceView>(EVENTS.interface, (event) => {
+      handler(event.payload);
+    }),
+  /** Version 2, lot E : synchronisation vérifiée, récupérée ou envoyée (toutes les fenêtres). */
+  onSync: (handler: (view: SyncView) => void): Promise<UnlistenFn> =>
+    listen<SyncView>(EVENTS.sync, (event) => {
       handler(event.payload);
     }),
 };

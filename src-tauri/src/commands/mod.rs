@@ -36,6 +36,15 @@ pub mod network;
 pub mod files;
 // Lot G - Démarrage et erreurs.
 pub mod startup;
+// Version 1 (docs/plan-v1.md) : préférences d'interface et historique des envois.
+pub mod history;
+pub mod interface;
+// Version 2, lot A : recherche Ctrl+K.
+pub mod search;
+// Version 2, lot D : « Copier la commande ».
+pub mod cli;
+// Version 2, lots E et F : synchronisation Git.
+pub mod sync;
 
 #[cfg(test)]
 mod tests {
@@ -66,3 +75,7 @@ mod tests {
         assert_eq!(registered, union_members("CommandName"));
     }
 }
+// Version 4 (docs/plan-v4.md) : tests en schéma, jeux de données, templates.
+pub mod datasets;
+pub mod flows;
+pub mod templates;

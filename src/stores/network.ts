@@ -9,10 +9,11 @@ import type {
   NetworkPrefsInput,
   NetworkView,
   ProjectAuthView,
+  TokenStatus,
 } from "@/types/ipc";
 
-/** Sections des préférences ; les suivantes viendront (Apparence, Raccourcis, Mises à jour). */
-export type PreferencesSection = "network" | "updates";
+/** Sections des préférences (1.6-e, 1.6-f, 1.6-f bis, 1.6-g). */
+export type PreferencesSection = "appearance" | "network" | "shortcuts" | "updates";
 
 /**
  * Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md) : préférences réseau du
@@ -104,6 +105,11 @@ export const useNetworkStore = defineStore("network", () => {
     projectAuth.value = await ipc.projectAuthSave(projectId, environment, auth, clientSecret);
   }
 
+  /** Jeton OAuth 2 du projet dans `environment`, pour la carte de l'authentification héritée. */
+  async function tokenStatus(projectId: string, environment: string): Promise<TokenStatus | null> {
+    return (await ipc.projectAuthLoad(projectId, environment)).token;
+  }
+
   async function renewToken(projectId: string, environment: string): Promise<void> {
     projectAuth.value = await ipc.oauth2TokenRenew(projectId, environment);
   }
@@ -180,6 +186,7 @@ export const useNetworkStore = defineStore("network", () => {
     openProjectSettings,
     closeProjectSettings,
     loadProjectAuth,
+    tokenStatus,
     saveProjectAuth,
     renewToken,
     forgetToken,

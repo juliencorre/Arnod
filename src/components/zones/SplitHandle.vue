@@ -29,6 +29,8 @@ const props = withDefaults(
 );
 const emit = defineEmits<{ preview: [ratio: number | null]; commit: [ratio: number] }>();
 
+/** `root` : l'emplacement dans la séparation ; `handle` : l'élément « separator », qui a le focus. */
+const root = useTemplateRef<HTMLElement>("root");
 const handle = useTemplateRef<HTMLElement>("handle");
 const dragging = ref(false);
 const current = ref(props.ratio);
@@ -38,7 +40,7 @@ const STEP = 0.05;
 const valueNow = computed(() => Math.round((dragging.value ? current.value : props.ratio) * 100));
 
 function containerSize(): number {
-  const rect = handle.value?.parentElement?.getBoundingClientRect();
+  const rect = root.value?.parentElement?.getBoundingClientRect();
   if (!rect) return 0;
   return props.axis === "row" ? rect.width : rect.height;
 }
@@ -73,7 +75,7 @@ function onPointerDown(event: PointerEvent): void {
 
 function onPointerMove(event: PointerEvent): void {
   if (!dragging.value) return;
-  const rect = handle.value?.parentElement?.getBoundingClientRect();
+  const rect = root.value?.parentElement?.getBoundingClientRect();
   if (!rect) return;
   const total = props.axis === "row" ? rect.width : rect.height;
   if (total <= 0) return;
@@ -127,6 +129,14 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
+/** Rangée d'aide montrée pendant le glisser (1.4-b) : gestes et taille minimale. */
+const help = computed(
+  () =>
+    `Glisser : redimensionner · Double-clic : parts égales · Flèches : au clavier · ${
+      props.axis === "row" ? "Largeur" : "Hauteur"
+    } mini : ${String(Math.max(props.minFirst, props.minSecond))} px`,
+);
+
 const bubble = computed(() => {
   if (!sizes.value) return "";
   const [first, second] = sizes.value;
@@ -137,29 +147,35 @@ const bubble = computed(() => {
 </script>
 
 <template>
-  <div
-    ref="handle"
-    class="handle"
-    :class="[`handle--${axis}`, { 'handle--dragging': dragging }]"
-    role="separator"
-    tabindex="0"
-    :aria-label="label"
-    :aria-orientation="axis === 'row' ? 'vertical' : 'horizontal'"
-    :aria-valuenow="valueNow"
-    aria-valuemin="10"
-    aria-valuemax="90"
-    :aria-valuetext="`${valueNow} % · ${100 - valueNow} %`"
-    title="Glisser : redimensionner · Double-clic : parts égales · Flèches : au clavier"
-    @pointerdown="onPointerDown"
-    @pointermove="onPointerMove"
-    @pointerup="onPointerUp"
-    @pointercancel="onPointerUp"
-    @dblclick="commit(0.5)"
-    @keydown="onKeydown"
-    @blur="sizes = null"
-  >
-    <span class="handle__line" aria-hidden="true" />
-    <span v-if="bubble" class="handle__bubble" aria-hidden="true">{{ bubble }}</span>
+  <!-- Le contenu glissé (« Détacher ») est à côté de l'élément « separator », jamais dedans (AC5). -->
+  <div ref="root" class="handle" :class="[`handle--${axis}`, { 'handle--dragging': dragging }]">
+    <div
+      ref="handle"
+      class="handle__grip"
+      role="separator"
+      tabindex="0"
+      :aria-label="label"
+      :aria-orientation="axis === 'row' ? 'vertical' : 'horizontal'"
+      :aria-valuenow="valueNow"
+      aria-valuemin="10"
+      aria-valuemax="90"
+      :aria-valuetext="`${valueNow} % · ${100 - valueNow} %`"
+      title="Glisser : redimensionner · Double-clic : parts égales · Flèches : au clavier"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="onPointerUp"
+      @pointercancel="onPointerUp"
+      @dblclick="commit(0.5)"
+      @keydown="onKeydown"
+      @blur="sizes = null"
+    >
+      <span class="handle__line" aria-hidden="true" />
+      <!-- Poignée au milieu de la séparation (1.4-b). -->
+      <span class="handle__mark" aria-hidden="true">{{ axis === "row" ? "⇔" : "⇕" }}</span>
+      <span v-if="bubble" class="handle__bubble" aria-hidden="true">
+        {{ bubble }}<span v-if="dragging" class="handle__help">{{ help }}</span>
+      </span>
+    </div>
     <slot />
   </div>
 </template>
@@ -169,6 +185,11 @@ const bubble = computed(() => {
   position: relative;
   z-index: 2;
   flex: none;
+}
+
+.handle__grip {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
   touch-action: none;
@@ -203,21 +224,59 @@ const bubble = computed(() => {
 }
 
 .handle:hover .handle__line,
-.handle--dragging .handle__line,
-.handle:focus-visible .handle__line {
+.handle--dragging .handle__line {
   background: var(--color-accent);
+}
+
+/* Focus au clavier : couleur de focus, 3:1 au moins (AC5). */
+.handle__grip:focus-visible .handle__line {
+  background: var(--color-focus);
 }
 
 .handle--row:hover .handle__line,
 .handle--row.handle--dragging .handle__line,
-.handle--row:focus-visible .handle__line {
+.handle--row .handle__grip:focus-visible .handle__line {
   width: 3px;
 }
 
 .handle--column:hover .handle__line,
 .handle--column.handle--dragging .handle__line,
-.handle--column:focus-visible .handle__line {
+.handle--column .handle__grip:focus-visible .handle__line {
   height: 3px;
+}
+
+.handle__mark {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  height: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-caption);
+  color: var(--color-muted);
+  background: var(--color-surface);
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+
+.handle--column .handle__mark {
+  width: 1.5rem;
+  height: 1rem;
+}
+
+.handle:hover .handle__mark,
+.handle--dragging .handle__mark,
+.handle__grip:focus-visible .handle__mark {
+  opacity: 1;
+}
+
+.handle__help {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: var(--text-caption);
+  opacity: 0.8;
 }
 
 .handle__bubble {

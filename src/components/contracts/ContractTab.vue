@@ -9,13 +9,16 @@
 import { computed, onMounted, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import { onTablistKeydown } from "@/lib/tablist";
 import { contractKey, useContractsStore } from "@/stores/contracts";
+import { useInterfaceStore } from "@/stores/interface";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { OperationView } from "@/types/ipc";
 
 const props = defineProps<{ projectId: string; path: string }>();
 
 const contracts = useContractsStore();
+const shortcuts = useInterfaceStore();
 const workbench = useWorkbenchStore();
 const key = computed(() => contractKey(props.projectId, props.path));
 const entry = computed(() => contracts.open[key.value] ?? null);
@@ -92,7 +95,7 @@ function openRequest(path: string): void {
 }
 
 function onSourceKeydown(event: KeyboardEvent): void {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+  if (shortcuts.matches(event, "saveContract")) {
     event.preventDefault();
     void contracts.save(key.value);
   }
@@ -107,7 +110,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
         <div class="contract__title">
           <h2 class="contract__name">{{ view.name }}</h2>
           <span v-if="view.version && !view.deduced" class="contract__version"
-            >version {{ view.version }}</span
+            >Contrat v{{ view.version }}</span
           >
           <span v-if="kindLabel" class="contract__kind">{{ kindLabel }}</span>
           <code class="contract__file">{{ view.path }}</code>
@@ -122,12 +125,18 @@ function onSourceKeydown(event: KeyboardEvent): void {
         </p>
       </header>
 
-      <div role="tablist" aria-label="Vues du contrat" class="contract__tabs">
+      <div
+        role="tablist"
+        aria-label="Vues du contrat"
+        class="contract__tabs"
+        @keydown="onTablistKeydown"
+      >
         <button
           type="button"
           role="tab"
           class="contract__tab"
           :aria-selected="tab === 'operations'"
+          :tabindex="tab === 'operations' ? 0 : -1"
           @click="tab = 'operations'"
         >
           Opérations <span class="contract__badge">{{ total }}</span>
@@ -137,6 +146,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
           role="tab"
           class="contract__tab"
           :aria-selected="tab === 'source'"
+          :tabindex="tab === 'source' ? 0 : -1"
           @click="tab = 'source'"
         >
           Source <span v-if="dirty" class="contract__dirty">●</span>
@@ -316,13 +326,14 @@ function onSourceKeydown(event: KeyboardEvent): void {
   font-weight: 600;
 }
 
+/* Version en pastille, la même que dans l'éditeur d'une requête liée (3.1-e). */
 .contract__version {
   padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-pill);
-  font-size: var(--text-small);
-  font-weight: 600;
-  color: var(--color-link);
-  background: var(--color-accent-soft);
+  font: 600 var(--text-small) var(--font-mono);
+  color: var(--color-text);
+  background: var(--color-chip);
 }
 
 .contract__kind {
@@ -433,7 +444,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
-  font: var(--text-body) / 1.5 var(--font-mono);
+  font: var(--editor-font-size) / 1.5 var(--editor-font);
   color: var(--color-text);
   background: var(--color-surface);
   resize: vertical;

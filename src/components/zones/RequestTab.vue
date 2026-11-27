@@ -166,14 +166,14 @@ async function closeRemoved(): Promise<void> {
 
 .request-tab__editor {
   display: flex;
-  flex: 1 1 55%;
+  flex: 1 1 58%;
   flex-direction: column;
   gap: 0.5rem;
   min-width: 0;
 }
 
 .request-tab__response {
-  flex: 1 1 45%;
+  flex: 1 1 42%;
   min-width: 0;
 }
 

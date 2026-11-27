@@ -127,7 +127,7 @@ jobs:
         run: |
           mkdir -p ../dist && touch ../dist/index.html
           cargo install cargo-llvm-cov --locked
-          cargo llvm-cov --locked --lib --lcov --output-path ../couverture.lcov
+          cargo llvm-cov --locked --workspace --lib --lcov --output-path ../couverture.lcov
           cargo llvm-cov report --summary-only | tee ../couverture.txt
           {
             echo "## Couverture du cœur"

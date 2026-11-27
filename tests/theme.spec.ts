@@ -12,16 +12,21 @@ function colorTokens(block: string): Map<string, string> {
   return tokens;
 }
 
-/** Contenu du premier bloc `:root { ... }` qui suit `from` dans la feuille de style. */
+/**
+ * Contenu du premier bloc `:root… { ... }` qui suit `from` dans la feuille de style (`:root`,
+ * `:root:not([data-theme="light"])` ou `:root[data-theme="dark"]`).
+ */
 function rootBlock(from: number): string {
-  const open = css.indexOf(":root {", from);
-  const close = css.indexOf("}", open);
+  const open = css.slice(from).search(/:root[^{]*\{/);
   expect(open).toBeGreaterThanOrEqual(0);
-  return css.slice(open, close);
+  const start = from + open;
+  return css.slice(start, css.indexOf("}", start));
 }
 
 const light = colorTokens(rootBlock(0));
 const dark = colorTokens(rootBlock(css.indexOf("@media (prefers-color-scheme: dark)")));
+/** Thème sombre forcé (Préférences → Apparence, 1.6-f). */
+const forcedDark = colorTokens(rootBlock(css.indexOf(':root[data-theme="dark"] {')));
 const themes = [
   ["clair", light],
   ["sombre", dark],
@@ -106,6 +111,18 @@ const PAIRS: { foreground: string[]; background: string[]; minimum: number }[] =
     background: ["--color-bg", "--color-surface", "--color-sidebar"],
     minimum: 3,
   },
+  // Action destructrice sur la barre de sélection, au fond color-text (4.1-a quater).
+  {
+    foreground: ["--color-danger-inverse"],
+    background: ["--color-text"],
+    minimum: 4.5,
+  },
+  // Bord des cases, radios et de l'interrupteur éteint (DE4, WCAG 1.4.11).
+  {
+    foreground: ["--color-border-control"],
+    background: ["--color-bg", "--color-surface", "--color-sidebar"],
+    minimum: 3,
+  },
 ];
 
 describe("thème (styles.css)", () => {
@@ -133,5 +150,18 @@ describe("thème (styles.css)", () => {
         }
       }
     }
+  });
+});
+
+describe("thème forcé (1.6-f)", () => {
+  it("le thème sombre forcé reprend chaque jeton du thème sombre du système", () => {
+    expect(forcedDark.size).toBeGreaterThan(40);
+    expect(Object.fromEntries(forcedDark)).toEqual(Object.fromEntries(dark));
+  });
+
+  it("le thème clair forcé écarte le thème sombre du système", () => {
+    expect(css).toContain(':root:not([data-theme="light"]) {');
+    expect(css).toMatch(/:root\[data-theme="light"\] \{\s*color-scheme: light;/);
+    expect(css).toMatch(/:root\[data-theme="dark"\] \{\s*color-scheme: dark;/);
   });
 });

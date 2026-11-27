@@ -1,0 +1,725 @@
+use super::*;
+use tempfile::TempDir;
+
+fn project() -> TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join(ROOT_FILE),
+        "opencollection: 1.0.0\ninfo:\n  name: Projet\n",
+    )
+    .unwrap();
+    dir
+}
+
+fn names(nodes: &[TreeNode]) -> Vec<String> {
+    nodes
+        .iter()
+        .map(|n| match n {
+            TreeNode::Folder { name, .. } | TreeNode::Request { name, .. } => name.clone(),
+        })
+        .collect()
+}
+
+#[test]
+fn projet_vide_sans_manifeste_ni_environnements() {
+    let dir = project();
+    fs::create_dir(dir.path().join(ENVIRONMENTS_DIR)).unwrap();
+    fs::create_dir(dir.path().join(".git")).unwrap();
+    assert!(read(dir.path()).unwrap().is_empty());
+}
+
+#[test]
+fn dossiers_d_abord_puis_requetes_sans_casse() {
+    let dir = project();
+    create_folder(dir.path(), "", "zèbre").unwrap();
+    create_folder(dir.path(), "", "Alpha").unwrap();
+    create_request(dir.path(), "", Some("beta")).unwrap();
+    create_request(dir.path(), "", Some("Aaa")).unwrap();
+    assert_eq!(
+        names(&read(dir.path()).unwrap()),
+        ["Alpha", "zèbre", "Aaa", "beta"]
+    );
+}
+
+#[test]
+fn compteur_de_requetes_recursif() {
+    let dir = project();
+    let a = create_folder(dir.path(), "", "a").unwrap();
+    let b = create_folder(dir.path(), &a, "b").unwrap();
+    create_request(dir.path(), &a, Some("r1")).unwrap();
+    create_request(dir.path(), &b, Some("r2")).unwrap();
+    let tree = read(dir.path()).unwrap();
+    let TreeNode::Folder { request_count, .. } = &tree[0] else {
+        panic!()
+    };
+    assert_eq!(*request_count, 2);
+}
+
+#[test]
+fn noms_uniques_sans_casse_et_valides() {
+    let dir = project();
+    create_folder(dir.path(), "", "Docs").unwrap();
+    assert_eq!(
+        create_folder(dir.path(), "", "docs").unwrap_err().kind,
+        CommandErrorKind::NameTaken
+    );
+    assert_eq!(
+        create_folder(dir.path(), "", "a/b").unwrap_err().kind,
+        CommandErrorKind::InvalidName
+    );
+    assert_eq!(
+        create_folder(dir.path(), "", "environments")
+            .unwrap_err()
+            .kind,
+        CommandErrorKind::NameTaken
+    );
+    create_request(dir.path(), "", Some("Créer")).unwrap();
+    assert_eq!(
+        create_request(dir.path(), "", Some("créer"))
+            .unwrap_err()
+            .kind,
+        CommandErrorKind::NameTaken
+    );
+}
+
+#[test]
+fn nom_de_fichier_derive_avec_suffixe() {
+    assert_eq!(slug("Créer une commande"), "creer-une-commande");
+    assert_eq!(slug("  !!  "), "requete");
+    let dir = project();
+    let first = create_request(dir.path(), "", Some("Créer")).unwrap();
+    let second = create_request(dir.path(), "", Some("Creer !")).unwrap();
+    assert_eq!(first, "creer.yml");
+    assert_eq!(second, "creer-2.yml");
+}
+
+#[test]
+fn nouvelle_requete_par_defaut_numerotee() {
+    let dir = project();
+    create_request(dir.path(), "", None).unwrap();
+    create_request(dir.path(), "", None).unwrap();
+    let tree = read(dir.path()).unwrap();
+    assert_eq!(names(&tree), ["Nouvelle requête", "Nouvelle requête 2"]);
+}
+
+#[test]
+fn renommer_un_dossier_le_renomme_sur_disque() {
+    let dir = project();
+    let a = create_folder(dir.path(), "", "a").unwrap();
+    create_request(dir.path(), &a, Some("r")).unwrap();
+    let renamed = rename(dir.path(), &a, "A2").unwrap();
+    assert_eq!(renamed, "A2");
+    assert!(dir.path().join("A2/r.yml").exists());
+    assert!(!dir.path().join("a").exists());
+}
+
+#[test]
+fn renommer_une_requete_suit_le_fichier_derive() {
+    let dir = project();
+    let path = create_request(dir.path(), "", Some("Ancien")).unwrap();
+    let renamed = rename(dir.path(), &path, "Nouveau nom").unwrap();
+    assert_eq!(renamed, "nouveau-nom.yml");
+    let request = file::read(&dir.path().join(&renamed)).unwrap();
+    assert_eq!(request.name, "Nouveau nom");
+    // fichier choisi à la main : conservé
+    fs::rename(
+        dir.path().join(&renamed),
+        dir.path().join("mon-fichier.yml"),
+    )
+    .unwrap();
+    assert_eq!(
+        rename(dir.path(), "mon-fichier.yml", "Autre").unwrap(),
+        "mon-fichier.yml"
+    );
+}
+
+#[test]
+fn deplacer_garde_le_contenu_et_refuse_les_descendants() {
+    let dir = project();
+    let a = create_folder(dir.path(), "", "a").unwrap();
+    let b = create_folder(dir.path(), &a, "b").unwrap();
+    let r = create_request(dir.path(), "", Some("r")).unwrap();
+    let before = file::read(&dir.path().join(&r)).unwrap();
+    let moved = move_to(dir.path(), &r, &b).unwrap();
+    assert_eq!(moved, "a/b/r.yml");
+    assert_eq!(file::read(&dir.path().join(&moved)).unwrap(), before);
+    assert_eq!(
+        move_to(dir.path(), &a, &b).unwrap_err().kind,
+        CommandErrorKind::InvalidRequest
+    );
+    assert_eq!(
+        move_to(dir.path(), &a, &a).unwrap_err().kind,
+        CommandErrorKind::InvalidRequest
+    );
+}
+
+#[test]
+fn deplacer_refuse_une_collision() {
+    let dir = project();
+    let a = create_folder(dir.path(), "", "a").unwrap();
+    create_request(dir.path(), &a, Some("r")).unwrap();
+    let r = create_request(dir.path(), "", Some("r")).unwrap();
+    assert_eq!(
+        move_to(dir.path(), &r, &a).unwrap_err().kind,
+        CommandErrorKind::NameTaken
+    );
+}
+
+#[test]
+fn dupliquer_garde_le_contenu() {
+    let dir = project();
+    let r = create_request(dir.path(), "", Some("Lire")).unwrap();
+    let copy = duplicate(dir.path(), &r).unwrap();
+    let a = file::read(&dir.path().join(&r)).unwrap();
+    let b = file::read(&dir.path().join(&copy)).unwrap();
+    assert_eq!(b.name, "Lire (copie)");
+    assert_ne!(r, copy);
+    assert_eq!(a.assertions, b.assertions);
+}
+
+#[test]
+fn fichier_illisible_liste_sans_bloquer() {
+    let dir = project();
+    create_request(dir.path(), "", Some("ok")).unwrap();
+    fs::write(dir.path().join("casse.yml"), "name: [").unwrap();
+    let tree = read(dir.path()).unwrap();
+    assert_eq!(tree.len(), 2);
+    assert!(
+        tree.iter()
+            .any(|n| matches!(n, TreeNode::Request { invalid: true, name, .. } if name == "casse"))
+    );
+}
+
+#[test]
+fn suppression_definitive_et_chemin_hors_projet() {
+    let dir = project();
+    let a = create_folder(dir.path(), "", "a").unwrap();
+    create_request(dir.path(), &a, Some("r")).unwrap();
+    delete(dir.path(), &a, true).unwrap();
+    assert!(!dir.path().join("a").exists());
+    assert_eq!(
+        resolve(dir.path(), "../x").unwrap_err().kind,
+        CommandErrorKind::InvalidRequest
+    );
+    assert_eq!(
+        delete(dir.path(), "", true).unwrap_err().kind,
+        CommandErrorKind::InvalidRequest
+    );
+}
+
+#[test]
+fn requetes_d_un_dossier_dans_l_ordre_de_l_arborescence() {
+    let dir = project();
+    let a = create_folder(dir.path(), "", "a").unwrap();
+    let b = create_folder(dir.path(), &a, "b").unwrap();
+    create_request(dir.path(), &a, Some("z")).unwrap();
+    create_request(dir.path(), &b, Some("y")).unwrap();
+    create_request(dir.path(), "", Some("racine")).unwrap();
+    assert_eq!(
+        requests_in(dir.path(), &a).unwrap(),
+        ["a/b/y.yml", "a/z.yml"]
+    );
+    assert_eq!(requests_in(dir.path(), "").unwrap().len(), 3);
+}
+
+#[test]
+fn nom_de_fichier_jamais_reserve_par_windows() {
+    assert_eq!(slug("Con!"), "_con");
+    assert_eq!(slug("nul ?"), "_nul");
+    assert_eq!(slug("Console"), "console");
+    let dir = project();
+    assert_eq!(
+        create_request(dir.path(), "", Some("Con!")).unwrap(),
+        "_con.yml"
+    );
+}
+
+/// Un lien qui ramène à un dossier parent n'est pas suivi : sans cela la
+/// lecture ne finit pas (deux liens doublent l'arbre à chaque niveau).
+#[cfg(unix)]
+#[test]
+fn liens_en_boucle_ignores_liens_externes_suivis() {
+    use std::os::unix::fs::symlink;
+
+    let dir = project();
+    let a = create_folder(dir.path(), "", "a").unwrap();
+    create_request(dir.path(), &a, Some("r1")).unwrap();
+    symlink(dir.path().join("a"), dir.path().join("a/boucle")).unwrap();
+    symlink(dir.path(), dir.path().join("a/racine")).unwrap();
+    // Dossier partagé hors du projet : un lien légitime reste suivi.
+    let shared = tempfile::tempdir().unwrap();
+    create_request(shared.path(), "", Some("commune")).unwrap();
+    symlink(shared.path(), dir.path().join("a/partage")).unwrap();
+
+    let tree = read(dir.path()).unwrap();
+    let TreeNode::Folder {
+        children,
+        request_count,
+        ..
+    } = &tree[0]
+    else {
+        panic!()
+    };
+    assert_eq!(names(children), ["partage", "r1"]);
+    assert_eq!(*request_count, 2);
+    assert_eq!(
+        requests_in(dir.path(), "").unwrap(),
+        ["a/partage/commune.yml", "a/r1.yml"]
+    );
+}
+
+// --- Référentiel de tests (docs/plan-requetes-dans-contrats.md, R1, R5, R6) ---
+
+fn request(name: &str, path: &str, contract: Option<&str>) -> TreeNode {
+    TreeNode::Request {
+        name: name.to_owned(),
+        path: path.to_owned(),
+        method: Some(Method::Get),
+        assertion_count: 0,
+        invalid: false,
+        contract: contract.map(str::to_owned),
+        url: String::new(),
+        tags: Vec::new(),
+    }
+}
+
+fn folder(path: &str, children: Vec<TreeNode>) -> TreeNode {
+    let request_count = children.iter().map(TreeNode::count).sum();
+    TreeNode::Folder {
+        name: path.rsplit('/').next().unwrap_or(path).to_owned(),
+        path: path.to_owned(),
+        test: is_test(&children),
+        children,
+        request_count,
+        tags: Vec::new(),
+        template: None,
+    }
+}
+
+#[test]
+fn r5_referentiel_sans_les_requetes_liees() {
+    let contracts: HashSet<String> = ["contracts/petstore.yaml".to_owned()].into();
+    let nodes = vec![
+        // Dossier du contrat : seulement des requêtes liées, il disparaît.
+        folder(
+            "Petstore",
+            vec![folder(
+                "Petstore/animaux",
+                vec![request(
+                    "Lister",
+                    "Petstore/animaux/lister.yml",
+                    Some("contracts/petstore.yaml"),
+                )],
+            )],
+        ),
+        // Dossier mixte : il garde ses requêtes libres, avec leur nombre.
+        folder(
+            "Mixte",
+            vec![
+                request("Libre", "Mixte/libre.yml", None),
+                request("Liée", "Mixte/liee.yml", Some("contracts/petstore.yaml")),
+            ],
+        ),
+        // Dossier vide créé à la main : il reste.
+        folder("Vide", vec![]),
+        // R6 : contrat absent, la requête reste dans le référentiel.
+        request(
+            "Orpheline",
+            "orpheline.yml",
+            Some("contracts/supprime.yaml"),
+        ),
+        request("google", "google.yml", None),
+    ];
+    let tests = tests_view(&nodes, &contracts);
+    assert_eq!(names(&tests), ["Mixte", "Vide", "Orpheline", "google"]);
+    assert!(
+        matches!(&tests[0], TreeNode::Folder { request_count: 1, children, .. } if names(children) == ["Libre"])
+    );
+    assert!(matches!(
+        &tests[1],
+        TreeNode::Folder {
+            request_count: 0,
+            ..
+        }
+    ));
+    // Sans contrat présent, tout reste.
+    assert_eq!(tests_view(&nodes, &HashSet::new()), nodes);
+}
+
+#[test]
+fn le_lien_au_contrat_est_lu_dans_l_arborescence() {
+    let dir = project();
+    let path = create_request(dir.path(), "", Some("liée")).unwrap();
+    let absolute = dir.path().join(&path);
+    let mut request = file::read(&absolute).unwrap();
+    request.contract = Some(crate::request::model::ContractLink {
+        file: "contracts/petstore.yaml".to_owned(),
+        operation: "GET /pets".to_owned(),
+    });
+    file::write(&absolute, &request).unwrap();
+    assert!(matches!(
+        &read(dir.path()).unwrap()[0],
+        TreeNode::Request { contract: Some(file), .. } if file == "contracts/petstore.yaml"
+    ));
+}
+
+// Tests et étapes (docs/plan-mvp-e-tests-etapes.md, R1, R11).
+
+#[test]
+fn lot_e_r1_un_dossier_de_requetes_sans_sous_dossier_est_un_test() {
+    let dir = project();
+    let rangement = create_folder(dir.path(), "", "Clients").unwrap();
+    let test = create_folder(dir.path(), &rangement, "Créer puis lire").unwrap();
+    create_folder(dir.path(), "", "Vide").unwrap();
+    create_request(dir.path(), &test, Some("Lire")).unwrap();
+    create_request(dir.path(), &rangement, Some("Libre")).unwrap();
+    let tree = read(dir.path()).unwrap();
+    let flags: Vec<(String, bool)> = tree
+        .iter()
+        .filter_map(|n| match n {
+            TreeNode::Folder {
+                name,
+                test,
+                children,
+                ..
+            } => {
+                let inner = children.iter().find_map(|c| match c {
+                    TreeNode::Folder { test, .. } => Some(*test),
+                    TreeNode::Request { .. } => None,
+                });
+                Some((format!("{name}:{inner:?}"), *test))
+            }
+            TreeNode::Request { .. } => None,
+        })
+        .collect();
+    // Un dossier qui range un dossier n'est pas un test, même avec une requête ; vide non plus.
+    assert_eq!(
+        flags,
+        [
+            ("Clients:Some(true)".to_owned(), false),
+            ("Vide:None".to_owned(), false)
+        ]
+    );
+}
+
+#[test]
+fn lot_e_r1_les_etapes_suivent_seq_puis_le_nom() {
+    let dir = project();
+    let test = create_folder(dir.path(), "", "Parcours").unwrap();
+    for (name, seq) in [
+        ("Alpha", Some(3.0)),
+        ("Zulu", Some(1.0)),
+        ("Bravo", None),
+        ("Mike", Some(2.0)),
+    ] {
+        let path = create_request(dir.path(), &test, Some(name)).unwrap();
+        let file_path = resolve(dir.path(), &path).unwrap();
+        let mut request = file::read(&file_path).unwrap();
+        request.seq = seq;
+        file::write(&file_path, &request).unwrap();
+    }
+    let view = test_view(dir.path(), &test).unwrap();
+    let order: Vec<&str> = view.steps.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(order, ["Zulu", "Mike", "Alpha", "Bravo"]);
+    assert!(view.test);
+}
+
+#[test]
+fn lot_e_r11_nouveau_test_puis_etapes() {
+    let dir = project();
+    let created = create_test(dir.path(), "").unwrap();
+    assert_eq!(created.folder, "Nouveau test");
+    assert_eq!(created.step, "Nouveau test/etape-1.yml");
+    let again = create_test(dir.path(), "").unwrap();
+    assert_eq!(again.folder, "Nouveau test 2");
+
+    // Une étape sans rang, ajoutée à la main : « + Étape » pose les rangs dans l'ordre actuel.
+    create_request(dir.path(), &created.folder, Some("Autre")).unwrap();
+    let second = add_step(dir.path(), &created.folder).unwrap();
+    let view = test_view(dir.path(), &created.folder).unwrap();
+    let order: Vec<&str> = view.steps.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(order, ["Étape 1", "Autre", "Étape 3"]);
+    assert_eq!(view.steps[2].path, second);
+    let seq = |path: &str| file::read(&resolve(dir.path(), path).unwrap()).unwrap().seq;
+    assert_eq!(seq(&second), Some(3.0));
+    assert_eq!(seq(&view.steps[1].path), Some(2.0));
+
+    // Un dossier qui range des dossiers refuse une étape.
+    let error = add_step(dir.path(), "").unwrap_err();
+    assert_eq!(error.kind, CommandErrorKind::NotFound);
+    let parent = create_folder(dir.path(), "", "Rangement").unwrap();
+    create_folder(dir.path(), &parent, "Sous").unwrap();
+    let error = add_step(dir.path(), &parent).unwrap_err();
+    assert_eq!(error.kind, CommandErrorKind::InvalidRequest);
+}
+
+#[test]
+fn lot_e_variables_lues_par_les_autres_requetes() {
+    let dir = project();
+    let first = create_request(dir.path(), "", Some("Créer")).unwrap();
+    let second = create_request(dir.path(), "", Some("Lire")).unwrap();
+    let path = resolve(dir.path(), &second).unwrap();
+    let mut request = file::read(&path).unwrap();
+    request.url = "{{baseUrl}}/clients/{{ client.id }}".to_owned();
+    file::write(&path, &request).unwrap();
+    let users = variable_users(dir.path(), &first, &["client.id".to_owned()]).unwrap();
+    assert_eq!(users.len(), 1);
+    assert_eq!(users[0].path, second);
+    assert_eq!(users[0].variables, ["client.id"]);
+    assert!(variable_users(dir.path(), &first, &[]).unwrap().is_empty());
+}
+
+// --- Lot D - Barre latérale (docs/plan-mvp-d-barre-laterale.md) ---------------
+
+#[test]
+fn lot_d_r1_adresse_et_etiquettes_des_requetes() {
+    let dir = project();
+    let path = create_request(dir.path(), "", Some("Lister")).unwrap();
+    let absolute = dir.path().join(&path);
+    let mut request = file::read(&absolute).unwrap();
+    request.url = "{{baseUrl}}/orders".to_owned();
+    request.tags = vec!["critique".to_owned(), "smoke".to_owned()];
+    file::write(&absolute, &request).unwrap();
+    fs::write(dir.path().join("casse.yml"), "::: pas du yaml").unwrap();
+
+    let nodes = read(dir.path()).unwrap();
+    let json = serde_json::to_value(&nodes).unwrap();
+    let lister = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["name"] == "Lister")
+        .unwrap();
+    assert_eq!(lister["url"], "{{baseUrl}}/orders");
+    assert_eq!(lister["tags"], serde_json::json!(["critique", "smoke"]));
+    // Fichier illisible : ni adresse ni étiquettes.
+    let casse = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["name"] == "casse")
+        .unwrap();
+    assert_eq!(casse["url"], "");
+    assert_eq!(casse["tags"], serde_json::json!([]));
+}
+
+#[test]
+fn lot_e_variables_extraites_par_les_etapes_precedentes() {
+    let dir = project();
+    let created = create_test(dir.path(), "").unwrap();
+    let path = resolve(dir.path(), &created.step).unwrap();
+    let mut first = file::read(&path).unwrap();
+    first.extractions.push(crate::request::model::Extraction {
+        name: "client.id".into(),
+        source: "body.id".into(),
+        scope: crate::request::model::ExtractionScope::Runtime,
+        enabled: true,
+    });
+    file::write(&path, &first).unwrap();
+    let second = add_step(dir.path(), &created.folder).unwrap();
+    assert_eq!(extracted_before(dir.path(), &second), ["client.id"]);
+    assert!(extracted_before(dir.path(), &created.step).is_empty());
+    assert!(extracted_before(dir.path(), "libre.yml").is_empty());
+}
+
+/// Chemins des dossiers montrés à la racine.
+fn top_folders(root: &Path) -> Vec<String> {
+    read(root)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|node| match node {
+            TreeNode::Folder { path, .. } => Some(path),
+            TreeNode::Request { .. } => None,
+        })
+        .collect()
+}
+
+/// PU4 : un dossier renommé ou déplacé sous un nom réservé ou caché serait accepté puis absent de
+/// l'arborescence : le nom est refusé, le dossier reste en place.
+#[test]
+fn pu4_nom_reserve_ou_cache_refuse_pour_renommer_et_deplacer() {
+    let dir = project();
+    let root = dir.path();
+    let folder = create_folder(root, "", "Dossier").unwrap();
+    create_request(root, &folder, Some("Requête")).unwrap();
+    for name in [
+        "contracts",
+        "Environments",
+        ".archive",
+        "folder.yml",
+        "opencollection.yml",
+    ] {
+        assert!(rename(root, &folder, name).is_err(), "« {name} » accepté");
+        assert_eq!(top_folders(root), ["Dossier"], "après « {name} »");
+    }
+    // Plus bas dans l'arborescence, `contracts` est un nom comme un autre…
+    let inner = create_folder(root, &folder, "contracts").unwrap();
+    create_request(root, &inner, Some("Signer")).unwrap();
+    // … mais il ne remonte pas à la racine.
+    assert_eq!(
+        move_to(root, &inner, "").unwrap_err().kind,
+        CommandErrorKind::NameTaken
+    );
+    assert_eq!(requests_in(root, "").unwrap().len(), 2);
+    assert_eq!(
+        create_folder(root, "", ".cache").unwrap_err().kind,
+        CommandErrorKind::InvalidName
+    );
+}
+
+/// PU5 : si la seconde étape d'un renommage de dossier échoue, le dossier reprend son nom au lieu
+/// de rester caché sous `.arnod-rename-<uuid>`. Ici le nom (64 émojis, 256 octets) dépasse la
+/// limite du système de fichiers.
+#[cfg(unix)]
+#[test]
+fn pu5_renommage_de_dossier_defait_si_la_seconde_etape_echoue() {
+    let dir = project();
+    let root = dir.path();
+    let folder = create_folder(root, "", "Commandes").unwrap();
+    create_request(root, &folder, Some("Requête")).unwrap();
+    assert!(rename(root, &folder, &"😀".repeat(64)).is_err());
+    assert!(root.join("Commandes").is_dir());
+    assert_eq!(top_folders(root), ["Commandes"]);
+    let hidden: Vec<String> = fs::read_dir(root)
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with(".arnod-rename"))
+        .collect();
+    assert!(hidden.is_empty(), "{hidden:?}");
+}
+
+/// AM37 (4.1-a bis) : un test nommé sur place dans la vue du dossier ; un nom pris ne crée rien.
+#[test]
+fn am37_nouveau_test_nomme_sur_place() {
+    let dir = project();
+    create_folder(dir.path(), "", "commandes").unwrap();
+    let created = create_test_named(dir.path(), "commandes", Some(" Annuler ")).unwrap();
+    assert_eq!(created.folder, "commandes/Annuler");
+    assert_eq!(created.step, "commandes/Annuler/etape-1.yml");
+    let taken = create_test_named(dir.path(), "commandes", Some("annuler"));
+    assert_eq!(taken.unwrap_err().kind, CommandErrorKind::NameTaken);
+    let names: Vec<String> = std::fs::read_dir(dir.path().join("commandes"))
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(names, ["Annuler"]);
+}
+
+/// AM38 (4.1-a ter) : le contenu d'un dossier se réordonne, dossiers et requêtes mêlés ; le rang
+/// va dans `info.seq` d'une requête et dans le `folder.yml` d'un dossier, créé conforme.
+#[test]
+fn am38_reordonner_le_contenu_d_un_dossier() {
+    let dir = project();
+    create_folder(dir.path(), "", "commandes").unwrap();
+    create_folder(dir.path(), "commandes", "erreurs").unwrap();
+    create_folder(dir.path(), "commandes", "v2").unwrap();
+    let annuler = create_request(dir.path(), "commandes", Some("Annuler")).unwrap();
+    let children = |root: &std::path::Path| -> Vec<String> {
+        match read(root).unwrap().into_iter().next().unwrap() {
+            TreeNode::Folder { children, .. } => children
+                .into_iter()
+                .map(|c| match c {
+                    TreeNode::Folder { name, .. } | TreeNode::Request { name, .. } => name,
+                })
+                .collect(),
+            TreeNode::Request { .. } => unreachable!(),
+        }
+    };
+    // Sans rang : les dossiers d'abord, puis les requêtes, par nom.
+    assert_eq!(children(dir.path()), ["erreurs", "v2", "Annuler"]);
+    reorder(
+        dir.path(),
+        "commandes",
+        &[
+            annuler.clone(),
+            "commandes/v2".into(),
+            "commandes/erreurs".into(),
+        ],
+    )
+    .unwrap();
+    assert_eq!(children(dir.path()), ["Annuler", "v2", "erreurs"]);
+    let folder_file = dir.path().join("commandes/erreurs").join(FOLDER_FILE);
+    let value = yaml::read(&folder_file).unwrap();
+    assert_eq!(value["info"]["seq"], 3.0);
+    assert!(schema::check(Part::Folder, &value).is_ok());
+    // Un chemin hors du dossier est refusé : rien ne change.
+    let refused = reorder(dir.path(), "commandes", &["autre.yml".into()]);
+    assert!(refused.is_err());
+    assert_eq!(children(dir.path()), ["Annuler", "v2", "erreurs"]);
+}
+
+/// Étiquettes d'un nœud : celles d'un dossier, ou les étiquettes effectives d'une requête.
+fn tags_of(nodes: &[TreeNode], path: &str) -> Vec<String> {
+    for node in nodes {
+        match node {
+            TreeNode::Folder {
+                path: p,
+                tags,
+                children,
+                ..
+            } => {
+                if p == path {
+                    return tags.clone();
+                }
+                let found = tags_of(children, path);
+                if !found.is_empty() {
+                    return found;
+                }
+            }
+            TreeNode::Request { path: p, tags, .. } if p == path => return tags.clone(),
+            TreeNode::Request { .. } => {}
+        }
+    }
+    Vec::new()
+}
+
+#[test]
+fn v2_r4_une_etiquette_de_dossier_vaut_pour_tout_ce_qu_il_contient() {
+    let dir = project();
+    create_folder(dir.path(), "", "paiements").unwrap();
+    create_folder(dir.path(), "paiements", "plusieurs-fois").unwrap();
+    let payer = create_request(dir.path(), "paiements/plusieurs-fois", Some("Payer")).unwrap();
+    let mut request = file::read(&dir.path().join(&payer)).unwrap();
+    request.tags = vec!["nominal".into(), "Smoke".into()];
+    file::write(&dir.path().join(&payer), &request).unwrap();
+
+    set_folder_tags(
+        dir.path(),
+        "paiements",
+        &[
+            " smoke ".into(),
+            "".into(),
+            "SMOKE".into(),
+            "contract:x#y".into(),
+            "lent".into(),
+        ],
+    )
+    .unwrap();
+    let nodes = read(dir.path()).unwrap();
+    // Nettoyées : espaces, vides, doublons sans casse, lien au contrat refusé.
+    assert_eq!(tags_of(&nodes, "paiements"), ["smoke", "lent"]);
+    // La requête garde les siennes, puis prend celles des parents, sans doublon.
+    assert_eq!(tags_of(&nodes, &payer), ["nominal", "Smoke", "lent"]);
+
+    // Écrites dans folder.yml, conforme au schéma ; le fichier de la requête ne change pas.
+    let value = yaml::read(&dir.path().join("paiements").join(FOLDER_FILE)).unwrap();
+    assert_eq!(value["info"]["tags"], serde_json::json!(["smoke", "lent"]));
+    assert_eq!(value["info"]["name"], "paiements");
+    assert!(schema::check(Part::Folder, &value).is_ok());
+    assert_eq!(
+        file::read(&dir.path().join(&payer)).unwrap().tags,
+        ["nominal", "Smoke"]
+    );
+
+    // Sans étiquette, la clé est retirée.
+    set_folder_tags(dir.path(), "paiements", &[]).unwrap();
+    let value = yaml::read(&dir.path().join("paiements").join(FOLDER_FILE)).unwrap();
+    assert!(value["info"].get("tags").is_none());
+    assert!(tags_of(&read(dir.path()).unwrap(), "paiements").is_empty());
+
+    // Seul un dossier du projet reçoit des étiquettes.
+    assert!(set_folder_tags(dir.path(), "", &["x".into()]).is_err());
+    assert!(set_folder_tags(dir.path(), &payer, &["x".into()]).is_err());
+}

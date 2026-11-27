@@ -3,42 +3,14 @@
  * Vérifications d'une requête (V2) : opérateurs d'OpenCollection et de Bruno, activables une
  * à une ; la conformité au contrat lié est rappelée (R8 du format OpenCollection).
  */
+import BaseButton from "@/components/ui/BaseButton.vue";
+import RowRemoveButton from "@/components/ui/RowRemoveButton.vue";
+import { OPERATORS, manualAssertion } from "@/lib/assertions";
 import type { Assertion, AssertionOperator, AssertionResult, Scalar } from "@/types/ipc";
 
 const props = defineProps<{ linked: boolean; results: AssertionResult[] | null }>();
 const assertions = defineModel<Assertion[]>({ required: true });
 
-/** Opérateurs d'OpenCollection et de Bruno (R4), dans l'ordre du menu. */
-const OPERATORS: { id: AssertionOperator; label: string }[] = [
-  { id: "equals", label: "est égal à" },
-  { id: "notEquals", label: "est différent de" },
-  { id: "contains", label: "contient" },
-  { id: "notContains", label: "ne contient pas" },
-  { id: "startsWith", label: "commence par" },
-  { id: "endsWith", label: "se termine par" },
-  { id: "lessThan", label: "est inférieur à" },
-  { id: "lessOrEqual", label: "est inférieur ou égal à" },
-  { id: "greaterThan", label: "est supérieur à" },
-  { id: "greaterOrEqual", label: "est supérieur ou égal à" },
-  { id: "between", label: "est entre (min, max)" },
-  { id: "in", label: "est parmi (a, b, …)" },
-  { id: "notIn", label: "n'est pas parmi (a, b, …)" },
-  { id: "length", label: "a pour longueur" },
-  { id: "exists", label: "existe" },
-  { id: "isUndefined", label: "n'existe pas" },
-  { id: "isNull", label: "est null" },
-  { id: "isEmpty", label: "est vide" },
-  { id: "isNotEmpty", label: "n'est pas vide" },
-  { id: "isTruthy", label: "est vrai (truthy)" },
-  { id: "isFalsy", label: "est faux (falsy)" },
-  { id: "isNumber", label: "est un nombre" },
-  { id: "isText", label: "est un texte" },
-  { id: "isBoolean", label: "est un booléen" },
-  { id: "isArray", label: "est une liste" },
-  { id: "isJson", label: "est un objet JSON" },
-  { id: "matches", label: "correspond à l'expression (non évaluée)" },
-  { id: "notMatches", label: "ne correspond pas à l'expression (non évaluée)" },
-];
 const NO_VALUE: AssertionOperator[] = [
   "exists",
   "isUndefined",
@@ -96,14 +68,7 @@ function setValue(index: number, text: string): void {
 }
 
 function add(): void {
-  assertions.value.push({
-    id: `manuelle-${crypto.randomUUID().slice(0, 8)}`,
-    target: "status",
-    operator: "equals",
-    value: 200,
-    origin: "manual",
-    enabled: true,
-  });
+  assertions.value.push(manualAssertion());
 }
 
 function remove(index: number): void {
@@ -174,17 +139,10 @@ function resultFor(id: string): boolean | null {
         />
         <span v-else />
         <span class="assertion__origin">{{ ORIGINS[assertion.origin] }}</span>
-        <button
-          type="button"
-          class="assertion__remove"
-          :aria-label="`Supprimer l'assertion ${index + 1}`"
-          @click="remove(index)"
-        >
-          ✕
-        </button>
+        <RowRemoveButton :label="`Supprimer l'assertion ${index + 1}`" @click="remove(index)" />
       </li>
     </ul>
-    <button type="button" class="link" @click="add">+ Assertion</button>
+    <BaseButton class="assertions__add" @click="add">+ Assertion</BaseButton>
   </div>
 </template>
 
@@ -262,26 +220,11 @@ function resultFor(id: string): boolean | null {
   color: var(--color-muted);
 }
 
-.assertion__remove,
-.link {
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
+.assertions__add {
+  align-self: flex-start;
 }
 
-.assertion__remove {
-  font-size: var(--text-body);
-  color: var(--color-muted);
-}
-
-.link {
-  font-size: var(--text-body);
-  font-weight: 600;
-  color: var(--color-link);
-}
-
-:is(.assertion input, .assertion select, .assertion__remove, .link):focus-visible {
+:is(.assertion input, .assertion select):focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;
 }

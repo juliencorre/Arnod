@@ -279,21 +279,33 @@ async function submit(mode: TransferMode): Promise<void> {
         <button v-if="!sameProject" type="button" class="copy-move__back" @click="backToSource">
           ‹ {{ targetName }}
         </button>
-        <input
-          :id="ids.search"
-          v-model="query"
-          type="search"
-          class="copy-move__search"
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded="true"
-          :aria-controls="ids.list"
-          :aria-activedescendant="selected ? optionId(selected) : undefined"
-          aria-label="Chercher une destination"
-          placeholder="⌕ Chercher une destination"
-          autocomplete="off"
-          @keydown="onKeydown"
-        />
+        <span class="copy-move__find">
+          <svg
+            class="copy-move__loupe"
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            aria-hidden="true"
+          >
+            <circle cx="5" cy="5" r="3.4" />
+            <path d="M7.6 7.6 10.5 10.5" />
+          </svg>
+          <input
+            :id="ids.search"
+            v-model="query"
+            type="search"
+            class="copy-move__search"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            :aria-controls="ids.list"
+            :aria-activedescendant="selected ? optionId(selected) : undefined"
+            aria-label="Chercher une destination"
+            placeholder="Chercher une destination"
+            autocomplete="off"
+            @keydown="onKeydown"
+          />
+        </span>
         <div :id="ids.list" role="listbox" class="copy-move__list" aria-label="Destinations">
           <div v-for="group in groups" :key="group.title" role="group" :aria-label="group.title">
             <p class="copy-move__group" aria-hidden="true">{{ group.title }}</p>
@@ -395,7 +407,7 @@ async function submit(mode: TransferMode): Promise<void> {
   background: none;
   font: inherit;
   font-weight: 600;
-  color: var(--color-accent-text);
+  color: var(--color-link);
   cursor: pointer;
 }
 
@@ -404,9 +416,30 @@ async function submit(mode: TransferMode): Promise<void> {
   outline-offset: 2px;
 }
 
+.copy-move__find {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.copy-move__loupe {
+  position: absolute;
+  left: 0.625rem;
+  pointer-events: none;
+}
+
+.copy-move__loupe circle,
+.copy-move__loupe path {
+  fill: none;
+  stroke: var(--color-muted);
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+
 .copy-move__search {
+  flex: 1;
   min-height: var(--control-md);
-  padding: 0 0.625rem;
+  padding: 0 0.625rem 0 1.75rem;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background-color: var(--color-surface);
@@ -450,7 +483,6 @@ async function submit(mode: TransferMode): Promise<void> {
 .copy-move__option--active,
 .copy-move__option--active:hover {
   background: var(--color-accent-soft);
-  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .copy-move__label {
@@ -467,7 +499,7 @@ async function submit(mode: TransferMode): Promise<void> {
 }
 
 .copy-move__note--accent {
-  color: var(--color-accent-text);
+  color: var(--color-text);
 }
 
 .copy-move__none {
