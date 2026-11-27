@@ -170,7 +170,16 @@ export type CommandName =
   | "updates_download"
   | "updates_cancel"
   | "updates_install"
-  | "window_quit_ready";
+  | "window_quit_ready"
+  // Version 1 (docs/plan-v1.md) : apparence, raccourcis, historique des envois.
+  | "interface_load"
+  | "interface_save_appearance"
+  | "interface_set_shortcut"
+  | "interface_reset_shortcuts"
+  | "history_load"
+  | "history_diff"
+  | "history_clear"
+  | "history_restore";
 
 /**
  * Nature d'une erreur de commande.
@@ -2054,3 +2063,124 @@ export type InstallState =
   | { state: "ready"; version: string; onExit: boolean }
   /** Échec du téléchargement ou de l'installation, message prêt à afficher. */
   | { state: "failed"; message: string };
+
+// --- Version 1 : apparence et raccourcis (1.6-f, 1.6-f bis, docs/plan-v1.md) --------
+
+/** Thème de l'interface (`interface::Theme`) : celui du système, ou forcé. */
+export type InterfaceTheme = "system" | "light" | "dark";
+
+/** Apparence du poste (`interface::Appearance`). */
+export interface Appearance {
+  theme: InterfaceTheme;
+  /** Zoom de l'interface, en pour cent. */
+  zoom: number;
+  /** Police des éditeurs ; `null` : la police à chasse fixe du système. */
+  editorFont: string | null;
+  /** Taille du texte des éditeurs, en pixels. */
+  editorFontSize: number;
+}
+
+/** Groupe de la liste des raccourcis (`interface::ShortcutGroup`). */
+export type ShortcutGroup = "request" | "window" | "project";
+
+/** Où agit une combinaison (`interface::ShortcutScope`). */
+export type ShortcutScope = "global" | "editor" | "response" | "sidebar" | "contract";
+
+/** Raccourci d'une action (`interface::ShortcutView`). */
+export interface ShortcutView {
+  id: string;
+  label: string;
+  group: ShortcutGroup;
+  scope: ShortcutScope;
+  /** Combinaisons en vigueur, canoniques (`Ctrl+Shift+K`) ; vide : aucun raccourci. */
+  keys: string[];
+  defaults: string[];
+  /** Se change dans les préférences. */
+  editable: boolean;
+}
+
+/** Préférences d'interface et valeurs proposées (`interface::InterfaceView`). */
+export interface InterfaceView {
+  appearance: Appearance;
+  zooms: number[];
+  fonts: string[];
+  sizes: number[];
+  shortcuts: ShortcutView[];
+}
+
+/** Action qui tient déjà une combinaison (`interface::ShortcutConflict`). */
+export interface ShortcutConflict {
+  keys: string;
+  action: string;
+  label: string;
+}
+
+/** Issue d'un changement de raccourci (`commands::interface::ShortcutChange`). */
+export interface ShortcutChange {
+  view: InterfaceView;
+  /** Présent : rien n'a changé, l'action citée tient la combinaison. */
+  conflict: ShortcutConflict | null;
+}
+
+// --- Version 1 : historique des envois (5.1-c bis) ---------------------------------
+
+/** Ce qui est parti, masqué (`history::HistorySent`). */
+export interface HistorySent {
+  method: string;
+  url: string;
+  headers: [string, string][];
+  body: string | null;
+}
+
+/** Envoi gardé sur le poste (`history::HistoryEntry`). */
+export interface HistoryEntry {
+  id: string;
+  /** Réception, en ms depuis l'époque Unix. */
+  at: number;
+  environment: string | null;
+  status: number;
+  statusText: string;
+  totalMs: number;
+  sizeBytes: number;
+  passed: boolean;
+  assertions: AssertionResult[];
+  headers: [string, string][];
+  body: string;
+  /** Corps coupé (5 Mo à l'envoi, 256 Ko dans l'historique). */
+  truncated: boolean;
+  sent: HistorySent | null;
+}
+
+/** Envoi comparé au précédent (`history::HistoryItem`). */
+export interface HistoryItem {
+  entry: HistoryEntry;
+  /** Heure de l'envoi précédent, `null` pour le plus ancien. */
+  previousAt: number | null;
+  /** Ce qui a changé depuis, en français ; vide : rien de notable. */
+  changes: string[];
+}
+
+/** Historique d'une requête, du plus récent au plus ancien (`history::HistoryView`). */
+export interface HistoryView {
+  path: string;
+  items: HistoryItem[];
+  /** Envois gardés au plus. */
+  max: number;
+}
+
+/** Partie d'une différence (`history::DiffPart`). */
+export type DiffPart = "status" | "header" | "body" | "assertion";
+
+/** Ligne ajoutée ou retirée (`history::DiffLine`). */
+export interface DiffLine {
+  part: DiffPart;
+  added: boolean;
+  text: string;
+}
+
+/** Différences d'un envoi avec le précédent (`history::HistoryDiff`). */
+export interface HistoryDiff {
+  previousId: string;
+  lines: DiffLine[];
+  truncated: boolean;
+}

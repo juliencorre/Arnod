@@ -23,11 +23,13 @@ import StepsCatalog from "@/components/steps/StepsCatalog.vue";
 import WorkspaceHome from "@/components/workspaces/WorkspaceHome.vue";
 import SplitHandle from "@/components/zones/SplitHandle.vue";
 import { useFocusRescue } from "@/composables/useFocusRescue";
+import { useInterfaceStore } from "@/stores/interface";
 import { useNavigationStore } from "@/stores/navigation";
 import { useWindowsStore } from "@/stores/windows";
 
 const navigation = useNavigationStore();
 const windows = useWindowsStore();
+const shortcuts = useInterfaceStore();
 const body = useTemplateRef<HTMLElement>("body");
 const main = useTemplateRef<HTMLElement>("main");
 useFocusRescue(main);
@@ -46,10 +48,9 @@ const sidebarPossible = computed(
 /** Barre latérale affichée : possible et pas masquée (Ctrl+\, 1.4-j). */
 const withSidebar = computed(() => sidebarPossible.value && !windows.sidebarHidden);
 
-/** Ctrl+\ masque ou affiche la barre latérale (1.4-j). */
+/** Ctrl+\ par défaut masque ou affiche la barre latérale (1.4-j, 1.6-f bis). */
 function onKeydown(event: KeyboardEvent): void {
-  if (event.defaultPrevented || !(event.ctrlKey || event.metaKey)) return;
-  if (event.altKey || event.shiftKey || event.code !== "Backslash") return;
+  if (event.defaultPrevented || !shortcuts.matches(event, "toggleSidebar")) return;
   event.preventDefault();
   void windows.toggleSidebar();
 }

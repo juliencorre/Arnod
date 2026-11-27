@@ -40,6 +40,7 @@ import { KNOWN_VARIABLES, vVariables } from "@/lib/variables";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
 import { useInputStore } from "@/stores/input";
+import { useInterfaceStore } from "@/stores/interface";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -50,6 +51,7 @@ const props = defineProps<{ editorKey: string }>();
 const editorRoot = useTemplateRef<HTMLElement>("editorRoot");
 
 const workbench = useWorkbenchStore();
+const shortcuts = useInterfaceStore();
 const contracts = useContractsStore();
 const catalog = useCatalogStore();
 const inputs = useInputStore();
@@ -274,11 +276,17 @@ function onCurlFocusOut(event: FocusEvent): void {
   if (next) curlOpen.value = false;
 }
 
-/** Ctrl+Maj+C dans l'éditeur : copie la requête en cURL (code de la touche, pour l'AZERTY). */
+/**
+ * Raccourcis de l'éditeur, d'après les préférences du poste (1.6-f bis) : Ctrl+Maj+C copie la
+ * requête en cURL, Ctrl+Entrée l'envoie (par défaut ; code de la touche, pour l'AZERTY).
+ */
 function onKeydown(event: KeyboardEvent): void {
-  if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyC") {
+  if (shortcuts.matches(event, "copyCurl")) {
     event.preventDefault();
     void openCurl(true);
+  } else if (shortcuts.matches(event, "send")) {
+    event.preventDefault();
+    if (!editor.value?.sending) guard(() => workbench.send(props.editorKey));
   }
 }
 

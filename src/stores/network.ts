@@ -12,8 +12,8 @@ import type {
   TokenStatus,
 } from "@/types/ipc";
 
-/** Sections des préférences ; les suivantes viendront (Apparence, Raccourcis, Mises à jour). */
-export type PreferencesSection = "network" | "updates";
+/** Sections des préférences (1.6-e, 1.6-f, 1.6-f bis, 1.6-g). */
+export type PreferencesSection = "appearance" | "network" | "shortcuts" | "updates";
 
 /**
  * Lot H - Réseau et authentification (docs/plan-mvp-h-reseau-auth.md) : préférences réseau du

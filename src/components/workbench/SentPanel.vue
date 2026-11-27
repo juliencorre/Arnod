@@ -188,7 +188,7 @@ function keep(drawn: DrawnValue): void {
   overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  font: var(--text-body) var(--font-mono);
+  font: var(--editor-font-size) var(--editor-font);
   white-space: pre-wrap;
   word-break: break-word;
   background: var(--color-sidebar);

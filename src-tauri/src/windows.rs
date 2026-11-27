@@ -62,6 +62,9 @@ pub mod events {
     /// Lot L : version trouvée et installation (`UpdatesView`), à chaque étape et au plus une
     /// fois par pour cent téléchargé (`docs/plan-mvp-l-mises-a-jour.md`, R8).
     pub const UPDATES: &str = "arnod://mise-a-jour";
+    /// Version 1 : préférences d'interface du poste (`InterfaceView`), après chaque changement :
+    /// thème, police des éditeurs et raccourcis suivent dans toutes les fenêtres.
+    pub const INTERFACE: &str = "arnod://interface";
 }
 
 /// Statuts des requêtes d'un projet, diffusés à chaque changement (R4, R5).

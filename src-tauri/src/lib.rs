@@ -13,10 +13,12 @@ pub mod contract;
 pub mod curl;
 pub mod environment;
 pub mod error;
+pub mod history;
 pub mod http;
 pub mod import;
 pub mod input;
 pub mod instance;
+pub mod interface;
 pub mod layout;
 pub mod local;
 pub mod manifest;
@@ -298,6 +300,15 @@ pub fn run() {
             commands::batch::tree_batch_undo,
             commands::batch::run_selection,
             commands::window::window_quit_ready,
+            // Version 1 (docs/plan-v1.md) : apparence et raccourcis puis historique des envois.
+            commands::interface::interface_load,
+            commands::interface::interface_save_appearance,
+            commands::interface::interface_set_shortcut,
+            commands::interface::interface_reset_shortcuts,
+            commands::history::history_load,
+            commands::history::history_diff,
+            commands::history::history_clear,
+            commands::history::history_restore,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

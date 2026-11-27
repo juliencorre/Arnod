@@ -5,9 +5,10 @@
  * retirables de la requête (`docs/plan-fin-premier-usage.md`, VT1 à VT3). Le corps (format,
  * aperçu, filtre JSONPath) est dans `ResponseBody` (`docs/plan-mvp-a-reponse.md`).
  */
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 
 import BaseButton from "@/components/ui/BaseButton.vue";
+import HistoryPanel from "@/components/workbench/HistoryPanel.vue";
 import ResponseBody from "@/components/workbench/ResponseBody.vue";
 import SentPanel from "@/components/workbench/SentPanel.vue";
 import TimelinePanel from "@/components/workbench/TimelinePanel.vue";
@@ -16,6 +17,7 @@ import { useGuard } from "@/composables/useGuard";
 import { durationLabel } from "@/lib/assertions";
 import { countLabel, formatBytes, formatDuration } from "@/lib/format";
 import { onTablistKeydown } from "@/lib/tablist";
+import { useHistoryStore } from "@/stores/history";
 import { useInputStore } from "@/stores/input";
 import { useToastStore } from "@/stores/toasts";
 import { useWorkbenchStore } from "@/stores/workbench";
@@ -30,7 +32,22 @@ const guard = useGuard();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
 const outcome = computed(() => editor.value?.outcome ?? null);
 // Lot K (5.1-c) : la chronologie remplace la ligne « Attente · Réception ».
-const view = ref<"body" | "headers" | "checks" | "sent" | "timeline">("body");
+const view = ref<"body" | "headers" | "checks" | "sent" | "timeline" | "history">("body");
+
+// Version 1 (5.1-c bis) : historique des envois de la requête, relu à chaque réponse reçue.
+const histories = useHistoryStore();
+const historyCount = computed(() => {
+  const current = editor.value;
+  return current ? (histories.viewOf(current.projectId, current.path)?.items.length ?? 0) : 0;
+});
+watch(
+  () => [editor.value?.projectId, editor.value?.path, editor.value?.receivedAt?.getTime()] as const,
+  ([projectId, path]) => {
+    if (projectId !== undefined && path !== undefined)
+      histories.load(projectId, path).catch(() => undefined);
+  },
+  { immediate: true },
+);
 
 /** Assertion de durée évaluée, telle qu'écrite, citée sous le total de la chronologie (5.1-c). */
 const durationCheck = computed(() => {
@@ -121,7 +138,15 @@ async function declareUnknown(): Promise<void> {
         modifiée.
       </p>
     </div>
-    <p v-else-if="!outcome" class="response__info">Envoyez la requête pour voir la réponse.</p>
+    <template v-else-if="!outcome">
+      <p class="response__info">Envoyez la requête pour voir la réponse.</p>
+      <!-- 5.1-c bis : les envois gardés sur le poste restent consultables après un redémarrage. -->
+      <HistoryPanel
+        v-if="editor && historyCount > 0"
+        :project-id="editor.projectId"
+        :path="editor.path"
+      />
+    </template>
     <template v-else>
       <div class="response__summary">
         <!-- AM28 (5.1-b) : statut en pastille, puis durée, taille ; l'environnement à droite. -->
@@ -145,6 +170,20 @@ async function declareUnknown(): Promise<void> {
         <span v-if="outcome.sent" class="response__env" title="Environnement de l'envoi">{{
           outcome.sent.environment
         }}</span>
+        <!-- 5.1-c bis : l'horloge mène à l'historique des envois. -->
+        <button
+          type="button"
+          class="response__clock"
+          :class="{ 'response__clock--alone': !outcome.sent }"
+          aria-label="Historique des envois"
+          title="Historique des envois"
+          @click="view = 'history'"
+        >
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </button>
       </div>
       <div
         role="tablist"
@@ -159,6 +198,7 @@ async function declareUnknown(): Promise<void> {
             ['checks', 'Assertions', outcome.assertions.length],
             ['sent', 'Envoyé', 0],
             ['timeline', 'Chronologie', 0],
+            ['history', 'Historique', historyCount],
           ] as const"
           :key="id"
           type="button"
@@ -196,6 +236,11 @@ async function declareUnknown(): Promise<void> {
       </template>
       <!-- Lot E (5.1-h) : ce qui est parti, valeurs tirées et extraites. -->
       <SentPanel v-else-if="view === 'sent'" :editor-key="editorKey" />
+      <HistoryPanel
+        v-else-if="view === 'history' && editor"
+        :project-id="editor.projectId"
+        :path="editor.path"
+      />
       <TimelinePanel
         v-else-if="view === 'timeline'"
         :timeline="outcome.response.timeline"
@@ -220,7 +265,11 @@ async function declareUnknown(): Promise<void> {
       </div>
       <!-- Un échec est affiché une fois (DE10) : dans ce panneau dépliable, sauf sous l'onglet
            Assertions, dont la liste le montre déjà. -->
-      <details v-if="failures.length > 0 && view !== 'checks'" class="failures" open>
+      <details
+        v-if="failures.length > 0 && view !== 'checks' && view !== 'history'"
+        class="failures"
+        open
+      >
         <summary class="failures__summary">
           <span>{{ countLabel(failed, "assertion en échec", "assertions en échec") }}</span>
           <span v-if="passed > 0" class="failures__passed">
@@ -334,6 +383,34 @@ async function declareUnknown(): Promise<void> {
 .response__env {
   margin-left: auto;
   color: var(--color-muted);
+}
+
+.response__clock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  background: none;
+  cursor: pointer;
+}
+
+.response__clock--alone {
+  margin-left: auto;
+}
+
+.response__clock:hover {
+  color: var(--color-text);
+  background-color: var(--color-sidebar);
+}
+
+.response__clock:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .response__slow {

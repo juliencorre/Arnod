@@ -1,16 +1,19 @@
 <script setup lang="ts">
 /**
  * Préférences du poste (1.6-e), ouvertes par Ctrl+, ou par Fichier → Préférences… : une colonne
- * de sections, puis la section choisie : « Réseau et certificats » (lot H,
- * docs/plan-mvp-h-reseau-auth.md, PR1) et « Mises à jour » (lot L allégé, 1.6-g). Apparence et
- * Raccourcis viendront s'ajouter à `SECTIONS`.
+ * de sections, puis la section choisie : « Apparence » (1.6-f) et « Raccourcis » (1.6-f bis,
+ * version 1, docs/plan-v1.md), « Réseau et certificats » (lot H, docs/plan-mvp-h-reseau-auth.md,
+ * PR1) et « Mises à jour » (lot L allégé, 1.6-g).
  */
 import { onBeforeUnmount, onMounted } from "vue";
 
+import AppearanceSection from "@/components/preferences/AppearanceSection.vue";
 import NetworkSection from "@/components/preferences/NetworkSection.vue";
+import ShortcutsSection from "@/components/preferences/ShortcutsSection.vue";
 import UpdatesSection from "@/components/preferences/UpdatesSection.vue";
 import BaseDialog from "@/components/ui/BaseDialog.vue";
 import { events } from "@/lib/ipc";
+import { useInterfaceStore } from "@/stores/interface";
 import { type PreferencesSection, useNetworkStore } from "@/stores/network";
 import { useToastStore } from "@/stores/toasts";
 import { useWindowsStore } from "@/stores/windows";
@@ -18,9 +21,12 @@ import { useWindowsStore } from "@/stores/windows";
 const network = useNetworkStore();
 const windows = useWindowsStore();
 const toasts = useToastStore();
+const shortcuts = useInterfaceStore();
 
 const SECTIONS: { id: PreferencesSection; label: string }[] = [
+  { id: "appearance", label: "Apparence" },
   { id: "network", label: "Réseau et certificats" },
+  { id: "shortcuts", label: "Raccourcis" },
   { id: "updates", label: "Mises à jour" },
 ];
 
@@ -28,9 +34,9 @@ function open(): void {
   network.openPreferences().catch(toasts.showError);
 }
 
-/** Ctrl+, : la virgule tapée, quelle que soit la disposition du clavier. */
+/** Ctrl+, par défaut : la virgule tapée, quelle que soit la disposition du clavier (1.6-f bis). */
 function onKeydown(event: KeyboardEvent): void {
-  if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key === ",") {
+  if (shortcuts.matches(event, "preferences")) {
     event.preventDefault();
     open();
   }
@@ -77,7 +83,9 @@ onBeforeUnmount(() => {
         <p class="preferences__note">Enregistrées automatiquement. Propres à ce poste.</p>
       </nav>
       <div class="preferences__content">
-        <NetworkSection v-if="network.section === 'network'" />
+        <AppearanceSection v-if="network.section === 'appearance'" />
+        <NetworkSection v-else-if="network.section === 'network'" />
+        <ShortcutsSection v-else-if="network.section === 'shortcuts'" />
         <UpdatesSection v-else-if="network.section === 'updates'" />
       </div>
     </div>

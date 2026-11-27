@@ -20,6 +20,7 @@ import { useDrafts } from "@/composables/useDrafts";
 import { events, ipc } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
 import { useContractsStore } from "@/stores/contracts";
+import { useInterfaceStore } from "@/stores/interface";
 import { useNavigationStore } from "@/stores/navigation";
 import { useStartupStore } from "@/stores/startup";
 import { useToastStore } from "@/stores/toasts";
@@ -111,6 +112,11 @@ onMounted(async () => {
   await events.onQuit(() => {
     void answerQuit();
   });
+  // Version 1 (1.6-f) : thème, zoom et police du poste, avant le premier écran ; un échec
+  // laisse l'apparence par défaut (raccourcis compris).
+  await useInterfaceStore()
+    .start()
+    .catch(() => undefined);
   if (await startup.check()) await boot();
   await reveal();
   // Lot L (1.6-g) : une version plus récente s'annonce, si la vérification est due.

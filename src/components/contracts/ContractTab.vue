@@ -11,12 +11,14 @@ import { computed, onMounted, watch } from "vue";
 import BaseButton from "@/components/ui/BaseButton.vue";
 import { onTablistKeydown } from "@/lib/tablist";
 import { contractKey, useContractsStore } from "@/stores/contracts";
+import { useInterfaceStore } from "@/stores/interface";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { OperationView } from "@/types/ipc";
 
 const props = defineProps<{ projectId: string; path: string }>();
 
 const contracts = useContractsStore();
+const shortcuts = useInterfaceStore();
 const workbench = useWorkbenchStore();
 const key = computed(() => contractKey(props.projectId, props.path));
 const entry = computed(() => contracts.open[key.value] ?? null);
@@ -93,7 +95,7 @@ function openRequest(path: string): void {
 }
 
 function onSourceKeydown(event: KeyboardEvent): void {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+  if (shortcuts.matches(event, "saveContract")) {
     event.preventDefault();
     void contracts.save(key.value);
   }
@@ -442,7 +444,7 @@ function onSourceKeydown(event: KeyboardEvent): void {
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
-  font: var(--text-body) / 1.5 var(--font-mono);
+  font: var(--editor-font-size) / 1.5 var(--editor-font);
   color: var(--color-text);
   background: var(--color-surface);
   resize: vertical;

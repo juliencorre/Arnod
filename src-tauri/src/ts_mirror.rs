@@ -303,6 +303,10 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::workbench::RunGroup>();
     v.visit::<crate::workbench::RunView>();
     v.visit::<crate::workbench::ProjectLastRun>();
+    v.visit::<crate::interface::InterfaceView>();
+    v.visit::<crate::commands::interface::ShortcutChange>();
+    v.visit::<crate::history::HistoryView>();
+    v.visit::<crate::history::HistoryDiff>();
 }
 
 /// Contenu attendu de `tests/ipc/coeur.ts`.

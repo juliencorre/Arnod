@@ -36,6 +36,9 @@ pub mod network;
 pub mod files;
 // Lot G - Démarrage et erreurs.
 pub mod startup;
+// Version 1 (docs/plan-v1.md) : préférences d'interface et historique des envois.
+pub mod history;
+pub mod interface;
 
 #[cfg(test)]
 mod tests {

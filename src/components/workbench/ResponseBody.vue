@@ -14,6 +14,7 @@ import HtmlPreview from "@/components/workbench/HtmlPreview.vue";
 import ResponseFilter from "@/components/workbench/ResponseFilter.vue";
 import { useGuard } from "@/composables/useGuard";
 import { bodyPathOf } from "@/lib/sent";
+import { useInterfaceStore } from "@/stores/interface";
 import { useResponseStore } from "@/stores/response";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { BodyToken, ResponseFormat } from "@/types/ipc";
@@ -21,6 +22,7 @@ import type { BodyToken, ResponseFormat } from "@/types/ipc";
 const props = defineProps<{ editorKey: string }>();
 
 const store = useResponseStore();
+const shortcuts = useInterfaceStore();
 const workbench = useWorkbenchStore();
 const received = computed(() => workbench.editors[props.editorKey]?.outcome?.response ?? null);
 const view = computed(() => store.views[props.editorKey] ?? null);
@@ -165,9 +167,9 @@ function onPickFocusOut(event: FocusEvent): void {
   picked.value = null;
 }
 
-/** Ctrl+F (Cmd+F) dans le corps : ouvre le filtre. */
+/** Ctrl+F par défaut (Cmd+F) dans le corps : ouvre le filtre (1.6-f bis). */
 function onKeydown(event: KeyboardEvent): void {
-  if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "f") {
+  if (shortcuts.matches(event, "filterResponse")) {
     event.preventDefault();
     filter.value?.focus();
   }
@@ -431,7 +433,7 @@ function onKeydown(event: KeyboardEvent): void {
 .code {
   padding: 0.5rem 0;
   overflow: auto;
-  font: var(--text-body) / 1.55 var(--font-mono);
+  font: var(--editor-font-size) / 1.55 var(--editor-font);
   color: var(--color-text);
 }
 

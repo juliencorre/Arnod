@@ -29,7 +29,9 @@ leur contrat selon `docs/plan-requetes-dans-contrats.md` (sections « Contrats d
 `docs/plan-qualite-interface.md` (échelles du design system appliquées au code et à la maquette).
 Un nouveau lot commence par un plan rédigé à partir de `docs/modele-plan.md`.
 
-Livré ensuite : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots A à L).
+Livré ensuite : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots A à L), puis la
+version 1 de la maquette selon `docs/plan-v1.md` (apparence, raccourcis modifiables, historique des
+envois ; section « Apparence, raccourcis et historique »).
 
 **Travail en cours** : qualité du MVP selon `docs/plan-qualite-mvp.md` (lots 0 et A à K en trois
 vagues, règles R1 à R14), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
@@ -96,12 +98,14 @@ src/                    Frontend Vue
   lib/url.ts            Paramètres de chemin d'une adresse, pour l'affichage
   lib/steps.ts          Libellés des natures d'étape (familles, moteurs, règles), pour l'affichage
   lib/status.ts         Comptage d'affichage des statuts (✓ / ✕, « réussies / exécutées »)
+  lib/shortcuts.ts      Raccourcis : touche pressée sous forme canonique, affichage, défauts
   stores/               catalog (instantané), navigation (onglet, vue, titre), toasts (notifications),
                         windows (fenêtres, zones, onglets de contenu), workbench (par projet :
                         arborescence, environnements, run, statuts ; par onglet : brouillon,
                         réponse),
                         contracts (contrats par projet, contrats ouverts), steps (catalogue des
-                        étapes, reconnaissance, essai)
+                        étapes, reconnaissance, essai), interface (apparence, raccourcis),
+                        history (historique des envois)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions),
                         brouillons avant fermeture ou sortie (useDrafts)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification,
@@ -144,6 +148,8 @@ src-tauri/              Cœur Rust
                         révision), statuts, notificateur des événements
   src/results.rs        Derniers résultats des envois, partagés entre fenêtres (pur)
   src/statuses.rs       Statut de la dernière exécution de chaque requête (statuses.json)
+  src/interface.rs      Préférences d'interface du poste : apparence, raccourcis (interface.json)
+  src/history.rs        Historique des envois de chaque requête (projects/<id>/history/)
   src/layout/           Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
   src/contract/         Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
                         file.rs range les contrats dans contracts/ du projet ; deduce.rs déduit
@@ -964,3 +970,29 @@ Référence : `docs/audit-impeccable-2026-11.md` (constats DI1 à DI7) et `docs/
   inversée (fond `--color-text`, « Supprimer » en `--color-danger-inverse`, Q2 du plan
   d'alignement) ; une sélection est un fond `--color-accent-soft`, jamais une barre sur le côté ;
   un texte estompé l'est par sa couleur, jamais par l'opacité.
+
+## Apparence, raccourcis et historique
+
+Référence : `docs/plan-v1.md` (version 1 : cas AP1 à AP4, RC1 à RC6, H1 à H5 ; règles R1 à R8, H1
+à H6), écrans 1.6-f, 1.6-f bis et 5.1-c bis.
+
+- Préférences d'interface du poste dans `interface.json` (dossier de données, écriture atomique) :
+  `src-tauri/src/interface.rs` (pur pour les règles) valide l'apparence (valeurs proposées
+  seulement) et les raccourcis (`normalize`, `assign` : réservés, conflits par portée). Commandes
+  `interface_*` ; chaque changement est appliqué aux fenêtres depuis Rust (thème de la fenêtre
+  native, `set_zoom`, sans permission) et diffusé par `arnod://interface`.
+- Thème forcé : `data-theme` sur la racine, posé par le store `interface` ;
+  `:root[data-theme="dark"]` reprend chaque jeton du thème sombre du système (vérifié par
+  `tests/theme.spec.ts`) : un nouveau jeton sombre s'écrit dans les deux blocs. Police des
+  éditeurs : `var(--editor-font)` et `var(--editor-font-size)` (corps, contrats, envoyé,
+  historique).
+- Raccourcis : un composant ne compare jamais `ctrlKey` et une touche lui-même pour une action
+  de la liste ; il demande `useInterfaceStore().matches(event, "<action>")`. Une action nouvelle
+  s'ajoute à `interface::ACTIONS` et à `DEFAULT_SHORTCUTS` (`src/lib/shortcuts.ts`, comparés par un
+  test Rust). Ctrl+Tab et Ctrl+0…9 sont fixes.
+- Historique : `request_send` garde chaque réponse reçue (`history::record`, 20 par requête, corps
+  coupé à 256 Ko) dans `projects/<id>/history/<chemin encodé>.json`, jamais dans le projet ;
+  `Workbench::rename_status` et `remove_status` le font suivre. Le cœur compare chaque envoi au
+  précédent (`changes`) et donne les différences (`history_diff`) ; « Effacer » se rattrape par
+  `history_restore`. Interface : `HistoryPanel.vue` (onglet « Historique » de la réponse, horloge
+  de la ligne d'état), store `history`.

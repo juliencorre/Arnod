@@ -23,11 +23,13 @@ import { droppedProject, isProjectDrag } from "@/lib/dnd";
 import { COLOR_LABELS, countLabel } from "@/lib/format";
 import { useCatalogStore } from "@/stores/catalog";
 import { useDialogStore } from "@/stores/dialogs";
+import { useInterfaceStore } from "@/stores/interface";
 import { useNavigationStore } from "@/stores/navigation";
 import { useToastStore } from "@/stores/toasts";
 import type { WorkspaceColor } from "@/types/ipc";
 
 const catalog = useCatalogStore();
+const shortcuts = useInterfaceStore();
 const dialogs = useDialogStore();
 const navigation = useNavigationStore();
 const toasts = useToastStore();
@@ -360,14 +362,14 @@ const dropHint = computed(() => {
 // --- Raccourcis globaux (S2, S5) ----------------------------------------------------------
 
 function onGlobalKeydown(event: KeyboardEvent): void {
-  if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-  if (event.shiftKey) {
-    if (event.key.toLowerCase() !== "w") return;
+  if (shortcuts.matches(event, "manageWorkspaces")) {
     event.preventDefault();
     close(false);
     navigation.showManage(current.value ?? undefined);
     return;
   }
+  // Ctrl+0…9 : raccourcis fixes (1.6-f bis).
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
   // Le code de la touche : Ctrl+1 donne « & » sur un clavier AZERTY.
   const digit = /^(?:Digit|Numpad)(\d)$/.exec(event.code)?.[1];
   if (digit === undefined) return;

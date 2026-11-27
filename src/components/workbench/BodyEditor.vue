@@ -207,7 +207,7 @@ function select(index: number): void {
 
 .body__content {
   min-height: 11rem;
-  font: var(--text-body) var(--font-mono);
+  font: var(--editor-font-size) var(--editor-font);
   resize: vertical;
 }
 

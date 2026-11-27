@@ -360,6 +360,7 @@ pages:
     plans:
       - "plan-mvp-h-reseau-auth (PR1–PR6)"
       - "plan-mvp-l-mises-a-jour (MJ1–MJ7)"
+      - "plan-v1 (AP1–AP4, RC1–RC6)"
     liees: ["3.4"]
     journal:
       - "2026-11-12 : Écrans repris de « Authentification et Préférences » (e, f, f bis)."
@@ -371,14 +372,29 @@ pages:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : e et g : bouton ✕ « Fermer » dans l'en-tête des préférences (ER4) ; g : « Vérifier maintenant » en couleur de lien et la même section en thème sombre, cases et radios au bord de contrôle (DE2, DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 1 écart ajouté."
       - "2026-11-26 : e, g : bouton ✕ « Fermer » des préférences, « Vérifier maintenant » en couleur de lien (plan-qualite-mvp, lot I, ER4, DE2)."
+      - "2026-11-27 : Version 1 (plan-v1) : f : Apparence, thème du système ou forcé, zoom de l'interface, police et taille des éditeurs, appliqués à toutes les fenêtres ; f bis : Raccourcis par usage, recherche, un clic change la combinaison, conflit signalé avant « Remplacer », « Rétablir les raccourcis par défaut », Ctrl+Entrée envoie."
     ecrans:
       e:
         etat: livré
         version: MVP
         pr: [58]
         captures: [h1-preferences-reseau]
-      f: { etat: à faire, version: V1 }
-      "f bis": { etat: à faire, version: V1 }
+      f:
+        etat: livré
+        version: V1
+        pr: [94]
+        captures: [v1-apparence]
+        ecart:
+          texte: "La colonne des préférences garde ses quatre sections (Apparence, Réseau et certificats, Raccourcis, Mises à jour), sans « Rechercher un réglage » ni « Général » ; le thème se choisit par trois boutons radio en pastilles plutôt qu'un sélecteur segmenté ; un aperçu de la police des éditeurs s'affiche sous ses listes."
+          aligner: maquette
+      "f bis":
+        etat: livré
+        version: V1
+        pr: [94]
+        captures: [v1-raccourcis]
+        ecart:
+          texte: "« Rechercher Ctrl+K » n'est pas listé (recherche en V2, 1.5) : l'exemple de conflit de l'écran ne se produit pas, celui de l'application est « Ctrl+J est déjà pris par « Résultat dessous ou à côté » » ; l'application liste aussi « Filtrer le référentiel », « Enregistrer le contrat » et « Gérer les workspaces », et marque « fixe » Ctrl+Tab et Ctrl+0…9."
+          aligner: maquette
       g:
         etat: livré
         version: MVP
@@ -976,8 +992,8 @@ pages:
       - "plan-mvp-b-saisie-curl (SA1–SA6, TX1–TX4)"
       - "plan-mvp-e-tests-etapes (VD1–VD4)"
       - "plan-mvp-h-reseau-auth (EC1–EC6)"
+      - "plan-v1 (H1–H5)"
     liees: ["5.2", "1.4"]
-    reste: "historique en V1 (c bis)."
     journal:
       - "2026-11-09 : Envoi, annulation, réponse et temps, livrés avec le premier usage."
       - "2026-11-12 : Page « Exécution » recentrée sur la requête ; d, e, f → 5.2, g → 6.3 (f)."
@@ -993,6 +1009,7 @@ pages:
       - "2026-11-26 : b, h : réponse vide en texte neutre, éditeur à 58 % et onglets sur une ligne à 1280 px, compteurs en pastille ; barre des étapes sur une rangée (plan-qualite-mvp, lot I, DE1, DE3, DE7, DE8)."
       - "2026-11-26 : b : l'erreur d'envoi propose « Ajouter » et « Environnements… », sinon « Réessayer » ; onglets de l'éditeur et de la réponse aux flèches (plan-qualite-mvp, lot J, ER6, AC3)."
       - "2026-11-26 : b, h : statut en pastille et environnement de l'envoi à droite ; onglet Envoyé avec « URL résolue », en-têtes d'abord, valeurs tirées surlignées dans le corps, source de chaque variable et note (plan-alignement-maquette, lot C, AM28, AM29)."
+      - "2026-11-27 : Version 1 (plan-v1) : c bis : onglet Historique de la réponse, les 20 derniers envois de la requête gardés sur ce poste, le plus récent déplié (corps, en-têtes, envoyé, assertions), comparé au précédent, « Voir les différences », « Effacer » puis « Annuler » ; l'horloge de la ligne d'état y mène."
     ecrans:
       a:
         etat: livré
@@ -1052,7 +1069,14 @@ pages:
             aligner: maquette
           - texte: "Barre d'attente à la couleur d'accent ; la maquette la dessine en sarcelle."
             aligner: à décider
-      "c bis": { etat: à faire, version: V1 }
+      "c bis":
+        etat: livré
+        version: V1
+        pr: [94]
+        captures: [v1-historique]
+        ecart:
+          texte: "Seuls les envois depuis l'éditeur sont gardés (pas les lignes d'un run) ; l'horloge est à droite de la ligne d'état, après l'environnement ; « Voir les différences » déplie les lignes retirées et ajoutées sous la comparaison."
+          aligner: maquette
       h:
         etat: livré
         version: MVP
