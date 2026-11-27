@@ -33,6 +33,11 @@ Livré ensuite : finalisation du MVP selon `docs/plan-finalisation-mvp.md` (lots
 version 1 de la maquette selon `docs/plan-v1.md` (apparence, raccourcis modifiables, historique des
 envois ; section « Apparence, raccourcis et historique »).
 
+**Prochain** : version 2 selon `docs/plan-v2.md` (recherche Ctrl+K, étiquettes partagées, ligne de
+commande `arnod run`, synchronisation Git ; lots A à F en `claude/v2-<lot>`). Lots A à F livrés
+(sections « Recherche », « Étiquettes partagées », « Ligne de commande », « Synchronisation ») ;
+reste Q2 : enregistrer les applications OAuth d'Arnod pour la connexion par le navigateur.
+
 **Travail en cours** : qualité du MVP selon `docs/plan-qualite-mvp.md` (lots 0 et A à K en trois
 vagues, règles R1 à R14), d'après l'audit `docs/audit-2026-11-mvp.md` (99 constats, preuves dans
 `docs/audit-2026-11-mvp/preuves/`). Lot 0 livré : la maquette redessinée est la référence
@@ -55,15 +60,24 @@ derniers écarts : plus aucun écran n'a d'écart `aligner: code`.
   cœur (`events`, `EVENTS`).
 - Les commandes Rust vivent dans `src-tauri/src/commands/`, un fichier par domaine
   (`hello.rs`, plus tard `http.rs`, `mocks.rs`...).
+- Le travail vit dans le cœur sans Tauri, `src-tauri/core/` (crate `arnod-core`, V2 lot C) : il
+  ne dépend ni de Tauri ni d'une fenêtre (un test le vérifie), l'application et la ligne de
+  commande s'en servent. Une tâche de fond de l'établi passe par `workbench::Spawner` (runtime de
+  Tauri dans l'application) ; un changement à diffuser par `workbench::Notifier`. Une commande, une
+  fenêtre, un menu ou une mise à jour restent dans l'application (`src-tauri/src/`), qui reprend
+  les modules du cœur sous leur nom (`crate::tree`, `crate::workbench`…). Un type sérialisé du
+  cœur dérive ts-rs sous la feature `ts` (`cfg_attr(feature = "ts", …)`), activée par les tests
+  de l'application.
 - Les types échangés sont écrits à la main dans `src/types/ipc.ts` et doivent refléter
   exactement la sérialisation serde (`#[serde(rename_all = "camelCase")]`). Vérifié (MA1) : chaque
   type sérialisé porte `#[cfg_attr(test, derive(ts_rs::TS))]` (ts-rs, dépendance de test
-  seulement) et, s'il s'appelle autrement côté interface, `#[cfg_attr(test, ts(rename = "…"))]` ;
+  seulement ; `feature = "ts"` dans le cœur) et, s'il s'appelle autrement côté interface,
+  `#[cfg_attr(test, ts(rename = "…"))]` ;
   un champ `skip_serializing_if = "Option::is_none"` prend `ts(optional)`. `src-tauri/src/ts_mirror.rs`
   génère `tests/ipc/coeur.ts` (comparé par vue-tsc à `ipc.ts`) et `tests/ipc/echantillons.json`
   (sorties du vrai cœur que le faux cœur doit rendre à l'identique) ; après un changement :
   `ARNOD_IPC_ECRIRE=1 cargo test --lib ts_mirror`.
-- Une commande qui peut échouer renvoie `Result<T, CommandError>` (`src-tauri/src/error.rs`) :
+- Une commande qui peut échouer renvoie `Result<T, CommandError>` (`src-tauri/core/src/error.rs`) :
   `kind` donne la nature de l'erreur, `message` un texte en français prêt à afficher. Côté
   interface, `IpcError` reprend `kind` (ou `null` si la cause n'est pas une `CommandError`) et
   `message`. Une nouvelle nature s'ajoute à `CommandErrorKind` en Rust, dans `src/types/ipc.ts`
@@ -105,7 +119,8 @@ src/                    Frontend Vue
                         réponse),
                         contracts (contrats par projet, contrats ouverts), steps (catalogue des
                         étapes, reconnaissance, essai), interface (apparence, raccourcis),
-                        history (historique des envois)
+                        history (historique des envois), search (recherche Ctrl+K), sync
+                        (synchronisation Git)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions),
                         brouillons avant fermeture ou sortie (useDrafts)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification,
@@ -128,47 +143,64 @@ tests/                  Tests Vitest (happy-dom, mockIPC, faux cœur fakeCore.ts
                         miroir des types généré par le cœur (ts_mirror.rs) ; perf/ : banc de
                         l'interface (scripts/perf-interface.mjs)
 e2e/                    Tests e2e sur l'application réelle (tauri-driver, WebdriverIO)
-src-tauri/              Cœur Rust
+src-tauri/              Application Tauri (espace de travail Cargo : l'application et core/)
   tauri.conf.json       Fenêtre, CSP, bundles (NSIS currentUser, AppImage)
   capabilities/         Permissions de la WebView
   src/lib.rs            Builder Tauri, plugins dialog et updater, état, enregistrement des
-                        commandes
-  src/error.rs          CommandError, erreur commune des commandes
-  src/catalog/          Règles des projets et workspaces (pur : ni Tauri, ni disque)
-  src/storage.rs        Lecture / écriture atomique d'arnod.json
-  src/request/          Requête : modèle, fichier, résolution des variables, vérifications,
-                        héritage des dossiers (inherit.rs), réponse attendue (example.rs)
-  src/tree/             Arborescence d'un projet sur disque (dossiers, requêtes, corbeille), copier
-                        et déplacer (transfer.rs), annulation (undo.rs)
-  src/environment.rs    Environnements d'un projet (fichiers, chaîne, protection)
-  src/local.rs          Données locales d'un projet (hors dépôt : local.json)
-  src/secrets.rs        Coffre des secrets (trait SecretStore, keyring du système)
-  src/http.rs           Envoi HTTP (reqwest), délai, annulation, troncature à 5 Mo
-  src/workbench.rs      Établi : envoi, variables, environnements actifs, runs (numéro, groupes,
-                        révision), statuts, notificateur des événements
-  src/results.rs        Derniers résultats des envois, partagés entre fenêtres (pur)
-  src/statuses.rs       Statut de la dernière exécution de chaque requête (statuses.json)
-  src/interface.rs      Préférences d'interface du poste : apparence, raccourcis (interface.json)
-  src/history.rs        Historique des envois de chaque requête (projects/<id>/history/)
-  src/layout/           Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
-  src/contract/         Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
-                        file.rs range les contrats dans contracts/ du projet ; deduce.rs déduit
-                        un contrat des essais
-  src/steps/            Catalogue des étapes (pur) : définitions (REST intégrée dans steps/rest.json),
-                        validation, reconnaissance, valeurs du formulaire, requête HTTP d'un essai
-  src/trial.rs          Essai sans projet : contrat déduit et « Essai N » dans « Non classés »
+                        commandes ; reprend les modules du cœur sous leur nom (crate::tree…)
   src/windows.rs        windows.json, fenêtres natives, focus, fermetures, événements arnod://
+  src/watch/app.rs      Surveillance des projets branchée aux fenêtres (le reste dans core/)
+  src/interface.rs      Préférences d'interface du poste : apparence, raccourcis (interface.json)
   src/quit.rs           Sortie d'Arnod : réponses des fenêtres à arnod://quitter (pur)
   src/instance.rs       Instance unique : verrou arnod.lock du dossier de données
-  src/opencollection/   Format OpenCollection 1.0.0 : schéma embarqué, YAML, requêtes, racine
-                        (opencollection.yml, extensions.arnod), conversion de l'ancien format
-  src/manifest.rs       Dossier d'un projet et sa racine opencollection.yml
   src/updates.rs        Mises à jour : version du canal, manifeste latest.json, état de
                         l'installation (pur)
-  src/state.rs          AppState : catalogue + stockage + annulation (app.manage)
   src/menu.rs           Menu natif (Fichier > Quitter, Fenêtre > Dispositions, détacher, rattacher)
   src/commands/         Commandes, un fichier par domaine
+  src/ts_mirror.rs      Miroir des types IPC (tests), sur les types de l'application et du cœur
   tests/                Tests d'intégration (application Tauri simulée : mises à jour)
+  steps/rest.json       Définition de la nature REST, embarquée par le cœur
+  core/                 Cœur sans Tauri (crate arnod-core, V2 lot C) : application et ligne de
+                        commande s'en servent
+    src/error.rs        CommandError, erreur commune des commandes
+    src/catalog/        Règles des projets et workspaces (pur : ni Tauri, ni disque)
+    src/storage.rs      Lecture / écriture atomique d'arnod.json
+    src/state.rs        AppState : catalogue + stockage + annulation (app.manage)
+    src/request/        Requête : modèle, fichier, résolution des variables, vérifications,
+                        héritage des dossiers (inherit.rs), réponse attendue (example.rs)
+    src/tree/           Arborescence d'un projet sur disque (dossiers, requêtes, corbeille), copier
+                        et déplacer (transfer.rs), annulation (undo.rs)
+    src/environment.rs  Environnements d'un projet (fichiers, chaîne, protection)
+    src/local.rs        Données locales d'un projet (hors dépôt : local.json)
+    src/secrets.rs      Coffre des secrets (trait SecretStore, keyring du système)
+    src/http.rs         Envoi HTTP (reqwest), délai, annulation, troncature à 5 Mo
+    src/workbench.rs    Établi : envoi, variables, environnements actifs, runs (numéro, groupes,
+                        révision, Spawner), statuts, notificateur des événements
+    src/results.rs      Derniers résultats des envois, partagés entre fenêtres (pur)
+    src/statuses.rs     Statut de la dernière exécution de chaque requête (statuses.json)
+    src/history.rs      Historique des envois de chaque requête (projects/<id>/history/)
+    src/search/         Recherche Ctrl+K : par nom, par adresse, groupes (pur)
+    src/layout/         Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
+    src/contract/       Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
+                        file.rs range les contrats dans contracts/ du projet ; deduce.rs déduit
+                        un contrat des essais
+    src/steps/          Catalogue des étapes (pur) : définitions (REST dans ../steps/rest.json),
+                        validation, reconnaissance, valeurs du formulaire, requête HTTP d'un essai
+    src/trial.rs        Essai sans projet : contrat déduit et « Essai N » dans « Non classés »
+    src/opencollection/ Format OpenCollection 1.0.0 : schéma embarqué, YAML, requêtes, racine
+                        (opencollection.yml, extensions.arnod), conversion de l'ancien format
+    src/manifest.rs     Dossier d'un projet et sa racine opencollection.yml
+    src/watch/          Fichiers modifiés hors d'Arnod : registre, surveillant, conflits
+    src/report/         Rapports d'un run : JUnit, Allure, HTML (pur)
+    src/sync/           Synchronisation Git (feature sync) : dépôt (git.rs), transport HTTP sur le
+                        réseau du poste, forges, fusion, descriptions en clair, sync.json
+    src/command/        Commande `arnod run` d'un test ou d'un dossier, citée pour le terminal (pur)
+    src/network/, input/, curl/, bruno/, import.rs, response/, startup.rs : voir leurs sections
+  cli/                  Ligne de commande (crate arnod-cli, binaire arnod-cli livré sous le nom
+                        arnod) : arguments, cible, sortie, run en lecture seule ; tests/ de bout
+                        en bout contre un serveur local
+  windows/              Crochets de l'installeur NSIS (bin dans le PATH de l'utilisateur)
+  tauri.cli.conf.json   Configuration ajoutée au build Windows de la CI : bin\arnod.exe, crochets
 docs/                   Plans, modèle de plan, maquettes, captures du README, schéma
                         OpenCollection 1.0.0 (docs/opencollection/), design system
                         (docs/design-system/)
@@ -189,6 +221,7 @@ PRODUCT.md, DESIGN.md   Contexte produit (à la main) ; design system au format 
 npm ci                      # dépendances frontend (Node 22.23.4+, 24.22.1+ ou 26.12.1+)
 npm run tauri dev           # application en développement (Vite sur le port 1420)
 npm run tauri build         # build release : NSIS sous Windows, AppImage sous Linux
+cd src-tauri && cargo run -p arnod-cli -- run "Clients" --projet <dossier>  # arnod run (lot D)
 
 npm run check               # avant chaque commit : tout ce que vérifie la CI hors build
 npm test                    # Vitest
@@ -235,8 +268,9 @@ Linux : installer d'abord les dépendances système
   sections de `.github/pull_request_template.md`.
 - Chaque tâche est relue avant commit ; `npm run check` passe avant chaque commit.
 - Une version se publie par un tag `vX.Y.Z` sur `main` (README, « Publier une version ») : la CI
-  crée la release. Jamais de release créée à la main ; `scripts/check-version.mjs` garde les six
-  sources de version concordantes.
+  crée la release. Jamais de release créée à la main ; `scripts/check-version.mjs` garde les dix
+  sources de version concordantes (dont le cœur et la ligne de commande, `src-tauri/core/` et
+  `src-tauri/cli/`).
 - Tests : règles dans `cargo test` (vrais dossiers temporaires pour le stockage), parcours
   d'interface dans Vitest avec le faux cœur `tests/fakeCore.ts`, parcours complets sur
   l'application réelle dans `e2e/` (à étendre à chaque nouvelle fonctionnalité visible).
@@ -346,7 +380,7 @@ plan quand elle est livrée.
   la touche, pour l'AZERTY). Tests : aides `tests/switcher.ts`.
 - Sections d'un projet dans la barre latérale : `SectionHeading` (icône `SectionIcon`, nom, nombre,
   « + »). Les icônes des sections à venir sont déjà dans `components/ui/sectionIcons.ts`.
-- Les règles vivent dans `src-tauri/src/catalog/`, module pur sans dépendance à Tauri ni au
+- Les règles vivent dans `src-tauri/core/src/catalog/`, module pur sans dépendance à Tauri ni au
   disque, testé règle par règle (`catalog/tests.rs`). L'interface affiche l'état et ne fait que
   des filtres et comptages d'affichage.
 - Une commande qui modifie le catalogue passe par `AppState::mutate` (ou `mutate_undoable`) :
@@ -368,7 +402,7 @@ plan quand elle est livrée.
 
 Référence : `docs/plan-fenetres-zones.md` (cas F1 à F14, règles Z1 à Z8).
 
-- La disposition vit dans le cœur : `src-tauri/src/layout/` (pur, testé dans `layout/tests.rs`)
+- La disposition vit dans le cœur : `src-tauri/core/src/layout/` (pur, testé dans `layout/tests.rs`)
   tient les onglets, les zones, l'arbre des séparations et les fenêtres ; `windows.rs` l'enregistre
   dans `windows.json` (même dossier qu'`arnod.json`, écriture atomique) et crée ou ferme les
   fenêtres natives. Chaque commande `layout_*` ou `window_*` renvoie l'état de toutes les fenêtres
@@ -400,7 +434,7 @@ Référence : `docs/plan-contrats-services.md` (cas C1 à C12, règles R1 à R12
   `contracts/` à la racine du projet. Ce dossier est réservé comme `environments/` : absent de
   l'arborescence, refusé comme nom de dossier racine. Un texte qui n'est pas un contrat lisible
   n'est jamais écrit.
-- Les règles vivent dans `src-tauri/src/contract/` : `parse`, `sample`, `generate` et
+- Les règles vivent dans `src-tauri/core/src/contract/` : `parse`, `sample`, `generate` et
   `conformance` sont purs, `file` touche au disque ; tests règle par règle dans
   `contract/tests.rs`. Pas de dépendance ajoutée : la validation couvre un sous-ensemble de JSON
   Schema (pas `pattern` ni `format`).
@@ -430,7 +464,7 @@ conservé dans `docs/opencollection/` et embarqué dans le cœur.
 - Ce qui est propre à Arnod va seulement dans `extensions.arnod` de `opencollection.yml`
   (identifiant, ordre et protection des environnements) et dans les étiquettes `info.tags` d'une
   requête (lien au contrat). Identifiants et origines des vérifications ne sont pas écrits.
-- `src-tauri/src/opencollection/` fait la correspondance avec le modèle de l'interface
+- `src-tauri/core/src/opencollection/` fait la correspondance avec le modèle de l'interface
   (`request/model.rs`, qui n'est plus écrit tel quel). Enregistrer fusionne les champs gérés dans
   le fichier existant : scripts, variables et actions (signalés par `preserved`), la partie
   `request` des exemples, les autres authentifications et corps sont conservés.
@@ -508,7 +542,7 @@ l'étude `docs/etude-catalogue-etapes.md` (catalogue synchronisé, non implémen
 
 Référence : `docs/plan-mvp-a-reponse.md` (lot A, cas F1 à F8, règles R1 à R10), écran `5.1-b bis`.
 
-- Le cœur met en forme et filtre (`src-tauri/src/response/`, pur) : format détecté d'après
+- Le cœur met en forme et filtre (`src-tauri/core/src/response/`, pur) : format détecté d'après
   `content-type` (`response_render`), aperçu HTML en arbre de balises sûres sans attribut
   (`response_preview`, ni `v-html` ni cadre), filtre JSONPath RFC 9535 (`response_filter`, crate
   `serde_json_path`) dont une expression invalide revient en français dans `FilterResult.error`.
@@ -580,7 +614,7 @@ Référence : `docs/plan-mvp-c-import-bruno.md` (cas IM1 à IM6, règles R1 à R
 - Les fichiers d'origine ne sont jamais écrits : une collection Bruno devient un nouveau projet
   (`AppState::create_project_with`, dossier retiré en cas d'échec) ou un nouveau dossier, au nom
   libre, d'un projet (réglages de la collection dans son `folder.yml`, environnements complétés).
-- `src-tauri/src/bruno/` : `parse` (analyseur `.bru` écrit à la main, blocs inconnus gardés bruts),
+- `src-tauri/core/src/bruno/` : `parse` (analyseur `.bru` écrit à la main, blocs inconnus gardés bruts),
   `read` (disque, `.env`), `convert` (pur : fichiers OpenCollection validés contre le schéma et
   rapport) ; tests sur la collection d'exemple `bruno/fixtures/boutique/`. Un bloc ou une option
   sans équivalent est signalé, jamais inventé.
@@ -747,7 +781,7 @@ CL3 ; règles R1 à R8), écrans 1.3-a, 1.3-b, 1.3-c et 1.4-j.
 Référence : `docs/plan-mvp-i-fichiers-externes.md` (lot I : cas FE1 à FE7, règles R1 à R12), écran
 `4.1-e`.
 
-- `src-tauri/src/watch/` : un observateur `notify` par projet ouvert (`Watchers`, démarré par
+- `src-tauri/core/src/watch/` (branché aux fenêtres par `src-tauri/src/watch/app.rs`) : un observateur `notify` par projet ouvert (`Watchers`, démarré par
   `tree_load`, arrêté quand le projet est oublié ou introuvable), un fil qui regroupe les événements
   300 ms, un registre de l'état connu (empreinte de chaque YAML / JSON, dossiers). `.git/`, éléments
   cachés, `*.tmp` et `*~` sont ignorés.
@@ -1000,3 +1034,93 @@ Référence : `docs/plan-v1.md` (version 1 : cas AP1 à AP4, RC1 à RC6, H1 à H
   précédent (`changes`) et donne les différences (`history_diff`) ; « Effacer » se rattrape par
   `history_restore`. Interface : `HistoryPanel.vue` (onglet « Historique » de la réponse, horloge
   de la ligne d'état), store `history`.
+
+## Recherche
+
+Référence : `docs/plan-v2.md`, lot A (cas RH1 à RH6, règles R1 à R3), écrans 1.5-a et 1.5-b.
+
+- Le cœur cherche (`src-tauri/core/src/search/`, pur) : par nom (mots dans le libellé ou l'adresse,
+  sans casse ni accents, `#étiquette`, méthode en capitales) ou par adresse (`POST /orders`,
+  modèle `{id}`, URL complète : un segment variable du contrat vaut tout segment, un segment
+  variable saisi ne vaut qu'un segment variable) ; groupes et rangs stables, 8 par groupe.
+- `search_query` (`commands/search.rs`) lit les projets du workspace (tous pour « Tous les
+  projets ») à l'ouverture de la palette (`refresh`) et les garde (`SearchCache`) ; les
+  frappes suivantes ne relisent rien.
+- Interface : `SearchPalette.vue` (montée par `AppShell`, motif combobox, Entrée, Ctrl+Entrée
+  dans une autre zone, Échap rend le focus), store `search` (150 ms après la dernière frappe, une
+  réponse dépassée est ignorée) ; raccourci « Rechercher » (Ctrl+K) des raccourcis modifiables.
+
+## Étiquettes partagées
+
+Référence : `docs/plan-v2.md`, lot B (cas ET1 à ET4, règle R4), écran 4.9-b.
+
+- Un dossier porte des étiquettes (`info.tags` de son `folder.yml`, `TreeNode::Folder.tags`,
+  écrites par `tree_set_folder_tags`, `folder.yml` créé conforme au besoin) ; elles valent pour
+  tout ce qu'il contient. `tree::read` donne à chaque requête ses étiquettes **effectives**
+  (`TreeNode::Request.tags` : les siennes, puis celles des dossiers parents, sans doublon) : le
+  filtre du référentiel, la recherche et les propositions de 4.9-a les prennent. Le fichier d'une
+  requête ne garde que les siennes (`RequestDoc.tags`).
+- Vue d'un dossier (`FolderTab.vue`) : « Étiquettes du dossier » (`TagsEditor`), étiquettes de
+  chaque ligne, filtre par étiquettes (`lib/tags.ts` : `hasTags`, `taggedTests`, comptages
+  d'affichage) ; une ligne hors filtre est estompée par sa couleur (`--color-subtle`).
+
+## Ligne de commande
+
+Référence : `docs/plan-v2.md`, lot D (cas LC1 à LC6, règles R5 à R8, R16 ; décisions Q3, Q5),
+écrans 5.3-a, 5.3-c et 4.9-d.
+
+- `src-tauri/cli/` (crate `arnod-cli`) : `arnod run [CIBLE]` et ses options (`--env`,
+  `--etiquette`, `--parallele`, `--rapport`, `--rapports`, `--projet`, `--confirmer`), arguments
+  lus à la main (`args.rs`, aide et erreurs en français), cible (`select.rs` : dossier, test, requête, étiquettes effectives ; la plus proche
+  proposée), sortie (`output.rs`), run (`run.rs`). Même moteur que l'application : l'établi du
+  cœur, en lecture seule (`Workbench::set_read_only` : ni statuts, ni dernier run, ni valeur
+  gardée dans l'environnement ; `Network::read_prefs` sans cookies écrits) ; rien n'est écrit hors
+  du dossier des rapports (R5). Le projet se lit sans écriture (`project.rs` : identifiant de
+  `extensions.arnod`, un projet au format précédent est refusé).
+- Variables (R6) : `ARNOD_VAR_<nom>` (`Workbench::set_overrides`, masquées sauf une variable
+  partagée), puis `local.json` et le coffre du poste (`ARNOD_DONNEES` ou le dossier de données de
+  l'application) ; une variable locale de l'environnement utilisée sans valeur arrête la commande
+  avant tout envoi. Codes de sortie (R7) : 0, 1 (échec ou erreur), 2 (commande invalide).
+- Rapports (`core/src/report/`, pur, R8) : un cas par test ou requête jouée seule
+  (`report::cases`), JUnit au schéma d'Ant, Allure au modèle « TestResult » (schéma dans
+  `report/allure-result.schema.json`, validé en test), HTML autonome sans script.
+- Livraison (Q3, R16) : le binaire s'appelle `arnod-cli` dans `target/` (l'application y a déjà
+  `arnod`). Windows : `bin\arnod.exe` de l'installeur (`tauri.cli.conf.json`, ajoutée au build
+  de la CI ; crochet `windows/installer-hooks.nsh` : `bin` ajouté au PATH de l'utilisateur, retiré
+  à la désinstallation, jamais un PATH tronqué). Linux : lié statiquement (cible
+  `x86_64-unknown-linux-musl`, cœur sans la feature `coffre`), `arnod-linux-x86_64.tar.gz` joint
+  à la release. `scripts/smoke-windows.ps1` vérifie `arnod --version` et le PATH.
+- « Copier la commande » (LC6) : menu ⋯ d'un test ou d'un dossier, `cli_command` (règle dans
+  `core/src/command/`, valeurs citées pour PowerShell ou sh), environnement actif.
+
+## Synchronisation
+
+Référence : `docs/plan-v2.md`, lots E et F (cas SY1 à SY8, CF1 à CF5, règles R9 à R15 ; décisions
+Q1, Q2, Q6, Q8, Q10, Q11), écrans 7.1-a à 7.1-e.
+
+- `src-tauri/core/src/sync/` (feature `sync` du cœur, absente de la ligne de commande) : libgit2
+  par `git2` (`vendored-libgit2`, sans HTTPS ni SSH propres). Le transport « smart HTTP »
+  (`transport.rs`) passe par `Network::raw` (proxy, autorités internes) sur le runtime du cœur ;
+  le jeton du compte, au coffre (`arnod-git:<hôte>:<compte>`), part en en-tête `Authorization`,
+  jamais dans `.git/config` (R9). Les opérations sont synchrones : une commande les lance sur un
+  fil sans runtime (`commands::sync::detached`).
+- Récupérer (`sync::pull`) : la fusion se calcule en mémoire, fichier par fichier, sur la version
+  commune, la mienne (dossier de travail) et celle de l'équipe (`merge.rs`, bâtie sur
+  `watch::conflict` : une requête élément par élément, « garder les deux » pour une ligne de
+  liste ; tout autre fichier en entier, Q8). Un conflit attend dans `SyncBook` sans rien écrire
+  (R13) ; réglé, les fichiers sont écrits comme toute écriture d'Arnod puis diffusés comme des
+  fichiers modifiés (les onglets se rechargent), la branche avance (avance rapide, ou commit de
+  fusion s'il y avait des envois en attente).
+- Envoyer (`sync::send`) : les éléments choisis, avec un message, au nom du compte relié (Q11) ;
+  un envoi refusé parce que l'équipe a avancé récupère puis renvoie, jamais de force (R11).
+  « Mes modifications » se comparent à la version commune, jamais à celle de l'équipe.
+- `describe.rs` (pur) décrit un fichier changé en élément partagé, en clair (R14) ; l'interface
+  n'affiche jamais un chemin ni un commit. `sync.json` (poste, R10) garde compte, branche,
+  dernière vérification, changements reçus (pastilles) et secrets remis « à plus tard » (R15).
+- Interface : store `sync` (vérification au démarrage, toutes les 5 minutes et au retour sur la
+  fenêtre, Q6 ; `arnod://synchro`), `components/sync/` : `StatusBar` (montée par `AppShell`),
+  `SyncPanel` (7.1-b), `LinkDialog` (7.1-a), `ConflictDialog` (7.1-c), `MissingSecrets` (7.1-e),
+  `TeamHistory` (onglet « Équipe » de l'éditeur, 7.1-d) ; pastilles dans `TreeRow` et `FolderTab`.
+  Une récupération enregistre d'abord les brouillons (`useDrafts`).
+- Connexion par le navigateur (flux « device ») seulement si `ARNOD_GITHUB_CLIENT_ID` ou
+  `ARNOD_GITLAB_CLIENT_ID` sont fournis à la construction (Q2) ; sinon, jeton personnel.

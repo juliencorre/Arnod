@@ -67,6 +67,7 @@ describe("menu d'un dossier et outils au survol (AM36, AM39 ; 4.1-a, 5.2-d)", ()
       "Renommer F2",
       "Déplacer vers…",
       "Exécuter les tests du dossier",
+      "Copier la commande",
       "Supprimer le dossier",
     ]);
   });

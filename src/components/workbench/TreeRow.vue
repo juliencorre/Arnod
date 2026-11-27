@@ -25,6 +25,7 @@ import StatusCount from "@/components/workbench/StatusCount.vue";
 import StatusMark from "@/components/workbench/StatusMark.vue";
 import { SECTION_ICONS } from "@/components/ui/sectionIcons";
 import { countStatuses, requestPaths } from "@/lib/status";
+import { initial } from "@/lib/sync";
 import { highlight, matchedByUrl, type TreeFilter } from "@/lib/treeFilter";
 import { REQUEST_DRAG, dragged, startRequestDrag } from "@/lib/requestDrag";
 import { firstChildItem, parentItem, TREE_TAB_STOP } from "@/lib/treeKeyboard";
@@ -33,6 +34,7 @@ import { useToastStore } from "@/stores/toasts";
 import { useSelectionStore } from "@/stores/selection";
 import { useTransferStore } from "@/stores/transfer";
 import { useWindowsStore } from "@/stores/windows";
+import { useSyncStore } from "@/stores/sync";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { FolderNode } from "@/lib/tree";
 import type { TreeNode } from "@/types/ipc";
@@ -54,6 +56,11 @@ const isTest = computed(() => props.node.kind === "folder" && props.node.test);
 const emit = defineEmits<{ action: [id: string, node: TreeNode, target?: string] }>();
 
 const workbench = useWorkbenchStore();
+const sync = useSyncStore();
+/** V2, lot F (7.1-d, CF4) : collègue qui a changé la requête à la dernière récupération. */
+const receivedBy = computed(() =>
+  props.node.kind === "request" ? sync.receivedBy(props.projectId, props.node.path) : null,
+);
 const windows = useWindowsStore();
 const tabStop = inject(TREE_TAB_STOP, null);
 /** Seul arrêt de tabulation de l'arbre (hors arbre, chaque ligne en est un). */
@@ -121,6 +128,8 @@ const items = computed<MenuItem[]>(() => {
       // Une requête nommée s'ajoute aussi, comme dans un dossier (R4 : libellés gardés).
       { id: "new-request", label: "Nouvelle requête" },
       { id: "run", label: "Exécuter le test", separatorBefore: true },
+      // V2, lot D (5.3-c) : la même exécution dans un terminal ou une chaîne d'intégration.
+      { id: "copy-command", label: "Copier la commande" },
       { id: "rename", label: "Renommer", separatorBefore: true },
       move,
       remove,
@@ -143,6 +152,7 @@ const items = computed<MenuItem[]>(() => {
       { id: "rename", label: "Renommer", shortcut: "F2", separatorBefore: true },
       { id: "move-to", label: "Déplacer vers…" },
       { id: "run", label: "Exécuter les tests du dossier", separatorBefore: true },
+      { id: "copy-command", label: "Copier la commande" },
       { id: "delete", label: "Supprimer le dossier", tone: "danger", separatorBefore: true },
     ];
   }
@@ -432,6 +442,13 @@ function toggleFromChevron(): void {
           <span v-if="byUrl" class="row__via">adresse</span>
           <span class="row__end">
             <span v-if="dirty" class="row__dirty" title="Modifiée, non enregistrée">●</span>
+            <span
+              v-if="receivedBy"
+              class="row__author"
+              :title="`Modifiée par ${receivedBy} à la dernière récupération`"
+              ><span aria-hidden="true">{{ initial(receivedBy) }}</span
+              ><span class="visually-hidden">modifiée par {{ receivedBy }}</span></span
+            >
             <span v-if="node.invalid" class="row__invalid" title="Fichier illisible">⚠</span>
             <StatusMark v-if="status" class="row__status" :status="status" />
           </span>
@@ -668,6 +685,19 @@ function toggleFromChevron(): void {
 
 .row__invalid {
   color: var(--color-danger);
+}
+
+/* Pastille de l'auteur d'un changement récupéré (7.1-d) : une initiale, jamais la couleur seule. */
+.row__author {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1rem;
+  height: 1rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-accent-soft);
 }
 
 /*

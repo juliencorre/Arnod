@@ -307,6 +307,16 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::commands::interface::ShortcutChange>();
     v.visit::<crate::history::HistoryView>();
     v.visit::<crate::history::HistoryDiff>();
+    v.visit::<crate::search::SearchResults>();
+    v.visit::<crate::command::Shell>();
+    v.visit::<crate::sync::SyncView>();
+    v.visit::<crate::sync::SyncConflicts>();
+    v.visit::<crate::sync::JournalEntry>();
+    v.visit::<crate::sync::forge::Repository>();
+    v.visit::<crate::sync::forge::DeviceCode>();
+    v.visit::<crate::sync::merge::Choice>();
+    v.visit::<crate::commands::sync::MissingSecrets>();
+    v.visit::<crate::commands::sync::SyncLoginOptions>();
 }
 
 /// Contenu attendu de `tests/ipc/coeur.ts`.

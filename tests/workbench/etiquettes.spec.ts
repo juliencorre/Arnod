@@ -42,6 +42,7 @@ const NODES: TreeNode[] = [
     path: "commandes",
     requestCount: 3,
     test: false,
+    tags: [],
     children: [
       request("b", ["Non-régression", "nominal"]),
       request("c", ["non-régression", "paiement"]),

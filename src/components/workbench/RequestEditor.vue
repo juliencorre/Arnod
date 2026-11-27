@@ -29,6 +29,7 @@ import DynamicValuesMenu from "@/components/workbench/DynamicValuesMenu.vue";
 import PairsEditor from "@/components/workbench/PairsEditor.vue";
 import SettingsEditor from "@/components/workbench/SettingsEditor.vue";
 import TrialGeneralize from "@/components/workbench/TrialGeneralize.vue";
+import TeamHistory from "@/components/sync/TeamHistory.vue";
 import TrialTransfer from "@/components/workbench/TrialTransfer.vue";
 import TagsEditor from "@/components/workbench/TagsEditor.vue";
 import VariablesEditor from "@/components/workbench/VariablesEditor.vue";
@@ -43,6 +44,7 @@ import { useInputStore } from "@/stores/input";
 import { useInterfaceStore } from "@/stores/interface";
 import { useSidebarStore } from "@/stores/sidebar";
 import { useToastStore } from "@/stores/toasts";
+import { useSyncStore } from "@/stores/sync";
 import { useWorkbenchStore } from "@/stores/workbench";
 import type { CurlCopy, HttpMethod, Pair, RequestDoc, UnknownVariable } from "@/types/ipc";
 
@@ -59,6 +61,11 @@ const sidebar = useSidebarStore();
 const toasts = useToastStore();
 const guard = useGuard();
 const editor = computed(() => workbench.editors[props.editorKey] ?? null);
+const sync = useSyncStore();
+/** Projet relié à un dépôt : l'onglet « Équipe » montre l'historique (7.1-d). */
+const linked = computed(() =>
+  editor.value ? Boolean(sync.views[editor.value.projectId]?.remote) : false,
+);
 const request = computed<RequestDoc | null>(() => editor.value?.draft ?? null);
 const folder = computed(() => {
   const path = editor.value?.path ?? "";
@@ -293,7 +300,15 @@ function onKeydown(event: KeyboardEvent): void {
 // --- Onglets ---------------------------------------------------------------------
 
 type Tab =
-  "params" | "body" | "headers" | "auth" | "docs" | "settings" | "variables" | "assertions";
+  | "params"
+  | "body"
+  | "headers"
+  | "auth"
+  | "docs"
+  | "settings"
+  | "variables"
+  | "assertions"
+  | "team";
 const tab = ref<Tab>("params");
 /** Un nombre pour une liste, un point pour un onglet rempli d'une seule valeur. */
 /** Onglets ; un compteur en pastille, une seule forme (DE7, 5.1-b ter). */
@@ -309,6 +324,8 @@ const tabs = computed<{ id: Tab; label: string; count?: number }[]>(() => {
     { id: "settings", label: "Réglages" },
     { id: "variables", label: "Variables", count: r?.extractions.length },
     { id: "assertions", label: "Assertions", count: r?.assertions.length },
+    // V2, lot F (7.1-d) : l'historique de l'équipe, quand le projet est relié.
+    ...(linked.value ? [{ id: "team" as const, label: "Équipe" }] : []),
   ];
 });
 // --- Lot E : modifié depuis l'envoi (écart 4.2-b), curseur dans l'adresse (4.1-b) ---------
@@ -641,6 +658,12 @@ watch(
         :project-id="editor.projectId"
         :path="editor.path"
         :extracted="editor.outcome?.sent?.extracted ?? null"
+      />
+
+      <TeamHistory
+        v-else-if="tab === 'team' && editor"
+        :project-id="editor.projectId"
+        :path="editor.path"
       />
 
       <AssertionsEditor

@@ -23,9 +23,9 @@ function cargoPackageVersion(text) {
   return undefined;
 }
 
-/** Version du paquet `arnod` dans Cargo.lock. */
-function cargoLockVersion(text) {
-  return /^name = "arnod"\r?\nversion = "([^"]+)"/m.exec(text)?.[1];
+/** Version d'un paquet (`arnod`, `arnod-core`) dans Cargo.lock. */
+function cargoLockVersion(text, name = "arnod") {
+  return new RegExp(`^name = "${name}"\\r?\\nversion = "([^"]+)"`, "m").exec(text)?.[1];
 }
 
 const lock = json("package-lock.json");
@@ -35,6 +35,15 @@ const sources = [
   ['package-lock.json (packages[""])', lock.packages?.[""]?.version],
   ["src-tauri/Cargo.toml", cargoPackageVersion(read("src-tauri/Cargo.toml"))],
   ["src-tauri/Cargo.lock", cargoLockVersion(read("src-tauri/Cargo.lock"))],
+  // Cœur sans Tauri (V2, lot C), publié avec l'application.
+  ["src-tauri/core/Cargo.toml", cargoPackageVersion(read("src-tauri/core/Cargo.toml"))],
+  [
+    "src-tauri/Cargo.lock (arnod-core)",
+    cargoLockVersion(read("src-tauri/Cargo.lock"), "arnod-core"),
+  ],
+  // Ligne de commande (V2, lot D) : `arnod --version`.
+  ["src-tauri/cli/Cargo.toml", cargoPackageVersion(read("src-tauri/cli/Cargo.toml"))],
+  ["src-tauri/Cargo.lock (arnod-cli)", cargoLockVersion(read("src-tauri/Cargo.lock"), "arnod-cli")],
   ["src-tauri/tauri.conf.json", json("src-tauri/tauri.conf.json").version],
 ];
 

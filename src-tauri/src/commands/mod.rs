@@ -39,6 +39,12 @@ pub mod startup;
 // Version 1 (docs/plan-v1.md) : préférences d'interface et historique des envois.
 pub mod history;
 pub mod interface;
+// Version 2, lot A : recherche Ctrl+K.
+pub mod search;
+// Version 2, lot D : « Copier la commande ».
+pub mod cli;
+// Version 2, lots E et F : synchronisation Git.
+pub mod sync;
 
 #[cfg(test)]
 mod tests {

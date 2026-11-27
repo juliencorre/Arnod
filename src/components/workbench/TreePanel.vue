@@ -220,6 +220,9 @@ async function onAction(id: string, node: TreeNode, target?: string): Promise<vo
     case "run":
       await guard(() => workbench.runFolder(props.projectId, node.path));
       break;
+    case "copy-command":
+      await guard(() => workbench.copyCommand(props.projectId, node.path));
+      break;
     case "new-test":
       await guard(() => workbench.createTest(props.projectId, node.path));
       break;

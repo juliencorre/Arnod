@@ -189,7 +189,7 @@ use ShortcutScope as S;
 
 /// Actions et raccourcis par défaut, dans l'ordre de la liste (1.6-f bis). Les mêmes valeurs
 /// sont dans `DEFAULT_SHORTCUTS` (`src/lib/shortcuts.ts`), vérifiées par un test.
-pub const ACTIONS: [Action; 15] = [
+pub const ACTIONS: [Action; 16] = [
     action("send", "Envoyer", G::Request, S::Editor, &["Ctrl+Enter"]),
     action(
         "copyCurl",
@@ -247,6 +247,7 @@ pub const ACTIONS: [Action; 15] = [
         S::Global,
         &["Ctrl+Backslash"],
     ),
+    action("search", "Rechercher", G::Window, S::Global, &["Ctrl+K"]),
     fixed(
         "nextTab",
         "Onglet suivant, précédent",

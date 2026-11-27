@@ -179,7 +179,31 @@ export type CommandName =
   | "history_load"
   | "history_diff"
   | "history_clear"
-  | "history_restore";
+  | "history_restore"
+  // Version 2, lot A : recherche Ctrl+K.
+  | "search_query"
+  // Version 2, lot B : étiquettes partagées.
+  | "tree_set_folder_tags"
+  // Version 2, lot D : « Copier la commande ».
+  | "cli_command"
+  // Version 2, lots E et F : synchronisation Git.
+  | "sync_status"
+  | "sync_check"
+  | "sync_login_options"
+  | "sync_connect_start"
+  | "sync_connect_wait"
+  | "sync_connect_cancel"
+  | "sync_token"
+  | "sync_repositories"
+  | "sync_create_repository"
+  | "sync_link"
+  | "sync_pull_push"
+  | "sync_conflicts"
+  | "sync_resolve"
+  | "sync_abandon"
+  | "sync_journal"
+  | "sync_missing_secrets"
+  | "sync_secrets_later";
 
 /**
  * Nature d'une erreur de commande.
@@ -206,7 +230,8 @@ export type CommandErrorKind =
   | "cancelled" // Exécution annulée par l'utilisateur.
   | "secretStore" // Le coffre du système est indisponible.
   | "protectedEnvironment" // Envoi sur un environnement protégé sans confirmation.
-  | "changedOnDisk"; // Fichier modifié hors d'Arnod depuis sa lecture, rien n'est écrasé (lot I).
+  | "changedOnDisk" // Fichier modifié hors d'Arnod depuis sa lecture, rien n'est écrasé (lot I).
+  | "conflict"; // Synchronisation : un élément changé des deux côtés attend un choix (V2, E et F).
 
 /**
  * Erreur renvoyée par une commande Rust qui échoue : la promesse d'`invoke` est
@@ -348,6 +373,8 @@ export type TreeNode =
       requestCount: number;
       /** Test : au moins une requête et aucun sous-dossier (docs/plan-mvp-e-tests-etapes.md, R1). */
       test: boolean;
+      /** Étiquettes du dossier (`folder.yml`) : elles valent pour tout ce qu'il contient (V2, R4). */
+      tags: string[];
     }
   | {
       kind: "request";
@@ -361,7 +388,10 @@ export type TreeNode =
       contract: string | null;
       /** Adresse, pour le filtre (docs/plan-mvp-d-barre-laterale.md, R1) ; vide si illisible. */
       url: string;
-      /** Étiquettes, sans celle du lien au contrat (R1). */
+      /**
+       * Étiquettes effectives, sans celle du lien au contrat (R1) : les siennes, puis celles de
+       * ses dossiers parents (V2, R4).
+       */
       tags: string[];
     };
 
@@ -2183,4 +2213,192 @@ export interface HistoryDiff {
   previousId: string;
   lines: DiffLine[];
   truncated: boolean;
+}
+
+// --- Version 2, lot A : recherche Ctrl+K (1.5-a, 1.5-b, docs/plan-v2.md) -------------
+
+/** Nature d'un résultat de la recherche (`search::SearchKind`) : ce qu'il ouvre. */
+export type SearchKind =
+  | "request"
+  | "test"
+  | "folder"
+  /** Opération d'un contrat : son endpoint (`path`), sinon son contrat (`contract`). */
+  | "operation"
+  | "contract"
+  | "environment"
+  | "project";
+
+/** Un résultat (`search::SearchHit`). */
+export interface SearchHit {
+  kind: SearchKind;
+  projectId: string;
+  label: string;
+  /** Où il se trouve : « boutique-tests · paiements ». */
+  detail: string;
+  method: string | null;
+  /** Ce qui s'ouvre : requête, test, dossier, contrat, endpoint d'une opération. */
+  path: string | null;
+  /** Contrat d'une opération, ouvert quand elle n'a pas d'endpoint. */
+  contract: string | null;
+  /** Passages du libellé à surligner, en caractères `[début, fin)`. */
+  highlight: [number, number][];
+}
+
+/** Un groupe de résultats (`search::SearchGroup`), au plus 8 montrés. */
+export interface SearchGroup {
+  title: string;
+  hits: SearchHit[];
+  total: number;
+}
+
+/** Résultats d'une saisie (`search::SearchResults`). */
+export interface SearchResults {
+  text: string;
+  /** Recherche par adresse (`POST /orders`, URL) plutôt que par nom. */
+  address: boolean;
+  groups: SearchGroup[];
+}
+
+// --- Version 2, lot D : ligne de commande (docs/plan-v2.md, LC6) ---
+
+/**
+ * Terminal pour lequel « Copier la commande » cite les valeurs (`command::Shell`) ; absent, le
+ * cœur prend celui du système (PowerShell sous Windows, sh ailleurs).
+ */
+export type CliShell = "powerShell" | "sh";
+
+// --- Version 2, lots E et F : synchronisation Git (docs/plan-v2.md, 7.1-a à 7.1-e) ---
+
+/** Forge d'un dépôt (`sync::forge::Forge`). */
+export type SyncForge = "github" | "gitlab" | "other";
+
+/** Compte relié (`sync::state::Account`) ; son jeton est au coffre. */
+export interface SyncAccount {
+  forge: SyncForge;
+  host: string;
+  login: string;
+  name: string;
+  /** Adresse des envois (Q11). */
+  email: string;
+}
+
+/** Dépôt distant relié (`sync::SyncRemote`). */
+export interface SyncRemote {
+  /** Adresse du dépôt, sans identifiant (R9). */
+  url: string;
+  forge: SyncForge;
+  host: string;
+  /** `acme/boutique-tests`. */
+  name: string;
+  branch: string;
+}
+
+/** Nature d'un élément partagé (`sync::describe::ItemKind`). */
+export type SharedItemKind =
+  "step" | "request" | "endpoint" | "folder" | "contract" | "environment" | "project" | "other";
+
+/** Élément partagé changé, décrit en clair (`sync::describe::SharedItem`, R14). */
+export interface SharedItem {
+  /** Clé pour le choisir, jamais affichée. */
+  key: string;
+  kind: SharedItemKind;
+  label: string;
+  /** Où il se range (« commandes / v2 »). */
+  place: string;
+  /** Ce qui a changé (« 2 assertions modifiées »). */
+  detail: string;
+  author: string | null;
+  at: number | null;
+}
+
+/** État de la synchronisation d'un projet (`sync::SyncView`). */
+export interface SyncView {
+  projectId: string;
+  repository: boolean;
+  /** `null` : « Pas encore partagé ». */
+  remote: SyncRemote | null;
+  account: SyncAccount | null;
+  incoming: SharedItem[];
+  outgoing: SharedItem[];
+  conflicts: number;
+  checkedAt: number | null;
+  error: string | null;
+  members: string[];
+  /** Éléments changés par un collègue à la dernière récupération : chemin → auteur (CF4). */
+  received: Record<string, string>;
+}
+
+/** Version gardée pour un élément en conflit (`sync::merge::Choice`). */
+export type SyncChoice = "ours" | "theirs" | "both";
+
+/** Élément changé des deux côtés (`sync::merge::Element`). */
+export interface SyncConflictElement {
+  key: string;
+  label: string;
+  ours: string | null;
+  theirs: string | null;
+  /** « Garder les deux » possible (ligne d'une liste). */
+  both: boolean;
+}
+
+/** Élément pris sans question (`sync::merge::Auto`, CF2). */
+export interface SyncMergedElement {
+  label: string;
+  /** `true` : la version du collègue. */
+  theirs: boolean;
+}
+
+/** Fichier en conflit (`sync::FileConflict`, 7.1-c). */
+export interface FileConflict {
+  item: SharedItem;
+  author: string;
+  at: number;
+  elements: SyncConflictElement[];
+  merged: SyncMergedElement[];
+  ours: string | null;
+  theirs: string | null;
+}
+
+/** Conflits de la récupération en attente (`sync::SyncConflicts`). */
+export interface SyncConflicts {
+  projectId: string;
+  conflicts: FileConflict[];
+}
+
+/** Entrée de l'historique d'un élément (`sync::JournalEntry`, CF5). */
+export interface JournalEntry {
+  author: string;
+  at: number;
+  detail: string;
+  message: string;
+  before: string | null;
+  after: string | null;
+}
+
+/** Dépôt d'un compte (`sync::forge::Repository`). */
+export interface SyncRepository {
+  name: string;
+  url: string;
+  private: boolean;
+  empty: boolean;
+}
+
+/** Code à saisir dans le navigateur (`sync::forge::DeviceCode`). */
+export interface SyncDeviceCode {
+  userCode: string;
+  verificationUri: string;
+  intervalSecs: number;
+  expiresInSecs: number;
+}
+
+/** Secrets à renseigner après une récupération (`commands::sync::MissingSecrets`, R15). */
+export interface MissingSecrets {
+  environment: string;
+  names: string[];
+}
+
+/** Connexion par le navigateur disponible, par forge (`commands::sync::SyncLoginOptions`). */
+export interface SyncLoginOptions {
+  githubBrowser: boolean;
+  gitlabBrowser: boolean;
 }

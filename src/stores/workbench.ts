@@ -187,6 +187,12 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     return load;
   }
 
+  /** Étiquettes d'un dossier (V2, lot B, ET1) : elles valent pour tout ce qu'il contient. */
+  async function setFolderTags(projectId: string, path: string, tags: string[]): Promise<void> {
+    await ipc.treeSetFolderTags(projectId, path, tags);
+    await refreshTree(projectId);
+  }
+
   async function refreshTree(projectId: string): Promise<void> {
     trees.value[projectId] = await ipc.treeLoad(projectId);
   }
@@ -924,6 +930,27 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     await ignoreCheck(key, check);
   }
 
+  /**
+   * « Copier la commande » (5.3-c, LC6) : `arnod run` du test ou du dossier, avec l'environnement
+   * actif du projet, citée par le cœur pour le terminal du poste.
+   */
+  async function copyCommand(projectId: string, path: string): Promise<void> {
+    const environment = activeEnvironment(projectId);
+    const command = await ipc.cliCommand(projectId, path, environment);
+    const toasts = useToastStore();
+    try {
+      await navigator.clipboard.writeText(command);
+    } catch {
+      toasts.show(`Copie impossible ; la commande : ${command}`, { tone: "error" });
+      return;
+    }
+    toasts.show(
+      environment === null
+        ? "✓ Commande copiée"
+        : `✓ Commande copiée · elle utilise l'environnement « ${environment} »`,
+    );
+  }
+
   /** Exécute un dossier et ouvre l'onglet du run, là où suit la sélection. */
   async function runFolder(projectId: string, folder: string, confirmed = false): Promise<void> {
     const environment = activeEnvironment(projectId);
@@ -1396,6 +1423,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     pending,
     loadProject,
     refreshTree,
+    setFolderTags,
     refreshEnvironments,
     peekEnvironments,
     isExpanded,
@@ -1403,6 +1431,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     collapse,
     toggleFolder,
     activeEnvironment,
+    copyCommand,
     openEditor,
     applyResult,
     loadResult,

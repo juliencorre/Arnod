@@ -1,0 +1,80 @@
+[package]
+name = "arnod-core"
+version = "0.0.4"
+description = "Arnod - cœur sans Tauri : modèle, fichiers, envoi, établi, recherche"
+authors = ["Julien Corre"]
+license = "MIT"
+repository = "https://github.com/juliencorre/Arnod"
+edition = "2024"
+rust-version = "1.90"
+publish = false
+
+[lib]
+name = "arnod_core"
+
+[features]
+default = ["coffre", "sync"]
+# Coffre du système (keyring). Retiré de l'exécutable `arnod` lié statiquement sous Linux (V2,
+# lot D, R16 : pas de D-Bus sur un agent ; les variables passent par `ARNOD_VAR_<nom>`).
+coffre = ["dep:keyring"]
+# Synchronisation Git (V2, lot E) : libgit2 compilé avec Arnod, sans HTTPS ni SSH propres ; le
+# transport HTTPS passe par `network::Network` (proxy et autorités du poste, R9). Retirée de la
+# ligne de commande.
+sync = ["dep:git2"]
+# Miroir IPC (MA1) : dérivation ts-rs des types sérialisés, activée par les tests de l'application
+# (`ts_mirror.rs`) ; rien n'entre dans l'application ni dans la ligne de commande.
+ts = ["dep:ts-rs"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+# Ordre du document conservé : opérations des contrats, corps des réponses.
+serde_json = { version = "1", features = ["preserve_order"] }
+# Fichiers OpenCollection (serde_yaml est déprécié).
+serde-saphyr = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+# Chemins canoniques sans préfixe \\?\ sous Windows.
+dunce = "1"
+# Client HTTP : TLS rustls (pas d'OpenSSL).
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# Tâches, annulation et concurrence des envois et des runs.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+# Coffre du système pour les secrets (Windows : gestionnaire d'identification).
+keyring = { version = "3", default-features = false, features = ["windows-native", "apple-native", "sync-secret-service"], optional = true }
+# Corbeille du système pour la suppression des dossiers et requêtes.
+trash = "5"
+# En-tête Authorization Basic.
+base64 = "0.23"
+# Encodage des paramètres d'adresse et des formulaires.
+percent-encoding = "2"
+# Filtre JSONPath de la réponse (RFC 9535, docs/plan-mvp-a-reponse.md).
+serde_json_path = "0.7"
+# Surveillance du dossier des projets ouverts (lot I) ; regroupement (300 ms) fait par Arnod.
+notify = "8"
+# Lot H : configuration TLS écrite à la main (autorités internes, certificat refusé gardé).
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# Autorités du magasin du système.
+rustls-native-certs = "0.8"
+# Racines Mozilla, en repli si le magasin du système est vide.
+webpki-roots = "1"
+# Empreinte SHA-256 des certificats.
+ring = "0.17"
+# Lecture des en-têtes Set-Cookie.
+cookie = "0.18"
+# Lot K (5.1-c) : chronométrage de la connexion (`network::phases`).
+tower-layer = "0.3"
+tower-service = "0.3"
+# Lot E (Q1) : bibliothèque Git. Sans ses transports HTTPS (OpenSSL) et SSH : le transport
+# « smart HTTP » est écrit par Arnod sur reqwest (`sync::transport`) ; libgit2 compilé avec Arnod
+# (`vendored-libgit2`), sans bibliothèque du système à installer.
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"], optional = true }
+# Miroir IPC, voir la feature `ts`.
+ts-rs = { version = "12", features = ["serde-json-impl", "uuid-impl"], optional = true }
+
+# Lot H : proxy du système lu dans le registre (`Internet Settings`).
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6"
+
+[dev-dependencies]
+tempfile = "3"
+# Serveur HTTP simulé pour les tests des envois et des runs.
+wiremock = "0.6"

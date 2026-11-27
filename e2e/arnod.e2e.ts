@@ -15,7 +15,7 @@
  * le premier usage jusqu'au run d'un dossier : vérifications en échec, résultat par dossier et
  * statuts de la barre latérale gardés au redémarrage (docs/plan-fin-premier-usage.md).
  */
-import type { ChildProcess } from "node:child_process";
+import { type ChildProcess, execFileSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -1826,12 +1826,15 @@ describe("Lot A - Réponse : format, aperçu, filtre JSONPath (5.1-b bis)", () =
     await browser.waitUntil(async () => (await browser.$(".code").getText()).includes("MUG-NOIR"));
 
     await browser.$(".filter__input").setValue("$.items[*].sku");
+    // « $.items[*] », tapé en chemin, donne aussi deux résultats : on attend ceux de « .sku ».
+    const marks = async () => browser.$$(".tok--match").map((m) => m.getText());
     await browser.waitUntil(
-      async () => (await browser.$(".filter__count").getText()) === "2 résultats",
+      async () =>
+        (await browser.$(".filter__count").getText()) === "2 résultats" &&
+        (await marks()).join() === '"TSH-BLU-M","MUG-NOIR"',
       { timeoutMsg: "deux résultats attendus" },
     );
-    const marks = await browser.$$(".tok--match").map((m) => m.getText());
-    expect(marks).toEqual(['"TSH-BLU-M"', '"MUG-NOIR"']);
+    expect(await marks()).toEqual(['"TSH-BLU-M"', '"MUG-NOIR"']);
     await screenshot(browser, "a1-reponse-filtre");
 
     await browser.$(".filter__input").setValue("$.items[0");
@@ -2209,7 +2212,16 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
 
   beforeAll(() => {
     cpSync(
-      path.join(import.meta.dirname, "..", "src-tauri", "src", "bruno", "fixtures", "boutique"),
+      path.join(
+        import.meta.dirname,
+        "..",
+        "src-tauri",
+        "core",
+        "src",
+        "bruno",
+        "fixtures",
+        "boutique",
+      ),
       source(),
       {
         recursive: true,
@@ -3167,6 +3179,264 @@ describe("Version 1 - Apparence et raccourcis (1.6-f, 1.6-f bis)", () => {
     await screenshot(browser, "v1-raccourcis");
     await browser.keys("Escape");
     await browser.$("dialog[open]").waitForExist({ reverse: true, timeout: 5_000 });
+  });
+});
+
+describe("Version 2 - Recherche Ctrl+K (1.5-a, 1.5-b)", () => {
+  it("Ctrl+K trouve une requête par nom, Entrée l'ouvre", async () => {
+    await browser.execute(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }));
+    });
+    await browser.$(".palette__input").waitForDisplayed({ timeoutMsg: "palette attendue" });
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(".palette__input");
+      if (!input) throw new Error("champ de recherche introuvable");
+      input.value = "lister les comm";
+      input.dispatchEvent(new Event("input"));
+    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll(".palette__label")).some((l) =>
+            l.textContent.includes("Lister les commandes"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "« Lister les commandes » attendu dans les résultats" },
+    );
+    await screenshot(browser, "v2-recherche");
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(".palette__input");
+      input?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    await browser.$(".palette").waitForExist({ reverse: true, timeout: 5_000 });
+    const opened = () =>
+      browser.execute(() =>
+        Array.from(document.querySelectorAll(".zone__tab")).some((t) =>
+          t.textContent.includes("Lister les commandes"),
+        ),
+      );
+    await browser.waitUntil(opened, {
+      timeout: 10_000,
+      timeoutMsg: "onglet « Lister les commandes » attendu",
+    });
+    expect(await opened()).toBe(true);
+    expect(await browser.$(".palette").isExisting()).toBe(false);
+  });
+});
+
+describe("Version 2 - Étiquettes partagées (4.9-b)", () => {
+  const folder = () => path.join(sandbox.home, "arnod", "boutique-tests", "Etiquettes V2");
+
+  beforeAll(() => {
+    // Un dossier ordinaire (un sous-dossier, deux requêtes), écrit hors d'Arnod : le lot I le
+    // fait paraître dans l'arborescence.
+    mkdirSync(path.join(folder(), "archives"), { recursive: true });
+    writeFileSync(
+      path.join(folder(), "smoke.yml"),
+      "info:\n  name: Requête smoke\n  type: http\n  tags:\n    - smoke\nhttp:\n  method: GET\n  url: http://127.0.0.1:1/smoke\n",
+    );
+    writeFileSync(
+      path.join(folder(), "autre.yml"),
+      "info:\n  name: Autre requête\n  type: http\nhttp:\n  method: GET\n  url: http://127.0.0.1:1/autre\n",
+    );
+  });
+
+  it("une étiquette de dossier vaut pour ses requêtes ; le filtre estompe les autres", async () => {
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document.querySelector('aside [role="treeitem"][data-path="Etiquettes V2"]') !== null,
+        ),
+      { timeout: 15_000, timeoutMsg: "dossier « Etiquettes V2 » attendu dans l'arborescence" },
+    );
+    await clickHidden('aside [role="treeitem"][data-path="Etiquettes V2"]');
+    await browser.$(".folder__tags").waitForExist({ timeout: 10_000 });
+    await clickHidden(".folder__tags .tag__add");
+    await browser.$(".folder__tags .tag__input").setValue("régression");
+    await browser.keys("Enter");
+    await browser.waitUntil(
+      () => readFileSync(path.join(folder(), "folder.yml"), "utf8").includes("régression"),
+      { timeout: 10_000, timeoutMsg: "étiquette écrite dans folder.yml attendue" },
+    );
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll(".folder__row-tag")).some((t) =>
+            t.textContent.includes("régression"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "étiquette du dossier sur les lignes attendue" },
+    );
+    await browser.execute(() => {
+      const select = document.querySelector<HTMLSelectElement>(".folder__filter-add");
+      if (!select) throw new Error("filtre d'étiquettes introuvable");
+      select.value = "smoke";
+      select.dispatchEvent(new Event("change"));
+    });
+    await browser.$(".folder__filter-summary").waitForExist({ timeout: 5_000 });
+    expect(await browser.$(".folder__filter-summary").getText()).toContain("1 test sur 2");
+    await screenshot(browser, "v2-etiquettes-dossier");
+    await clickHidden('button[aria-label="Fermer Etiquettes V2"]');
+  });
+});
+
+describe("Version 2 - Copier la commande (5.3-c)", () => {
+  it("le menu ⋯ d'un dossier copie arnod run avec l'environnement actif", async () => {
+    // « Etiquettes V2 » (écrit par le parcours précédent) : un dossier ordinaire du projet.
+    await browser.execute(() => {
+      const row = Array.from(document.querySelectorAll('aside li[role="presentation"]')).find(
+        (li) => li.querySelector(".row__name")?.textContent.trim() === "Etiquettes V2",
+      );
+      const more = row?.querySelector<HTMLElement>(".row__more");
+      if (!more) throw new Error("ligne « Etiquettes V2 » introuvable");
+      more.click();
+    });
+    await browser.$('[role="menuitem"]=Copier la commande').waitForExist({ timeout: 5_000 });
+    await screenshot(browser, "v2-copier-commande-menu");
+    await clickText('[role="menuitem"]', "Copier la commande");
+    const toast = browser.$(".toast__message");
+    await toast.waitForExist({ timeout: 10_000 });
+    // Presse-papiers accepté ou refusé par la WebView : la commande est donnée dans les deux cas.
+    const message = await toast.getText();
+    expect(
+      message.startsWith("✓ Commande copiée · elle utilise l'environnement") ||
+        message.includes('arnod run "Etiquettes V2" --env'),
+    ).toBe(true);
+    await screenshot(browser, "v2-copier-commande");
+  });
+});
+
+describe("Version 2 - Synchronisation (7.1-a, 7.1-b, 7.1-c, 7.1-d)", () => {
+  const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
+  const bare = () => path.join(sandbox.home, "depots", "boutique-tests.git");
+  const smoke = "Etiquettes V2/smoke.yml";
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=Marc",
+        "-c",
+        "user.email=marc@exemple.fr",
+        "-c",
+        "init.defaultBranch=main",
+        ...args,
+      ],
+      { cwd, stdio: "pipe" },
+    ).toString();
+
+  /** Un collègue : un clone du dépôt où il change l'adresse de la requête smoke, puis envoie. */
+  function colleague(url: string): void {
+    const dir = path.join(sandbox.home, "collegue");
+    rmSync(dir, { recursive: true, force: true });
+    git(sandbox.home, "clone", "-q", "-b", "main", bare(), dir);
+    const file = path.join(dir, smoke);
+    writeFileSync(file, readFileSync(file, "utf8").replace(/url: .*\/smoke[^\n]*/, `url: ${url}`));
+    git(dir, "commit", "-q", "-am", "Adresse de la requête smoke");
+    git(dir, "push", "-q", "origin", "main");
+  }
+
+  async function statusIs(text: string): Promise<void> {
+    await browser.waitUntil(
+      async () => (await browser.$(".statusbar [role='status']").getText()) === text,
+      { timeout: 20_000, timeoutMsg: `barre d'état « ${text} » attendue` },
+    );
+  }
+
+  /** Ouvre le panneau et attend que la vérification voie `count` éléments à récupérer. */
+  async function openPanel(count: number): Promise<void> {
+    await clickHidden(".statusbar__sync");
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          (n) =>
+            document.querySelector("dialog[open] #sync-incoming")?.textContent.trim() ===
+            `À récupérer · ${String(n)}`,
+          count,
+        ),
+      { timeout: 20_000, timeoutMsg: `${String(count)} élément(s) à récupérer attendu(s)` },
+    );
+  }
+
+  beforeAll(() => {
+    mkdirSync(path.dirname(bare()), { recursive: true });
+    git(sandbox.home, "init", "-q", "--bare", "-b", "main", bare());
+  });
+
+  it("relie le projet à un dépôt, récupère la modification d'un collègue, règle un conflit", async () => {
+    await statusIs("Pas encore partagé");
+    await clickHidden(".statusbar__sync");
+    await browser.$("dialog[open] .link__forges").waitForDisplayed({ timeout: 10_000 });
+    await clickText("dialog[open] [role='radio']", "Autre URL Git");
+    await browser.execute((url) => {
+      const input = document.querySelector<HTMLInputElement>(
+        'dialog[open] input[aria-label="Adresse du dépôt"]',
+      );
+      if (!input) throw new Error("adresse du dépôt introuvable");
+      input.value = url;
+      input.dispatchEvent(new Event("input"));
+    }, bare());
+    await screenshot(browser, "v2-relier");
+    await clickText("dialog[open] button", "Relier et envoyer");
+    await statusIs("À jour avec l'équipe");
+    expect(git(bare(), "log", "--format=%s", "main")).toContain("Partage du projet");
+
+    // 7.1-b : la modification d'un collègue arrive, décrite en clair.
+    colleague("http://127.0.0.1:1/smoke-v2");
+    await openPanel(1);
+    const panel = await browser.$("dialog[open]").getText();
+    expect(panel).toContain("Requête smoke");
+    expect(panel).toContain("adresse modifiée");
+    expect(panel).toContain("Marc");
+    // Ce que seul le collègue a changé n'est pas « à envoyer ».
+    expect(panel).toContain("Mes modifications · 0");
+    await screenshot(browser, "v2-synchroniser");
+    await clickText("dialog[open] button", "Récupérer");
+    await statusIs("À jour avec l'équipe");
+    expect(readFileSync(path.join(project(), smoke), "utf8")).toContain("smoke-v2");
+    await clickHidden("dialog[open] .dialog__close");
+    // 7.1-d : la pastille du collègue dans la barre latérale.
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll("aside .row__author")).some((a) =>
+            a.textContent.includes("Marc"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "pastille de Marc attendue" },
+    );
+    await screenshot(browser, "v2-pastille");
+
+    // 7.1-c : la même adresse changée des deux côtés.
+    const file = path.join(project(), smoke);
+    writeFileSync(file, readFileSync(file, "utf8").replace("smoke-v2", "smoke-local"));
+    colleague("http://127.0.0.1:1/smoke-marc");
+    await openPanel(1);
+    await clickText("dialog[open] button", "Récupérer");
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          document.querySelector("dialog[open] .dialog__title")?.textContent.includes("conflit"),
+        ),
+      { timeout: 20_000, timeoutMsg: "conflit attendu" },
+    );
+    // Rien n'est écrit avant de valider (R13).
+    expect(readFileSync(file, "utf8")).toContain("smoke-local");
+    expect(await browser.$("dialog[open]").getText()).toContain("Adresse");
+    await screenshot(browser, "v2-conflit");
+    await browser.execute(() => {
+      const radios = document.querySelectorAll<HTMLInputElement>(
+        'dialog[open] input[type="radio"]',
+      );
+      radios[1]?.click();
+    });
+    await clickText("dialog[open] button", "Valider la résolution");
+    await browser.waitUntil(() => readFileSync(file, "utf8").includes("smoke-marc"), {
+      timeout: 20_000,
+      timeoutMsg: "version de Marc écrite attendue",
+    });
+    await statusIs("À jour avec l'équipe");
   });
 });
 

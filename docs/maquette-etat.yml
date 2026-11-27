@@ -352,9 +352,24 @@ pages:
   "1.5":
     nom: "Recherche"
     version: V2
+    plans:
+      - "plan-v2 (RH1–RH6, lot A)"
+    journal:
+      - "2026-11-27 : Recherche Ctrl+K (plan-v2, lot A) : palette au-dessus de la zone, portée du workspace affiché ; par nom sans casse ni accents (terme surligné, #étiquette, méthode), par adresse (POST /orders, modèle, URL complète collée : correspondance exacte, endpoints de la ressource, tests qui l'appellent) ; ↑ ↓, Entrée, Ctrl+Entrée dans une autre zone, Échap ; raccourci modifiable."
     ecrans:
-      a: { etat: à faire }
-      b: { etat: à faire }
+      a:
+        etat: livré
+        pr: [96]
+        captures: [v2-recherche]
+        ecart:
+          texte: "Les groupes sont Tests, Dossiers, Endpoints, Contrats, Environnements et Projets : « Exigences » (V7), « Mocks et anomalies » (V5, V7) viendront avec leurs versions ; une ligne du pied de la palette rappelle les touches, la portée est à droite du champ."
+          aligner: maquette
+      b:
+        etat: livré
+        pr: [96]
+        ecart:
+          texte: "Les groupes s'appellent « Correspondance exacte », « Endpoints de /orders » et « Tests qui l'appellent » ; un test est cité par son nom et son dossier, pas par son étape."
+          aligner: maquette
   "1.6":
     nom: "Préférences"
     version: [MVP, V1]
@@ -394,7 +409,7 @@ pages:
         pr: [94]
         captures: [v1-raccourcis]
         ecart:
-          texte: "« Rechercher Ctrl+K » n'est pas listé (recherche en V2, 1.5) : l'exemple de conflit de l'écran ne se produit pas, celui de l'application est « Ctrl+J est déjà pris par « Résultat dessous ou à côté » » ; l'application liste aussi « Filtrer le référentiel », « Enregistrer le contrat » et « Gérer les workspaces », et marque « fixe » Ctrl+Tab et Ctrl+0…9."
+          texte: "L'application liste aussi « Filtrer le référentiel », « Enregistrer le contrat » et « Gérer les workspaces », et marque « fixe » Ctrl+Tab et Ctrl+0…9."
           aligner: maquette
       g:
         etat: livré
@@ -965,13 +980,16 @@ pages:
     version: [MVP, V2, V7]
     plans:
       - "plan-configuration-endpoint (étiquettes)"
+      - "plan-v2 (ET1–ET4, LC3, lots B et D)"
     liees: ["4.1", "6.3", "5.3"]
-    reste: "filtrer, composer une campagne, ligne de commande (b, c, d)."
+    reste: "composer une campagne (c, V7)."
     journal:
       - "2026-11-09 : Étiquettes libres d'une requête (PR #32)."
       - "2026-11-13 : Étiquettes du projet proposées avec leur nombre de requêtes à la saisie, puis « + Créer » (a, PR #56)."
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 1 réécrit ou complété."
+      - "2026-11-27 : Étiquettes partagées (plan-v2, lot B) : un dossier reçoit des étiquettes (folder.yml), qui valent pour tout ce qu'il contient ; la vue d'un dossier montre les étiquettes de chaque ligne et se filtre par étiquettes, « N tests sur T · les autres sont estompés » ; le filtre du référentiel et la recherche prennent les étiquettes héritées."
+      - "2026-11-27 : arnod run --etiquette (plan-v2, lot D) : les tests qui portent l'étiquette, héritée des dossiers comprise, « N tests dans M dossiers » ; plusieurs --etiquette se cumulent (d)."
     ecrans:
       a:
         etat: livré
@@ -981,9 +999,22 @@ pages:
         ecart:
           texte: "Le champ d'ajout s'ouvre par « + Étiquette » sous les étiquettes, pas en ligne sous l'adresse ; le nombre compte les requêtes du projet qui portent l'étiquette. La liste des assertions de l'écran n'est pas rendue (gabarits « {{ … }} »)."
           aligner: maquette
-      b: { etat: à faire, version: V2 }
+      b:
+        etat: livré
+        version: V2
+        pr: [96]
+        captures: [v2-etiquettes-dossier]
+        ecart:
+          texte: "Le filtre s'ajoute par une liste « + Étiquette » et ses pastilles se retirent par × ; les étiquettes du dossier ont leur propre ligne (« Étiquettes du dossier ») sous le résumé ; un sous-dossier dit « N tests · M smoke » pendant un filtre ; les lignes estompées le sont par la couleur du texte."
+          aligner: maquette
       c: { etat: à faire, version: V7 }
-      d: { etat: à faire, version: V2 }
+      d:
+        etat: livré
+        version: V2
+        pr: [96]
+        ecart:
+          texte: "Écran de terminal, sans capture de l'application (tests de bout en bout de la commande : src-tauri/cli/tests/). Chaque test a sa ligne (pas « … 2 autres ») ; 8 en parallèle par défaut, comme l'application (--parallele pour changer) ; un dossier qui ne range que des requêtes est un test, nommé par son dossier ; la cible d'une assertion d'en-tête est écrite en minuscules (headers.location)."
+          aligner: maquette
   "5.1":
     nom: "Envoi et réponse"
     version: [MVP, V1]
@@ -1132,12 +1163,34 @@ pages:
   "5.3":
     nom: "Ligne de commande"
     version: [V2, V7]
+    plans:
+      - "plan-v2 (LC1–LC6, lot D)"
     liees: ["5.2", "4.9"]
+    reste: "étape manuelle dans un terminal (b, V7) ; intégration continue (d, à décider)."
+    journal:
+      - "2026-11-27 : Ligne de commande (plan-v2, lot D) : arnod run d'un dossier, d'un test, d'une requête ou d'une étiquette, en lecture seule, variables ARNOD_VAR_<nom>, rapports JUnit, Allure et HTML, codes de sortie 0, 1 et 2 ; exécutable autonome (Windows : bin/arnod.exe de l'installeur, dans le PATH de l'utilisateur ; Linux : lié statiquement) ; « Copier la commande » du menu ⋯ d'un test ou d'un dossier."
     ecrans:
-      a: { etat: à faire }
-      b: { etat: à faire }
-      c: { etat: à faire }
-      d: { etat: à faire }
+      a:
+        etat: livré
+        version: V2
+        pr: [96]
+        ecart:
+          texte: "Écran de terminal, sans capture de l'application (tests de bout en bout de la commande : src-tauri/cli/tests/). Chaque test a sa ligne (pas « … 24 autres ») ; 8 en parallèle par défaut, comme l'application (--parallele pour changer) ; sans --env, le premier environnement du projet ; le texte de l'écran parle d'une image Docker, retirée (Q4)."
+          aligner: maquette
+      b: { etat: à faire, version: V7 }
+      c:
+        etat: livré
+        version: V2
+        pr: [96]
+        captures: [v2-copier-commande-menu, v2-copier-commande]
+        ecart:
+          texte: "L'entrée est dans le menu ⋯ d'un test et d'un dossier du référentiel (les campagnes viennent en V7) ; la notification nomme l'environnement actif : « ✓ Commande copiée · elle utilise l'environnement « … » »."
+          aligner: maquette
+      d:
+        etat: à décider
+        ecart:
+          texte: "L'écran montre l'image Docker arnod/arnod et des exemples GitHub Actions et Jenkins : l'intégration continue est retirée de la V2 (plan-v2, Q4) et Docker refusé, parce qu'il demande une installation sur le poste ; l'écran est à redécider."
+          aligner: maquette
   "6.1":
     nom: "Produits et versions"
     version: V7
@@ -1225,13 +1278,46 @@ pages:
   "7.1":
     nom: "Synchronisation"
     version: V2
+    plans:
+      - "plan-v2 (SY1–SY8, CF1–CF5, lots E et F)"
     liees: ["3.3"]
+    journal:
+      - "2026-11-27 : Synchronisation (plan-v2, lots E et F) : barre d'état, relier à GitHub, GitLab ou une adresse Git (jeton au coffre, transport par le réseau du poste), récupérer puis envoyer les éléments choisis avec un message, fusion élément par élément, conflit réglé assertion par assertion sans rien écrire avant de valider, secrets manquants après une récupération, pastilles et historique en clair."
     ecrans:
-      a: { etat: à faire }
-      b: { etat: à faire }
-      c: { etat: à faire }
-      d: { etat: à faire }
-      e: { etat: à faire }
+      a:
+        etat: livré
+        pr: [96]
+        captures: [v2-relier]
+        ecart:
+          texte: "La connexion par le navigateur n'est offerte que si l'application OAuth d'Arnod est fournie à la construction (Q2) ; sinon, un jeton personnel, vérifié par la forge et rangé au coffre. Les dépôts n'affichent pas leurs contributeurs. « Relier » crée le dépôt Git local s'il n'existe pas (Q10), alors que la maquette dit le contraire ; il ajoute un .gitignore pour les rapports d'arnod run."
+          aligner: maquette
+      b:
+        etat: livré
+        pr: [96]
+        captures: [v2-synchroniser]
+        ecart:
+          texte: "Le panneau s'ouvre en fenêtre modale depuis la barre d'état ; « Récupérer » seul reste offert à côté de « Récupérer puis envoyer » ; les éléments sont des étapes, requêtes, endpoints, dossiers, contrats, environnements ou réglages (exigences et anomalies en V7) ; les entrées « mocks » et « catalogue » de la barre d'état viennent en V5 et V6."
+          aligner: maquette
+      c:
+        etat: livré
+        pr: [96]
+        captures: [v2-conflit]
+        ecart:
+          texte: "Le conflit s'ouvre en fenêtre modale, pas dans la zone principale ; un fichier qui n'est pas une requête (environnement, contrat, réglages) se garde en entier, d'un côté ou de l'autre (Q8) ; « Abandonner la récupération » laisse le projet tel quel."
+          aligner: maquette
+      d:
+        etat: livré
+        pr: [96]
+        captures: [v2-pastille]
+        ecart:
+          texte: "Les pastilles marquent les requêtes (barre latérale, vue d'un dossier) changées à la dernière récupération ; l'historique est l'onglet « Équipe » de l'éditeur d'une requête, montré quand le projet est relié ; pas de lien « Couvre EX-… » (exigences en V7)."
+          aligner: maquette
+      e:
+        etat: livré
+        pr: [96]
+        ecart:
+          texte: "Bandeau en haut de la zone principale après une récupération (sans capture e2e : vérifié par Vitest) ; « Renseigner » ouvre la page des environnements, « Plus tard » ferme jusqu'à un nouveau secret manquant ; le coffre est « celui du système »."
+          aligner: maquette
 
 # Feuille de route (écran 0.1-a), générée par scripts/maquette-sync.py. L'état d'une fonction se
 # déduit des écrans qu'elle cite (« ecrans ») : un code de page prend les écrans de la page de la
@@ -1315,15 +1401,15 @@ feuille_de_route:
           texte: "Préférences → Apparence : forcer le thème clair ou sombre, zoom, police des éditeurs."
           ecrans: ["1.6-f"]
     - code: V2
-      titre: "Travailler en équipe et en intégration continue"
+      titre: "Travailler en équipe, jouer les tests hors de l'application"
       sous_titre: "Les projets sont déjà des fichiers dans Git : on les partage, et on les joue hors de l'application."
       fonctions:
         - nom: "Synchronisation"
           texte: "Relier le projet à GitHub ou GitLab ; envoyer, récupérer, régler un conflit assertion par assertion ; les secrets ne voyagent pas."
           ecrans: ["7.1"]
         - nom: "Ligne de commande arnod"
-          texte: "Lancer un test, un dossier ou une étiquette hors de l'application ; rapports JUnit, Allure, HTML ; image Docker, exemples GitHub Actions et Jenkins."
-          ecrans: ["5.3-a", "5.3-c", "5.3-d"]
+          texte: "Lancer un test, un dossier ou une étiquette hors de l'application ; rapports JUnit, Allure, HTML ; exécutable autonome, sans installation à part ni Docker."
+          ecrans: ["5.3-a", "5.3-c"]
         - nom: "Étiquettes partagées"
           texte: "Étiquettes communes au projet, visibles dans le référentiel et choisies à la ligne de commande."
           ecrans: ["4.9-b", "4.9-d"]
@@ -1332,7 +1418,7 @@ feuille_de_route:
           ecrans: ["1.5"]
         - nom: "Barre d'état"
           texte: "Elle arrive avec les modifications à envoyer ; mocks (V5) et catalogue (V6) s'y ajoutent ensuite."
-          etat: à faire
+          etat: livré
           note: "toutes les pages"
     - code: V3
       titre: "Couvrir tous les appels HTTP"
@@ -1454,9 +1540,9 @@ feuille_de_route:
           note: "à décider · sans écran"
   suite:
     titre: "Remplacer Bruno partout, puis SoapUI, puis piloter la recette"
-    progression: "Chaque version s'appuie sur les précédentes. L'équipe et la CI (V2) puis tous les appels HTTP (V3) achèvent de remplacer Bruno. Les scénarios et les jeux de données (V4) rendent possibles SoapUI (V5) et les autres natures de test (V6). La recette (V7, V8) s'appuie sur des tests complets ; l'assistance (V9), sur leur historique."
+    progression: "Chaque version s'appuie sur les précédentes. L'équipe et la ligne de commande (V2) puis tous les appels HTTP (V3) achèvent de remplacer Bruno. Les scénarios et les jeux de données (V4) rendent possibles SoapUI (V5) et les autres natures de test (V6). La recette (V7, V8) s'appuie sur des tests complets ; l'assistance (V9), sur leur historique."
   a_decider:
     - sujet: "macOS et Linux"
-      texte: "l'application est annoncée pour Windows seulement ; Bruno et SoapUI tournent sur les trois systèmes. La commande arnod tourne sous Linux dès la V2 (image Docker). L'application : pour quelle version ?"
+      texte: "l'application est annoncée pour Windows seulement ; Bruno et SoapUI tournent sur les trois systèmes. La commande arnod tourne sous Linux dès la V2 (exécutable autonome, sans Docker). L'application : pour quelle version ?"
     - sujet: "Tests de sécurité et de charge"
       texte: "rangés en V9, sans écran dessiné. Les dessiner, ou les sortir du périmètre ?"

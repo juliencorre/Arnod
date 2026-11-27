@@ -23,6 +23,7 @@ export const DEFAULT_SHORTCUTS = {
   saveContract: ["Ctrl+S"],
   togglePlacement: ["Ctrl+J"],
   toggleSidebar: ["Ctrl+Backslash"],
+  search: ["Ctrl+K"],
   nextTab: ["Ctrl+Tab", "Ctrl+Shift+Tab"],
   closeTab: ["Ctrl+W"],
   environments: ["Ctrl+Shift+E"],

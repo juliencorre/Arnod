@@ -13,6 +13,18 @@ import type {
   HistoryDiff,
   HistoryEntry,
   HistoryView,
+  SearchResults,
+  CliShell,
+  JournalEntry,
+  MissingSecrets,
+  SyncAccount,
+  SyncChoice,
+  SyncConflicts,
+  SyncDeviceCode,
+  SyncForge,
+  SyncLoginOptions,
+  SyncRepository,
+  SyncView,
   InterfaceView,
   ShortcutChange,
   ConflictSide,
@@ -129,6 +141,7 @@ const COMMAND_ERROR_KINDS: Record<CommandErrorKind, true> = {
   secretStore: true,
   protectedEnvironment: true,
   changedOnDisk: true,
+  conflict: true,
 };
 
 /** Indique si la cause d'un rejet est une `CommandError` renvoyée par le cœur natif. */
@@ -869,6 +882,86 @@ export const ipc = {
   /** « Annuler » après « Effacer » : les envois effacés reviennent. */
   historyRestore: (project: string, path: string, entries: HistoryEntry[]): Promise<HistoryView> =>
     call<HistoryView>("history_restore", { project, path, entries }),
+
+  // --- Version 2, lot A : recherche Ctrl+K (1.5-a, 1.5-b) ---
+  /**
+   * Résultats de `text` dans les projets du workspace (`null` : tous les projets). `refresh` relit
+   * les projets (à l'ouverture de la recherche) ; sinon le cœur reprend ceux qu'il a lus.
+   */
+  searchQuery: (workspace: string | null, text: string, refresh: boolean): Promise<SearchResults> =>
+    call<SearchResults>("search_query", { workspace, text, refresh }),
+
+  // --- Version 2, lot B : étiquettes partagées (4.9-b) ---
+  /** Étiquettes d'un dossier : elles valent pour tout ce qu'il contient. */
+  treeSetFolderTags: (project: string, path: string, tags: string[]): Promise<void> =>
+    call<null>("tree_set_folder_tags", { project, path, tags }).then(() => undefined),
+
+  // --- Version 2, lot D : ligne de commande (5.3-c) ---
+  /**
+   * Commande `arnod run` d'un test ou d'un dossier (`path`), avec l'environnement donné, citée
+   * pour le terminal du poste (`shell` absent) ; refusée (`notFound`) si le dossier n'existe plus.
+   */
+  cliCommand: (
+    project: string,
+    path: string,
+    environment: string | null,
+    shell: CliShell | null = null,
+  ): Promise<string> => call<string>("cli_command", { project, path, environment, shell }),
+
+  // --- Version 2, lots E et F : synchronisation Git (7.1-a à 7.1-e) ---
+  /** État de la synchronisation du projet, sans réseau. */
+  syncStatus: (project: string): Promise<SyncView> => call<SyncView>("sync_status", { project }),
+  /** Vérifie ce qui arrive des collègues (Q6), sans rien écrire dans le projet. */
+  syncCheck: (project: string): Promise<SyncView> => call<SyncView>("sync_check", { project }),
+  syncLoginOptions: (): Promise<SyncLoginOptions> => call<SyncLoginOptions>("sync_login_options"),
+  /** Connexion par le navigateur : ouvre la page de la forge, rend le code à saisir. */
+  syncConnectStart: (forge: SyncForge, host: string): Promise<SyncDeviceCode> =>
+    call<SyncDeviceCode>("sync_connect_start", { forge, host }),
+  /** Attend la validation dans le navigateur ; le jeton va au coffre. */
+  syncConnectWait: (forge: SyncForge, host: string): Promise<SyncAccount> =>
+    call<SyncAccount>("sync_connect_wait", { forge, host }),
+  syncConnectCancel: (forge: SyncForge, host: string): Promise<void> =>
+    call<null>("sync_connect_cancel", { forge, host }).then(() => undefined),
+  /** Jeton personnel saisi, vérifié par la forge puis rangé au coffre. */
+  syncToken: (
+    forge: SyncForge,
+    host: string,
+    token: string,
+    login: string | null,
+  ): Promise<SyncAccount> => call<SyncAccount>("sync_token", { forge, host, token, login }),
+  syncRepositories: (account: SyncAccount, query: string): Promise<SyncRepository[]> =>
+    call<SyncRepository[]>("sync_repositories", { account, query }),
+  syncCreateRepository: (account: SyncAccount, name: string): Promise<SyncRepository> =>
+    call<SyncRepository>("sync_create_repository", { account, name }),
+  /** « Relier et envoyer » (7.1-a). */
+  syncLink: (
+    project: string,
+    url: string,
+    branch: string,
+    account: SyncAccount | null,
+  ): Promise<SyncView> => call<SyncView>("sync_link", { project, url, branch, account }),
+  /** Récupérer (`push` faux), récupérer puis envoyer, ou envoyer seulement (`pull` faux). */
+  syncPullPush: (
+    project: string,
+    items: string[],
+    message: string,
+    pull: boolean,
+    push: boolean,
+  ): Promise<SyncView> => call<SyncView>("sync_pull_push", { project, items, message, pull, push }),
+  syncConflicts: (project: string): Promise<SyncConflicts> =>
+    call<SyncConflicts>("sync_conflicts", { project }),
+  /** « Valider la résolution » : chemin → élément → version gardée. */
+  syncResolve: (
+    project: string,
+    choices: Record<string, Record<string, SyncChoice>>,
+  ): Promise<SyncView> => call<SyncView>("sync_resolve", { project, choices }),
+  syncAbandon: (project: string): Promise<SyncView> => call<SyncView>("sync_abandon", { project }),
+  syncJournal: (project: string, path: string): Promise<JournalEntry[]> =>
+    call<JournalEntry[]>("sync_journal", { project, path }),
+  syncMissingSecrets: (project: string): Promise<MissingSecrets[]> =>
+    call<MissingSecrets[]>("sync_missing_secrets", { project }),
+  syncSecretsLater: (project: string, environment: string, names: string[]): Promise<void> =>
+    call<null>("sync_secrets_later", { project, environment, names }).then(() => undefined),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */
@@ -893,6 +986,8 @@ export const EVENTS = {
   quit: "arnod://quitter",
   // Version 1 : préférences d'interface du poste (thème, police, raccourcis).
   interface: "arnod://interface",
+  // Version 2, lot E : état de la synchronisation d'un projet.
+  sync: "arnod://synchro",
 } as const;
 
 /** Abonnements aux événements du cœur ; chacun renvoie sa fonction de désabonnement. */
@@ -977,6 +1072,11 @@ export const events = {
   /** Version 1 : préférences d'interface changées dans n'importe quelle fenêtre. */
   onInterface: (handler: (view: InterfaceView) => void): Promise<UnlistenFn> =>
     listen<InterfaceView>(EVENTS.interface, (event) => {
+      handler(event.payload);
+    }),
+  /** Version 2, lot E : synchronisation vérifiée, récupérée ou envoyée (toutes les fenêtres). */
+  onSync: (handler: (view: SyncView) => void): Promise<UnlistenFn> =>
+    listen<SyncView>(EVENTS.sync, (event) => {
       handler(event.payload);
     }),
 };

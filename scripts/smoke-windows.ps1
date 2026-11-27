@@ -6,11 +6,12 @@
   1. Vérifie que le manifeste de l'installeur demande « asInvoker » (pas d'invite UAC, N1).
   2. Installe en mode silencieux (/S) pour l'utilisateur courant.
   3. Vérifie le dossier d'installation, le raccourci du menu Démarrer et
-     l'entrée de désinstallation dans HKCU (Paramètres Windows).
+     l'entrée de désinstallation dans HKCU (Paramètres Windows), puis la ligne de commande
+     (bin\arnod.exe, son dossier dans le PATH de l'utilisateur ; V2, lot D).
   4. Lance Arnod, attend que la page affiche « Bienvenue dans Arnod » (poste vierge :
      premier lancement, 1a), via UI Automation,
      enregistre une capture, puis ferme la fenêtre comme avec la croix (F4).
-  5. Désinstalle en mode silencieux et vérifie la suppression.
+  5. Désinstalle en mode silencieux et vérifie la suppression (PATH compris).
 
   Limite : le runner CI est administrateur. L'absence d'invite UAC sur un compte
   standard se vérifie à la main (voir README), ce script contrôle le manifeste.
@@ -87,6 +88,8 @@ function Save-Screenshot([string] $Path) {
 $installDir = Join-Path $env:LOCALAPPDATA 'Arnod'
 $exe = Join-Path $installDir 'arnod.exe'
 $uninstaller = Join-Path $installDir 'uninstall.exe'
+$cliDir = Join-Path $installDir 'bin'
+$cli = Join-Path $cliDir 'arnod.exe'
 $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Arnod.lnk'
 $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Arnod'
 
@@ -110,6 +113,19 @@ if (-not (Test-Path $shortcut)) { throw "Raccourci du menu Démarrer introuvable
 if (-not (Test-Path $uninstallKey)) { throw "Entrée de désinstallation absente de HKCU." }
 $location = (Get-ItemProperty $uninstallKey).InstallLocation.Trim('"')
 Write-Host "Installé dans $location (entrée de désinstallation dans HKCU)."
+
+# 3 bis. Ligne de commande (V2, lot D, Q3) : bin\arnod.exe, son dossier dans le PATH de
+# l'utilisateur (HKCU\Environment), sans élévation.
+if (-not (Test-Path $cli)) { throw "bin\arnod.exe introuvable dans $installDir." }
+$cliVersion = & $cli --version
+if ($LASTEXITCODE -ne 0 -or $cliVersion -notmatch '^arnod \d') {
+  throw "arnod --version a échoué (code $LASTEXITCODE) : $cliVersion"
+}
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if (($userPath -split ';') -notcontains $cliDir) {
+  throw "$cliDir absent du PATH de l'utilisateur : $userPath"
+}
+Write-Host "Ligne de commande : $cliVersion, $cliDir dans le PATH de l'utilisateur."
 
 # 4. Lancement, attente du premier lancement (1a), puis fermeture par la croix (F4).
 $app = Start-Process -FilePath $exe -PassThru
@@ -169,4 +185,8 @@ Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait | Out-Null
 Wait-Until -TimeoutSeconds 60 -Message "La désinstallation n'a pas supprimé arnod.exe et l'entrée HKCU." -Condition {
   -not (Test-Path $exe) -and -not (Test-Path $uninstallKey)
 }
-Write-Host "Désinstallation silencieuse réussie."
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if ($userPath -and (($userPath -split ';') -contains $cliDir)) {
+  throw "La désinstallation a laissé $cliDir dans le PATH de l'utilisateur : $userPath"
+}
+Write-Host "Désinstallation silencieuse réussie (PATH de l'utilisateur rendu)."

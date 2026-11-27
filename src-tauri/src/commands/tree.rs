@@ -115,6 +115,22 @@ pub fn tree_create_folder(
     tree_changed(&window, project, result)
 }
 
+/// Étiquettes d'un dossier (`docs/plan-v2.md`, lot B, ET1) : elles valent pour tout ce qu'il
+/// contient (R4).
+#[tauri::command]
+pub fn tree_set_folder_tags(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    project: Uuid,
+    path: String,
+    tags: Vec<String>,
+) -> Result<(), CommandError> {
+    let result = state
+        .project_ctx(project)
+        .and_then(|ctx| tree::set_folder_tags(&ctx.root, &path, &tags));
+    tree_changed(&window, project, result)
+}
+
 #[tauri::command]
 pub fn tree_create_request(
     window: WebviewWindow,
