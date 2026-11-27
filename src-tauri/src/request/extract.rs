@@ -117,6 +117,7 @@ mod tests {
         Extraction {
             name: name.to_owned(),
             source: source.to_owned(),
+            scope: crate::request::model::ExtractionScope::Runtime,
             enabled: true,
         }
     }

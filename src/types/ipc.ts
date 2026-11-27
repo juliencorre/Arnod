@@ -1473,7 +1473,16 @@ export interface Extraction {
   /** `body.id`, `headers.Location`, `status`, ou `request.body.ref` pour une valeur envoyée. */
   source: string;
   enabled: boolean;
+  /** Portée de la variable, `variable.scope` de l'action (4.2-b bis, AM44). */
+  scope: ExtractionScope;
 }
+
+/**
+ * Portée d'une variable extraite (`ExtractionScope`) : `runtime` (le test) ou `environment`
+ * (gardée aussi en variable locale de l'environnement de l'envoi) ; `request`, `folder` et
+ * `collection`, écrites par Bruno ou à la main, sont gardées et appliquées comme `runtime`.
+ */
+export type ExtractionScope = "runtime" | "environment" | "request" | "folder" | "collection";
 
 /** Valeur extraite à un envoi (`ExtractedValue`). */
 export interface ExtractedValue {

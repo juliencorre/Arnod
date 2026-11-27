@@ -681,7 +681,7 @@ export const useWorkbenchStore = defineStore("workbench", () => {
     for (let n = 2; draft.extractions.some((e) => e.name === name); n += 1) {
       name = `${base}${String(n)}`;
     }
-    draft.extractions.push({ name, source, enabled: true });
+    draft.extractions.push({ name, source, enabled: true, scope: "runtime" });
     return name;
   }
 

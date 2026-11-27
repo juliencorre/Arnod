@@ -25,23 +25,27 @@ Chaque écart est le texte de son entrée dans `maquette-etat.yml`.
 - un environnement se crée dans une fenêtre (adresse de base, variables reprises, place dans la
   chaîne), et une requête qui hérite d'une authentification la montre en carte ;
 - l'import fait correspondre les environnements, laisse choisir où vont les secrets, et un script
-  Bruno non repris se remplace par une assertion ou s'accepte sans lui.
+  Bruno non repris se remplace par une assertion ou s'accepte sans lui ;
+- les environnements se gèrent dans un onglet, leurs variables dans un seul tableau avec leur
+  portée, et une extraction choisit sa portée (lot G, ajouté le 27 novembre pour les deux derniers
+  écarts).
 
 ## 2. Maquettes
 
-| Repère                                           | Dans ce plan                       | Lot |
-| ------------------------------------------------ | ---------------------------------- | --- |
-| 0.3-b, 1.2-d, 2.1-a, 2.1-a ter                   | textes et libellés                 | A   |
-| 2.1-a sexies, 2.3-b, 3.1-f, 3.2-c                | textes et libellés                 | A   |
-| 3.3-0, 4.2-c, 4.4-d, 5.1-c                       | textes et libellés                 | A   |
-| 1.1-a, 1.1-b bis, 1.1-d, 1.1-e                   | formes et dispositions             | B   |
-| 1.2-a bis, 1.2-e, 1.3-a, 1.3-c                   | formes et dispositions             | B   |
-| 1.4-b, 1.4-h, 2.2-b, 2.2-d, 2.2-f                | formes et dispositions             | B   |
-| 3.1-e, 3.2-a, 3.2-a2, 3.4-a, 4.1-a quater, 4.1-g | formes et dispositions             | B   |
-| 5.1-b, 5.1-h, 5.2-e, 5.2-f, 3.3-c, 4.2-b bis     | réponse, envoyé, run, confirmation | C   |
-| 3.3-a, 3.3-b, 3.4-b                              | environnements et authentification | D   |
-| 4.1-a, 4.1-a bis, 4.1-a ter, 5.2-d               | dossiers                           | E   |
-| 1.1-c, 2.3-b, 2.3-f                              | import                             | F   |
+| Repère                                           | Dans ce plan                        | Lot |
+| ------------------------------------------------ | ----------------------------------- | --- |
+| 0.3-b, 1.2-d, 2.1-a, 2.1-a ter                   | textes et libellés                  | A   |
+| 2.1-a sexies, 2.3-b, 3.1-f, 3.2-c                | textes et libellés                  | A   |
+| 3.3-0, 4.2-c, 4.4-d, 5.1-c                       | textes et libellés                  | A   |
+| 1.1-a, 1.1-b bis, 1.1-d, 1.1-e                   | formes et dispositions              | B   |
+| 1.2-a bis, 1.2-e, 1.3-a, 1.3-c                   | formes et dispositions              | B   |
+| 1.4-b, 1.4-h, 2.2-b, 2.2-d, 2.2-f                | formes et dispositions              | B   |
+| 3.1-e, 3.2-a, 3.2-a2, 3.4-a, 4.1-a quater, 4.1-g | formes et dispositions              | B   |
+| 5.1-b, 5.1-h, 5.2-e, 5.2-f, 3.3-c, 4.2-b bis     | réponse, envoyé, run, confirmation  | C   |
+| 3.3-a, 3.3-b, 3.4-b                              | environnements et authentification  | D   |
+| 4.1-a, 4.1-a bis, 4.1-a ter, 5.2-d               | dossiers                            | E   |
+| 1.1-c, 2.3-b, 2.3-f                              | import                              | F   |
+| 3.3-a, 4.2-b bis                                 | environnements, portée d'extraction | G   |
 
 ## 3. Règles
 
@@ -133,6 +137,13 @@ enregistre les environnements sur place, ER2)
 | AM41 | 2.3-b | La fenêtre « Importer » fait correspondre chaque environnement de la collection à un environnement du projet (ou un nouveau) et dit combien de variables il reçoit ; « N valeurs ressemblent à des secrets » (case cochée : variables locales au coffre). |
 | AM42 | 2.3-f | Dans le rapport, « Remplacer par une assertion… » ouvre l'ajout d'une assertion sur la requête et retire le script ; « Accepter sans ce script » le retire du fichier et le marque repris ; « Annuler » dans la notification.                             |
 
+**Lot G - Variables** (après le lot F ; les deux écarts `aligner: code` restés hors des lots A à F)
+
+| ID   | Écran     | Comportement attendu                                                                                                                                                                                                                                                                                                                                                                   |
+| ---- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AM43 | 3.3-a     | Les environnements s'ouvrent dans un onglet (contenu `environments`, Q7) : fil d'Ariane, « Environnements · N · propres à ce projet », « ✓ Enregistré », « Copier depuis un autre projet… », « + Nouvel environnement » ; liste réordonnée par ⋮⋮ (glisser, ↑ ↓) ; un seul tableau Variable, Valeur, Portée (partagée ou locale, Q10) ; « Utilisation » (Q8) ; Protection ; Supprimer. |
+| AM44 | 4.2-b bis | Une extraction choisit sa portée (« le test ▾ ») : le test (`runtime`) ou l'environnement (`environment`, Q9) ; la portée est écrite dans `variable.scope` et appliquée à l'envoi comme au run.                                                                                                                                                                                        |
+
 ## 5. Hors périmètre
 
 - Les écarts `aligner: maquette` et `à décider` (la maquette se redessine ; les questions se
@@ -151,6 +162,9 @@ La chaîne reste : composant Vue → store Pinia → `src/lib/ipc.ts` → comman
   quand l'utilisateur réordonne ; un dossier sans rang suit les rangés, par nom (lot E).
 - Script Bruno accepté ou remplacé : retiré de `runtime.scripts` de la requête ; `import.json`
   (poste) marque l'élément repris (lot F).
+- Portée d'une extraction : `variable.scope` de l'action `set-variable`, `runtime` (le test) ou
+  `environment` ; `request`, `folder` et `collection`, valeurs du schéma écrites par Bruno ou à la
+  main, sont lues, montrées, gardées et appliquées comme `runtime` (lot G).
 - Rien d'autre ne change.
 
 ### 6.2 Cœur Rust
@@ -164,18 +178,25 @@ La chaîne reste : composant Vue → store Pinia → `src/lib/ipc.ts` → comman
   chaîne (lot D).
 - `import` : correspondance des environnements et choix des secrets dans `ImportOptions` ;
   `import_script` (accepter ou remplacer) et `import_script_undo` (lot F).
+- `Extraction.scope` ; une valeur extraite de portée `environment` devient une variable locale
+  (poste) de l'environnement de l'envoi, déclarée au besoin ; `environment::copy_from` copie des
+  environnements d'un autre projet (variables partagées et noms des locales, jamais les valeurs
+  locales ni les secrets) ; `Workbench::environment_usage` donne le dernier run de chaque
+  environnement parmi ceux que le cœur garde (lot G).
 
 ### 6.3 Commandes IPC
 
-| Commande                  | Paramètres                                    | Réponse            | Lot |
-| ------------------------- | --------------------------------------------- | ------------------ | --- |
-| `request_send` (résultat) | inchangés                                     | + environnement    | C   |
-| `tree_folder_view`        | `projectId`, `path`                           | `FolderView`       | E   |
-| `tree_reorder`            | `projectId`, `folder`, `order: string[]`      | `TreeView`         | E   |
-| `environment_create`      | + `baseUrl`, `copyFrom`, `after`, `protected` | `EnvironmentsView` | D   |
-| `import_run`              | + `environments: map`, `secretsLocal: bool`   | `ImportReport`     | F   |
-| `import_script`           | `projectId`, `index`, `choice`                | `ScriptResolved`   | F   |
-| `import_script_undo`      | `undoToken`                                   | `ImportReport`     | F   |
+| Commande                  | Paramètres                                    | Réponse              | Lot |
+| ------------------------- | --------------------------------------------- | -------------------- | --- |
+| `request_send` (résultat) | inchangés                                     | + environnement      | C   |
+| `tree_folder_view`        | `projectId`, `path`                           | `FolderView`         | E   |
+| `tree_reorder`            | `projectId`, `folder`, `order: string[]`      | `TreeView`           | E   |
+| `environment_create`      | + `baseUrl`, `copyFrom`, `after`, `protected` | `EnvironmentsView`   | D   |
+| `import_run`              | + `environments: map`, `secretsLocal: bool`   | `ImportReport`       | F   |
+| `import_script`           | `projectId`, `index`, `choice`                | `ScriptResolved`     | F   |
+| `import_script_undo`      | `undoToken`                                   | `ImportReport`       | F   |
+| `environment_copy`        | `projectId`, `fromProject`, `names`           | `EnvironmentsView`   | G   |
+| `environment_usage`       | `projectId`                                   | `EnvironmentUsage[]` | G   |
 
 ### 6.4 Frontend
 
@@ -183,6 +204,8 @@ La chaîne reste : composant Vue → store Pinia → `src/lib/ipc.ts` → comman
   chevron seul plie et déplie (lot E).
 - `EnvironmentCreateDialog.vue` (lot D) ; carte d'authentification héritée dans `AuthEditor.vue`.
 - `lib/format.ts` : accord des nombres (R4).
+- Contenu `environments` (page des environnements, `EnvironmentsTab.vue`) à la place de la fenêtre
+  modale ; `CopyEnvironmentsDialog.vue` ; colonne « Portée » de `VariablesEditor.vue` (lot G).
 
 ### 6.5 Design
 
@@ -253,6 +276,12 @@ pull request dit après laquelle la fusionner. Ordre, avec les lots de `plan-qua
       (`choice` : `accept` ou `replace`) au lieu de deux, et `import_script_undo` pour « Annuler » ;
       l'assertion s'ajoute dans l'éditeur de la requête, qui s'ouvre sur l'onglet « Assertions ».
 
+**Lot G - Variables** (`claude/alignement-g-variables`)
+
+- [ ] **T18** AM43 : page des environnements en onglet, tableau unique, copie depuis un autre
+      projet, utilisation.
+- [ ] **T19** AM44 : portée d'une extraction.
+
 ## 9. Critères d'acceptation
 
 - [ ] `maquette-etat.yml` n'a plus aucun écart `aligner: code` ; `check-maquette` le compte.
@@ -279,3 +308,7 @@ pull request dit après laquelle la fusionner. Ordre, avec les lots de `plan-qua
 | Q4  | Clic sur un dossier : ouvre la vue ou plie ?                                                      | 2026-11-26 : ouvre la vue (aperçu, comme une requête) ; le chevron plie                           |
 | Q5  | Secrets à l'import (2.3-b), case décochée : valeurs partagées en clair ?                          | 2026-11-26 : oui, c'est le choix de l'utilisateur ; cochée par défaut                             |
 | Q6  | « Accepter sans ce script » (2.3-f) retire le script du fichier ou le garde marqué « accepté » ?  | 2026-11-26 : le retire, avec « Annuler » ; le rapport le marque repris                            |
+| Q7  | Environnements (3.3-a) : onglet ou fenêtre modale ?                                               | 2026-11-27 : onglet, comme la maquette ; Ctrl+Maj+E, la pastille et « Environnements… » l'ouvrent |
+| Q8  | « Utilisation » (3.3-a) sans campagnes (V4, R3) ?                                                 | 2026-11-27 : le dernier run sur l'environnement que le cœur garde ; les campagnes compléteront    |
+| Q9  | Portée « l'environnement » (4.2-b bis) : où va la valeur extraite ?                               | 2026-11-27 : variable locale (poste) de l'environnement de l'envoi, jamais dans le projet         |
+| Q10 | Portée d'une variable (3.3-a) : où va la valeur d'une variable locale ?                           | 2026-11-27 : saisie, au coffre ; une valeur locale déjà en clair (extraite) reste lisible         |

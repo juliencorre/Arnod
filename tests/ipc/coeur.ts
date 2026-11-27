@@ -135,7 +135,9 @@ export type ExampleRef = { index: number, status: number | null, name: string, }
 
 export type ExtractedValue = { name: string, source: string, value: string | null, message: string | null, };
 
-export type Extraction = { name: string, source: string, enabled: boolean, };
+export type Extraction = { name: string, source: string, enabled: boolean, scope: ExtractionScope, };
+
+export type ExtractionScope = "runtime" | "environment" | "request" | "folder" | "collection";
 
 export type FailureCause = "certificate" | "proxy" | "proxyAuth" | "dns" | "unreachable" | "timeout" | "tls" | "other";
 
@@ -601,6 +603,7 @@ export type CheckImportDone = Check<Same<Ipc.ImportDone, ImportDone>>;
 export type CheckScriptChoice = Check<Same<Ipc.ScriptChoice, ScriptChoice>>;
 export type CheckScriptResolved = Check<Same<Ipc.ScriptResolved, ScriptResolved>>;
 export type CheckExtraction = Check<Same<Ipc.Extraction, Extraction>>;
+export type CheckExtractionScope = Check<Same<Ipc.ExtractionScope, ExtractionScope>>;
 export type CheckExtractedValue = Check<Same<Ipc.ExtractedValue, ExtractedValue>>;
 export type CheckDrawnValue = Check<Same<Ipc.DrawnValue, DrawnValue>>;
 export type CheckUsedSource = Check<Same<Ipc.UsedSource, UsedSource>>;

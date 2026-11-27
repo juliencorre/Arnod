@@ -262,7 +262,7 @@ function boutiqueTests(): FakeCore {
       method: "POST",
       url: "{{baseUrl}}/customers",
       seq: 1,
-      extractions: [{ name: "client.id", source: "body.id", enabled: true }],
+      extractions: [{ name: "client.id", source: "body.id", enabled: true, scope: "runtime" }],
       assertions: [check("s", "status", 201), check("d", "responseTime", 500)],
     }),
   );
@@ -320,7 +320,7 @@ function commandesLotE(): FakeCore {
         selected: 0,
         other: "",
       },
-      extractions: [{ name: "order.id", source: "body.id", enabled: true }],
+      extractions: [{ name: "order.id", source: "body.id", enabled: true, scope: "runtime" }],
       seq: 1,
     }),
   );

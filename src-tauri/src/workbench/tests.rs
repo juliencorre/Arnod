@@ -940,6 +940,7 @@ async fn lot_e_un_test_passe_la_valeur_extraite_et_s_arrete_au_premier_echec() {
         r.extractions.push(Extraction {
             name: "client.id".into(),
             source: "body.id".into(),
+            scope: crate::request::model::ExtractionScope::Runtime,
             enabled: true,
         });
         r.assertions.push(status_is(201));
@@ -1061,11 +1062,13 @@ async fn lot_e_un_envoi_seul_extrait_tire_et_montre_ce_qui_est_parti() {
         Extraction {
             name: "commande".into(),
             source: "headers.Location".into(),
+            scope: crate::request::model::ExtractionScope::Runtime,
             enabled: true,
         },
         Extraction {
             name: "ref".into(),
             source: "request.body.ref".into(),
+            scope: crate::request::model::ExtractionScope::Runtime,
             enabled: true,
         },
     ];
@@ -1181,5 +1184,80 @@ async fn am35_envoye_dit_le_jeton_oauth2_sans_sa_valeur() {
         !serde_json::to_string(&sent)
             .unwrap()
             .contains("jeton-secret")
+    );
+}
+
+/// AM44 (4.2-b bis) : une extraction de portée « l'environnement » garde sa valeur en variable
+/// locale (poste) de l'environnement de l'envoi, déclarée au besoin ; « le test » ne touche pas
+/// l'environnement. Au run comme à l'envoi.
+#[tokio::test]
+async fn am44_portee_environnement_garde_la_valeur_en_variable_locale() {
+    use crate::request::model::ExtractionScope;
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/token"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(r#"{"access":"jeton-42","id":"x"}"#),
+        )
+        .mount(&server)
+        .await;
+    let f = fixture();
+    set_base_url(&f, &server.uri());
+    let mut request = Request::new("Jeton");
+    request.method = Method::Post;
+    request.url = "{{baseUrl}}/token".into();
+    request.extractions = vec![
+        Extraction {
+            name: "jeton".into(),
+            source: "body.access".into(),
+            scope: ExtractionScope::Environment,
+            enabled: true,
+        },
+        Extraction {
+            name: "seul.test".into(),
+            source: "body.id".into(),
+            scope: ExtractionScope::Runtime,
+            enabled: true,
+        },
+    ];
+    f.bench
+        .send(&f.ctx, Uuid::new_v4(), "Local", request.clone(), false)
+        .await
+        .unwrap();
+    let env = &f.bench.environments(&f.ctx).environments[0];
+    assert_eq!(
+        env.environment.locals,
+        ["jeton"],
+        "seule la portée environnement est déclarée"
+    );
+    let local = env.local_vars.iter().find(|v| v.name == "jeton").unwrap();
+    assert_eq!(local.value.as_deref(), Some("jeton-42"));
+    assert!(!local.secret);
+    // Jamais dans le projet : seul le nom est déclaré dans le fichier de l'environnement.
+    let file = std::fs::read_to_string(f.ctx.root.join("environments/local.yml")).unwrap();
+    assert!(!file.contains("jeton-42"), "{file}");
+
+    // Au run : la valeur suivante remplace la précédente.
+    Mock::given(method("POST"))
+        .and(path("/token2"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"access":"jeton-43"}"#))
+        .mount(&server)
+        .await;
+    request.url = "{{baseUrl}}/token2".into();
+    let saved = tree::create_request(&f.ctx.root, "", Some("Jeton")).unwrap();
+    file::write(&tree::resolve(&f.ctx.root, &saved).unwrap(), &request).unwrap();
+    // Le run du projet : la requête enregistrée est sa seule ligne.
+    let run = f.bench.start_run(&f.ctx, "", "Local", None, false).unwrap();
+    let run = wait(&f.bench, run.id).await;
+    assert_eq!(run.items[0].path, saved);
+    let env = &f.bench.environments(&f.ctx).environments[0];
+    assert_eq!(
+        env.local_vars
+            .iter()
+            .find(|v| v.name == "jeton")
+            .unwrap()
+            .value
+            .as_deref(),
+        Some("jeton-43")
     );
 }

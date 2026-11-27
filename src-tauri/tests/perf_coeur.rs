@@ -573,6 +573,7 @@ fn step_request(test: usize, step: usize) -> Request {
         request.extractions = vec![Extraction {
             name: format!("parcours{test}Id"),
             source: "body.id".to_owned(),
+            scope: arnod_lib::request::model::ExtractionScope::Runtime,
             enabled: true,
         }];
     } else {

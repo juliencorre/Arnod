@@ -411,6 +411,50 @@ pub struct Extraction {
     /// Une extraction désactivée n'est pas appliquée.
     #[serde(default = "yes")]
     pub enabled: bool,
+    /// Portée de la variable (4.2-b bis, AM44) : `variable.scope` de l'action.
+    #[serde(default)]
+    pub scope: ExtractionScope,
+}
+
+/// Portée d'une variable extraite (`variable.scope` du schéma OpenCollection, AM44).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "lowercase")]
+pub enum ExtractionScope {
+    /// « le test » : variable d'exécution, passée aux étapes suivantes et gardée pour la session.
+    #[default]
+    Runtime,
+    /// « l'environnement » : gardée aussi en variable locale (poste) de l'environnement de l'envoi.
+    Environment,
+    /// Valeurs du schéma écrites par Bruno ou à la main : lues, montrées, gardées, appliquées comme
+    /// `Runtime`.
+    Request,
+    Folder,
+    Collection,
+}
+
+impl ExtractionScope {
+    /// Valeur du schéma ; une valeur inconnue est lue comme `Runtime`.
+    pub fn parse(text: &str) -> Self {
+        match text {
+            "environment" => Self::Environment,
+            "request" => Self::Request,
+            "folder" => Self::Folder,
+            "collection" => Self::Collection,
+            _ => Self::Runtime,
+        }
+    }
+
+    /// Valeur écrite dans `variable.scope`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Runtime => "runtime",
+            Self::Environment => "environment",
+            Self::Request => "request",
+            Self::Folder => "folder",
+            Self::Collection => "collection",
+        }
+    }
 }
 
 /// Opération d'un contrat dont la requête est issue (C7).
