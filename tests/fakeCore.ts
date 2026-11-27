@@ -26,6 +26,7 @@ import {
   handleInterface,
   recordSend,
 } from "./fakeInterface";
+import { fakeSearch } from "./fakeSearch";
 import { createFakeUpdates, type FakeUpdates, handleUpdates } from "./fakeUpdates";
 import { STEP_CATALOG, detect } from "./fakeSteps";
 // Lot C - Import Bruno.
@@ -409,6 +410,8 @@ export function installFakeCore(initial: CatalogSnapshot): FakeCore {
           // Version 1 : apparence, raccourcis, historique des envois.
           const iface = handleInterface(core.interface, cmd, args);
           if (iface !== undefined) return iface;
+          // Version 2, lot A : recherche Ctrl+K.
+          if (cmd === "search_query") return fakeSearch(core.workbench, String(args.text));
           // Sélection multiple (4.1-a quater).
           const batched = handleBatch(core.workbench, cmd, args);
           if (batched !== undefined) {

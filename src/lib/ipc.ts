@@ -13,6 +13,7 @@ import type {
   HistoryDiff,
   HistoryEntry,
   HistoryView,
+  SearchResults,
   InterfaceView,
   ShortcutChange,
   ConflictSide,
@@ -869,6 +870,14 @@ export const ipc = {
   /** « Annuler » après « Effacer » : les envois effacés reviennent. */
   historyRestore: (project: string, path: string, entries: HistoryEntry[]): Promise<HistoryView> =>
     call<HistoryView>("history_restore", { project, path, entries }),
+
+  // --- Version 2, lot A : recherche Ctrl+K (1.5-a, 1.5-b) ---
+  /**
+   * Résultats de `text` dans les projets du workspace (`null` : tous les projets). `refresh` relit
+   * les projets (à l'ouverture de la recherche) ; sinon le cœur reprend ceux qu'il a lus.
+   */
+  searchQuery: (workspace: string | null, text: string, refresh: boolean): Promise<SearchResults> =>
+    call<SearchResults>("search_query", { workspace, text, refresh }),
 };
 
 /** Événements diffusés par le cœur à toutes les fenêtres (F11). */

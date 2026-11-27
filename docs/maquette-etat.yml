@@ -354,9 +354,22 @@ pages:
     version: V2
     plans:
       - "plan-v2 (RH1–RH6, lot A)"
+    journal:
+      - "2026-11-27 : Recherche Ctrl+K (plan-v2, lot A) : palette au-dessus de la zone, portée du workspace affiché ; par nom sans casse ni accents (terme surligné, #étiquette, méthode), par adresse (POST /orders, modèle, URL complète collée : correspondance exacte, endpoints de la ressource, tests qui l'appellent) ; ↑ ↓, Entrée, Ctrl+Entrée dans une autre zone, Échap ; raccourci modifiable."
     ecrans:
-      a: { etat: à faire }
-      b: { etat: à faire }
+      a:
+        etat: livré
+        pr: [96]
+        captures: [v2-recherche]
+        ecart:
+          texte: "Les groupes sont Tests, Dossiers, Endpoints, Contrats, Environnements et Projets : « Exigences » (V7), « Mocks et anomalies » (V5, V7) viendront avec leurs versions ; une ligne du pied de la palette rappelle les touches, la portée est à droite du champ."
+          aligner: maquette
+      b:
+        etat: livré
+        pr: [96]
+        ecart:
+          texte: "Les groupes s'appellent « Correspondance exacte », « Endpoints de /orders » et « Tests qui l'appellent » ; un test est cité par son nom et son dossier, pas par son étape."
+          aligner: maquette
   "1.6":
     nom: "Préférences"
     version: [MVP, V1]
@@ -396,7 +409,7 @@ pages:
         pr: [94]
         captures: [v1-raccourcis]
         ecart:
-          texte: "« Rechercher Ctrl+K » n'est pas listé (recherche en V2, 1.5) : l'exemple de conflit de l'écran ne se produit pas, celui de l'application est « Ctrl+J est déjà pris par « Résultat dessous ou à côté » » ; l'application liste aussi « Filtrer le référentiel », « Enregistrer le contrat » et « Gérer les workspaces », et marque « fixe » Ctrl+Tab et Ctrl+0…9."
+          texte: "L'application liste aussi « Filtrer le référentiel », « Enregistrer le contrat » et « Gérer les workspaces », et marque « fixe » Ctrl+Tab et Ctrl+0…9."
           aligner: maquette
       g:
         etat: livré

@@ -109,7 +109,7 @@ src/                    Frontend Vue
                         réponse),
                         contracts (contrats par projet, contrats ouverts), steps (catalogue des
                         étapes, reconnaissance, essai), interface (apparence, raccourcis),
-                        history (historique des envois)
+                        history (historique des envois), search (recherche Ctrl+K)
   composables/          Actions partagées : projets (useProjectActions), onglets (useTabActions),
                         brouillons avant fermeture ou sortie (useDrafts)
   components/ui/        Composants de base : bouton, dialogue, menu, interrupteur, notification,
@@ -154,6 +154,7 @@ src-tauri/              Cœur Rust
   src/statuses.rs       Statut de la dernière exécution de chaque requête (statuses.json)
   src/interface.rs      Préférences d'interface du poste : apparence, raccourcis (interface.json)
   src/history.rs        Historique des envois de chaque requête (projects/<id>/history/)
+  src/search/           Recherche Ctrl+K : par nom, par adresse, groupes (pur)
   src/layout/           Zones, onglets et fenêtres (pur : ni Tauri, ni disque)
   src/contract/         Contrats OpenAPI : lecture, exemples, requêtes créées, conformité ;
                         file.rs range les contrats dans contracts/ du projet ; deduce.rs déduit
@@ -1004,3 +1005,18 @@ Référence : `docs/plan-v1.md` (version 1 : cas AP1 à AP4, RC1 à RC6, H1 à H
   précédent (`changes`) et donne les différences (`history_diff`) ; « Effacer » se rattrape par
   `history_restore`. Interface : `HistoryPanel.vue` (onglet « Historique » de la réponse, horloge
   de la ligne d'état), store `history`.
+
+## Recherche
+
+Référence : `docs/plan-v2.md`, lot A (cas RH1 à RH6, règles R1 à R3), écrans 1.5-a et 1.5-b.
+
+- Le cœur cherche (`src-tauri/src/search/`, pur) : par nom (mots dans le libellé ou l'adresse,
+  sans casse ni accents, `#étiquette`, méthode en capitales) ou par adresse (`POST /orders`,
+  modèle `{id}`, URL complète : un segment variable du contrat vaut tout segment, un segment
+  variable saisi ne vaut qu'un segment variable) ; groupes et rangs stables, 8 par groupe.
+- `search_query` (`commands/search.rs`) lit les projets du workspace (tous pour « Tous les
+  projets ») à l'ouverture de la palette (`refresh`) et les garde (`SearchCache`) ; les
+  frappes suivantes ne relisent rien.
+- Interface : `SearchPalette.vue` (montée par `AppShell`, motif combobox, Entrée, Ctrl+Entrée
+  dans une autre zone, Échap rend le focus), store `search` (150 ms après la dernière frappe, une
+  réponse dépassée est ignorée) ; raccourci « Rechercher » (Ctrl+K) des raccourcis modifiables.

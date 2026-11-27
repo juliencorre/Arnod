@@ -307,6 +307,7 @@ fn visit_all(v: &mut Collect) {
     v.visit::<crate::commands::interface::ShortcutChange>();
     v.visit::<crate::history::HistoryView>();
     v.visit::<crate::history::HistoryDiff>();
+    v.visit::<crate::search::SearchResults>();
 }
 
 /// Contenu attendu de `tests/ipc/coeur.ts`.

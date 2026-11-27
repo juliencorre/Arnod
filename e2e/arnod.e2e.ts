@@ -3170,6 +3170,45 @@ describe("Version 1 - Apparence et raccourcis (1.6-f, 1.6-f bis)", () => {
   });
 });
 
+describe("Version 2 - Recherche Ctrl+K (1.5-a, 1.5-b)", () => {
+  it("Ctrl+K trouve une requête par nom, Entrée l'ouvre", async () => {
+    await browser.execute(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }));
+    });
+    await browser.$(".palette__input").waitForDisplayed({ timeoutMsg: "palette attendue" });
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(".palette__input");
+      if (!input) throw new Error("champ de recherche introuvable");
+      input.value = "lister les comm";
+      input.dispatchEvent(new Event("input"));
+    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll(".palette__label")).some((l) =>
+            l.textContent.includes("Lister les commandes"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "« Lister les commandes » attendu dans les résultats" },
+    );
+    await screenshot(browser, "v2-recherche");
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(".palette__input");
+      input?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    await browser.$(".palette").waitForExist({ reverse: true, timeout: 5_000 });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          Array.from(document.querySelectorAll(".zone__tab")).some((t) =>
+            t.textContent.includes("Lister les commandes"),
+          ),
+        ),
+      { timeout: 10_000, timeoutMsg: "onglet « Lister les commandes » attendu" },
+    );
+  });
+});
+
 describe("Lot K - Vocabulaire et finitions (4.2-c, 5.1-c)", () => {
   const project = () => path.join(sandbox.home, "arnod", "boutique-tests");
   const file = () => path.join(project(), "chrono-k.yml");

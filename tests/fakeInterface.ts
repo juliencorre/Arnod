@@ -33,6 +33,7 @@ const ACTIONS: Record<string, [string, ShortcutGroup, ShortcutScope, boolean]> =
   saveContract: ["Enregistrer le contrat", "request", "contract", true],
   togglePlacement: ["Résultat dessous ou à côté", "window", "global", true],
   toggleSidebar: ["Afficher ou masquer la barre latérale", "window", "global", true],
+  search: ["Rechercher", "window", "global", true],
   nextTab: ["Onglet suivant, précédent", "window", "global", false],
   closeTab: ["Fermer l'onglet", "window", "global", true],
   environments: ["Environnements du projet", "project", "global", true],

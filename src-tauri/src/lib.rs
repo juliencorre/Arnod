@@ -30,6 +30,7 @@ pub mod quit;
 pub mod request;
 pub mod response;
 pub mod results;
+pub mod search;
 pub mod secrets;
 pub mod startup;
 pub mod state;
@@ -69,6 +70,7 @@ pub fn run() {
         // (aucune permission WebView ; clé publique dans `tauri.conf.json`).
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(commands::updates::UpdatesState::default())
+        .manage(commands::search::SearchCache::default())
         .menu(menu::build)
         .on_menu_event(menu::handle_event)
         .setup(|app| {
@@ -309,6 +311,8 @@ pub fn run() {
             commands::history::history_diff,
             commands::history::history_clear,
             commands::history::history_restore,
+            // Version 2 (lot A) : recherche Ctrl+K.
+            commands::search::search_query,
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement d'Arnod")

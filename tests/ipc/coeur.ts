@@ -343,6 +343,14 @@ export type ScriptChoice = "accept" | "replace";
 
 export type ScriptResolved = { report: ImportReport, undoToken: string, };
 
+export type SearchGroup = { title: string, hits: Array<SearchHit>, total: number, };
+
+export type SearchHit = { kind: SearchKind, projectId: string, label: string, detail: string, method: string | null, path: string | null, contract: string | null, highlight: Array<[number, number]>, };
+
+export type SearchKind = "request" | "test" | "folder" | "operation" | "contract" | "environment" | "project";
+
+export type SearchResults = { text: string, address: boolean, groups: Array<SearchGroup>, };
+
 export type SendOutcome = { response: HttpResponse, assertions: Array<AssertionResult>, passed: boolean, slow: boolean, sent: Sent | null, };
 
 export type Sent = { environment: string, method: string, url: string, headers: Array<[string, string]>, body: string | null, drawn: Array<DrawnValue>, used: Array<UsedVariable>, extracted: Array<ExtractedValue>, oauth2: SentToken | null, };
@@ -717,6 +725,10 @@ export type CheckHistoryView = Check<Same<Ipc.HistoryView, HistoryView>>;
 export type CheckDiffPart = Check<Same<Ipc.DiffPart, DiffPart>>;
 export type CheckDiffLine = Check<Same<Ipc.DiffLine, DiffLine>>;
 export type CheckHistoryDiff = Check<Same<Ipc.HistoryDiff, HistoryDiff>>;
+export type CheckSearchKind = Check<Same<Ipc.SearchKind, SearchKind>>;
+export type CheckSearchHit = Check<Same<Ipc.SearchHit, SearchHit>>;
+export type CheckSearchGroup = Check<Same<Ipc.SearchGroup, SearchGroup>>;
+export type CheckSearchResults = Check<Same<Ipc.SearchResults, SearchResults>>;
 
 // Sans homologue généré (écrits seulement côté interface) :
 // - CommandName

@@ -1,6 +1,6 @@
 # Plan - Version 2 : travailler en équipe, jouer les tests hors de l'application
 
-**Version** 0.1 · **Date** 2026-11-27 · **Statut** Brouillon (questions du § 11 à trancher) ·
+**Version** 0.1 · **Date** 2026-11-27 · **Statut** En cours (lot A livré ; questions du § 11 à trancher par lot) ·
 **Base** version 0.0.4 (Develop @46f5d44)
 
 Plan d'implémentation de la **V2** de la maquette : « Les projets sont déjà des fichiers dans Git :
@@ -269,10 +269,10 @@ d'abord (courts, visibles), puis C, D, puis E, F.
 
 **Lot A - Recherche (1.5-a, 1.5-b)**
 
-- [ ] **T1** `search/` : index, normalisation, correspondance d'adresse, tri et groupes (R1 à R3),
+- [x] **T1** `search/` : index, normalisation, correspondance d'adresse, tri et groupes (R1 à R3),
       tests règle par règle.
-- [ ] **T2** `search_query`, types IPC, faux cœur.
-- [ ] **T3** `SearchPalette.vue`, store `search`, action « Rechercher » (Ctrl+K) ; Vitest au
+- [x] **T2** `search_query`, types IPC, faux cœur.
+- [x] **T3** `SearchPalette.vue`, store `search`, action « Rechercher » (Ctrl+K) ; Vitest au
       clavier ; e2e ; 1.6-f bis : écart retiré.
 
 **Lot B - Étiquettes partagées (4.9-b)**

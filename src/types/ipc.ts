@@ -179,7 +179,9 @@ export type CommandName =
   | "history_load"
   | "history_diff"
   | "history_clear"
-  | "history_restore";
+  | "history_restore"
+  // Version 2, lot A : recherche Ctrl+K.
+  | "search_query";
 
 /**
  * Nature d'une erreur de commande.
@@ -2183,4 +2185,48 @@ export interface HistoryDiff {
   previousId: string;
   lines: DiffLine[];
   truncated: boolean;
+}
+
+// --- Version 2, lot A : recherche Ctrl+K (1.5-a, 1.5-b, docs/plan-v2.md) -------------
+
+/** Nature d'un résultat de la recherche (`search::SearchKind`) : ce qu'il ouvre. */
+export type SearchKind =
+  | "request"
+  | "test"
+  | "folder"
+  /** Opération d'un contrat : son endpoint (`path`), sinon son contrat (`contract`). */
+  | "operation"
+  | "contract"
+  | "environment"
+  | "project";
+
+/** Un résultat (`search::SearchHit`). */
+export interface SearchHit {
+  kind: SearchKind;
+  projectId: string;
+  label: string;
+  /** Où il se trouve : « boutique-tests · paiements ». */
+  detail: string;
+  method: string | null;
+  /** Ce qui s'ouvre : requête, test, dossier, contrat, endpoint d'une opération. */
+  path: string | null;
+  /** Contrat d'une opération, ouvert quand elle n'a pas d'endpoint. */
+  contract: string | null;
+  /** Passages du libellé à surligner, en caractères `[début, fin)`. */
+  highlight: [number, number][];
+}
+
+/** Un groupe de résultats (`search::SearchGroup`), au plus 8 montrés. */
+export interface SearchGroup {
+  title: string;
+  hits: SearchHit[];
+  total: number;
+}
+
+/** Résultats d'une saisie (`search::SearchResults`). */
+export interface SearchResults {
+  text: string;
+  /** Recherche par adresse (`POST /orders`, URL) plutôt que par nom. */
+  address: boolean;
+  groups: SearchGroup[];
 }

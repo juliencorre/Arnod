@@ -14,6 +14,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from "vue";
 
 import AppSidebar from "@/components/layout/AppSidebar.vue";
+import SearchPalette from "@/components/layout/SearchPalette.vue";
 import SharedDialogs from "@/components/layout/SharedDialogs.vue";
 import WorkspaceSwitcher from "@/components/layout/WorkspaceSwitcher.vue";
 import ManageScreen from "@/components/manage/ManageScreen.vue";
@@ -166,6 +167,8 @@ const detachHover = ref(false);
       </div>
     </div>
     <SharedDialogs />
+    <!-- Version 2, lot A (1.5) : recherche Ctrl+K. -->
+    <SearchPalette />
   </div>
 </template>
 
