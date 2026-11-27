@@ -58,6 +58,12 @@ pub enum ItemStatus {
     Skipped,
     /// Valeur connue, rangée dans le coffre du système.
     Stored,
+    /// Script retiré du fichier : la requête s'exécute sans lui (« Accepter sans ce script »,
+    /// AM42).
+    Accepted,
+    /// Script retiré du fichier, remplacé par une assertion (« Remplacer par une
+    /// assertion… », AM42).
+    Replaced,
 }
 
 /// Élément signalé par l'import, avec le fichier d'origine.

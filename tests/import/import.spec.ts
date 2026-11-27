@@ -19,6 +19,14 @@ afterEach(() => {
 });
 
 const BRUNO = "/home/julien/bruno/boutique-api";
+/** Choix par défaut de la fenêtre (AM41) : chaque environnement garde son nom, secrets au coffre. */
+const OPTIONS = {
+  environments: [
+    { from: "Local", to: "Local" },
+    { from: "Recette", to: "Recette" },
+  ],
+  secretsLocal: true,
+};
 
 async function clickButton(app: AppWrapper, selector: string, text: string): Promise<void> {
   const found = app.findAll(`${selector} button`).find((b) => b.text().trim() === text);
@@ -60,6 +68,7 @@ describe("importer (2.3-a)", () => {
     expect(core.calls.find((c) => c.cmd === "import_run")?.args).toEqual({
       path: BRUNO,
       target: { kind: "newProject", location: null, workspaceId: null },
+      options: OPTIONS,
     });
     expect(wrapper.find("dialog[open]").exists()).toBe(false);
     expect(core.calls.find((c) => c.cmd === "layout_open_selection")?.args).toEqual({
@@ -106,6 +115,8 @@ describe("importer (2.3-a)", () => {
       name: "partenaires-v2",
       counts: { ...brunoSource().counts, requests: 0 },
       files: 0,
+      environments: [],
+      secrets: [],
     };
     core.imports.picked = path;
     wrapper = await mountApp();
@@ -188,6 +199,7 @@ describe("reprendre l'existant (2.3-b)", () => {
     expect(core.calls.find((c) => c.cmd === "import_run")?.args).toEqual({
       path: BRUNO,
       target: { kind: "project", projectId: BOUTIQUE_TESTS },
+      options: OPTIONS,
     });
     expect(core.calls.filter((c) => c.cmd === "tree_load").length).toBeGreaterThan(1);
     expect(app.get(".report h1").text()).toContain("dans boutique-tests, dossier « Boutique API »");
@@ -208,6 +220,7 @@ describe("reprendre l'existant (2.3-b)", () => {
     expect(core.calls.find((c) => c.cmd === "import_run")?.args).toEqual({
       path: BRUNO,
       target: { kind: "newProject", location: null, workspaceId: BOUTIQUE },
+      options: OPTIONS,
     });
   });
 });

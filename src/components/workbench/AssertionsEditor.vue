@@ -5,7 +5,7 @@
  */
 import BaseButton from "@/components/ui/BaseButton.vue";
 import RowRemoveButton from "@/components/ui/RowRemoveButton.vue";
-import { OPERATORS } from "@/lib/assertions";
+import { OPERATORS, manualAssertion } from "@/lib/assertions";
 import type { Assertion, AssertionOperator, AssertionResult, Scalar } from "@/types/ipc";
 
 const props = defineProps<{ linked: boolean; results: AssertionResult[] | null }>();
@@ -68,14 +68,7 @@ function setValue(index: number, text: string): void {
 }
 
 function add(): void {
-  assertions.value.push({
-    id: `manuelle-${crypto.randomUUID().slice(0, 8)}`,
-    target: "status",
-    operator: "equals",
-    value: 200,
-    origin: "manual",
-    enabled: true,
-  });
+  assertions.value.push(manualAssertion());
 }
 
 function remove(index: number): void {

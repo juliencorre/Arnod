@@ -108,6 +108,9 @@ export type CommandName =
   | "import_detect"
   | "import_run"
   | "import_report"
+  // Lot F de l'alignement : scripts Bruno repris (2.3-f, AM42).
+  | "import_script"
+  | "import_script_undo"
   // Lot E : tests et étapes (docs/plan-mvp-e-tests-etapes.md).
   | "test_read"
   | "tree_create_test"
@@ -1329,6 +1332,37 @@ export interface ImportSource {
   counts: ImportCounts;
   /** Fichiers `.bru` lus. */
   files: number;
+  /** Environnements de la collection (Bruno), dans son ordre (2.3-b, AM41). */
+  environments: SourceEnvironment[];
+  /**
+   * Variables partagées dont le nom ressemble à un secret (jeton, mot de passe, clé d'API…) :
+   * avec `secretsLocal`, elles deviennent des variables locales, valeur au coffre.
+   */
+  secrets: string[];
+}
+
+/** Environnement d'une collection, tel que l'import le reprendra (2.3-b, AM41). */
+export interface SourceEnvironment {
+  name: string;
+  /** Noms de ses variables actives, partagées et locales. */
+  variables: string[];
+}
+
+/** Choix de la fenêtre « Importer » (2.3-b, AM41). Équivalent Rust : `import::ImportOptions`. */
+export interface ImportOptions {
+  /**
+   * Environnement du projet qui reçoit chaque environnement de la collection ; un environnement
+   * sans choix garde son nom (complété s'il existe, sinon créé).
+   */
+  environments: EnvironmentChoice[];
+  /** Valeurs qui ressemblent à des secrets en variables locales, au coffre du système. */
+  secretsLocal: boolean;
+}
+
+/** Un environnement de la collection (`from`) et celui du projet qui le reçoit (`to`). */
+export interface EnvironmentChoice {
+  from: string;
+  to: string;
 }
 
 /** Destination d'un import (`ImportTarget`). */
@@ -1349,8 +1383,12 @@ export type ImportItemKind =
   | "extraction"
   | "option";
 
-/** Suite à donner à un élément du rapport (`ItemStatus`). */
-export type ImportItemStatus = "notRun" | "toFill" | "toCheck" | "skipped" | "stored";
+/**
+ * Suite à donner à un élément du rapport (`ItemStatus`) ; `accepted` et `replaced` : script
+ * retiré du fichier, sans lui ou remplacé par une assertion (AM42).
+ */
+export type ImportItemStatus =
+  "notRun" | "toFill" | "toCheck" | "skipped" | "stored" | "accepted" | "replaced";
 
 /** Élément signalé par l'import, avec son fichier d'origine. */
 export interface ImportReportItem {
@@ -1413,6 +1451,15 @@ export interface ImportDone {
   report: ImportReport | null;
   /** Contrat ajouté (OpenAPI), relatif au projet. */
   contract: string | null;
+}
+
+/** Suite donnée à un script Bruno du rapport (2.3-f, AM42). Équivalent Rust : `ScriptChoice`. */
+export type ScriptChoice = "accept" | "replace";
+
+/** Réponse de `import_script` : le rapport à jour et le jeton de « Annuler ». */
+export interface ScriptResolved {
+  report: ImportReport;
+  undoToken: string;
 }
 
 // ---------------------------------------------------------------------------

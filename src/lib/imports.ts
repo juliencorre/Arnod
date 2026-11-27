@@ -32,6 +32,8 @@ export const STATUS_LABELS: Record<ImportItemStatus, string> = {
   toCheck: "à vérifier",
   skipped: "non importé",
   stored: "au coffre",
+  accepted: "repris",
+  replaced: "remplacé",
 };
 
 /** Phrase de tête de « Après · dans Arnod ». */
@@ -41,7 +43,14 @@ export const STATUS_HEADLINES: Record<ImportItemStatus, string> = {
   toCheck: "Repris, à vérifier.",
   skipped: "Non importé.",
   stored: "Rangé dans le coffre du système.",
+  accepted: "Repris sans ce script.",
+  replaced: "Remplacé par une assertion.",
 };
+
+/** Scripts Bruno (tests, avant la requête, après la réponse) : repris ou remplacés (AM42). */
+export function isScript(item: ImportReportItem): boolean {
+  return item.kind === "tests" || item.kind === "preRequest" || item.kind === "postResponse";
+}
 
 /** Contenu d'origine tel qu'il s'écrit dans le fichier `.bru` (« tests { … } »). */
 export function originalBlock(item: ImportReportItem): string | null {

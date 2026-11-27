@@ -2213,6 +2213,7 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
     const done = (await invoke("import_run", {
       path: source(),
       target: { kind: "newProject", location: path.join(sandbox.home, "arnod"), workspaceId: null },
+      options: { environments: [], secretsLocal: true },
     })) as { projectId: string };
     await invoke("layout_open_selection", {
       content: { kind: "importReport", projectId: done.projectId },
@@ -2241,6 +2242,25 @@ describe("Import d'une collection Bruno (2.3-a, 2.3-f)", () => {
     expect(request).toContain("{{$randomUUID}}");
     expect(readFileSync(path.join(project(), "environments", "recette.yml"), "utf8")).not.toContain(
       "ne-pas-lire",
+    );
+  });
+
+  it("« Accepter sans ce script » retire le script du fichier (2.3-f, AM42)", async () => {
+    const file = path.join(project(), "Commandes", "creer-une-commande.yml");
+    expect(readFileSync(file, "utf8")).toContain("type: tests");
+    await clickText(".report__item", "TESTS");
+    await browser.waitUntil(async () => await browser.$(".report__actions").isExisting(), {
+      timeout: 5_000,
+      timeoutMsg: "actions du script attendues",
+    });
+    await screenshot(browser, "c1b-script-a-reprendre");
+    await clickText(".report__actions button", "Accepter sans ce script");
+    await browser.waitUntil(() => !readFileSync(file, "utf8").includes("type: tests"), {
+      timeout: 5_000,
+      timeoutMsg: "script retiré du fichier attendu",
+    });
+    expect(await browser.$(".report__item[aria-pressed='true'] .report__status").getText()).toBe(
+      "repris",
     );
   });
 });

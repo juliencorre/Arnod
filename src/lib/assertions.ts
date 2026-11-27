@@ -36,6 +36,18 @@ export const OPERATORS: { id: AssertionOperator; label: string }[] = [
   { id: "notMatches", label: "ne correspond pas à l'expression (non évaluée)" },
 ];
 
+/** Assertion ajoutée à la main (« + Assertion ») : le statut 200, à modifier. */
+export function manualAssertion(): Assertion {
+  return {
+    id: `manuelle-${crypto.randomUUID().slice(0, 8)}`,
+    target: "status",
+    operator: "equals",
+    value: 200,
+    origin: "manual",
+    enabled: true,
+  };
+}
+
 /** « responseTime inférieur à 500 ms » : l'assertion de durée, sans le « est » du menu (5.1-c). */
 export function durationLabel(assertion: Assertion): string {
   const label = OPERATORS.find((o) => o.id === assertion.operator)?.label ?? assertion.operator;

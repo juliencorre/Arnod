@@ -28,6 +28,8 @@ export const useSidebarStore = defineStore("sidebar", () => {
   /** Dernière réponse attendue ouverte depuis la barre latérale, mise en évidence (E3). */
   const shownExample = ref<ExampleFocus | null>(null);
   const contractCounts = ref<Record<string, number>>({});
+  /** Requête à ouvrir sur une nouvelle assertion (« Remplacer par une assertion… », AM42). */
+  const assertionFocus = ref<string | null>(null);
 
   function filterOf(projectId: string): string {
     return filters.value[projectId] ?? "";
@@ -58,6 +60,19 @@ export const useSidebarStore = defineStore("sidebar", () => {
     if (exampleFocus.value?.key === key) exampleFocus.value = null;
   }
 
+  /**
+   * Ouvre la requête sur l'onglet « Assertions », une assertion ajoutée à compléter (2.3-f,
+   * AM42) ; servie par l'éditeur de la requête.
+   */
+  async function openNewAssertion(projectId: string, path: string): Promise<void> {
+    assertionFocus.value = requestKey(projectId, path);
+    await useWorkbenchStore().openRequest(projectId, path);
+  }
+
+  function consumeAssertionFocus(key: string): void {
+    if (assertionFocus.value === key) assertionFocus.value = null;
+  }
+
   /** Lit le nombre de contrats d'un projet, pour sa carte (W1). */
   async function loadContractCount(projectId: string): Promise<void> {
     contractCounts.value[projectId] = await ipc.contractCount(projectId);
@@ -75,6 +90,9 @@ export const useSidebarStore = defineStore("sidebar", () => {
     setSectionOpen,
     openExample,
     consumeExampleFocus,
+    assertionFocus,
+    openNewAssertion,
+    consumeAssertionFocus,
     loadContractCount,
   };
 });

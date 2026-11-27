@@ -5,7 +5,15 @@ import { ipc } from "@/lib/ipc";
 import { useCatalogStore } from "@/stores/catalog";
 import { useToastStore } from "@/stores/toasts";
 import { useWindowsStore } from "@/stores/windows";
-import type { ImportDone, ImportReport, ImportSource, ImportTarget } from "@/types/ipc";
+import { useWorkbenchStore } from "@/stores/workbench";
+import type {
+  ImportDone,
+  ImportOptions,
+  ImportReport,
+  ImportSource,
+  ImportTarget,
+  ScriptChoice,
+} from "@/types/ipc";
 
 /** Fenêtre « Importer » : projet ouvert (destination proposée) et workspace courant. */
 export interface ImportDialogState {
@@ -66,9 +74,16 @@ export const useImportStore = defineStore("imports", () => {
     }
   }
 
-  /** Importe ; le catalogue et le rapport sont mis à jour. */
-  async function run(path: string, target: ImportTarget): Promise<ImportDone> {
-    const done = await ipc.importRun(path, target);
+  /**
+   * Importe avec les choix de la fenêtre (environnements, secrets : AM41) ; le catalogue et le
+   * rapport sont mis à jour.
+   */
+  async function run(
+    path: string,
+    target: ImportTarget,
+    options: ImportOptions,
+  ): Promise<ImportDone> {
+    const done = await ipc.importRun(path, target, options);
     if (done.snapshot) catalog.apply(done.snapshot);
     if (done.report) reports.value[done.projectId] = done.report;
     return done;
@@ -81,10 +96,44 @@ export const useImportStore = defineStore("imports", () => {
     return report;
   }
 
+  /**
+   * Reprend le script Bruno de l'élément `index` (2.3-f, AM42) : le cœur le retire du fichier et
+   * marque l'élément ; la requête ouverte est relue. « Annuler » dans la notification le remet.
+   */
+  async function resolveScript(
+    projectId: string,
+    index: number,
+    choice: ScriptChoice,
+  ): Promise<ImportReport> {
+    const workbench = useWorkbenchStore();
+    const resolved = await ipc.importScript(projectId, index, choice);
+    reports.value[projectId] = resolved.report;
+    const request = resolved.report.items[index]?.request ?? null;
+    const reread = async (): Promise<void> => {
+      if (request !== null) await workbench.reloadOpened(projectId, [request]);
+    };
+    await reread();
+    toasts.show(
+      choice === "accept"
+        ? "Script retiré du fichier : la requête s'exécute sans lui."
+        : "Script retiré du fichier : complétez l'assertion qui le remplace.",
+      {
+        action: {
+          label: "Annuler",
+          run: async () => {
+            reports.value[projectId] = await ipc.importScriptUndo(resolved.undoToken);
+            await reread();
+          },
+        },
+      },
+    );
+    return resolved.report;
+  }
+
   /** Ouvre l'onglet du rapport d'import d'un projet. */
   async function openReport(projectId: string): Promise<void> {
     await windows.openSelection({ kind: "importReport", projectId });
   }
 
-  return { dialog, reports, open, close, pick, choose, run, load, openReport };
+  return { dialog, reports, open, close, pick, choose, run, load, resolveScript, openReport };
 });

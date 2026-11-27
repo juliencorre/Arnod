@@ -163,7 +163,7 @@ La chaîne reste : composant Vue → store Pinia → `src/lib/ipc.ts` → comman
 - `environment::create_with` : adresse de base, variables reprises (sans les secrets), place dans la
   chaîne (lot D).
 - `import` : correspondance des environnements et choix des secrets dans `ImportOptions` ;
-  `import_accept_script` et `import_replace_script` (lot F).
+  `import_script` (accepter ou remplacer) et `import_script_undo` (lot F).
 
 ### 6.3 Commandes IPC
 
@@ -174,8 +174,8 @@ La chaîne reste : composant Vue → store Pinia → `src/lib/ipc.ts` → comman
 | `tree_reorder`            | `projectId`, `folder`, `order: string[]`      | `TreeView`         | E   |
 | `environment_create`      | + `baseUrl`, `copyFrom`, `after`, `protected` | `EnvironmentsView` | D   |
 | `import_run`              | + `environments: map`, `secretsLocal: bool`   | `ImportReport`     | F   |
-| `import_accept_script`    | `projectId`, `item`                           | `ImportReport`     | F   |
-| `import_replace_script`   | `projectId`, `item`, `assertion`              | `ImportReport`     | F   |
+| `import_script`           | `projectId`, `index`, `choice`                | `ScriptResolved`   | F   |
+| `import_script_undo`      | `undoToken`                                   | `ImportReport`     | F   |
 
 ### 6.4 Frontend
 
@@ -246,9 +246,12 @@ pull request dit après laquelle la fusionner. Ordre, avec les lots de `plan-qua
 
 **Lot F - Import** (`claude/alignement-f-import`)
 
-- [ ] **T15** AM40 : « Importer… » d'« Ajouter des projets » par l'import unique.
-- [ ] **T16** AM41 : environnements et secrets à l'import.
-- [ ] **T17** AM42 : scripts Bruno remplacés ou acceptés.
+- [x] **T15** AM40 : « Importer… » d'« Ajouter des projets » par l'import unique.
+- [x] **T16** AM41 : environnements et secrets à l'import (`ImportSource.environments` et
+      `secrets`, `ImportOptions` passé à `import_run`).
+- [x] **T17** AM42 : scripts Bruno remplacés ou acceptés. Une seule commande `import_script`
+      (`choice` : `accept` ou `replace`) au lieu de deux, et `import_script_undo` pour « Annuler » ;
+      l'assertion s'ajoute dans l'éditeur de la requête, qui s'ouvre sur l'onglet « Assertions ».
 
 ## 9. Critères d'acceptation
 
