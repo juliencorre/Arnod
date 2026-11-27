@@ -208,7 +208,7 @@ pages:
       - "2026-11-26 : a bis, e : « + Nouvel environnement » en couleur de lien ; champ de filtre sans bouton natif (plan-alignement-maquette, lot B, AM17, AM18)."
       - "2026-11-26 : Sélection multiple et réponse attendue ouverte en fond accent doux, sans barre sur le côté ; opération sans requête estompée par la couleur (a quater, 3.2-a3, Impeccable DI2, DI4, PR #85)."
       - "2026-11-26 : a : nom coupé avec son infobulle, ⋯ au survol et au focus, qui rend sa place au nom ; l'arbre se parcourt aux flèches (Début, Fin, F2, Suppr, Maj+F10), un seul arrêt de tabulation ; lignes d'un contrat nommées par leur texte visible (plan-qualite-mvp, lot H, T25 : AC1, AC9, DE5)."
-      - "2026-11-27 : d bis : « Plus » en dernière ligne du projet, les sections masquées avec leur raison d'être et « Afficher » ; « Templates » s'affiche seule au premier template (plan-v4, lot G)."
+      - "2026-11-27 : d bis : « Plus » en dernière ligne du projet, les sections masquées avec leur raison d'être et « Afficher » ; « Templates » s'affiche seule au premier template (plan-v4, lot G, PR #97)."
     ecrans:
       "0": { etat: remplacé }
       a:
@@ -243,6 +243,7 @@ pages:
           aligner: à décider
       "d bis":
         etat: en partie
+        pr: [97]
         version: V4
         captures: [v4-plus]
         ecart:
@@ -563,7 +564,7 @@ pages:
       b:
         etat: livré
         version: MVP
-        pr: [50]
+        pr: [50, 97]
         ecart:
           texte: "« 7 scripts gardés dans les fichiers, exécutés à l'envoi » au lieu de « deviendront des étapes Script » : un script Bruno reste dans son fichier et s'exécute à chaque envoi (V4, R10), il ne devient pas une étape."
           aligner: maquette
@@ -634,7 +635,7 @@ pages:
       - "2026-11-26 : Comparée à l'application (captures e2e et aperçu du 26 novembre) : 5 écarts ajoutés, 3 réécrits ou complétés."
       - "2026-11-26 : c : « La requête « … » devient l'étape 1 d'un nouveau test du référentiel. », assertions accordées (plan-alignement-maquette, lot A, AM8)."
       - "2026-11-26 : a, a2 : en-tête de l'éditeur sur une rangée, Nom, Description et Étiquettes sur une rangée (plan-alignement-maquette, lot B, AM25)."
-      - "2026-11-27 : d : « Transférer vers les templates » dans « Requête au point ? » : les valeurs écrites en dur deviennent des paramètres (plan-v4, lot F, TP6)."
+      - "2026-11-27 : d : « Transférer vers les templates » dans « Requête au point ? » : les valeurs écrites en dur deviennent des paramètres (plan-v4, lot F, TP6, PR #97)."
     ecrans:
       a:
         etat: livré
@@ -676,6 +677,7 @@ pages:
           aligner: à décider
       d:
         etat: livré
+        pr: [97]
         version: V4
         ecart:
           texte: "Sans capture de l'application (couvert par Vitest). « Transférer vers les templates » est un bouton de « Requête au point ? », sous une requête d'un projet (pas dans « Non classés ») ; une fenêtre propose le nom, « Ranger dans » et les valeurs écrites en dur (adresse, en-têtes, paramètres, corps), à cocher pour en faire des paramètres ; la requête d'origine reste telle quelle."
@@ -869,11 +871,11 @@ pages:
       - "2026-11-26 : a, b, c : barre des étapes sur une rangée qui défile ; échec affiché une fois dans un panneau dépliable, « Ignorer pour ce résultat » ; note du coffre lisible (plan-qualite-mvp, lot I, DE8, DE10, ER3, DE2)."
       - "2026-11-26 : b bis : un clic sur une valeur du corps propose « Extraire dans une variable », la valeur extraite est marquée « → nom » (plan-alignement-maquette, lot C, AM32)."
       - "2026-11-27 : b bis : la portée d'une extraction se choisit, « le test » ou « l'environnement » (variable locale de l'environnement de l'envoi) ; écrite dans variable.scope (plan-alignement-maquette, lot G, AM44)."
-      - "2026-11-27 : a : « Si une étape échoue » sous la liste (Arrêter le test, Continuer), ⋮⋮ réordonne les étapes ; l'onglet du test est celui des tests en schéma, en liste (plan-v4, R5)."
+      - "2026-11-27 : a : « Si une étape échoue » sous la liste (Arrêter le test, Continuer), ⋮⋮ réordonne les étapes ; l'onglet du test est celui des tests en schéma, en liste (plan-v4, R5, PR #97)."
     ecrans:
       a:
         etat: livré
-        pr: [27, 51]
+        pr: [27, 51, 97]
         captures: [21-test-reussi, 22-test-arrete]
         ecart:
           - texte: "« Si une étape échoue » est une liste sous les étapes (Arrêter le test, Continuer), pas un réglage dans un panneau ; pas de campagnes sous la liste (V7)."
@@ -909,10 +911,11 @@ pages:
     liees: ["4.2", "4.4"]
     reste: "étape SOAP (f, V5) ; étapes IHM (h, i, V6) ; ajouter une nature depuis le catalogue (catalogue synchronisé)."
     journal:
-      - "2026-11-27 : Tests en schéma (plan-v4, lots A à C) : un même test en liste ou en schéma, conditions, boucles, attentes, variables, script JavaScript isolé, test existant et template ; « + » sur un lien ou dépôt depuis la palette insère une étape « à configurer », annulable ; après exécution, chemin suivi et valeurs sur les liens ; schéma écrit dans extensions.arnod.tests."
+      - "2026-11-27 : Tests en schéma (plan-v4, lots A à C) : un même test en liste ou en schéma, conditions, boucles, attentes, variables, script JavaScript isolé, test existant et template ; « + » sur un lien ou dépôt depuis la palette insère une étape « à configurer », annulable ; après exécution, chemin suivi et valeurs sur les liens ; schéma écrit dans extensions.arnod.tests (PR #97)."
     ecrans:
       a:
         etat: livré
+        pr: [97]
         version: V4
         captures: [v4-test-liste]
         ecart:
@@ -920,6 +923,7 @@ pages:
           aligner: maquette
       b:
         etat: livré
+        pr: [97]
         version: V4
         captures: [v4-test-schema]
         ecart:
@@ -927,6 +931,7 @@ pages:
           aligner: maquette
       "b bis":
         etat: livré
+        pr: [97]
         version: V4
         captures: [v4-inserer]
         ecart:
@@ -934,12 +939,14 @@ pages:
           aligner: maquette
       "b ter":
         etat: livré
+        pr: [97]
         version: V4
         ecart:
           texte: "Sans capture (le glisser-déposer HTML ne se pilote pas par WebDriver ; couvert par Vitest). L'exemple glisse SOAP (V5) : seules les natures livrées se glissent."
           aligner: maquette
       "b quater":
         etat: livré
+        pr: [97]
         version: V4
         captures: [v4-insere]
         ecart:
@@ -947,6 +954,7 @@ pages:
           aligner: maquette
       c:
         etat: livré
+        pr: [97]
         version: V4
         captures: [v4-etape-choisie]
         ecart:
@@ -954,6 +962,7 @@ pages:
           aligner: maquette
       d:
         etat: livré
+        pr: [97]
         version: V4
         captures: [v4-test-schema]
         ecart:
@@ -963,6 +972,7 @@ pages:
             aligner: à décider
       e:
         etat: livré
+        pr: [97]
         version: V4
         ecart:
           texte: "Le choix ne propose que les natures livrées : REST, Script, Condition, Boucle, Attente, Variable, Test existant, Template (SOAP en V5, IHM en V6) ; la saisie filtre, Entrée choisit."
@@ -970,6 +980,7 @@ pages:
       f: { etat: à faire, version: V5 }
       g:
         etat: livré
+        pr: [97]
         version: V4
         captures: [v4-etape-script]
       h: { etat: à faire, version: V6 }
@@ -1032,33 +1043,39 @@ pages:
     reste: "fichier Excel (a bis) ; « Créer une anomalie » pour un cas (b, V7)."
     journal:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
-      - "2026-11-27 : Jeux de données (plan-v4, lot D) : onglet « Données », tableau ou fichier CSV du projet lié par une étiquette, requête jouée une fois par cas, résultat par cas sous la réponse et dans le run."
-      - "2026-11-27 : Avant / Après d'un dossier (plan-v4, lot E) : quatre phases d'étapes, « Avant » en échec : tests non joués, « Après » joué quand même."
+      - "2026-11-27 : Jeux de données (plan-v4, lot D) : onglet « Données », tableau ou fichier CSV du projet lié par une étiquette, requête jouée une fois par cas, résultat par cas sous la réponse et dans le run (PR #97)."
+      - "2026-11-27 : Avant / Après d'un dossier (plan-v4, lot E) : quatre phases d'étapes, « Avant » en échec : tests non joués, « Après » joué quand même (PR #97)."
     ecrans:
       a:
         etat: livré
+        pr: [97]
         captures: [v4-donnees]
       "a bis":
         etat: en partie
+        pr: [97]
         ecart:
           texte: "Fichier CSV seulement : un classeur Excel (.xlsx) n'est pas lu (aucune bibliothèque ajoutée, hors périmètre du plan V4) ; un CSV se modifie dans Excel et un fichier lié par data-file: est relu à chaque envoi ; « Fichier CSV… » range une copie dans données/."
           aligner: à décider
       b:
         etat: livré
+        pr: [97]
         captures: [v4-cas]
         ecart:
           texte: "Pas de « Créer une anomalie » pour un cas (anomalies en V7) ; le résultat par cas est une barre sous la réponse, avec ses flèches."
           aligner: maquette
       "b bis":
         etat: livré
+        pr: [97]
       c:
         etat: livré
+        pr: [97]
         captures: [v4-avant-apres]
         ecart:
           texte: "Natures d'une étape d'Avant / Après : requête, test existant, script, variable, template (SOAP en V5) ; « + Avant / Après » ouvre les phases d'un dossier qui n'en a pas ; une étape non jouée dit « — Non joué »."
           aligner: maquette
       "c bis":
         etat: livré
+        pr: [97]
   "4.8":
     nom: "Templates"
     version: V4
@@ -1067,22 +1084,26 @@ pages:
     liees: ["3.2", "4.2"]
     journal:
       - "2026-11-17 : Redessiné selon plan-qualite-mvp (maquette de référence) : cases, radios et interrupteurs au bord de contrôle (#8f8a83) (DE4)."
-      - "2026-11-27 : Propriétés d'un dossier et templates (plan-v4, lots E et F) : propriétés avec leur origine ; template créé depuis un dossier (paramètres détectés, dossier remplacé par une utilisation), ses paramètres, son contenu et ses utilisations ; une utilisation ne règle que les valeurs."
+      - "2026-11-27 : Propriétés d'un dossier et templates (plan-v4, lots E et F) : propriétés avec leur origine ; template créé depuis un dossier (paramètres détectés, dossier remplacé par une utilisation), ses paramètres, son contenu et ses utilisations ; une utilisation ne règle que les valeurs (PR #97)."
     ecrans:
       a:
         etat: livré
+        pr: [97]
         captures: [v4-proprietes]
         ecart:
           texte: "La vue garde « + Test », « + Sous-dossier » et « ▶ Exécuter le dossier » à côté de « ◇ Créer un template de ce dossier » ; une nouvelle propriété se nomme sur place, sur sa ligne, puis « Ajouter »."
           aligner: maquette
       b:
         etat: livré
+        pr: [97]
         captures: [v4-creer-template]
       c:
         etat: livré
+        pr: [97]
         captures: [v4-template]
       d:
         etat: livré
+        pr: [97]
         captures: [v4-utilisation]
   "4.9":
     nom: "Étiquettes"
