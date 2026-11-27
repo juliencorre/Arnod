@@ -169,6 +169,12 @@ fn files(root: &Path) -> Vec<EnvFile> {
 
 /// Environnements du projet dans l'ordre de la chaîne ; ceux qui n'y figurent
 /// pas suivent par nom. Un fichier illisible ou non conforme est ignoré.
+/// Environnement lu depuis le texte d'un fichier (version venue de Git, V2 lot E).
+pub fn parse_text(text: &str) -> Option<Environment> {
+    let value = crate::opencollection::yaml::parse(text).ok()?;
+    from_value(&value, false)
+}
+
 pub fn list(root: &Path) -> Vec<Environment> {
     let order = collection::read_meta(root).environment_order;
     let mut found: Vec<Environment> = files(root).into_iter().map(|f| f.environment).collect();

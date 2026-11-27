@@ -131,6 +131,7 @@ const COMMAND_ERROR_KINDS: Record<CommandErrorKind, true> = {
   secretStore: true,
   protectedEnvironment: true,
   changedOnDisk: true,
+  conflict: true,
 };
 
 /** Indique si la cause d'un rejet est une `CommandError` renvoyée par le cœur natif. */

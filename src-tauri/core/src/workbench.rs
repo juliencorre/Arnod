@@ -471,16 +471,23 @@ pub trait Spawner: Send + Sync {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TokioSpawner;
 
-impl Spawner for TokioSpawner {
-    fn spawn(&self, task: Task) {
-        static RUNTIME: OnceLock<Option<tokio::runtime::Runtime>> = OnceLock::new();
-        let runtime = RUNTIME.get_or_init(|| {
+/// Runtime tokio propre au cœur, créé au premier besoin : runs hors de l'application, échanges
+/// du transport Git (appelés depuis un fil sans runtime, V2 lot E).
+pub fn core_runtime() -> Option<&'static tokio::runtime::Runtime> {
+    static RUNTIME: OnceLock<Option<tokio::runtime::Runtime>> = OnceLock::new();
+    RUNTIME
+        .get_or_init(|| {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
                 .ok()
-        });
-        match runtime {
+        })
+        .as_ref()
+}
+
+impl Spawner for TokioSpawner {
+    fn spawn(&self, task: Task) {
+        match core_runtime() {
             Some(runtime) => {
                 runtime.spawn(task);
             }

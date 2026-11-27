@@ -13,10 +13,14 @@ publish = false
 name = "arnod_core"
 
 [features]
-default = ["coffre"]
+default = ["coffre", "sync"]
 # Coffre du système (keyring). Retiré de l'exécutable `arnod` lié statiquement sous Linux (V2,
 # lot D, R16 : pas de D-Bus sur un agent ; les variables passent par `ARNOD_VAR_<nom>`).
 coffre = ["dep:keyring"]
+# Synchronisation Git (V2, lot E) : libgit2 compilé avec Arnod, sans HTTPS ni SSH propres ; le
+# transport HTTPS passe par `network::Network` (proxy et autorités du poste, R9). Retirée de la
+# ligne de commande.
+sync = ["dep:git2"]
 # Miroir IPC (MA1) : dérivation ts-rs des types sérialisés, activée par les tests de l'application
 # (`ts_mirror.rs`) ; rien n'entre dans l'application ni dans la ligne de commande.
 ts = ["dep:ts-rs"]
@@ -59,6 +63,10 @@ cookie = "0.18"
 # Lot K (5.1-c) : chronométrage de la connexion (`network::phases`).
 tower-layer = "0.3"
 tower-service = "0.3"
+# Lot E (Q1) : bibliothèque Git. Sans ses transports HTTPS (OpenSSL) et SSH : le transport
+# « smart HTTP » est écrit par Arnod sur reqwest (`sync::transport`) ; libgit2 compilé avec Arnod
+# (`vendored-libgit2`), sans bibliothèque du système à installer.
+git2 = { version = "0.21", default-features = false, features = ["vendored-libgit2"], optional = true }
 # Miroir IPC, voir la feature `ts`.
 ts-rs = { version = "12", features = ["serde-json-impl", "uuid-impl"], optional = true }
 

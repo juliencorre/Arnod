@@ -69,7 +69,7 @@ export type CliShell = "powerShell" | "sh";
 
 export type CommandError = { kind: CommandErrorKind, message: string, failure?: NetworkFailure, };
 
-export type CommandErrorKind = "invalidName" | "nameTaken" | "folderNotEmpty" | "alreadyRegistered" | "notAProject" | "notFound" | "undoExpired" | "io" | "corruptState" | "newerVersion" | "unknownVariable" | "invalidRequest" | "network" | "timeout" | "cancelled" | "secretStore" | "protectedEnvironment" | "changedOnDisk";
+export type CommandErrorKind = "invalidName" | "nameTaken" | "folderNotEmpty" | "alreadyRegistered" | "notAProject" | "notFound" | "undoExpired" | "io" | "corruptState" | "newerVersion" | "unknownVariable" | "invalidRequest" | "network" | "timeout" | "cancelled" | "secretStore" | "protectedEnvironment" | "changedOnDisk" | "conflict";
 
 export type ConflictItem = { key: string, label: string, disk: string | null, draft: string | null, identical: boolean, suggested: ConflictSide | null, };
 

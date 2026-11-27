@@ -212,7 +212,8 @@ export type CommandErrorKind =
   | "cancelled" // Exécution annulée par l'utilisateur.
   | "secretStore" // Le coffre du système est indisponible.
   | "protectedEnvironment" // Envoi sur un environnement protégé sans confirmation.
-  | "changedOnDisk"; // Fichier modifié hors d'Arnod depuis sa lecture, rien n'est écrasé (lot I).
+  | "changedOnDisk" // Fichier modifié hors d'Arnod depuis sa lecture, rien n'est écrasé (lot I).
+  | "conflict"; // Synchronisation : un élément changé des deux côtés attend un choix (V2, E et F).
 
 /**
  * Erreur renvoyée par une commande Rust qui échoue : la promesse d'`invoke` est

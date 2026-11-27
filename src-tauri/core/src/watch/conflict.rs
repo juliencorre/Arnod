@@ -346,6 +346,17 @@ pub fn merge(
     draft: &Request,
     choices: &BTreeMap<String, ConflictSide>,
 ) -> Result<Request, String> {
+    merge_keeping(disk, draft, choices, &BTreeSet::new())
+}
+
+/// Comme [`merge`], avec des lignes de liste gardées des deux côtés (`both` : « Garder les deux
+/// assertions », V2 lot F) : la ligne du brouillon, puis celle du disque juste après.
+pub fn merge_keeping(
+    disk: &Request,
+    draft: &Request,
+    choices: &BTreeMap<String, ConflictSide>,
+    both: &BTreeSet<String>,
+) -> Result<Request, String> {
     let disk_map = to_value(disk);
     let mut merged = to_value(draft);
     let disk_elements = elements(&disk_map);
@@ -354,7 +365,7 @@ pub fn merge(
     for key in keys {
         let differs =
             disk_elements.get(key).map(|(_, v)| v) != draft_elements.get(key).map(|(_, v)| v);
-        if differs && !choices.contains_key(key) {
+        if differs && !choices.contains_key(key) && !both.contains(key) {
             return Err(
                 "Le fichier a encore changé sur le disque : revoyez les différences avant d'appliquer."
                     .to_owned(),
@@ -377,12 +388,20 @@ pub fn merge(
         for (key, _, item) in &draft_lines {
             if !from_disk(key) {
                 out.push(item.clone());
+                if both.contains(key)
+                    && let Some((_, _, theirs)) = disk_lines.iter().find(|(k, _, _)| k == key)
+                    && comparable(list, theirs) != comparable(list, item)
+                {
+                    out.push(theirs.clone());
+                }
             } else if let Some((_, _, theirs)) = disk_lines.iter().find(|(k, _, _)| k == key) {
                 out.push(keep_id(list, item, theirs));
             }
         }
         for (key, _, item) in &disk_lines {
-            if from_disk(key) && !draft_lines.iter().any(|(k, _, _)| k == key) {
+            if (from_disk(key) || both.contains(key))
+                && !draft_lines.iter().any(|(k, _, _)| k == key)
+            {
                 out.push(item.clone());
             }
         }

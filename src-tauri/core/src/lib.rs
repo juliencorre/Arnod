@@ -33,6 +33,8 @@ pub mod state;
 pub mod statuses;
 pub mod steps;
 pub mod storage;
+#[cfg(feature = "sync")]
+pub mod sync;
 pub mod tree;
 pub mod trial;
 #[cfg(any(test, feature = "ts"))]

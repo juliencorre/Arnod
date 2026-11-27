@@ -51,6 +51,24 @@ const CONNECT_TIMEOUT_RANGE: (u64, u64) = (1_000, 300_000);
 /// adresse de stockage).
 const DOWNLOAD_REDIRECTS: u32 = 10;
 
+/// Réponse d'un [`Network::raw`] : statut, en-têtes (noms en minuscules), corps.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Exchange {
+    pub status: u16,
+    pub headers: Vec<(String, String)>,
+    pub body: Vec<u8>,
+}
+
+impl Exchange {
+    /// Valeur d'un en-tête, sans casse sur son nom.
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
+    }
+}
+
 pub fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -447,6 +465,82 @@ impl Network {
                 rejection,
             },
         )
+    }
+
+    /// V2, lot E (R9) : un échange HTTP quelconque par le client du poste (proxy, autorités
+    /// internes), pour le transport Git et l'API des forges. Le corps de la réponse est lu en
+    /// entier, au plus `max_bytes` ; le statut est rendu tel quel, même en erreur.
+    pub async fn raw(
+        &self,
+        method: &str,
+        url: &str,
+        headers: &[(String, String)],
+        body: Option<Vec<u8>>,
+        max_bytes: u64,
+    ) -> Result<Exchange, CommandError> {
+        let (client, effective, connect_timeout_ms) = self.client(DOWNLOAD_REDIRECTS)?;
+        let parsed = Url::parse(url).map_err(|_| {
+            CommandError::new(
+                CommandErrorKind::InvalidRequest,
+                format!("L'adresse « {url} » est invalide."),
+            )
+        })?;
+        let host = parsed.host_str().unwrap_or_default().to_ascii_lowercase();
+        let used_proxy = effective.for_url(parsed.scheme(), &host);
+        let started = Instant::now();
+        let millis = || u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let method = reqwest::Method::from_bytes(method.as_bytes()).map_err(|_| {
+            CommandError::new(CommandErrorKind::InvalidRequest, "Méthode HTTP invalide.")
+        })?;
+        let mut request = client.request(method, parsed);
+        for (name, value) in headers {
+            request = request.header(name.as_str(), value.as_str());
+        }
+        if let Some(body) = body {
+            request = request.body(body);
+        }
+        let outcome = async {
+            let mut response = request.send().await?;
+            let status = response.status().as_u16();
+            let headers: Vec<(String, String)> = response
+                .headers()
+                .iter()
+                .map(|(name, value)| {
+                    (
+                        name.as_str().to_owned(),
+                        String::from_utf8_lossy(value.as_bytes()).into_owned(),
+                    )
+                })
+                .collect();
+            let mut bytes = Vec::new();
+            while let Some(chunk) = response.chunk().await? {
+                if (bytes.len() + chunk.len()) as u64 > max_bytes {
+                    return Ok(Err(CommandError::new(
+                        CommandErrorKind::InvalidRequest,
+                        format!(
+                            "La réponse de {host} dépasse {} Mo : elle est refusée.",
+                            max_bytes / (1024 * 1024)
+                        ),
+                    )));
+                }
+                bytes.extend_from_slice(&chunk);
+            }
+            Ok(Ok(Exchange {
+                status,
+                headers,
+                body: bytes,
+            }))
+        };
+        match outcome.await {
+            Ok(result) => result,
+            Err(error) => Err(self.explain(
+                &error,
+                url,
+                used_proxy,
+                connect_timeout_ms,
+                (started, millis()),
+            )),
+        }
     }
 
     /// Lot L (`docs/plan-mvp-l-mises-a-jour.md`, R4) : télécharge `url` en binaire par le client

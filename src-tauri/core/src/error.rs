@@ -56,6 +56,8 @@ pub enum CommandErrorKind {
     ProtectedEnvironment,
     /// Fichier modifié hors d'Arnod depuis sa dernière lecture : rien n'est écrasé (lot I).
     ChangedOnDisk,
+    /// Synchronisation : un élément changé des deux côtés attend un choix (V2, lots E et F).
+    Conflict,
 }
 
 /// Erreur renvoyée par une commande : une nature et un message prêt à afficher.
@@ -117,7 +119,7 @@ mod tests {
     use crate::ts_contract::{serialized_name, union_members};
 
     /// Toutes les natures, à compléter à chaque ajout de variante.
-    const ALL_KINDS: [CommandErrorKind; 18] = [
+    const ALL_KINDS: [CommandErrorKind; 19] = [
         CommandErrorKind::InvalidName,
         CommandErrorKind::NameTaken,
         CommandErrorKind::FolderNotEmpty,
@@ -136,6 +138,7 @@ mod tests {
         CommandErrorKind::SecretStore,
         CommandErrorKind::ProtectedEnvironment,
         CommandErrorKind::ChangedOnDisk,
+        CommandErrorKind::Conflict,
     ];
 
     fn serialized_kind(kind: CommandErrorKind) -> String {
